@@ -1,0 +1,1 @@
+export const projects = ['hero.png','logo.png','logo0.png','logoAmaki.jpeg'];
