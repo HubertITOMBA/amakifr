@@ -1,41 +1,45 @@
 import { Hero } from "@/components/home/Hero";
 import Emblacarousel from "@/components/home/Home-carousel";
 import { Navbar } from "@/components/home/Navbar";
-import ShadCarousel from "@/components/home/shad-carousel";
-import Image from "next/image";
+import { AboutSection } from "@/components/home/AboutSection";
+import { ValuesSection } from "@/components/home/ValuesSection";
+import { EventsSection } from "@/components/home/EventsSection";
+import { TestimonialsSection } from "@/components/home/TestimonialsSection";
+import { NewsletterSection } from "@/components/home/NewsletterSection";
+import { Footer } from "@/components/home/Footer";
 
 export default function Home() {
   return (
-    <main className="max-w-7xl mx-auto sm:px--6 lg:px-8">
-   {/* </main> <main className="mx-auto m-5 font-title text-xl"> */}
-      <Navbar/>
-      <Emblacarousel />
-     {/* <ShadCarousel /> */}
-       <Hero />
-   
-    {/* <div className="py-10 md:grid flex flex-col grid-cols-2 mb-2 3xl:flex"> 
-     <div>
-          
-      </div>
-      <div  className="mt-5 ">
-          MAP ETAIT LA
-      </div>
-    </div>
-
-    <div className="space-y-6 text-center">
-          <h1 className={cn(
-            "text-6xl font-semibold text-white drop-shadow-md", 
-            font.className,
-            )}
-          >
-               🔐   Connexion
-          </h1>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
+      <Navbar />
       
-          <p className="text-white text-lgexit">Amicale des anciens élèves de Kipako depuis (home)</p>
-          <div>
-           
-          </div>
-      </div>       */}
-  </main>
+      {/* Hero Section */}
+      <Hero />
+      
+      {/* Carousel Section */}
+      <section className="py-16 bg-white dark:bg-slate-900">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <Emblacarousel />
+        </div>
+      </section>
+      
+      {/* About Section */}
+      <AboutSection />
+      
+      {/* Values Section */}
+      <ValuesSection />
+      
+      {/* Events Section */}
+      <EventsSection />
+      
+      {/* Testimonials Section */}
+      <TestimonialsSection />
+      
+      {/* Newsletter Section */}
+      <NewsletterSection />
+      
+      {/* Footer */}
+      <Footer />
+    </div>
   );
 }

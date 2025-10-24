@@ -1,109 +1,125 @@
-//import { RainbowButton } from "@/components/ui/rainbow-button";
 import Image from "next/image";
 import Link from "next/link";
 import HeroImage from "@/public/images/logoAmaki.jpeg";
 import { LoginButton } from "../auth/login-button";
 import { Button } from "@/components/ui/button";
- 
+import { ArrowRight, Users, Calendar, Award } from "lucide-react";
 
 export function Hero() {
   return (
-    <section className="relative flex flex-col items-center justify-center py-12 lg:py-20">
-      {/* <div className="text-center">
-        <span className="text-sm text-primary font-medium tracking-tight bg-primary/10 px-4 py-2 rounded-full">
-        Template de Dev Master  1.0
-        </span>
-        <h1 className="mt-8 text-4xl sm:text-6xl md:text-7xl lg:text-8xl font-semibold tracking-tighter">
-              Starter Kit Dev Master Next.js 15.3.0 
-          <span className="block mt-4 bg-gradient-to-l from-blue-500 via-teal-500 to-green-500 text-transparent bg-clip-text">
-          Auth v.5 - Prisma 6.5.0 - Resend
-          </span>
-        </h1>
-
-        <p className="max-w-xl mx-auto mt-4 lg:text-lg text-muted-foreground">
-           Carousel - Login par mail, Google et Github. 2FA
-        </p>
-
-        <div className="mt-7 mb-12">
-          <Link             
-              href="/auth/sign-in"
-              className="-mx-3 block rounded-lg px-3 py-2.5 text-base font-semibold leading-7"
-            >
-                <LoginButton>
-                🔐  Connexion
-                </LoginButton>    
-
-          </Link>
-
-          <LoginButton>
-                <Button variant="default" size="lg" className="w-full text-white font-semibold bg-blue-700 rounded-xl shadow-2xl">
-                    Se connecter
-                </Button> 
-            </LoginButton>
-
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+      {/* Background avec dégradé */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-800" />
+      
+      {/* Éléments décoratifs */}
+      <div className="absolute inset-0">
+        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl animate-pulse delay-500" />
+      </div>
+      
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+          {/* Contenu principal */}
+          <div className="text-white space-y-8">
+            <div className="space-y-4">
+              <div className="inline-flex items-center px-4 py-2 bg-white/10 backdrop-blur-lg rounded-full text-sm font-medium">
+                <span className="w-2 h-2 bg-green-400 rounded-full mr-2 animate-pulse" />
+                Communauté Active
+              </div>
+              
+              <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
+                Bienvenue à 
+                <span className="block bg-gradient-to-r from-yellow-400 to-orange-500 text-transparent bg-clip-text">
+                  AMAKI France
+                </span>
+              </h1>
+              
+              <p className="text-xl lg:text-2xl text-blue-100 leading-relaxed">
+                L'Amicale des Anciens Élèves de Kipako - 
+                <span className="block font-semibold text-white">
+                  Unis par l'excellence, guidés par la solidarité, l'intégation, le respect ...
+                </span>
+              </p>
+            </div>
+            
+            <div className="flex flex-col sm:flex-row gap-4">
+              <LoginButton>
+                <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-8 py-4 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1">
+                  Rejoindre l'AMAKI
+                  <ArrowRight className="ml-2 h-5 w-5" />
+                </Button>
+              </LoginButton>
+              
+              <Button 
+                variant="outline" 
+                size="lg" 
+                className="border-2 border-white/30 text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl backdrop-blur-lg transition-all duration-300"
+              >
+                Découvrir nos Événements
+              </Button>
+            </div>
+            
+            {/* Statistiques */}
+            <div className="grid grid-cols-3 gap-8 pt-8">
+              <div className="text-center">
+                <div className="flex items-center justify-center w-12 h-12 bg-white/10 rounded-lg mx-auto mb-2">
+                  <Users className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-2xl font-bold text-white">500+</div>
+                <div className="text-sm text-blue-200">Membres Actifs</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="flex items-center justify-center w-12 h-12 bg-white/10 rounded-lg mx-auto mb-2">
+                  <Calendar className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-2xl font-bold text-white">10+</div>
+                <div className="text-sm text-blue-200">Années d'Existence</div>
+              </div>
+              
+              <div className="text-center">
+                <div className="flex items-center justify-center w-12 h-12 bg-white/10 rounded-lg mx-auto mb-2">
+                  <Award className="h-6 w-6 text-white" />
+                </div>
+                <div className="text-2xl font-bold text-white">50+</div>
+                <div className="text-sm text-blue-200">Événements</div>
+              </div>
+            </div>
+          </div>
+          
+          {/* Image hero */}
+          <div className="relative">
+            <div className="relative">
+              {/* Cercle décoratif */}
+              <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full blur-2xl opacity-30 animate-pulse" />
+              
+              {/* Image principale */}
+              <div className="relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl">
+                <Image
+                  src={HeroImage}
+                  alt="Logo AMAKI"
+                  className="w-full h-auto rounded-2xl shadow-xl"
+                />
+                
+                {/* Badge flottant */}
+                <div className="absolute -top-4 -right-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg">
+                  Depuis 2016
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
-
-      </div> */}
-
-      <div className="relative items-center w-full py-12 mx-auto mt-12">
-        <svg
-          className="absolute inset-0 -mt-24 blur-3xl"
-          style={{ zIndex: -1 }}
-          fill="none"
-          viewBox="0 0 400 400"
-          height="100%"
-          width="100%"
-          xmlns="http://www.w3.org/2000/svg"
-        >
-          <g clipPath="url(#clip0_10_20)">
-            <g filter="url(#filter0_f_10_20)">
-              <path
-                d="M128.6 0H0V322.2L106.2 134.75L128.6 0Z"
-                fill="#03FFE0"
-              ></path>
-              <path
-                d="M0 322.2V400H240H320L106.2 134.75L0 322.2Z"
-                fill="#7C87F8"
-              ></path>
-              <path
-                d="M320 400H400V78.75L106.2 134.75L320 400Z"
-                fill="#4C65E4"
-              ></path>
-              <path
-                d="M400 0H128.6L106.2 134.75L400 78.75V0Z"
-                fill="#043AFF"
-              ></path>
-            </g>
-          </g>
-          <defs>
-            <filter
-              colorInterpolationFilters="sRGB"
-              filterUnits="userSpaceOnUse"
-              height="720.666"
-              id="filter0_f_10_20"
-              width="720.666"
-              x="-160.333"
-              y="-160.333"
-            >
-              <feFlood floodOpacity="0" result="BackgroundImageFix"></feFlood>
-              <feBlend
-                in="SourceGraphic"
-                in2="BackgroundImageFix"
-                mode="normal"
-                result="shape"
-              ></feBlend>
-              <feGaussianBlur
-                result="effect1_foregroundBlur_10_20"
-                stdDeviation="80.1666"
-              ></feGaussianBlur>
-            </filter>
-          </defs>
-        </svg>
-        <Image
-          src={HeroImage}
-          alt="Hero image"
-          className="relative object-cover w-full border rounded-lg lg:rounded-2xl shadow-2xl"
-        />
+      </div>
+      
+      {/* Scroll indicator */}
+      <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 text-white/60 animate-bounce">
+        <div className="flex flex-col items-center">
+          <span className="text-sm mb-2">Découvrez plus</span>
+          <div className="w-6 h-10 border-2 border-white/30 rounded-full flex justify-center">
+            <div className="w-1 h-3 bg-white/60 rounded-full mt-2 animate-pulse" />
+          </div>
+        </div>
       </div>
     </section>
   );
