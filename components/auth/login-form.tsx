@@ -2,7 +2,8 @@
 
 import { useForm } from 'react-hook-form'
 import { useState, useTransition } from "react";
-import { redirect, useSearchParams } from "next/navigation";
+import { redirect, useSearchParams, useRouter } from "next/navigation";
+import { signIn } from "next-auth/react";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginSchema } from '@/schemas';
@@ -31,6 +32,7 @@ const LoginForm = () => {
     const [ showTwoFactor, setShowTwoFactor ] = useState(false)
 
     const searchParams = useSearchParams();
+    const router = useRouter();
     const callbackUrl = searchParams.get('callbackUrl')
     const urlError = searchParams.get("error") === "OAuthAccountNotLinked"
     ? "E-mail déjà utilisé avec un autre fournisseur !"
@@ -46,21 +48,25 @@ const LoginForm = () => {
 
     const onSubmit = (data: z.infer<typeof LoginSchema>) => {
       console.log(data);
-      startTransition(() => {
-          login(data, callbackUrl)
-              .then((response) => {
-                  if (response?.error){
-                      form.reset()
-                      setError(response?.error)
-                  }
+      startTransition(async () => {
+        try {
+          const result = await signIn("credentials", {
+            email: data.email,
+            password: data.password,
+            redirect: false,
+          });
 
-                  if(response?.twoFactor) {
-                      setShowTwoFactor(true)
-                  }
-                  
-              })
-              .catch(() => setError("Une erreur s'est produite !"))
-      })
+          if (result?.error) {
+            setError("Identifiants non valides!");
+            form.reset();
+          } else if (result?.ok) {
+            // Connexion réussie - redirection automatique
+            window.location.href = callbackUrl || "/";
+          }
+        } catch (error) {
+          setError("Une erreur s'est produite !");
+        }
+      });
     }
 
     if(showTwoFactor){

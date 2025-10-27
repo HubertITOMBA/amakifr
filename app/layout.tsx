@@ -3,9 +3,10 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Navbar } from "@/components/home/Navbar";
 import { Hero } from "@/components/home/Hero";
+
 import { ThemeProvider } from "next-themes";
 import { LoginButton } from "@/components/auth/login-button";
-import { Button } from "react-day-picker";
+import { AuthSessionProvider } from "@/components/providers/session-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -32,17 +33,19 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased`}
       >
-        <ThemeProvider
-           attribute="class"
-           defaultTheme="system"
-           enableSystem
-           disableTransitionOnChange
-        >
-          {/* 
-          <Hero /> */}
-          
-          {children}
-        </ThemeProvider>
+        <AuthSessionProvider>
+          <ThemeProvider
+             attribute="class"
+             defaultTheme="system"
+             enableSystem
+             disableTransitionOnChange
+          >
+            {/* 
+            <Hero /> */}
+            
+            {children}
+          </ThemeProvider>
+        </AuthSessionProvider>
       </body>
     </html>
   );

@@ -13,7 +13,6 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-
 enum UserRole {
   Admin
   Membre
@@ -26,131 +25,397 @@ enum UserStatus {
 }
 
 enum Civilities {
-Monsieur 
-Madame
-Mademoiselle 
-Partenaire
+  Monsieur
+  Madame
+  Mademoiselle
+  Partenaire
 }
 
+enum TypeCotisation {
+  Forfait
+  Assistance
+  Anniversaire
+  Adhesion
+}
+
+enum MoyenPaiement {
+  Especes
+  Cheque
+  Virement
+  CarteBancaire
+}
+
+enum TypeTelephone {
+  Mobile
+  Fixe
+  Professionnel
+}
+
+enum StatutRelance {
+  EnAttente
+  Envoyee
+  Relancee
+  Payee
+  Annulee
+}
+
+enum TypeRelance {
+  Email
+  SMS
+  Telephone
+  Courrier
+  Visite
+}
+
+enum ElectionStatus {
+  Preparation
+  Ouverte
+  Cloturee
+  Annulee
+}
+
+enum PositionType {
+  President
+  VicePresident
+  Secretaire
+  ViceSecretaire
+  Tresorier
+  ViceTresorier
+  CommissaireComptes
+  MembreComiteDirecteur
+}
+
+enum CandidacyStatus {
+  EnAttente
+  Validee
+  Rejetee
+  Retiree
+}
+
+enum VoteStatus {
+  Valide
+  Invalide
+  Blanc
+}
+
+
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String  @map("user_id")
-  type               String
-  provider           String
-  providerAccountId  String  @map("provider_account_id")
-  refresh_token      String? @db.Text
-  access_token       String? @db.Text
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String? @db.Text
-  session_state      String?
- 
+  id                String  @id @default(cuid())
+  userId            String  @map("user_id")
+  type              String
+  provider          String
+  providerAccountId String  @map("provider_account_id")
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
+
   @@unique([provider, providerAccountId])
   @@map("accounts")
 }
- 
+
 model Session {
-  id                String   @id @default(cuid())
-  sessionToken      String   @unique @map("session_token")
-  userId            String   @map("user_id")
-  expires           DateTime
-  user              User     @relation(fields: [userId], references: [id], onDelete: Cascade)
- 
+  id           String   @id @default(cuid())
+  sessionToken String   @unique @map("session_token")
+  userId       String   @map("user_id")
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@map("sessions")
 }
- 
+
 model User {
-  id                  String    @id @default(cuid())
-  name                String?
-  email               String?   @unique
-  emailVerified       DateTime? @map("email_verified")
-  password            String?
-  image               String?
-  accounts            Account[]
-  sessions            Session[]
-  adherent            Adherent?
-  role                UserRole  @default(Membre)
-  status              UserStatus @default(Inactif)
+  id            String     @id @default(cuid())
+  name          String?
+  email         String?    @unique
+  emailVerified DateTime?  @map("email_verified")
+  password      String?
+  image         String?
+  accounts      Account[]
+  sessions      Session[]
+  adherent      Adherent?
+  role          UserRole   @default(Membre)
+  status        UserStatus @default(Inactif)
 
-  lastLogin           DateTime? @updatedAt
-  createdAt           DateTime  @default(now())
-  updatedAt           DateTime  @updatedAt
+  lastLogin DateTime? @updatedAt
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
 
-  remember_token      String?      @db.VarChar(100)
-  isTwoFactorEnabled Boolean @default(false)
+  remember_token        String?                @db.VarChar(100)
+  isTwoFactorEnabled    Boolean                @default(false)
   twoFactorConfirmation TwoFactorConfirmation?
- 
+
   @@map("users")
 }
- 
+
 model VerificationToken {
-  id          String     @id @default(cuid())
-  email       String
-  token       String     @unique
-  expires     DateTime
- 
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
+
   @@unique([email, token])
   @@map("verification_tokens")
 }
 
 model PasswordResetToken {
-  id              String   @id @default(cuid())
-  email           String
-  token           String   @unique
-  expires         DateTime
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
 
   @@unique([email, token])
-} 
-
+  @@map("password_reset_tokens")
+}
 
 model TwoFactorToken {
-  id            String @id @default(cuid())
-  email         String
-  token         String @unique
-  expires       DateTime
+  id      String   @id @default(cuid())
+  email   String
+  token   String   @unique
+  expires DateTime
 
   @@unique([email, token])
+  @@map("two_factor_tokens")
 }
 
 model TwoFactorConfirmation {
-  id          String @id @default(cuid())
-  userId      String
-  user        User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id     String @id @default(cuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@unique([userId])
+  @@map("two_factor_confirmations")
 }
 
-
 model Adherent {
-  id                      String  @id @default(cuid())
-  civility                Civilities?   @default(Monsieur) 
-  firstname               String       @db.VarChar(255)
-  lastname                String       @db.VarChar(255)
-  departement_id          Int
-  Adresse                 Adresse[]
-  sous_departement_id     Int          @default(0)
-  created_at              DateTime?    @db.Timestamp(0)
-  updated_at              DateTime?    @db.Timestamp(0)
-  userId                  String       @unique
-  User                    User @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
+  id                    String                 @id @default(cuid())
+  civility              Civilities?            @default(Monsieur)
+  firstname             String                 @db.VarChar(255)
+  lastname              String                 @db.VarChar(255)
+  Adresse               Adresse[]
+  Cotisations           Cotisation[]
+  Telephones            Telephone[]
+  ObligationsCotisation ObligationCotisation[]
+  Relances              Relance[]
+  Candidacies           Candidacy[]
+  Votes                 Vote[]
+  created_at            DateTime?              @db.Timestamp(0)
+  updated_at            DateTime?              @db.Timestamp(0)
+  userId                String                 @unique
+  User                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("adherent")
 }
 
 model Adresse {
-  id              String    @id @default(cuid())
-  adherentId      String
-  streetnum       String? 
-  street1         String?  
-  street2         String?     
-  codepost        String?  
-  city            String?
-  country         String?   
-  createdAt       DateTime  @default(now())
-  updatedAt       DateTime  @updatedAt
- 
-  Adherent    Adherent     @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-    
+  id         String   @id @default(cuid())
+  adherentId String
+  streetnum  String?
+  street1    String?
+  street2    String?
+  codepost   String?
+  city       String?
+  country    String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  Adherent Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+
+  @@map("adresse")
+}
+
+model Cotisation {
+  id             String         @id @default(cuid())
+  adherentId     String
+  type           TypeCotisation
+  montant        Decimal        @db.Decimal(10, 2)
+  dateCotisation DateTime       @default(now())
+  moyenPaiement  MoyenPaiement
+  description    String?        @db.Text
+  reference      String?        @db.VarChar(100)
+  statut         String         @default("Valide") // Valide, Annule, EnAttente
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  Adherent Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+
+  @@map("cotisations")
+}
+
+model Telephone {
+  id           String        @id @default(cuid())
+  adherentId   String
+  numero       String        @db.VarChar(20)
+  type         TypeTelephone
+  estPrincipal Boolean       @default(false)
+  description  String?       @db.VarChar(255)
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  Adherent Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+
+  @@map("telephones")
+}
+
+model ObligationCotisation {
+  id             String         @id @default(cuid())
+  adherentId     String
+  type           TypeCotisation
+  montantAttendu Decimal        @db.Decimal(10, 2)
+  montantPaye    Decimal        @default(0) @db.Decimal(10, 2)
+  montantRestant Decimal        @db.Decimal(10, 2)
+  dateEcheance   DateTime
+  periode        String         @db.VarChar(50) // ex: "2024-01", "2024-Anniversaire"
+  statut         String         @default("EnAttente") // EnAttente, PartiellementPaye, Paye, EnRetard
+  description    String?        @db.Text
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  Adherent Adherent  @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  Relances Relance[]
+
+  @@map("obligations_cotisation")
+}
+
+model Relance {
+  id                     String        @id @default(cuid())
+  adherentId             String
+  obligationCotisationId String
+  type                   TypeRelance
+  statut                 StatutRelance @default(EnAttente)
+  dateEnvoi              DateTime?
+  dateRelance            DateTime?
+  contenu                String?       @db.Text
+  reponse                String?       @db.Text
+  montantRappele         Decimal?      @db.Decimal(10, 2)
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+
+  Adherent             Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  ObligationCotisation ObligationCotisation @relation(fields: [obligationCotisationId], references: [id], onDelete: Cascade)
+
+  @@map("relances")
+}
+
+// Modèles pour le système d'élections
+model Election {
+  id          String         @id @default(cuid())
+  titre       String         @db.VarChar(255)
+  description String?        @db.Text
+  status      ElectionStatus @default(Preparation)
+
+  // Dates importantes
+  dateOuverture DateTime
+  dateCloture   DateTime
+  dateScrutin   DateTime
+
+  // Configuration
+  nombreMandats  Int     @default(1) // Nombre de postes à pourvoir
+  quorumRequis   Int? // Quorum requis pour valider l'élection
+  majoriteRequis String? @db.VarChar(50) // "Absolue", "Relative", "Qualifiée"
+
+  // Relations
+  positions   Position[]
+  candidacies Candidacy[]
+  votes       Vote[]
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String // ID de l'utilisateur qui a créé l'élection
+
+  @@map("elections")
+}
+
+model Position {
+  id          String       @id @default(cuid())
+  electionId  String
+  type        PositionType
+  titre       String       @db.VarChar(255)
+  description String?      @db.Text
+
+  // Configuration spécifique au poste
+  nombreMandats Int     @default(1)
+  dureeMandat   Int? // Durée en mois
+  conditions    String? @db.Text // Conditions spécifiques
+
+  // Relations
+  election    Election    @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  candidacies Candidacy[]
+  votes       Vote[]
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([electionId, type])
+  @@map("positions")
+}
+
+model Candidacy {
+  id         String @id @default(cuid())
+  electionId String
+  positionId String
+  adherentId String
+
+  // Informations de candidature
+  status     CandidacyStatus @default(EnAttente)
+  motivation String?         @db.Text
+  programme  String?         @db.Text
+
+  // Documents joints
+  documents String? @db.Text // JSON array des URLs des documents
+
+  // Validation
+  valideePar     String? // ID de l'utilisateur qui a validé
+  dateValidation DateTime?
+  commentaires   String?   @db.Text
+
+  // Relations
+  election Election @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  adherent Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  votes    Vote[]
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([electionId, positionId, adherentId])
+  @@map("candidacies")
+}
+
+model Vote {
+  id         String @id @default(cuid())
+  electionId String
+  positionId String
+  adherentId String // Adhérent qui vote
+
+  // Candidat choisi (peut être null pour vote blanc)
+  candidacyId String?
+
+  // Informations du vote
+  status    VoteStatus @default(Valide)
+  dateVote  DateTime   @default(now())
+  ipAddress String?    @db.VarChar(45) // Pour audit
+  userAgent String?    @db.VarChar(500) // Pour audit
+
+  // Relations
+  election  Election   @relation(fields: [electionId], references: [id], onDelete: Cascade)
+  position  Position   @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  adherent  Adherent   @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  candidacy Candidacy? @relation(fields: [candidacyId], references: [id], onDelete: SetNull)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([electionId, positionId, adherentId])
+  @@map("votes")
 }
 

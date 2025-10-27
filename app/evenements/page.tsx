@@ -3,7 +3,8 @@ import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Clock, Users, Vote, Award, CheckCircle, Cake, Gift } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, Vote, Award, CheckCircle, Cake, Gift, Trophy } from "lucide-react";
+import Link from "next/link";
 
 export default function EvenementsPage() {
   return (
@@ -20,15 +21,15 @@ export default function EvenementsPage() {
             </div>
           </div>
           <h1 className="text-5xl md:text-7xl font-bold mb-6 text-white drop-shadow-lg">
-            ÉLECTIONS 2024
+            ÉLECTIONS 2026
           </h1>
           <p className="text-2xl md:text-3xl mb-8 text-blue-100 font-semibold">
-            Renouvellement du Bureau - 29 Novembre
+            Renouvellement du Bureau - 29 Novembre 2025
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center mb-8">
             <Badge variant="secondary" className="bg-white/30 text-white border-white/40 text-xl px-8 py-4 font-semibold">
               <Calendar className="h-6 w-6 mr-3" />
-              29 Novembre 2024
+              29 Novembre 2025
             </Badge>
             <Badge variant="secondary" className="bg-white/30 text-white border-white/40 text-xl px-8 py-4 font-semibold">
               <Users className="h-6 w-6 mr-3" />
@@ -39,7 +40,7 @@ export default function EvenementsPage() {
             <p className="text-lg text-white font-medium">
               <strong>Événement majeur :</strong> Pour la première fois, nous élirons également les membres du comité directeur. 
               Votre participation est essentielle pour l'avenir de notre association.
-            </p>
+            </p> 
           </div>
         </div>
       </section>
@@ -75,7 +76,7 @@ export default function EvenementsPage() {
                         <div>
                           <h3 className="font-semibold text-lg mb-2">Date des élections</h3>
                           <p className="text-gray-600 dark:text-gray-300">
-                            Vendredi 29 Novembre 2024 - Assemblée Générale
+                            Vendredi 29 Novembre 2025 - Assemblée Générale
                           </p>
                         </div>
                       </div>
@@ -84,7 +85,7 @@ export default function EvenementsPage() {
                         <div>
                           <h3 className="font-semibold text-lg mb-2">Lieu</h3>
                           <p className="text-gray-600 dark:text-gray-300">
-                            Siège de l'amicale - Adresse à confirmer
+                            77124 VILLENOY
                           </p>
                         </div>
                       </div>
@@ -106,6 +107,10 @@ export default function EvenementsPage() {
                         <div className="flex items-center gap-2">
                           <CheckCircle className="h-5 w-5 text-green-600" />
                           <span>Trésorier(ère) + Vice-Trésorier(ère)</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <CheckCircle className="h-5 w-5 text-green-600" />
+                          <span>Commissaire aux comptes</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <CheckCircle className="h-5 w-5 text-green-600" />
@@ -249,6 +254,47 @@ export default function EvenementsPage() {
                 </CardContent>
               </Card>
 
+              {/* 
+              ================================================
+              Bouton pour afficher les résultats des élections 
+              ================================================
+              */}
+              {/* <Card className="border-2 border-blue-500 shadow-xl bg-gradient-to-r from-blue-50 via-white to-red-50 dark:from-blue-900/20 dark:via-slate-800 dark:to-red-900/20">
+                <CardContent className="p-8 text-center">
+                  <div className="space-y-6">
+                    <div className="flex justify-center">
+                      <div className="bg-gradient-to-r from-blue-600 via-white to-red-600 p-4 rounded-full shadow-lg">
+                        <Trophy className="h-12 w-12 text-yellow-500" />
+                      </div>
+                    </div>
+                    <div>
+                      <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+                        🏆 Résultats des Élections Disponibles
+                      </h3>
+                      <p className="text-gray-600 dark:text-gray-300 mb-6">
+                        Découvrez les résultats officiels des élections et rencontrez vos nouveaux dirigeants élus
+                      </p>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                      <Link href="/resultats">
+                        <Button className="bg-gradient-to-r from-blue-600 to-red-600 hover:from-blue-700 hover:to-red-700 text-white px-8 py-4 rounded-lg font-semibold transition-all duration-300 transform hover:scale-105 shadow-lg">
+                          <Trophy className="h-5 w-5 mr-2" />
+                          Voir les Résultats
+                        </Button>
+                      </Link>
+                      <Button variant="outline" className="border-2 border-blue-600 text-blue-600 hover:bg-blue-50 dark:border-blue-400 dark:text-blue-400 dark:hover:bg-blue-900/20 px-8 py-4 rounded-lg font-semibold transition-all duration-300">
+                        <Award className="h-5 w-5 mr-2" />
+                        Féliciter les Élus
+                      </Button>
+                    </div>
+                    <div className="flex justify-center items-center gap-2 text-sm text-gray-500 dark:text-gray-400">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span>Résultats officiels validés</span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card> */}
+
               {/* Événement d'anniversaire - En second plan */}
               <Card className="border border-pink-200 dark:border-pink-800 shadow-lg bg-gradient-to-br from-pink-50/50 to-rose-50/50 dark:from-pink-900/10 dark:to-rose-900/10">
                 <CardHeader className="bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20">
@@ -315,7 +361,7 @@ export default function EvenementsPage() {
                     <div>
                       <h4 className="font-semibold">Date d'élection</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-300">
-                        29 Novembre 2024
+                        29 Novembre 2025
                       </p>
                     </div>
                   </div>
@@ -335,7 +381,7 @@ export default function EvenementsPage() {
                     <div>
                       <h4 className="font-semibold">Passation de pouvoir</h4>
                       <p className="text-sm text-gray-600 dark:text-gray-300">
-                        Lors de la dernière réunion
+                        Lors de la réunion de décembre 2025
                       </p>
                     </div>
                   </div>
@@ -386,7 +432,7 @@ export default function EvenementsPage() {
             </p>
             <div className="bg-white/20 backdrop-blur-sm rounded-2xl p-6 mb-8">
               <p className="text-lg text-white font-medium">
-                <strong>Date importante :</strong> 29 Novembre 2024 - Ne manquez pas ce moment historique !
+                <strong>Date importante :</strong> 29 Novembre 2025 - Ne manquez pas ce moment historique !
               </p>
             </div>
             <div className="flex flex-col sm:flex-row gap-6 justify-center">

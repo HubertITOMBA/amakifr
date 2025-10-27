@@ -31,7 +31,7 @@ export function AboutSection() {
               
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                  <Calendar className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  <Calendar className="h-6 w-6 text-green-600 dark:text-green-400" />50
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">15+</p>

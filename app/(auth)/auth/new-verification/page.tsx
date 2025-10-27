@@ -1,13 +1,11 @@
 import { NewVerificationForm } from "@/components/auth/new-verification-form";
 
-
 const NewVerificationPage = () => {
     return ( 
-        <main>
+        <div className="min-h-screen">
             <NewVerificationForm />
-       </main>
-        );
-     
-  }
+        </div>
+    );
+}
    
-  export default NewVerificationPage;
+export default NewVerificationPage;

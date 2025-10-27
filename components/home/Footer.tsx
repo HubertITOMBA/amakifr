@@ -33,15 +33,16 @@ export function Footer() {
           {/* Logo et description */}
           <div className="lg:col-span-1">
             <Link href="/" className="flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
+              {/* <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
                 <span className="text-white font-bold text-xl">A</span>
-              </div>
+              </div> */}
               <h3 className="text-2xl font-bold">
-                ama<span className="text-red-500">K</span>i
+                Ama<span className="text-red-500">K</span>i France
               </h3>
             </Link>
             <p className="text-gray-300 mb-6 leading-relaxed">
-              L'Amicale des Anciens Élèves de Kipako, unie par la solidarité, 
+              L'Amicale des Anciens Élèves de Kipako, 
+              unie par l'intégration, le respect, la solidarité, 
               l'excellence et l'entraide pour construire l'avenir ensemble.
             </p>
             <div className="flex space-x-4">
@@ -126,7 +127,7 @@ export function Footer() {
         <div className="border-t border-slate-800 mt-12 pt-8">
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="text-gray-400 text-sm">
-              © 2026 AMAKI France- Amicale des Anciens Élèves de Kipako en France. Tous droits réservés.
+               AMAKI France- Amicale des Anciens Élèves de Kipako en France © 2026 Tous droits réservés.
             </div>
             <div className="flex space-x-6 mt-4 md:mt-0">
               <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors duration-300">

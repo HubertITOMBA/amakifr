@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import HeroImage from "@/public/images/logoAmaki.jpeg";
+import HeroImage from "@/public/images/logow1.webp";
 import { LoginButton } from "../auth/login-button";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Users, Calendar, Award } from "lucide-react";
@@ -36,7 +36,7 @@ export function Hero() {
               </h1>
               
               <p className="text-xl lg:text-2xl text-blue-100 leading-relaxed">
-                L'Amicale des Anciens Élèves de Kipako - 
+                L'Amicale des Anciens Élèves de Kipako 
                 <span className="block font-semibold text-white">
                   Unis par l'excellence, guidés par la solidarité, l'intégation, le respect ...
                 </span>
@@ -46,18 +46,20 @@ export function Hero() {
             <div className="flex flex-col sm:flex-row gap-4">
               <LoginButton>
                 <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-8 py-4 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1">
-                  Rejoindre l'AMAKI
+                  Rejoindre AMAKI
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </LoginButton>
               
-              <Button 
-                variant="outline" 
-                size="lg" 
-                className="border-2 border-white/30 text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl backdrop-blur-lg transition-all duration-300"
-              >
-                Découvrir nos Événements
-              </Button>
+              <Link href="/evenements">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="border-2 border-white/30 text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl backdrop-blur-lg transition-all duration-300"
+                >
+                  Découvrir nos Événements
+                </Button>
+              </Link>
             </div>
             
             {/* Statistiques */}
@@ -66,7 +68,7 @@ export function Hero() {
                 <div className="flex items-center justify-center w-12 h-12 bg-white/10 rounded-lg mx-auto mb-2">
                   <Users className="h-6 w-6 text-white" />
                 </div>
-                <div className="text-2xl font-bold text-white">500+</div>
+                <div className="text-2xl font-bold text-white">120+</div>
                 <div className="text-sm text-blue-200">Membres Actifs</div>
               </div>
               
@@ -82,7 +84,7 @@ export function Hero() {
                 <div className="flex items-center justify-center w-12 h-12 bg-white/10 rounded-lg mx-auto mb-2">
                   <Award className="h-6 w-6 text-white" />
                 </div>
-                <div className="text-2xl font-bold text-white">50+</div>
+                <div className="text-2xl font-bold text-white">53+</div>
                 <div className="text-sm text-blue-200">Événements</div>
               </div>
             </div>

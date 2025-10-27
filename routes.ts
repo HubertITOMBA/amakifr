@@ -9,6 +9,10 @@ export const publicRoutes = [
     "/amicale",
     "/contact",
     "/evenements",
+    "/galerie",
+    "/upload",
+    "/api/upload", 
+    "/resultats",// Ajout de l'API route pour l'upload
     
 ];
 /**

@@ -7,6 +7,7 @@ import { EventsSection } from "@/components/home/EventsSection";
 import { TestimonialsSection } from "@/components/home/TestimonialsSection";
 import { NewsletterSection } from "@/components/home/NewsletterSection";
 import { Footer } from "@/components/home/Footer";
+import { SessionDebug } from "@/components/debug/session-debug";
 
 export default function Home() {
   return (
@@ -40,6 +41,9 @@ export default function Home() {
       
       {/* Footer */}
       <Footer />
+      
+      {/* Debug Session (seulement en développement) */}
+      <SessionDebug />
     </div>
   );
 }

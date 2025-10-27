@@ -2,13 +2,14 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import Logo from "@/public/logo0.png";
+import Logo from "@/public/logow1.webp";
 import HeroImage from "@/public/hero.png";
 import { buttonVariants } from "@/components/ui/button";
 import { UserButton } from "../auth/user-button";
 import { ThemeToggle } from "../ThemeToggle";
 import { useState } from "react";
-import { Menu, X } from "lucide-react";
+import { Menu, X, Shield } from "lucide-react";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 
 const navigation = [
@@ -16,13 +17,17 @@ const navigation = [
   { name: "L'amicale", href: '/amicale' },
   { name: 'Evénements', href: '/evenements' },
   { name: 'Agenda', href: '/agenda' },
+  { name: 'Galerie', href: '/galerie' },
+  { name: 'Upload', href: '/upload' },
   { name: 'Contact', href: '/contact' },
+  // { name: 'Reso', href: '/resultats' },
 ]
 
 
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const user = useCurrentUser();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -51,6 +56,16 @@ export function Navbar() {
                 {item.name}
               </Link>
             ))}
+            {/* Menu Admin - visible seulement pour les administrateurs */}
+            {user?.role === "Admin" && (
+              <Link 
+                href="/admin"
+                className="font-title text-xl font-semibold leading-6 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2"
+              >
+                <Shield className="h-5 w-5" />
+                Admin
+              </Link>
+            )}
           </div>
 
           {/* Actions Desktop */}
@@ -91,6 +106,17 @@ export function Navbar() {
                   {item.name}
                 </Link>
               ))}
+              {/* Menu Admin Mobile - visible seulement pour les administrateurs */}
+              {user?.role === "Admin" && (
+                <Link
+                  href="/admin"
+                  className="flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  <Shield className="h-4 w-4" />
+                  Admin
+                </Link>
+              )}
             </div>
           </div>
         )}

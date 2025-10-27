@@ -6,7 +6,7 @@ export function EventsSection() {
     {
       id: 1,
       title: "Conférence sur l'Entrepreneuriat",
-      date: "15 Mars 2024",
+      date: "15 Mars 2026",
       time: "14h00 - 17h00",
       location: "Salle de conférence AMAKI",
       attendees: 120,
@@ -17,7 +17,7 @@ export function EventsSection() {
     {
       id: 2,
       title: "Soirée Réseautage",
-      date: "22 Mars 2024",
+      date: "22 Mars 2026",
       time: "18h00 - 22h00",
       location: "Hôtel des Gouverneurs",
       attendees: 80,
@@ -28,7 +28,7 @@ export function EventsSection() {
     {
       id: 3,
       title: "Atelier de Développement Personnel",
-      date: "5 Avril 2024",
+      date: "5 Avril 2026",
       time: "09h00 - 12h00",
       location: "Centre de Formation AMAKI",
       attendees: 50,
