@@ -3,6 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Users, 
   Calendar, 
@@ -12,8 +13,105 @@ import {
   MessageSquare,
   Activity,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Vote,
+  Award,
+  CheckCircle,
+  XCircle,
+  Clock
 } from "lucide-react";
+import { useState, useEffect } from "react";
+import { 
+  getAllCandidaciesForAdmin, 
+  getAllElectionsForAdmin, 
+  updateCandidacyStatus, 
+  closeElection 
+} from "@/actions/elections";
+import { CandidacyStatus, ElectionStatus } from "@prisma/client";
+import { POSTES_LABELS } from "@/lib/elections-constants";
+import {
+  createColumnHelper,
+  flexRender,
+  getCoreRowModel,
+  useReactTable,
+  getSortedRowModel,
+  SortingState,
+  getFilteredRowModel,
+  ColumnFiltersState,
+} from "@tanstack/react-table";
+
+// Types pour les tables
+type CandidacyData = {
+  id: string;
+  adherent: {
+    firstname: string;
+    lastname: string;
+    civility: string;
+    User: {
+      email: string;
+    };
+    Telephones: Array<{
+      numero: string;
+      type: string;
+    }>;
+  };
+  position: {
+    type: string;
+    titre: string;
+    election: {
+      titre: string;
+      status: string;
+      dateOuverture: string;
+      dateCloture: string;
+    };
+  };
+  status: string;
+  motivation: string;
+  programme: string;
+  createdAt: string;
+};
+
+type ElectionData = {
+  id: string;
+  titre: string;
+  status: string;
+  dateOuverture: string;
+  dateCloture: string;
+  positions: Array<{
+    candidacies: Array<any>;
+    votes: Array<any>;
+  }>;
+};
+
+// Helper pour créer les colonnes
+const columnHelper = createColumnHelper<CandidacyData>();
+
+// Fonction pour obtenir la couleur du statut
+const getStatusColor = (status: string) => {
+  switch (status) {
+    case CandidacyStatus.Validee:
+      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+    case CandidacyStatus.Rejetee:
+      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+    case CandidacyStatus.EnAttente:
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+    default:
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+  }
+};
+
+const getStatusLabel = (status: string) => {
+  switch (status) {
+    case CandidacyStatus.Validee:
+      return "Validée";
+    case CandidacyStatus.Rejetee:
+      return "Rejetée";
+    case CandidacyStatus.EnAttente:
+      return "En attente";
+    default:
+      return status;
+  }
+};
 
 // Données d'exemple pour le dashboard
 const stats = [
@@ -114,17 +212,209 @@ const upcomingEvents = [
 ];
 
 export default function AdminDashboard() {
+  const [candidacies, setCandidacies] = useState<CandidacyData[]>([]);
+  const [elections, setElections] = useState<ElectionData[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+
+  // Charger les données
+  useEffect(() => {
+    const loadData = async () => {
+      try {
+        const [candidaciesResult, electionsResult] = await Promise.all([
+          getAllCandidaciesForAdmin(),
+          getAllElectionsForAdmin()
+        ]);
+
+        if (candidaciesResult.success) {
+          setCandidacies(candidaciesResult.candidacies || []);
+        }
+        if (electionsResult.success) {
+          setElections(electionsResult.elections || []);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des données:", error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadData();
+  }, []);
+
+  // Fonction pour valider/rejeter une candidature
+  const handleCandidacyStatusChange = async (candidacyId: string, status: CandidacyStatus) => {
+    try {
+      const result = await updateCandidacyStatus(candidacyId, status);
+      if (result.success) {
+        // Mettre à jour l'état local
+        setCandidacies(prev => 
+          prev.map(c => 
+            c.id === candidacyId ? { ...c, status } : c
+          )
+        );
+      } else {
+        alert(result.error || "Erreur lors de la mise à jour");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      alert("Erreur lors de la mise à jour");
+    }
+  };
+
+  // Fonction pour clôturer une élection
+  const handleCloseElection = async (electionId: string) => {
+    if (confirm("Êtes-vous sûr de vouloir clôturer cette élection ?")) {
+      try {
+        const result = await closeElection(electionId);
+        if (result.success) {
+          // Mettre à jour l'état local
+          setElections(prev => 
+            prev.map(e => 
+              e.id === electionId ? { ...e, status: ElectionStatus.Cloturee } : e
+            )
+          );
+        } else {
+          alert(result.error || "Erreur lors de la clôture");
+        }
+      } catch (error) {
+        console.error("Erreur:", error);
+        alert("Erreur lors de la clôture");
+      }
+    }
+  };
+
+  // Configuration des colonnes pour la table des candidatures
+  const candidacyColumns = [
+    columnHelper.accessor("adherent.firstname", {
+      header: "Candidat",
+      cell: ({ row }) => {
+        const candidacy = row.original;
+        return (
+          <div className="flex items-center space-x-3">
+            <div>
+              <div className="font-medium text-gray-900 dark:text-gray-100">
+                {candidacy.adherent.civility && (
+                  <span className="text-sm text-gray-500 mr-1">
+                    {candidacy.adherent.civility === 'Monsieur' ? 'M.' : 
+                     candidacy.adherent.civility === 'Madame' ? 'Mme' : 
+                     candidacy.adherent.civility === 'Mademoiselle' ? 'Mlle' : 
+                     candidacy.adherent.civility}
+                  </span>
+                )}
+                {candidacy.adherent.firstname} {candidacy.adherent.lastname}
+              </div>
+              <div className="text-sm text-gray-500">{candidacy.adherent.User.email}</div>
+            </div>
+          </div>
+        );
+      },
+    }),
+    columnHelper.accessor("position.type", {
+      header: "Poste",
+      cell: ({ row }) => {
+        const candidacy = row.original;
+        return (
+          <div>
+            <div className="font-medium text-gray-900 dark:text-gray-100">
+              {POSTES_LABELS[candidacy.position.type as keyof typeof POSTES_LABELS]}
+            </div>
+            <div className="text-sm text-gray-500">{candidacy.position.election.titre}</div>
+          </div>
+        );
+      },
+    }),
+    columnHelper.accessor("status", {
+      header: "Statut",
+      cell: ({ row }) => {
+        const status = row.getValue("status") as string;
+        return (
+          <Badge className={`${getStatusColor(status)} text-xs font-semibold`}>
+            {getStatusLabel(status)}
+          </Badge>
+        );
+      },
+    }),
+    columnHelper.accessor("createdAt", {
+      header: "Date",
+      cell: ({ row }) => {
+        const date = new Date(row.getValue("createdAt"));
+        return <span className="text-sm text-gray-600 dark:text-gray-300">{date.toLocaleDateString()}</span>;
+      },
+    }),
+    columnHelper.display({
+      id: "actions",
+      header: "Actions",
+      cell: ({ row }) => {
+        const candidacy = row.original;
+        return (
+          <div className="flex space-x-2">
+            {candidacy.status === CandidacyStatus.EnAttente && (
+              <>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-green-600 border-green-600 hover:bg-green-50"
+                  onClick={() => handleCandidacyStatusChange(candidacy.id, CandidacyStatus.Validee)}
+                >
+                  <CheckCircle className="h-4 w-4 mr-1" />
+                  Valider
+                </Button>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  className="text-red-600 border-red-600 hover:bg-red-50"
+                  onClick={() => handleCandidacyStatusChange(candidacy.id, CandidacyStatus.Rejetee)}
+                >
+                  <XCircle className="h-4 w-4 mr-1" />
+                  Rejeter
+                </Button>
+              </>
+            )}
+          </div>
+        );
+      },
+    }),
+  ];
+
+  // Configuration de la table des candidatures
+  const candidacyTable = useReactTable({
+    data: candidacies,
+    columns: candidacyColumns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    state: {
+      sorting,
+      columnFilters,
+    },
+  });
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-          Tableau de bord
+          Tableau de bord Admin
         </h1>
         <p className="text-gray-600 dark:text-gray-300 mt-2">
-          Vue d'ensemble de l'activité de l'association
+          Gestion administrative de l'association
         </p>
       </div>
+
+      {/* Tabs Navigation */}
+      <Tabs defaultValue="dashboard" className="space-y-6">
+        <TabsList className="grid w-full grid-cols-3">
+          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
+          <TabsTrigger value="elections">Élections</TabsTrigger>
+          <TabsTrigger value="votes">Votes</TabsTrigger>
+        </TabsList>
+
+        {/* Dashboard Tab */}
+        <TabsContent value="dashboard" className="space-y-6">
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -296,6 +586,130 @@ export default function AdminDashboard() {
           </div>
         </CardContent>
       </Card>
+        </TabsContent>
+
+        {/* Elections Tab */}
+        <TabsContent value="elections" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Vote className="h-5 w-5 mr-2 text-blue-600" />
+                Gestion des Élections
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              {loading ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : (
+                <div className="space-y-6">
+                  {/* Liste des élections */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Élections en cours</h3>
+                    <div className="space-y-3">
+                      {elections.map((election) => (
+                        <div key={election.id} className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                          <div className="flex items-center justify-between">
+                            <div>
+                              <h4 className="font-semibold text-gray-900 dark:text-white">
+                                {election.titre}
+                              </h4>
+                              <p className="text-sm text-gray-600 dark:text-gray-300">
+                                Du {new Date(election.dateOuverture).toLocaleDateString()} au {new Date(election.dateCloture).toLocaleDateString()}
+                              </p>
+                              <div className="flex items-center space-x-4 mt-2">
+                                <Badge className={`${getStatusColor(election.status)} text-xs`}>
+                                  {election.status}
+                                </Badge>
+                                <span className="text-xs text-gray-500">
+                                  {election.positions.reduce((acc, pos) => acc + pos.candidacies.length, 0)} candidatures
+                                </span>
+                              </div>
+                            </div>
+                            {election.status === ElectionStatus.Ouverte && (
+                              <Button
+                                variant="outline"
+                                className="text-red-600 border-red-600 hover:bg-red-50"
+                                onClick={() => handleCloseElection(election.id)}
+                              >
+                                <Clock className="h-4 w-4 mr-1" />
+                                Clôturer
+                              </Button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Table des candidatures */}
+                  <div>
+                    <h3 className="text-lg font-semibold mb-4">Candidatures</h3>
+                    <div className="border rounded-lg overflow-hidden">
+                      <table className="w-full">
+                        <thead className="bg-gray-50 dark:bg-gray-800">
+                          {candidacyTable.getHeaderGroups().map(headerGroup => (
+                            <tr key={headerGroup.id}>
+                              {headerGroup.headers.map(header => (
+                                <th
+                                  key={header.id}
+                                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                                >
+                                  {header.isPlaceholder
+                                    ? null
+                                    : flexRender(
+                                        header.column.columnDef.header,
+                                        header.getContext()
+                                      )}
+                                </th>
+                              ))}
+                            </tr>
+                          ))}
+                        </thead>
+                        <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                          {candidacyTable.getRowModel().rows.map(row => (
+                            <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                              {row.getVisibleCells().map(cell => (
+                                <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
+                                  {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                </td>
+                              ))}
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Votes Tab */}
+        <TabsContent value="votes" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center">
+                <Award className="h-5 w-5 mr-2 text-green-600" />
+                Gestion des Votes
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="text-center py-8">
+                <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                  Fonctionnalité en développement
+                </h3>
+                <p className="text-gray-600 dark:text-gray-300">
+                  La gestion des votes sera bientôt disponible
+                </p>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+      </Tabs>
     </div>
   );
 }

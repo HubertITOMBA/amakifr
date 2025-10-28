@@ -7,6 +7,7 @@ import { Hero } from "@/components/home/Hero";
 import { ThemeProvider } from "next-themes";
 import { LoginButton } from "@/components/auth/login-button";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
+import { ToastProvider } from "@/components/providers/toast-provider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -44,6 +45,7 @@ export default function RootLayout({
             <Hero /> */}
             
             {children}
+            <ToastProvider />
           </ThemeProvider>
         </AuthSessionProvider>
       </body>

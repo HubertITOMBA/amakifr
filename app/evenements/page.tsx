@@ -339,10 +339,18 @@ export default function EvenementsPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
-                    <Users className="h-4 w-4 mr-2" />
-                    Devenir Candidat
-                  </Button>
+                  <Link href="/candidatures" className="block">
+                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
+                      <Users className="h-4 w-4 mr-2" />
+                      Devenir Candidat
+                    </Button>
+                  </Link>
+                  <Link href="/candidats" className="block">
+                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                      <Award className="h-4 w-4 mr-2" />
+                      Voir les Candidats
+                    </Button>
+                  </Link>
                   <Button variant="outline" className="w-full border-green-600 text-green-600 hover:bg-green-50">
                     <Vote className="h-4 w-4 mr-2" />
                     Voter

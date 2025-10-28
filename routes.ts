@@ -11,9 +11,8 @@ export const publicRoutes = [
     "/evenements",
     "/galerie",
     "/upload",
-    "/api/upload", 
-    "/resultats",// Ajout de l'API route pour l'upload
-    
+    "/resultats",
+    "/vote",
 ];
 /**
  * Routes utilisées pour l'authentification
@@ -27,6 +26,9 @@ export const authRoutes = [
  "/auth/reset",
  "/auth/new-password",
  "/auth/new-verification",
+"/candidatures", 
+ "/elections",
+
   ];
   
 /**

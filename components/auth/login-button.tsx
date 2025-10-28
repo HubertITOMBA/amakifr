@@ -1,6 +1,6 @@
 "use client"
 
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { 
     Dialog, 
     DialogContent, 
@@ -21,11 +21,13 @@ export const LoginButton = ({
         asChild
     } : LoginButtonProps) => {
 
-
         const router = useRouter();
+        const pathname = usePathname();
 
         const onClick = () => {
-            router.push("/auth/sign-in");
+            // Inclure l'URL actuelle comme callbackUrl pour rediriger après connexion
+            const callbackUrl = encodeURIComponent(pathname);
+            router.push(`/auth/sign-in?callbackUrl=${callbackUrl}`);
           }
 
          if (mode === "modal") {

@@ -41,10 +41,6 @@ export default auth( (req) => {
             `/auth/sign-in?callbackUrl=${encodedCallbackUrl}`, nextUrl));
     }
 
-    if (!isLoggedIn && !isPublicRoute) {
-        return Response.redirect(new URL("/auth/sign-in", nextUrl));
-    }
-
 
     return null;
 })        
