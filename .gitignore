@@ -34,6 +34,7 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 POMPE_Dev_Master.pl
+*.md
 
 # vercel
 .vercel

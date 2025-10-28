@@ -13,6 +13,7 @@ export const publicRoutes = [
     "/upload",
     "/resultats",
     "/vote",
+    "/elections",
 ];
 /**
  * Routes utilisées pour l'authentification
@@ -27,7 +28,7 @@ export const authRoutes = [
  "/auth/new-password",
  "/auth/new-verification",
 "/candidatures", 
- "/elections",
+
 
   ];
   

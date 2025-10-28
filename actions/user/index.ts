@@ -7,7 +7,7 @@ import { Civilities, TypeTelephone } from "@prisma/client";
 import { writeFile } from "fs/promises";
 import { join } from "path";
 import { existsSync, mkdirSync } from "fs";
-import { toast } from "react-toastify";
+// import { toast } from "react-toastify"; // Supprimé car non utilisé
 
 // Types pour les données
 interface UserProfileData {
@@ -93,8 +93,7 @@ export async function getUserProfile(): Promise<{ success: boolean; data?: UserP
             id: true,
             type: true,
             provider: true,
-            providerAccountId: true,
-            createdAt: true
+            providerAccountId: true
           }
         }
       }
@@ -115,16 +114,16 @@ export async function getUserProfile(): Promise<{ success: boolean; data?: UserP
       lastLogin: user.lastLogin?.toISOString() || null,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
-      adherent: user.adherent ? {
-        id: user.adherent.id,
-        civility: user.adherent.civility,
-        firstname: user.adherent.firstname,
-        lastname: user.adherent.lastname,
-        departement_id: user.adherent.departement_id,
-        sous_departement_id: user.adherent.sous_departement_id,
-        created_at: user.adherent.created_at?.toISOString() || null,
-        updated_at: user.adherent.updated_at?.toISOString() || null,
-        Adresse: user.adherent.Adresse.map(address => ({
+      adherent: (user as any).adherent ? {
+        id: (user as any).adherent.id,
+        civility: (user as any).adherent.civility,
+        firstname: (user as any).adherent.firstname,
+        lastname: (user as any).adherent.lastname,
+        departement_id: (user as any).adherent.departement_id,
+        sous_departement_id: (user as any).adherent.sous_departement_id,
+        created_at: (user as any).adherent.created_at?.toISOString() || null,
+        updated_at: (user as any).adherent.updated_at?.toISOString() || null,
+        Adresse: (user as any).adherent.Adresse.map((address: any) => ({
           id: address.id,
           streetnum: address.streetnum,
           street1: address.street1,
@@ -136,12 +135,12 @@ export async function getUserProfile(): Promise<{ success: boolean; data?: UserP
           updatedAt: address.updatedAt.toISOString()
         }))
       } : null,
-      accounts: user.accounts.map(account => ({
+      accounts: (user as any).accounts.map((account: any) => ({
         id: account.id,
         type: account.type,
         provider: account.provider,
         providerAccountId: account.providerAccountId,
-        createdAt: account.createdAt?.toISOString() || new Date().toISOString()
+        createdAt: new Date().toISOString()
       }))
     };
 
@@ -180,7 +179,25 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
       return { success: false, error: "Utilisateur non trouvé" };
     }
 
-    return { success: true, user };
+    // Convertir les valeurs Decimal en nombres pour éviter l'erreur de sérialisation
+    const userWithConvertedDecimals = {
+      ...user,
+      adherent: user.adherent ? {
+        ...user.adherent,
+        Cotisations: user.adherent.Cotisations?.map((cotisation: any) => ({
+          ...cotisation,
+          montant: Number(cotisation.montant)
+        })) || [],
+        ObligationsCotisation: user.adherent.ObligationsCotisation?.map((obligation: any) => ({
+          ...obligation,
+          montantAttendu: Number(obligation.montantAttendu),
+          montantPaye: Number(obligation.montantPaye),
+          montantRestant: Number(obligation.montantRestant)
+        })) || []
+      } : null
+    };
+
+    return { success: true, user: userWithConvertedDecimals };
   } catch (error) {
     console.error("Erreur lors de la récupération des données utilisateur:", error);
     return { success: false, error: "Erreur serveur" };
@@ -427,5 +444,183 @@ export async function uploadFile(
       success: false, 
       message: `Erreur lors de l'upload du fichier: ${error instanceof Error ? error.message : 'Erreur inconnue'}` 
     };
+  }
+}
+
+// Server Action pour récupérer les candidatures de l'utilisateur
+export async function getUserCandidatures(): Promise<{ success: boolean; candidatures?: any[]; error?: string }> {
+  try {
+    const session = await auth();
+    
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Récupérer l'adhérent de l'utilisateur
+    const adherent = await prisma.adherent.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!adherent) {
+      return { success: false, error: "Adhérent non trouvé" };
+    }
+
+    // Récupérer les candidatures de l'adhérent
+    const candidatures = await prisma.candidacy.findMany({
+      where: { adherentId: adherent.id },
+      include: {
+        election: {
+          select: {
+            id: true,
+            titre: true,
+            description: true,
+            status: true,
+            dateOuverture: true,
+            dateCloture: true
+          }
+        },
+        position: {
+          select: {
+            id: true,
+            titre: true,
+            description: true,
+            type: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return { success: true, candidatures };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des candidatures:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+// Server Action pour récupérer les votes de l'utilisateur
+export async function getUserVotes(): Promise<{ success: boolean; votes?: any[]; error?: string }> {
+  try {
+    const session = await auth();
+    
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Récupérer l'adhérent de l'utilisateur
+    const adherent = await prisma.adherent.findUnique({
+      where: { userId: session.user.id }
+    });
+
+    if (!adherent) {
+      return { success: false, error: "Adhérent non trouvé" };
+    }
+
+    // Récupérer les votes de l'adhérent
+    const votes = await prisma.vote.findMany({
+      where: { adherentId: adherent.id },
+      include: {
+        election: {
+          select: {
+            id: true,
+            titre: true,
+            description: true,
+            status: true,
+            dateOuverture: true,
+            dateCloture: true
+          }
+        },
+        position: {
+          select: {
+            id: true,
+            titre: true,
+            description: true,
+            type: true
+          }
+        },
+        candidacy: {
+          include: {
+            adherent: {
+              select: {
+                firstname: true,
+                lastname: true,
+                civility: true,
+                User: {
+                  select: {
+                    image: true
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return { success: true, votes };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des votes:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+// Server Action pour récupérer tous les candidats (pour la liste des candidats)
+export async function getAllCandidatesForProfile(): Promise<{ success: boolean; candidates?: any[]; error?: string }> {
+  try {
+    const session = await auth();
+    
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Récupérer toutes les candidatures avec leurs détails
+    const candidates = await prisma.candidacy.findMany({
+      include: {
+        adherent: {
+          include: {
+            User: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true
+              }
+            }
+          }
+        },
+        election: {
+          select: {
+            id: true,
+            titre: true,
+            status: true,
+            dateOuverture: true,
+            dateCloture: true
+          }
+        },
+        position: {
+          select: {
+            id: true,
+            titre: true,
+            type: true
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return { success: true, candidates };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des candidats:", error);
+    return { success: false, error: "Erreur interne du serveur" };
   }
 }

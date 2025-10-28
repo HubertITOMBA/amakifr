@@ -415,7 +415,7 @@ export default function VotePage() {
                 <h3 className="font-semibold text-gray-900 dark:text-white mb-2">Anonyme</h3>
                 <p className="text-sm text-gray-600 dark:text-gray-300">Votre identité reste confidentielle</p>
               </div>
-              <div className="text-center">
+            <div className="text-center">
                 <div className="w-12 h-12 bg-gradient-to-r from-purple-100 to-pink-100 dark:from-purple-900/20 dark:to-pink-900/20 rounded-full flex items-center justify-center mx-auto mb-3">
                   <CheckCircle className="h-6 w-6 text-purple-600" />
                 </div>
@@ -450,7 +450,7 @@ export default function VotePage() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
         <div className="container mx-auto px-4 py-6 lg:py-8">
-          <div className="text-center">
+        <div className="text-center">
             <div className="w-16 h-16 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
               <Vote className="h-8 w-8 text-red-600 dark:text-red-400" />
             </div>
@@ -554,8 +554,8 @@ export default function VotePage() {
         {/* Contenu conditionnel */}
         {activeTab === 'current' ? (
           <>
-            {/* Sélection d'élection */}
-            {elections.length > 1 && (
+        {/* Sélection d'élection */}
+        {elections.length > 1 && (
               <Card className="mb-8 shadow-xl border-0 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
                 <CardHeader className="text-center pb-4">
                   <CardTitle className="text-2xl font-bold text-gray-900 dark:text-white flex items-center justify-center">
@@ -565,19 +565,19 @@ export default function VotePage() {
                   <CardDescription className="text-gray-600 dark:text-gray-300">
                     Choisissez l'élection pour laquelle vous souhaitez voter
                   </CardDescription>
-                </CardHeader>
-                <CardContent>
+            </CardHeader>
+            <CardContent>
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {elections.map((election) => (
-                      <div
-                        key={election.id}
+                {elections.map((election) => (
+                  <div
+                    key={election.id}
                         className={`group relative p-6 border-2 rounded-xl cursor-pointer transition-all duration-300 transform hover:scale-105 ${
-                          selectedElection === election.id
+                      selectedElection === election.id
                             ? 'border-blue-500 bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 shadow-lg'
                             : 'border-gray-200 hover:border-blue-300 hover:shadow-md bg-white dark:bg-slate-700'
-                        }`}
-                        onClick={() => setSelectedElection(election.id)}
-                      >
+                    }`}
+                    onClick={() => setSelectedElection(election.id)}
+                  >
                         <div className="flex items-start justify-between mb-4">
                           <div className="flex items-center">
                             <div className={`w-3 h-3 rounded-full mr-3 ${
@@ -606,12 +606,12 @@ export default function VotePage() {
                             <span>{election.positions.length} poste(s) à pourvoir</span>
                           </div>
                         </div>
-                      </div>
-                    ))}
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
             {/* Indicateur de progression */}
             {selectedElectionData && (
@@ -635,8 +635,8 @@ export default function VotePage() {
               </Card>
             )}
 
-            {/* Formulaire de vote */}
-            {selectedElectionData && (
+        {/* Formulaire de vote */}
+        {selectedElectionData && (
               <Card className="shadow-xl border-0 bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm">
                 <CardHeader className="text-center pb-6">
                   <div className="flex items-center justify-center mb-4">
@@ -649,8 +649,8 @@ export default function VotePage() {
                       </CardTitle>
                       <CardDescription className="text-gray-600 dark:text-gray-300">
                         Élection en cours
-                      </CardDescription>
-                    </div>
+                  </CardDescription>
+                </div>
                   </div>
                   
                   <div className="flex flex-wrap items-center justify-center gap-6 text-sm text-gray-600 dark:text-gray-300 mb-6">
@@ -671,22 +671,22 @@ export default function VotePage() {
                   <div className="flex flex-wrap items-center justify-center gap-3">
                     <Badge className="bg-gradient-to-r from-green-100 to-emerald-100 text-green-800 dark:from-green-900 dark:to-emerald-900 dark:text-green-200 px-4 py-2">
                       <CheckCircle className="h-4 w-4 mr-2" />
-                      Ouverte au vote
-                    </Badge>
-                    {hasVoted && (
+                    Ouverte au vote
+                  </Badge>
+                  {hasVoted && (
                       <Badge className="bg-gradient-to-r from-blue-100 to-indigo-100 text-blue-800 dark:from-blue-900 dark:to-indigo-900 dark:text-blue-200 px-4 py-2">
                         <CheckCircle2 className="h-4 w-4 mr-2" />
-                        Vous avez voté
-                      </Badge>
-                    )}
+                      Vous avez voté
+                    </Badge>
+                  )}
                     <Badge className="bg-gradient-to-r from-purple-100 to-pink-100 text-purple-800 dark:from-purple-900 dark:to-pink-900 dark:text-purple-200 px-4 py-2">
                       <Shield className="h-4 w-4 mr-2" />
                       Vote sécurisé
                     </Badge>
-                  </div>
-                </CardHeader>
+              </div>
+            </CardHeader>
                 
-                <CardContent>
+            <CardContent>
                   <div className="space-y-10">
                     {selectedElectionData.positions.map((position, index) => (
                       <div key={position.id} className="relative">
@@ -700,10 +700,10 @@ export default function VotePage() {
                               <div>
                                 <h3 className="text-xl font-bold text-gray-900 dark:text-white">
                                   {POSTES_LABELS[position.type as keyof typeof POSTES_LABELS]}
-                                </h3>
+                      </h3>
                                 <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                                  Sélectionnez votre candidat ou votez blanc
-                                </p>
+                        Sélectionnez votre candidat ou votez blanc
+                      </p>
                                 <div className="flex items-center space-x-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
                                   <div className="flex items-center">
                                     <div className="w-2 h-2 bg-green-500 rounded-full mr-2"></div>
@@ -725,29 +725,29 @@ export default function VotePage() {
                               </div>
                             )}
                           </div>
-                        </div>
+                    </div>
 
                         {/* Contenu de vote */}
                         <div className="bg-white dark:bg-slate-700 rounded-b-xl border-x border-b border-gray-200 dark:border-gray-600 p-6">
-                          <RadioGroup
-                            value={votes[position.id] || ""}
-                            onValueChange={(value) => {
-                              if (value === "blanc") {
-                                handleVote(position.id, null);
-                              } else {
-                                handleVote(position.id, value);
-                              }
-                            }}
-                            className="space-y-4"
-                          >
-                            {/* Vote blanc */}
+                    <RadioGroup
+                      value={votes[position.id] || ""}
+                      onValueChange={(value) => {
+                        if (value === "blanc") {
+                          handleVote(position.id, null);
+                        } else {
+                          handleVote(position.id, value);
+                        }
+                      }}
+                      className="space-y-4"
+                    >
+                      {/* Vote blanc */}
                             <div className={`group relative overflow-hidden rounded-xl border-2 transition-all duration-300 cursor-pointer ${
                               votes[position.id] === "blanc" 
                                 ? 'border-gray-400 bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-800 dark:to-slate-800 shadow-lg' 
                                 : 'border-gray-200 hover:border-gray-300 hover:shadow-md bg-white dark:bg-slate-600'
                             }`}>
                               <div className="p-6">
-                                <div className="flex items-center">
+                          <div className="flex items-center">
                                   <RadioGroupItem value="blanc" id={`blanc-${position.id}`} className="mr-4" />
                                   <div className="flex items-center flex-1">
                                     <div className={`w-12 h-12 rounded-full flex items-center justify-center mr-4 transition-colors ${
@@ -756,24 +756,24 @@ export default function VotePage() {
                                         : 'bg-gray-200 dark:bg-gray-700 group-hover:bg-gray-300 dark:group-hover:bg-gray-600'
                                     }`}>
                                       <span className="text-gray-600 dark:text-gray-300 text-lg font-bold">∅</span>
-                                    </div>
+                            </div>
                                     <div className="flex-1">
                                       <div className="flex items-center justify-between">
-                                        <div>
+                            <div>
                                           <div className="font-bold text-lg text-gray-900 dark:text-white">
                                             Vote blanc
                                           </div>
                                           <div className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                                            Je ne souhaite pas voter pour ce poste
+                                Je ne souhaite pas voter pour ce poste
                                           </div>
                                         </div>
                                         {votes[position.id] === "blanc" && (
                                           <CheckCircle className="h-6 w-6 text-green-600" />
                                         )}
-                                      </div>
-                                    </div>
-                                  </div>
-                                </div>
+                              </div>
+                            </div>
+                          </div>
+                      </div>
                               </div>
                               <Label htmlFor={`blanc-${position.id}`} className="absolute inset-0 cursor-pointer" />
                             </div>
@@ -810,16 +810,16 @@ export default function VotePage() {
                                       </AvatarFallback>
                                     </Avatar>
                                     
-                                    <div className="flex-1">
+                              <div className="flex-1">
                                       <div className="flex items-center justify-between">
                                         <div>
                                           <div className="font-semibold text-lg text-gray-900 dark:text-white">
-                                            {candidacy.adherent.firstname} {candidacy.adherent.lastname}
-                                          </div>
-                                          <div className="text-sm text-gray-600 dark:text-gray-300">
+                                  {candidacy.adherent.firstname} {candidacy.adherent.lastname}
+                                </div>
+                                <div className="text-sm text-gray-600 dark:text-gray-300">
                                             {candidacy.adherent.User.name}
-                                          </div>
-                                        </div>
+                                </div>
+                                  </div>
                                         
                                         <div className="flex items-center space-x-2">
                                           {votes[position.id] === candidacy.id && (
@@ -842,12 +842,12 @@ export default function VotePage() {
                                 {candidacy.status === "Validee" && (
                                   <Label htmlFor={candidacy.id} className="absolute inset-0 cursor-pointer" />
                                 )}
-                              </div>
-                            ))}
-                          </RadioGroup>
+                        </div>
+                      ))}
+                    </RadioGroup>
 
-                          {/* Indicateur de vote */}
-                          {votes[position.id] && (
+                    {/* Indicateur de vote */}
+                    {votes[position.id] && (
                             <div className="mt-6 p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-700">
                               <div className="flex items-center">
                                 <CheckCircle className="h-5 w-5 mr-3 text-green-600" />
@@ -856,7 +856,7 @@ export default function VotePage() {
                                     Vote enregistré avec succès
                                   </span>
                                   <div className="text-sm text-green-700 dark:text-green-300 mt-1">
-                                    {votes[position.id] === "blanc" 
+                          {votes[position.id] === "blanc" 
                                       ? "Vous avez voté blanc pour ce poste" 
                                       : `Vous avez voté pour ${position.candidacies?.find(c => c.id === votes[position.id])?.adherent.firstname} ${position.candidacies?.find(c => c.id === votes[position.id])?.adherent.lastname}`
                                     }
@@ -890,9 +890,9 @@ export default function VotePage() {
                           <div key={index} className="flex items-center justify-between p-3 bg-white dark:bg-slate-700 rounded-lg">
                             <span className="font-medium text-gray-900 dark:text-white">{summary.position}</span>
                             <span className="text-sm text-gray-600 dark:text-gray-300">{summary.vote}</span>
-                          </div>
-                        ))}
-                      </div>
+                  </div>
+                ))}
+              </div>
                       
                       <div className="mt-6 text-center">
                         <Button 
@@ -907,16 +907,16 @@ export default function VotePage() {
                     </div>
                   )}
 
-                  {/* Instructions */}
+              {/* Instructions */}
                   <div className="mt-10 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-xl border border-blue-200 dark:border-blue-700">
-                    <div className="flex items-start">
+                <div className="flex items-start">
                       <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-full flex items-center justify-center mr-4 flex-shrink-0">
                         <AlertCircle className="h-6 w-6 text-white" />
                       </div>
                       <div className="flex-1">
                         <h4 className="text-xl font-bold text-blue-900 dark:text-blue-100 mb-4">
-                          Instructions de vote
-                        </h4>
+                      Instructions de vote
+                    </h4>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                           <div className="space-y-3">
                             <div className="flex items-start">
@@ -951,24 +951,24 @@ export default function VotePage() {
                             </div>
                           </div>
                         </div>
-                      </div>
-                    </div>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
             {/* Message quand aucune élection */}
-            {elections.length === 0 && (
+        {elections.length === 0 && (
               <Card className="bg-gradient-to-r from-gray-50 to-slate-50 dark:from-gray-900/20 dark:to-slate-900/20 border-gray-200 dark:border-gray-800">
                 <CardContent className="p-12 text-center">
                   <div className="w-16 h-16 bg-gray-100 dark:bg-gray-900/30 rounded-full flex items-center justify-center mx-auto mb-4">
                     <Vote className="h-8 w-8 text-gray-600 dark:text-gray-400" />
                   </div>
                   <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                    Aucune élection ouverte au vote
-                  </h3>
-                  <p className="text-gray-600 dark:text-gray-300">
+              Aucune élection ouverte au vote
+            </h3>
+            <p className="text-gray-600 dark:text-gray-300">
                     Il n'y a actuellement aucune élection ouverte au vote.
                   </p>
                 </CardContent>

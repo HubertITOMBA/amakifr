@@ -70,6 +70,16 @@ export const {
 				session.user.role = token.role as UserRole;
 			}
 
+			// Propager des métadonnées supplémentaires à la session
+			if (session.user) {
+				// @ts-ignore - enrichir l'objet user dynamiquement
+				session.user.lastLogin = token.lastLogin as string | undefined;
+				// @ts-ignore
+				session.user.createdAt = token.createdAt as string | undefined;
+				// @ts-ignore
+				session.user.status = token.status as string | undefined;
+			}
+
 			return session;
 		},
 
@@ -81,6 +91,10 @@ export const {
 			if (!existingUser) return token;
 
 			token.role = existingUser.role;
+			// Ajouter des champs supplémentaires pour utilisation côté client
+			token.lastLogin = existingUser.lastLogin ? existingUser.lastLogin.toISOString() : undefined;
+			token.createdAt = existingUser.createdAt ? existingUser.createdAt.toISOString() : undefined;
+			token.status = existingUser.status;
 
 			return token;
 		},
