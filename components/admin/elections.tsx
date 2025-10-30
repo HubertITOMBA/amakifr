@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -86,11 +86,23 @@ export default function ElectionsPage() {
     conditions: "Être membre actif de l'association"
   });
 
+  const createFormRef = useRef<HTMLFormElement | null>(null);
+
   // Charger les élections et les postes
   useEffect(() => {
     loadElections();
     loadPostes();
   }, []);
+
+  useEffect(() => {
+    const onModalSave = () => {
+      if (showCreateForm && createFormRef.current) {
+        createFormRef.current.requestSubmit();
+      }
+    };
+    window.addEventListener("modal-save", onModalSave as EventListener);
+    return () => window.removeEventListener("modal-save", onModalSave as EventListener);
+  }, [showCreateForm]);
 
   const loadPostes = async () => {
     try {
@@ -304,7 +316,7 @@ export default function ElectionsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleCreateElection} className="space-y-6">
+              <form ref={createFormRef} onSubmit={handleCreateElection} className="space-y-6">
                 {/* Informations générales */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   <div>

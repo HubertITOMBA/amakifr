@@ -382,19 +382,15 @@ export default function AdminElectionsPage() {
         return (
           <div className="flex space-x-2">
             <Button size="sm" variant="outline" asChild>
-              <Link href={`/elections/${election.id}`}>
+              <Link href={`/admin/elections/${election.id}/consultation`}>
                 <Eye className="h-4 w-4" />
               </Link>
             </Button>
-            {election.status === ElectionStatus.Ouverte && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleCloseElection(election.id)}
-              >
-                <XCircle className="h-4 w-4" />
-              </Button>
-            )}
+            <Button size="sm" variant="outline" asChild>
+              <Link href={`/admin/elections/${election.id}/edition`}>
+                <Edit className="h-4 w-4" />
+              </Link>
+            </Button>
           </div>
         );
       },
@@ -736,7 +732,7 @@ export default function AdminElectionsPage() {
                 Élections
               </CardTitle>
               <Button asChild>
-                <Link href="/elections">
+                <Link href="/admin/elections/gestion">
                   <Plus className="h-4 w-4 mr-2" />
                   Créer une élection
                 </Link>

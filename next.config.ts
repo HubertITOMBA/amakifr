@@ -35,7 +35,7 @@ const nextConfig: NextConfig = {
         hostname: '**.googleusercontent.com',
       },
     ],
-    domains: ['images.unsplash.com'],
+    // domains supprimé car deprecated
   },
 
 };

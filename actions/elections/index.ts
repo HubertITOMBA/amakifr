@@ -1478,3 +1478,78 @@ export async function getCandidacyById(candidacyId: string) {
     return { success: false, error: "Erreur lors de la récupération de la candidature" };
   }
 }
+
+export async function updateElection(
+  electionId: string,
+  data: Partial<ElectionData>
+): Promise<{ success: boolean; election?: any; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") {
+      return { success: false, error: "Seuls les administrateurs peuvent modifier une élection" };
+    }
+
+    const allowedData: any = {};
+    if (typeof data.titre !== "undefined") allowedData.titre = data.titre;
+    if (typeof data.description !== "undefined") allowedData.description = data.description;
+    if (typeof data.dateOuverture !== "undefined") allowedData.dateOuverture = data.dateOuverture;
+    if (typeof data.dateCloture !== "undefined") allowedData.dateCloture = data.dateCloture;
+    if (typeof data.dateScrutin !== "undefined") allowedData.dateScrutin = data.dateScrutin;
+    if (typeof data.nombreMandats !== "undefined") allowedData.nombreMandats = data.nombreMandats;
+    if (typeof data.quorumRequis !== "undefined") allowedData.quorumRequis = data.quorumRequis;
+    if (typeof data.majoriteRequis !== "undefined") allowedData.majoriteRequis = data.majoriteRequis;
+
+    const election = await prisma.election.update({
+      where: { id: electionId },
+      data: allowedData,
+    });
+
+    return { success: true, election };
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de l'élection:", error);
+    return { success: false, error: "Erreur lors de la mise à jour de l'élection" };
+  }
+}
+
+export async function updatePosition(
+  positionId: string,
+  data: { titre?: string; description?: string; nombreMandats?: number; dureeMandat?: number; conditions?: string }
+): Promise<{ success: boolean; position?: any; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Seuls les administrateurs peuvent modifier un poste" };
+
+    const position = await prisma.position.update({
+      where: { id: positionId },
+      data,
+    });
+    return { success: true, position };
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour du poste:", error);
+    return { success: false, error: "Erreur lors de la mise à jour du poste" };
+  }
+}
+
+export async function deletePosition(positionId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Seuls les administrateurs peuvent supprimer un poste" };
+
+    await prisma.position.delete({ where: { id: positionId } });
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur lors de la suppression du poste:", error);
+    return { success: false, error: "Erreur lors de la suppression du poste" };
+  }
+}
