@@ -4,23 +4,20 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { useSession } from "next-auth/react";
 import { redirect } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LogoutButton } from "@/components/auth/logout-button";
 import { 
   Users, 
+  Euro, 
   Settings, 
   BarChart3, 
   FileText, 
   Calendar,
   Mail,
   Shield,
-  LogOut,
+  Home,
   Menu,
   X
 } from "lucide-react";
 import Link from "next/link";
-import { Button } from "@/components/ui/button";
-import { signOut } from "next-auth/react";
-import { useRouter } from "next/navigation";
 
 const adminMenuItems = [
   {
@@ -35,11 +32,37 @@ const adminMenuItems = [
     icon: Users,
     description: "Gestion des membres"
   },
+
+  {
+    title: "Cotisations",
+    href: "/admin/cotisations",
+    icon: Euro,
+    description: "Gestion des cotisations"
+  },
+  {
+    title: "Gestion des Cotisations",
+    href: "/admin/cotisations/gestion",
+    icon: Euro,
+    description: "Gestion des cotisations"
+  },
+  {
+    title: "Depenses",
+    href: "/admin/depenses",
+    icon: Euro,
+    description: "Gestion des depenses"
+  },
+
   {
     title: "Événements",
-    href: "/admin/events",
+    href: "/admin/evenements",
     icon: Calendar,
     description: "Gestion des événements"
+  },
+  {
+    title: "Élections",
+    href: "/admin/elections",
+    icon: Calendar,
+    description: "Gestion des élections"
   },
   {
     title: "Contenu",
@@ -69,7 +92,6 @@ export default function AdminLayout({
   const { data: session, status } = useSession();
   const user = useCurrentUser();
   const [sidebarOpen, setSidebarOpen] = useState(false);
-  const router = useRouter();
 
   useEffect(() => {
     if (status === "unauthenticated") {
@@ -81,22 +103,6 @@ export default function AdminLayout({
     }
   }, [status, user?.role]);
 
-  const handleLogout = async () => {
-    try {
-      await signOut({
-        redirect: false,
-        callbackUrl: "/"
-      });
-      // Redirection vers la page d'accueil
-      router.push("/");
-      // Rafraîchir la page pour s'assurer que l'état de session est mis à jour
-      router.refresh();
-    } catch (error) {
-      console.error("Erreur lors de la déconnexion:", error);
-      // En cas d'erreur, forcer la redirection vers la page d'accueil
-      window.location.href = "/";
-    }
-  };
 
   if (status === "loading") {
     return (
@@ -180,17 +186,15 @@ export default function AdminLayout({
           })}
         </nav>
 
-        {/* Logout */}
+        {/* Retour à l'accueil */}
         <div className="p-4 border-t border-gray-200 dark:border-gray-700">
-          <button
-            onClick={handleLogout}
-            className="flex items-center space-x-3 w-full px-3 py-2 text-sm font-medium text-red-600 dark:text-red-400 rounded-lg hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+          <Link
+            href="/"
+            className="flex items-center space-x-3 w-full px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group"
           >
-             <LogoutButton>
-                Déconnexion
-            </LogoutButton> 
-
-          </button>
+            <Home className="h-4 w-4 group-hover:scale-110 transition-transform" />
+            <span>Retour à l'accueil</span>
+          </Link>
         </div>
       </div>
 

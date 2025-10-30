@@ -1,7 +1,7 @@
 "use server"
 
 import { auth } from "@/auth";
-import { db } from "@/lib/db";
+import prisma from "@/lib/prisma";
 import { ElectionStatus, PositionType, CandidacyStatus } from "@prisma/client";
 
 // Types pour les données
@@ -34,11 +34,13 @@ interface CandidacyData {
 }
 
 import { POSTES_LABELS, getPosteLabel } from "@/lib/elections-constants";
+import { getAllPostesTemplates } from "@/actions/postes";
 
 // Server Action pour créer une élection avec ses postes
+// Accepte soit des IDs de PosteTemplate (nouveau système) soit des PositionType (rétrocompatibilité)
 export async function createElection(
   electionData: ElectionData, 
-  selectedPostes: PositionType[]
+  selectedPostes: string[] // IDs de PosteTemplate ou PositionType pour rétrocompatibilité
 ): Promise<{ success: boolean; election?: any; error?: string }> {
   try {
     const session = await auth();
@@ -48,7 +50,7 @@ export async function createElection(
     }
 
     // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: session.user.id }
     });
 
@@ -62,7 +64,7 @@ export async function createElection(
     }
 
     // Créer l'élection avec ses postes en une transaction
-    const result = await db.$transaction(async (tx) => {
+    const result = await prisma.$transaction(async (tx) => {
       // Créer l'élection
       const election = await tx.election.create({
         data: {
@@ -72,18 +74,76 @@ export async function createElection(
         }
       });
 
-      // Créer les postes pour cette élection
+      // Récupérer les postes depuis la base de données
+      const postesTemplates = await prisma.posteTemplate.findMany({
+        where: {
+          id: { in: selectedPostes },
+          actif: true
+        }
+      });
+
+      // Si pas de postes trouvés, essayer avec PositionType (rétrocompatibilité)
+      if (postesTemplates.length === 0) {
+        // Traitement de rétrocompatibilité avec l'ancien système
+        const positions = await Promise.all(
+          selectedPostes.map(async (posteId) => {
+            // Essayer de convertir en PositionType si c'est une valeur d'enum
+            const posteType = posteId as PositionType;
+            if (Object.values(PositionType).includes(posteType)) {
+              // Trouver le template correspondant au type
+              const template = await prisma.posteTemplate.findFirst({
+                where: {
+                  code: posteType.toLowerCase().replace(/([A-Z])/g, '_$1').toLowerCase()
+                }
+              });
+
+              return await tx.position.create({
+                data: {
+                  electionId: election.id,
+                  type: posteType,
+                  titre: POSTES_LABELS[posteType] || posteType,
+                  description: template?.description || `Poste de ${POSTES_LABELS[posteType]?.toLowerCase() || posteType.toLowerCase()}`,
+                  nombreMandats: template?.nombreMandatsDefaut || 1,
+                  dureeMandat: template?.dureeMandatDefaut || 24,
+                  conditions: "Être membre actif de l'association",
+                  posteTemplateId: template?.id || null
+                }
+              });
+            } else {
+              throw new Error(`Type de poste invalide: ${posteId}`);
+            }
+          })
+        );
+        return { election, positions };
+      }
+
+      // Créer les postes pour cette élection avec les templates
       const positions = await Promise.all(
-        selectedPostes.map(async (posteType) => {
+        postesTemplates.map(async (template) => {
+          // Mapper le code du template à un PositionType pour la rétrocompatibilité
+          const codeToTypeMap: Record<string, PositionType> = {
+            'president': PositionType.President,
+            'vice_president': PositionType.VicePresident,
+            'secretaire': PositionType.Secretaire,
+            'vice_secretaire': PositionType.ViceSecretaire,
+            'tresorier': PositionType.Tresorier,
+            'vice_tresorier': PositionType.ViceTresorier,
+            'commissaire_comptes': PositionType.CommissaireComptes,
+            'membre_comite_directeur': PositionType.MembreComiteDirecteur,
+          };
+
+          const positionType = codeToTypeMap[template.code] || PositionType.MembreComiteDirecteur;
+
           return await tx.position.create({
             data: {
               electionId: election.id,
-              type: posteType,
-              titre: POSTES_LABELS[posteType],
-              description: `Poste de ${POSTES_LABELS[posteType].toLowerCase()}`,
-              nombreMandats: 1, // Par défaut 1 mandat
-              dureeMandat: 2, // Par défaut 2 ans
-              conditions: "Être membre actif de l'association"
+              type: positionType,
+              titre: template.libelle,
+              description: template.description || `Poste de ${template.libelle.toLowerCase()}`,
+              nombreMandats: template.nombreMandatsDefaut,
+              dureeMandat: template.dureeMandatDefaut || 24,
+              conditions: "Être membre actif de l'association",
+              posteTemplateId: template.id
             }
           });
         })
@@ -113,7 +173,7 @@ export async function createCustomPosition(
     }
 
     // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: session.user.id }
     });
 
@@ -122,7 +182,7 @@ export async function createCustomPosition(
     }
 
     // Vérifier que l'élection existe
-    const election = await db.election.findUnique({
+    const election = await prisma.election.findUnique({
       where: { id: electionId }
     });
 
@@ -131,7 +191,7 @@ export async function createCustomPosition(
     }
 
     // Créer le poste personnalisé
-    const position = await db.position.create({
+    const position = await prisma.position.create({
       data: {
         electionId,
         ...positionData
@@ -159,7 +219,7 @@ export async function addPositionsToElection(
     }
 
     // Vérifier que l'élection existe
-    const election = await db.election.findUnique({
+    const election = await prisma.election.findUnique({
       where: { id: electionId }
     });
 
@@ -170,7 +230,7 @@ export async function addPositionsToElection(
     // Créer les postes
     const createdPositions = await Promise.all(
       positions.map(position => 
-        db.position.create({
+        prisma.position.create({
           data: {
             ...position,
             electionId,
@@ -198,7 +258,7 @@ export async function createCandidacy(candidacyData: CandidacyData): Promise<{ s
     }
 
     // Vérifier que l'utilisateur est bien un adhérent
-    const adherent = await db.adherent.findUnique({
+    const adherent = await prisma.adherent.findUnique({
       where: { userId: session.user.id },
       include: {
         User: true
@@ -213,7 +273,7 @@ export async function createCandidacy(candidacyData: CandidacyData): Promise<{ s
     }
 
     // Vérifier que l'élection est ouverte aux candidatures
-    const election = await db.election.findUnique({
+    const election = await prisma.election.findUnique({
       where: { id: candidacyData.electionId }
     });
 
@@ -222,7 +282,7 @@ export async function createCandidacy(candidacyData: CandidacyData): Promise<{ s
     }
 
     // Vérifier que l'adhérent n'a pas déjà postulé pour ce poste spécifique
-    const existingCandidacy = await db.candidacy.findFirst({
+    const existingCandidacy = await prisma.candidacy.findFirst({
       where: {
         adherentId: adherent.id,
         electionId: candidacyData.electionId,
@@ -235,7 +295,7 @@ export async function createCandidacy(candidacyData: CandidacyData): Promise<{ s
     }
 
     // Vérifier que le poste existe et appartient à cette élection
-    const position = await db.position.findFirst({
+    const position = await prisma.position.findFirst({
       where: {
         id: candidacyData.positionId,
         electionId: candidacyData.electionId
@@ -247,7 +307,7 @@ export async function createCandidacy(candidacyData: CandidacyData): Promise<{ s
     }
 
     // Créer la candidature
-    const candidacy = await db.candidacy.create({
+    const candidacy = await prisma.candidacy.create({
       data: {
         ...candidacyData,
         adherentId: adherent.id,
@@ -287,7 +347,7 @@ export async function createMultipleCandidacies(
     }
 
     // Vérifier que l'utilisateur est bien un adhérent
-    const adherent = await db.adherent.findUnique({
+    const adherent = await prisma.adherent.findUnique({
       where: { userId: session.user.id },
       include: {
         User: true
@@ -302,7 +362,7 @@ export async function createMultipleCandidacies(
     }
 
     // Vérifier que l'élection est ouverte aux candidatures
-    const election = await db.election.findUnique({
+    const election = await prisma.election.findUnique({
       where: { id: electionId }
     });
 
@@ -311,7 +371,7 @@ export async function createMultipleCandidacies(
     }
 
     // Vérifier que tous les postes existent et appartiennent à cette élection
-    const positions = await db.position.findMany({
+    const positions = await prisma.position.findMany({
       where: {
         id: { in: positionIds },
         electionId: electionId
@@ -323,7 +383,7 @@ export async function createMultipleCandidacies(
     }
 
     // Vérifier qu'il n'y a pas de candidatures existantes pour ces postes
-    const existingCandidacies = await db.candidacy.findMany({
+    const existingCandidacies = await prisma.candidacy.findMany({
       where: {
         adherentId: adherent.id,
         electionId: electionId,
@@ -381,7 +441,7 @@ export async function getUserCandidacies(): Promise<{ success: boolean; candidac
     }
 
     // Récupérer l'adhérent de l'utilisateur
-    const adherent = await db.adherent.findUnique({
+    const adherent = await prisma.adherent.findUnique({
       where: { userId: session.user.id }
     });
 
@@ -390,7 +450,7 @@ export async function getUserCandidacies(): Promise<{ success: boolean; candidac
     }
 
     // Récupérer toutes les candidatures de l'adhérent
-    const candidacies = await db.candidacy.findMany({
+    const candidacies = await prisma.candidacy.findMany({
       where: {
         adherentId: adherent.id
       },
@@ -438,7 +498,7 @@ export async function updateCandidacy(
     }
 
     // Récupérer l'adhérent de l'utilisateur
-    const adherent = await db.adherent.findUnique({
+    const adherent = await prisma.adherent.findUnique({
       where: { userId: session.user.id }
     });
 
@@ -552,7 +612,7 @@ export async function updateCandidacyPositions(
     }
 
     // Récupérer l'adhérent de l'utilisateur
-    const adherent = await db.adherent.findUnique({
+    const adherent = await prisma.adherent.findUnique({
       where: { userId: session.user.id }
     });
 
@@ -561,7 +621,7 @@ export async function updateCandidacyPositions(
     }
 
     // Récupérer la candidature existante avec l'élection associée
-    const existingCandidacy = await db.candidacy.findFirst({
+    const existingCandidacy = await prisma.candidacy.findFirst({
       where: {
         id: candidacyId,
         adherentId: adherent.id
@@ -601,7 +661,7 @@ export async function updateCandidacyPositions(
     }
 
     // Récupérer toutes les candidatures existantes de l'adhérent pour cette élection
-    const existingCandidacies = await db.candidacy.findMany({
+    const existingCandidacies = await prisma.candidacy.findMany({
       where: {
         adherentId: adherent.id,
         electionId: existingCandidacy.position.electionId
@@ -705,7 +765,7 @@ export async function updateCandidacyPositions(
 // Server Action pour récupérer les élections
 export async function getElections(): Promise<{ success: boolean; elections?: any[]; error?: string }> {
   try {
-    const elections = await db.election.findMany({
+    const elections = await prisma.election.findMany({
       include: {
         positions: {
           include: {
@@ -752,7 +812,7 @@ export async function getElections(): Promise<{ success: boolean; elections?: an
 // Server Action pour récupérer tous les candidats avec leurs informations
 export async function getAllCandidates(): Promise<{ success: boolean; candidates?: any[]; error?: string }> {
   try {
-    const candidates = await db.candidacy.findMany({
+    const candidates = await prisma.candidacy.findMany({
       include: {
         adherent: {
           include: {
@@ -827,7 +887,7 @@ export async function getAllCandidates(): Promise<{ success: boolean; candidates
 // Server Action pour récupérer toutes les candidatures pour l'admin
 export async function getAllCandidaciesForAdmin(): Promise<{ success: boolean; candidacies?: any[]; error?: string }> {
   try {
-    const candidacies = await db.candidacy.findMany({
+    const candidacies = await prisma.candidacy.findMany({
       include: {
         adherent: {
           include: {
@@ -881,7 +941,7 @@ export async function updateCandidacyStatus(
     }
 
     // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { role: true }
     });
@@ -890,7 +950,7 @@ export async function updateCandidacyStatus(
       return { success: false, error: "Accès refusé - Admin requis" };
     }
 
-    await db.candidacy.update({
+    await prisma.candidacy.update({
       where: { id: candidacyId },
       data: { status }
     });
@@ -911,7 +971,7 @@ export async function closeElection(electionId: string): Promise<{ success: bool
     }
 
     // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { role: true }
     });
@@ -920,7 +980,7 @@ export async function closeElection(electionId: string): Promise<{ success: bool
       return { success: false, error: "Accès refusé - Admin requis" };
     }
 
-    await db.election.update({
+    await prisma.election.update({
       where: { id: electionId },
       data: { 
         status: ElectionStatus.Cloturee,
@@ -938,7 +998,7 @@ export async function closeElection(electionId: string): Promise<{ success: bool
 // Server Action pour récupérer toutes les élections pour l'admin
 export async function getAllElectionsForAdmin(): Promise<{ success: boolean; elections?: any[]; error?: string }> {
   try {
-    const elections = await db.election.findMany({
+    const elections = await prisma.election.findMany({
       include: {
         positions: {
           include: {
@@ -955,6 +1015,11 @@ export async function getAllElectionsForAdmin(): Promise<{ success: boolean; ele
                 }
               }
             },
+            votes: true
+          }
+        },
+        _count: {
+          select: {
             votes: true
           }
         }
@@ -977,7 +1042,7 @@ export async function getUserVotes(electionId: string): Promise<{ success: boole
       return { success: false, error: "Non autorisé" };
     }
 
-    const adherent = await db.adherent.findUnique({
+    const adherent = await prisma.adherent.findUnique({
       where: { userId: session.user.id }
     });
 
@@ -985,7 +1050,7 @@ export async function getUserVotes(electionId: string): Promise<{ success: boole
       return { success: false, error: "Profil adhérent non trouvé" };
     }
 
-    const votes = await db.vote.findMany({
+    const votes = await prisma.vote.findMany({
       where: {
         electionId: electionId,
         adherentId: adherent.id
@@ -1024,7 +1089,7 @@ export async function getUserVotes(electionId: string): Promise<{ success: boole
 // Server Action pour récupérer une élection spécifique
 export async function getElectionById(electionId: string): Promise<{ success: boolean; election?: any; error?: string }> {
   try {
-    const election = await db.election.findUnique({
+    const election = await prisma.election.findUnique({
       where: { id: electionId },
       include: {
         positions: {
@@ -1097,7 +1162,7 @@ export async function vote(
     }
 
     // Récupérer l'adhérent de l'utilisateur
-    const adherent = await db.adherent.findUnique({
+    const adherent = await prisma.adherent.findUnique({
       where: { userId: session.user.id }
     });
 
@@ -1106,7 +1171,7 @@ export async function vote(
     }
 
     // Vérifier que l'élection est ouverte au vote
-    const election = await db.election.findUnique({
+    const election = await prisma.election.findUnique({
       where: { id: electionId }
     });
 
@@ -1115,7 +1180,7 @@ export async function vote(
     }
 
     // Vérifier que l'utilisateur n'a pas déjà voté pour ce poste
-    const existingVote = await db.vote.findFirst({
+    const existingVote = await prisma.vote.findFirst({
       where: {
         electionId,
         positionId,
@@ -1128,7 +1193,7 @@ export async function vote(
     }
 
     // Créer le vote
-    const vote = await db.vote.create({
+    const vote = await prisma.vote.create({
       data: {
         electionId,
         positionId,
@@ -1171,7 +1236,7 @@ export async function validateCandidacy(
     }
 
     // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: session.user.id }
     });
 
@@ -1219,7 +1284,7 @@ export async function updateElectionStatus(
     }
 
     // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
+    const user = await prisma.user.findUnique({
       where: { id: session.user.id }
     });
 
@@ -1257,7 +1322,7 @@ export async function updateElectionStatus(
 // Server Action pour obtenir les résultats d'une élection
 export async function getElectionResults(electionId: string): Promise<{ success: boolean; results?: any; error?: string }> {
   try {
-    const election = await db.election.findUnique({
+    const election = await prisma.election.findUnique({
       where: { id: electionId },
       include: {
         positions: {
@@ -1323,7 +1388,7 @@ export async function getUserVoteHistory(): Promise<{ success: boolean; election
       return { success: false, error: "Non autorisé" };
     }
 
-    const adherent = await db.adherent.findUnique({
+    const adherent = await prisma.adherent.findUnique({
       where: { userId: session.user.id }
     });
 
@@ -1332,7 +1397,7 @@ export async function getUserVoteHistory(): Promise<{ success: boolean; election
     }
 
     // Récupérer toutes les élections avec les votes de l'utilisateur
-    const elections = await db.election.findMany({
+    const elections = await prisma.election.findMany({
       include: {
         positions: {
           include: {
@@ -1379,5 +1444,37 @@ export async function getUserVoteHistory(): Promise<{ success: boolean; election
   } catch (error) {
     console.error("Erreur lors de la récupération de l'historique des votes:", error);
     return { success: false, error: "Erreur lors de la récupération de l'historique des votes" };
+  }
+}
+
+// Server Action pour récupérer une candidature par ID (pour admin)
+export async function getCandidacyById(candidacyId: string) {
+  try {
+    const candidacy = await prisma.candidacy.findUnique({
+      where: { id: candidacyId },
+      include: {
+        adherent: {
+          include: {
+            User: true,
+            adresse: true
+          }
+        },
+        position: {
+          include: {
+            election: true
+          }
+        }
+      }
+    });
+
+    if (!candidacy) {
+      return { success: false, error: "Candidature non trouvée" };
+    }
+
+    return { success: true, data: candidacy };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la candidature:", error);
+    return { success: false, error: "Erreur lors de la récupération de la candidature" };
   }
 }

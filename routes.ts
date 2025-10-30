@@ -15,6 +15,24 @@ export const publicRoutes = [
     "/vote",
     "/elections",
 ];
+
+/**
+ * Fonction pour vérifier si une route est publique
+ * Prend en compte les routes dynamiques comme /evenements/[id]
+ */
+export function isPublicRoute(pathname: string): boolean {
+    // Routes exactes publiques
+    if (publicRoutes.includes(pathname)) {
+        return true;
+    }
+    
+    // Routes dynamiques publiques
+    if (pathname.startsWith("/evenements/")) {
+        return true;
+    }
+    
+    return false;
+}
 /**
  * Routes utilisées pour l'authentification
  * Ces routes redirigeront les utilisateurs connectés vers /settings

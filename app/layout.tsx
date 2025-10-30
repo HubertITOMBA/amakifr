@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import { LoginButton } from "@/components/auth/login-button";
 import { AuthSessionProvider } from "@/components/providers/session-provider";
 import { ToastProvider } from "@/components/providers/toast-provider";
+import { Toaster } from "sonner";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -46,6 +47,7 @@ export default function RootLayout({
             
             {children}
             <ToastProvider />
+            <Toaster richColors position="top-right" />
           </ThemeProvider>
         </AuthSessionProvider>
       </body>

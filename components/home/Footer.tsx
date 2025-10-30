@@ -1,14 +1,33 @@
+"use client";
+
 import Image from "next/image";
 import Link from "next/link";
-import { Mail, Phone, MapPin, Facebook, Twitter, Linkedin, Instagram } from "lucide-react";
+import { 
+  Mail, 
+  Phone, 
+  MapPin, 
+  Facebook, 
+  Twitter, 
+  Linkedin, 
+  Instagram,
+  Heart,
+  Users,
+  Calendar,
+  Award,
+  ArrowRight,
+  Sparkles,
+  Globe,
+  Shield
+} from "lucide-react";
+import { motion } from "framer-motion";
 
 export function Footer() {
   const quickLinks = [
-    { name: "Accueil", href: "/" },
-    { name: "L'Amicale", href: "/amicale" },
-    { name: "Événements", href: "/evenements" },
-    { name: "Agenda", href: "/agenda" },
-    { name: "Contact", href: "/contact" }
+    { name: "Accueil", href: "/", icon: Heart },
+    { name: "L'Amicale", href: "/amicale", icon: Users },
+    { name: "Événements", href: "/evenements", icon: Calendar },
+    { name: "Agenda", href: "/agenda", icon: Calendar },
+    { name: "Contact", href: "/contact", icon: Mail }
   ];
 
   const resources = [
@@ -20,126 +39,263 @@ export function Footer() {
   ];
 
   const socialLinks = [
-    { name: "Facebook", icon: Facebook, href: "#" },
-    { name: "Twitter", icon: Twitter, href: "#" },
-    { name: "LinkedIn", icon: Linkedin, href: "#" },
-    { name: "Instagram", icon: Instagram, href: "#" }
+    { name: "Facebook", icon: Facebook, href: "#", color: "hover:bg-blue-600" },
+    { name: "Twitter", icon: Twitter, href: "#", color: "hover:bg-sky-500" },
+    { name: "LinkedIn", icon: Linkedin, href: "#", color: "hover:bg-blue-700" },
+    { name: "Instagram", icon: Instagram, href: "#", color: "hover:bg-pink-600" }
+  ];
+
+  const stats = [
+    { label: "Membres Actifs", value: "150+", icon: Users },
+    { label: "Événements", value: "25+", icon: Calendar },
+    { label: "Pays", value: "3", icon: Globe },
+    { label: "Années", value: "5+", icon: Award }
   ];
 
   return (
-    <footer className="bg-slate-900 text-white">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-          {/* Logo et description */}
-          <div className="lg:col-span-1">
-            <Link href="/" className="flex items-center gap-2 mb-6">
-              {/* <div className="w-10 h-10 bg-blue-600 rounded-lg flex items-center justify-center">
-                <span className="text-white font-bold text-xl">A</span>
-              </div> */}
-              <h3 className="text-2xl font-bold">
-                Ama<span className="text-red-500">K</span>i France
-              </h3>
-            </Link>
-            <p className="text-gray-300 mb-6 leading-relaxed">
-              L'Amicale des Anciens Élèves de Kipako, 
-              unie par l'intégration, le respect, la solidarité, 
-              l'excellence et l'entraide pour construire l'avenir ensemble.
-            </p>
-            <div className="flex space-x-4">
-              {socialLinks.map((social) => (
-                <Link
-                  key={social.name}
-                  href={social.href}
-                  className="p-2 bg-slate-800 rounded-lg hover:bg-blue-600 transition-colors duration-300"
-                >
-                  <social.icon className="h-5 w-5" />
+    <footer className="relative bg-gradient-to-br from-slate-900 via-indigo-900 to-purple-900 text-white overflow-hidden">
+      {/* Background animé */}
+      <div className="absolute inset-0">
+        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500/10 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-purple-500/10 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/10 rounded-full blur-3xl animate-pulse delay-500" />
+      </div>
+
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Section principale */}
+        <div className="py-20">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
+            {/* Logo et description - Prend plus d'espace */}
+            <div className="lg:col-span-5">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8 }}
+                viewport={{ once: true }}
+              >
+                <Link href="/" className="flex items-center gap-3 mb-8 group">
+                  <div className="relative">
+                    <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center group-hover:scale-110 transition-transform duration-300">
+                      <span className="text-white font-bold text-xl">A</span>
+                    </div>
+                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-pink-500 to-red-500 rounded-full animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="text-3xl font-bold bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
+                      AMAKI France
+                    </h3>
+                    <p className="text-sm text-purple-200">Association Reconnue d'Intérêt Général</p>
+                  </div>
                 </Link>
-              ))}
+                
+                <p className="text-gray-300 mb-8 leading-relaxed text-lg">
+                  L'Amicale des Anciens Élèves de Kipaku, 
+                  unie par l'intégration, le respect, la solidarité, 
+                  la diversité, l'excellence et l'entraide pour construire l'avenir ensemble.
+                </p>
+
+                {/* Statistiques */}
+                <div className="grid grid-cols-2 gap-4 mb-8">
+                  {stats.map((stat, index) => (
+                    <motion.div
+                      key={stat.label}
+                      initial={{ opacity: 0, y: 20 }}
+                      whileInView={{ opacity: 1, y: 0 }}
+                      transition={{ duration: 0.6, delay: index * 0.1 }}
+                      viewport={{ once: true }}
+                      className="bg-white/5 backdrop-blur-sm rounded-lg p-4 border border-white/10"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="p-2 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-lg">
+                          <stat.icon className="h-4 w-4 text-white" />
+                        </div>
+                        <div>
+                          <div className="text-xl font-bold text-white">{stat.value}</div>
+                          <div className="text-xs text-gray-400">{stat.label}</div>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+
+                {/* Réseaux sociaux */}
+                <div className="flex space-x-3">
+                  {socialLinks.map((social, index) => (
+                    <motion.div
+                      key={social.name}
+                      initial={{ opacity: 0, scale: 0 }}
+                      whileInView={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.5, delay: index * 0.1 }}
+                      viewport={{ once: true }}
+                    >
+                      <Link
+                        href={social.href}
+                        className={`p-3 bg-white/10 backdrop-blur-sm rounded-xl border border-white/20 ${social.color} transition-all duration-300 hover:scale-110 hover:shadow-lg`}
+                      >
+                        <social.icon className="h-5 w-5" />
+                      </Link>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
             </div>
-          </div>
-          
-          {/* Liens rapides */}
-          <div>
-            <h4 className="text-lg font-semibold mb-6">Navigation</h4>
-            <ul className="space-y-3">
-              {quickLinks.map((link) => (
-                <li key={link.name}>
-                  <Link
-                    href={link.href}
-                    className="text-gray-300 hover:text-white transition-colors duration-300"
-                  >
-                    {link.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          {/* Ressources */}
-          <div>
-            <h4 className="text-lg font-semibold mb-6">Ressources</h4>
-            <ul className="space-y-3">
-              {resources.map((resource) => (
-                <li key={resource.name}>
-                  <Link
-                    href={resource.href}
-                    className="text-gray-300 hover:text-white transition-colors duration-300"
-                  >
-                    {resource.name}
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          </div>
-          
-          {/* Contact */}
-          <div>
-            <h4 className="text-lg font-semibold mb-6">Contact</h4>
-            <div className="space-y-4">
-              <div className="flex items-start">
-                <Mail className="h-5 w-5 text-blue-400 mr-3 mt-1" />
-                <div>
-                  <p className="text-gray-300">contact@amaki.fr</p>
-                  <p className="text-sm text-gray-400">Email principal</p>
+
+            {/* Navigation */}
+            <div className="lg:col-span-2">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.2 }}
+                viewport={{ once: true }}
+              >
+                <h4 className="text-xl font-bold mb-8 flex items-center gap-2">
+                  <Sparkles className="h-5 w-5 text-purple-400" />
+                  Navigation
+                </h4>
+                <ul className="space-y-4">
+                  {quickLinks.map((link, index) => (
+                    <motion.li
+                      key={link.name}
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.5, delay: index * 0.1 }}
+                      viewport={{ once: true }}
+                    >
+                      <Link
+                        href={link.href}
+                        className="flex items-center gap-3 text-gray-300 hover:text-white transition-all duration-300 group"
+                      >
+                        <link.icon className="h-4 w-4 text-purple-400 group-hover:text-purple-300" />
+                        <span className="group-hover:translate-x-1 transition-transform duration-300">
+                          {link.name}
+                        </span>
+                        <ArrowRight className="h-3 w-3 opacity-0 group-hover:opacity-100 transition-all duration-300" />
+                      </Link>
+                    </motion.li>
+                  ))}
+                </ul>
+              </motion.div>
+            </div>
+
+            {/* Ressources */}
+            <div className="lg:col-span-2">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.4 }}
+                viewport={{ once: true }}
+              >
+                <h4 className="text-xl font-bold mb-8 flex items-center gap-2">
+                  <Shield className="h-5 w-5 text-blue-400" />
+                  Ressources
+                </h4>
+                <ul className="space-y-4">
+                  {resources.map((resource, index) => (
+                    <motion.li
+                      key={resource.name}
+                      initial={{ opacity: 0, x: -20 }}
+                      whileInView={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.5, delay: index * 0.1 }}
+                      viewport={{ once: true }}
+                    >
+                      <Link
+                        href={resource.href}
+                        className="text-gray-300 hover:text-white transition-all duration-300 hover:translate-x-1 block"
+                      >
+                        {resource.name}
+                      </Link>
+                    </motion.li>
+                  ))}
+                </ul>
+              </motion.div>
+            </div>
+
+            {/* Contact */}
+            <div className="lg:col-span-3">
+              <motion.div
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.8, delay: 0.6 }}
+                viewport={{ once: true }}
+              >
+                <h4 className="text-xl font-bold mb-8 flex items-center gap-2">
+                  <Mail className="h-5 w-5 text-green-400" />
+                  Contact
+                </h4>
+                <div className="space-y-6">
+                  <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300">
+                    <div className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg">
+                      <Mail className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">asso.amaki@gmail.com</p>
+                      <p className="text-sm text-gray-400">Email principal</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300">
+                    <div className="p-2 bg-gradient-to-r from-green-500 to-emerald-500 rounded-lg">
+                      <Phone className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">+33 7 51 06 62 64</p>
+                      <p className="text-sm text-gray-400">Téléphone</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300">
+                    <div className="p-2 bg-gradient-to-r from-purple-500 to-pink-500 rounded-lg">
+                      <MapPin className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-white font-medium">119 rue des Grands Champs</p>
+                      <p className="text-sm text-gray-400">77000 Lieusaint, France</p>
+                    </div>
+                  </div>
                 </div>
-              </div>
-              
-              <div className="flex items-start">
-                <Phone className="h-5 w-5 text-blue-400 mr-3 mt-1" />
-                <div>
-                  <p className="text-gray-300">+06 XX XX XX XX</p>
-                  <p className="text-sm text-gray-400">Téléphone</p>
-                </div>
-              </div>
-              
-              <div className="flex items-start">
-                <MapPin className="h-5 w-5 text-blue-400 mr-3 mt-1" />
-                <div>
-                  <p className="text-gray-300">119 rue des Grands Champs, 77000 Lieusaint</p>
-                  <p className="text-sm text-gray-400">Siège social</p>
-                </div>
-              </div>
+              </motion.div>
             </div>
           </div>
         </div>
         
-        {/* Ligne de séparation */}
-        <div className="border-t border-slate-800 mt-12 pt-8">
-          <div className="flex flex-col md:flex-row justify-between items-center">
-            <div className="text-gray-400 text-sm">
-               AMAKI France- Amicale des Anciens Élèves de Kipako en France © 2026 Tous droits réservés.
-            </div>
-            <div className="flex space-x-6 mt-4 md:mt-0">
-              <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors duration-300">
+        {/* Section de séparation avec gradient */}
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent h-px" />
+        </div>
+        
+        {/* Footer bottom */}
+        <div className="py-8">
+          <div className="flex flex-col md:flex-row justify-between items-center gap-6">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6 }}
+              viewport={{ once: true }}
+              className="text-gray-400 text-sm text-center md:text-left"
+            >
+              <p className="mb-2">
+                <span className="font-semibold text-white">AMAKI France</span> - Amicale des Anciens Élèves de Kipaku en France
+              </p>
+              <p>© 2026 Tous droits réservés. Fait avec ❤️ pour notre communauté.</p>
+            </motion.div>
+            
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.6, delay: 0.2 }}
+              viewport={{ once: true }}
+              className="flex flex-wrap justify-center md:justify-end gap-6"
+            >
+              <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors duration-300 hover:underline">
                 Politique de Confidentialité
               </Link>
-              <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors duration-300">
+              <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors duration-300 hover:underline">
                 Conditions d'Utilisation
               </Link>
-              <Link href="/cookies" className="text-gray-400 hover:text-white text-sm transition-colors duration-300">
+              <Link href="/cookies" className="text-gray-400 hover:text-white text-sm transition-colors duration-300 hover:underline">
                 Cookies
               </Link>
-            </div>
+            </motion.div>
           </div>
         </div>
       </div>

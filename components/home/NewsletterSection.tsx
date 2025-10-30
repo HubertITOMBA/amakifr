@@ -1,10 +1,37 @@
-import { Mail, Send, CheckCircle, Users, Calendar, MessageCircle } from "lucide-react";
+"use client";
+
+import { Mail, Send, CheckCircle, Users, Calendar, MessageCircle, Sparkles } from "lucide-react";
+import { motion } from "framer-motion";
 
 export function NewsletterSection() {
   return (
-    <section className="py-20 bg-gradient-to-r from-blue-600 to-purple-700">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+    <section className="py-20 bg-gradient-to-r from-blue-700/95 via-indigo-800/95 to-slate-900 dark:from-slate-900 dark:via-indigo-950/90 dark:to-slate-950 relative overflow-hidden">
+      {/* Decorative background elements - opacité réduite */}
+      <div className="absolute inset-0 overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-white/8 dark:bg-white/5 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-white/8 dark:bg-white/5 rounded-full blur-3xl animate-pulse delay-1000" />
+      </div>
+      
+      {/* Top decorative border */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/40 dark:via-white/20 to-transparent" />
+      
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Frame wrapper */}
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+          className="relative"
+        >
+          {/* Decorative corners */}
+          <div className="absolute -top-6 -left-6 w-24 h-24 border-t-4 border-l-4 border-white/40 rounded-tl-3xl" />
+          <div className="absolute -top-6 -right-6 w-24 h-24 border-t-4 border-r-4 border-white/40 rounded-tr-3xl" />
+          <div className="absolute -bottom-6 -left-6 w-24 h-24 border-b-4 border-l-4 border-white/40 rounded-bl-3xl" />
+          <div className="absolute -bottom-6 -right-6 w-24 h-24 border-b-4 border-r-4 border-white/40 rounded-br-3xl" />
+          
+          <div className="relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 md:p-12 border-2 border-white/20 shadow-2xl">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Contenu principal */}
           <div className="text-white">
             <h2 className="text-4xl font-bold mb-6">
@@ -71,7 +98,7 @@ export function NewsletterSection() {
                   </div>
                   <div>
                     <p className="text-white font-semibold">Email</p>
-                    <p className="text-white/80">contact@amaki.fr</p>
+                    <p className="text-white/80">asso.amaki@gmail.com</p>
                   </div>
                 </div>
                 
@@ -81,7 +108,7 @@ export function NewsletterSection() {
                   </div>
                   <div>
                     <p className="text-white font-semibold">WhatsApp</p>
-                    <p className="text-white/80">+06 XX XX XX XX</p>
+                    <p className="text-white/80">+07 51 06 62 64</p>
                   </div>
                 </div>
                 
@@ -116,8 +143,13 @@ export function NewsletterSection() {
               </div>
             </div>
           </div>
-        </div>
+            </div>
+          </div>
+        </motion.div>
       </div>
+      
+      {/* Bottom decorative border */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-white/50 to-transparent" />
     </section>
   );
 }

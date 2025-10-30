@@ -1,20 +1,57 @@
+"use client";
+
 import Image from "next/image";
 import { Users, Calendar, Heart, Award, Handshake, Shield, Users2 } from "lucide-react";
+import { motion } from "framer-motion";
 
 export function AboutSection() {
   return (
-    <section className="py-20 bg-white dark:bg-slate-900">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+    <section className="py-20 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative overflow-hidden">
+      {/* Decorative background elements - opacité réduite */}
+      <div className="absolute inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute top-1/4 right-0 w-64 h-64 bg-blue-300/8 dark:bg-blue-600/5 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 left-0 w-96 h-96 bg-purple-300/8 dark:bg-purple-600/5 rounded-full blur-3xl" />
+      </div>
+      
+      {/* Top decorative border - plus subtil */}
+      <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-blue-400/30 dark:via-blue-600/15 via-purple-400/30 dark:via-purple-600/15 to-transparent opacity-40" />
+      
+      <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* Frame wrapper */}
+        <motion.div
+          initial={{ opacity: 0, y: 50 }}
+          whileInView={{ opacity: 1, y: 0 }}
+          viewport={{ once: true }}
+          transition={{ duration: 0.8 }}
+          className="relative"
+        >
+          {/* Decorative corners - couleurs plus douces */}
+          <div className="absolute -top-6 -left-6 w-24 h-24 border-t-4 border-l-4 border-blue-400/40 dark:border-blue-600/25 rounded-tl-3xl opacity-60" />
+          <div className="absolute -top-6 -right-6 w-24 h-24 border-t-4 border-r-4 border-indigo-400/40 dark:border-indigo-600/25 rounded-tr-3xl opacity-60" />
+          <div className="absolute -bottom-6 -left-6 w-24 h-24 border-b-4 border-l-4 border-purple-400/40 dark:border-purple-600/25 rounded-bl-3xl opacity-60" />
+          <div className="absolute -bottom-6 -right-6 w-24 h-24 border-b-4 border-r-4 border-pink-400/40 dark:border-pink-600/25 rounded-br-3xl opacity-60" />
+          
+          {/* Main content with decorative frame - gradient wrapper plus subtil */}
+          <div className="p-1 bg-gradient-to-r from-blue-200/40 via-indigo-200/40 to-purple-200/40 dark:from-blue-900/25 dark:via-indigo-900/25 dark:to-purple-900/25 rounded-3xl shadow-2xl">
+            <div className="relative bg-white/90 dark:bg-slate-900/90 backdrop-blur-sm rounded-3xl p-8 md:p-12 lg:p-16">
+              <div className="absolute inset-0 bg-gradient-to-br from-white/80 via-blue-50/30 to-indigo-50/30 dark:from-slate-900/80 dark:via-blue-950/25 dark:to-indigo-950/25 rounded-3xl" />
+            
+            <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
           {/* Contenu texte */}
-          <div className="space-y-6">
+          <motion.div
+            initial={{ opacity: 0, x: -50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8 }}
+            className="space-y-6"
+          >
             <div className="space-y-4">
               <h2 className="text-4xl font-bold text-gray-900 dark:text-white">
-                L'Amicale des Anciens Élèves de Kipako en France
+                L'Amicale des Anciens Élèves de Kipaku en France
               </h2>
               <p className="text-lg text-gray-600 dark:text-gray-300">
-                Depuis sa création, AMAKI rassemble les anciens élèves de Kipako 
-                autour de valeurs communes : la solidarité, l'intégration, l'excellence et l'entraide.
+                Depuis sa création, AMAKI rassemble les anciens élèves de Kipaku 
+                autour de valeurs communes : l'intégration, le respect, la solidarité, l'excellence et l'entraide.
               </p>
             </div>
             
@@ -31,7 +68,7 @@ export function AboutSection() {
               
               <div className="flex items-center space-x-3">
                 <div className="p-2 bg-green-100 dark:bg-green-900 rounded-lg">
-                  <Calendar className="h-6 w-6 text-green-600 dark:text-green-400" />50
+                  <Calendar className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
                   <p className="text-2xl font-bold text-gray-900 dark:text-white">15+</p>
@@ -102,30 +139,46 @@ export function AboutSection() {
               
              
             </div>
-          </div>
+          </motion.div>
           
           {/* Image */}
-          <div className="relative">
-            <div className="relative h-96 rounded-2xl overflow-hidden shadow-2xl">
-              <Image
-                src="/images/logoAmaki.jpeg"
-                alt="Équipe AMAKI"
-                fill
-                className="object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-              <div className="absolute bottom-6 left-6 text-white">
-                <h3 className="text-xl font-semibold">Notre Équipe</h3>
-                <p className="text-sm opacity-90">Ensemble pour l'excellence</p>
+          <motion.div
+            initial={{ opacity: 0, x: 50 }}
+            whileInView={{ opacity: 1, x: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.8, delay: 0.2 }}
+            className="relative"
+          >
+            {/* Decorative frame around image */}
+            <div className="relative p-4 bg-gradient-to-br from-blue-100/60 via-indigo-100/60 to-purple-100/60 dark:from-blue-900/30 dark:via-indigo-900/30 dark:to-purple-900/30 rounded-3xl shadow-2xl">
+              <div className="relative h-96 rounded-2xl overflow-hidden border-4 border-white/50 dark:border-slate-700/50">
+                <Image
+                  src="/images/logoAmaki.jpeg"
+                  alt="Équipe AMAKI"
+                  fill
+                  className="object-cover"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent" />
+                <div className="absolute bottom-6 left-6 text-white">
+                  <h3 className="text-xl font-bold drop-shadow-lg">Notre Équipe</h3>
+                  <p className="text-sm opacity-90 font-medium">Ensemble pour l'excellence</p>
+                </div>
               </div>
+              
+              {/* Enhanced decorative elements - opacité réduite */}
+              <div className="absolute -top-2 -right-2 w-16 h-16 bg-gradient-to-br from-blue-400/40 to-indigo-500/40 dark:from-blue-600/20 dark:to-indigo-600/20 rounded-full opacity-70 animate-pulse shadow-lg blur-sm" />
+              <div className="absolute -bottom-2 -left-2 w-12 h-12 bg-gradient-to-br from-green-400/40 to-emerald-500/40 dark:from-green-600/20 dark:to-emerald-600/20 rounded-full opacity-70 animate-pulse delay-1000 shadow-lg blur-sm" />
+              <div className="absolute top-1/2 -right-4 w-8 h-8 bg-gradient-to-br from-purple-400/40 to-pink-500/40 dark:from-purple-600/20 dark:to-pink-600/20 rounded-full opacity-60 animate-pulse delay-500 shadow-lg blur-sm" />
             </div>
-            
-            {/* Éléments décoratifs */}
-            <div className="absolute -top-4 -right-4 w-24 h-24 bg-blue-500 rounded-full opacity-20 animate-pulse" />
-            <div className="absolute -bottom-4 -left-4 w-16 h-16 bg-green-500 rounded-full opacity-20 animate-pulse delay-1000" />
+          </motion.div>
+            </div>
           </div>
         </div>
+        </motion.div>
       </div>
+      
+      {/* Bottom decorative border */}
+      <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-indigo-400/30 dark:via-indigo-600/15 via-pink-400/30 dark:via-pink-600/15 to-transparent opacity-40" />
     </section>
   );
 }

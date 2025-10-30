@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import HeroImage from "@/public/images/logow1.webp";
+import HeroImage from "@/public/images/favico_Amaki.jpeg";
 import { LoginButton } from "../auth/login-button";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Users, Calendar, Award } from "lucide-react";
@@ -8,14 +8,14 @@ import { ArrowRight, Users, Calendar, Award } from "lucide-react";
 export function Hero() {
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
-      {/* Background avec dégradé */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-800" />
+      {/* Background avec dégradé - plus doux en mode sombre */}
+      <div className="absolute inset-0 bg-gradient-to-br from-blue-700/90 via-indigo-800/90 to-slate-900 dark:from-slate-900 dark:via-indigo-950/80 dark:to-slate-950" />
       
-      {/* Éléments décoratifs */}
+      {/* Éléments décoratifs - opacité réduite */}
       <div className="absolute inset-0">
-        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-500/20 rounded-full blur-3xl animate-pulse" />
-        <div className="absolute bottom-20 right-10 w-96 h-96 bg-purple-500/20 rounded-full blur-3xl animate-pulse delay-1000" />
-        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-indigo-500/20 rounded-full blur-3xl animate-pulse delay-500" />
+        <div className="absolute top-20 left-10 w-72 h-72 bg-blue-400/10 dark:bg-blue-500/5 rounded-full blur-3xl animate-pulse" />
+        <div className="absolute bottom-20 right-10 w-96 h-96 bg-indigo-400/10 dark:bg-indigo-500/5 rounded-full blur-3xl animate-pulse delay-1000" />
+        <div className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 w-64 h-64 bg-purple-400/10 dark:bg-purple-500/5 rounded-full blur-3xl animate-pulse delay-500" />
       </div>
       
       <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-20">
@@ -30,13 +30,13 @@ export function Hero() {
               
               <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
                 Bienvenue à 
-                <span className="block bg-gradient-to-r from-yellow-400 to-orange-500 text-transparent bg-clip-text">
+                <span className="block bg-gradient-to-r from-amber-300 via-yellow-300 to-orange-300 dark:from-amber-400/80 dark:via-yellow-400/80 dark:to-orange-400/80 text-transparent bg-clip-text">
                   AMAKI France
                 </span>
               </h1>
               
-              <p className="text-xl lg:text-2xl text-blue-100 leading-relaxed">
-                L'Amicale des Anciens Élèves de Kipako 
+              <p className="text-xl lg:text-2xl text-blue-50 dark:text-slate-300 leading-relaxed">
+                L'Amicale des Anciens Élèves de Kipaku 
                 <span className="block font-semibold text-white">
                   Unis par l'excellence, guidés par la solidarité, l'intégation, le respect ...
                 </span>
@@ -69,7 +69,7 @@ export function Hero() {
                   <Users className="h-6 w-6 text-white" />
                 </div>
                 <div className="text-2xl font-bold text-white">120+</div>
-                <div className="text-sm text-blue-200">Membres Actifs</div>
+                <div className="text-sm text-blue-100 dark:text-slate-400">Membres Actifs</div>
               </div>
               
               <div className="text-center">
@@ -77,7 +77,7 @@ export function Hero() {
                   <Calendar className="h-6 w-6 text-white" />
                 </div>
                 <div className="text-2xl font-bold text-white">10+</div>
-                <div className="text-sm text-blue-200">Années d'Existence</div>
+                <div className="text-sm text-blue-100 dark:text-slate-400">Années d'Existence</div>
               </div>
               
               <div className="text-center">
@@ -85,7 +85,7 @@ export function Hero() {
                   <Award className="h-6 w-6 text-white" />
                 </div>
                 <div className="text-2xl font-bold text-white">53+</div>
-                <div className="text-sm text-blue-200">Événements</div>
+                <div className="text-sm text-blue-100 dark:text-slate-400">Événements</div>
               </div>
             </div>
           </div>
@@ -94,7 +94,7 @@ export function Hero() {
           <div className="relative">
             <div className="relative">
               {/* Cercle décoratif */}
-              <div className="absolute -inset-4 bg-gradient-to-r from-blue-500 to-purple-600 rounded-full blur-2xl opacity-30 animate-pulse" />
+              <div className="absolute -inset-4 bg-gradient-to-r from-blue-500/20 to-indigo-600/20 dark:from-blue-600/10 dark:to-indigo-700/10 rounded-full blur-2xl opacity-30 animate-pulse" />
               
               {/* Image principale */}
               <div className="relative bg-white/10 backdrop-blur-lg rounded-3xl p-8 shadow-2xl">
@@ -105,7 +105,7 @@ export function Hero() {
                 />
                 
                 {/* Badge flottant */}
-                <div className="absolute -top-4 -right-4 bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg">
+                <div className="absolute -top-4 -right-4 bg-gradient-to-r from-amber-400/90 to-orange-400/90 dark:from-amber-500/70 dark:to-orange-500/70 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg backdrop-blur-sm">
                   Depuis 2016
                 </div>
               </div>

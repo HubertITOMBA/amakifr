@@ -85,6 +85,31 @@ enum PositionType {
   MembreComiteDirecteur
 }
 
+// Modèle pour historiser les postes électoraux
+model PosteTemplate {
+  id          String  @id @default(cuid())
+  code        String  @unique @db.VarChar(100) // Code unique (ex: "president")
+  libelle     String  @db.VarChar(255) // Libellé français (ex: "Président")
+  description String? @db.Text // Description du poste
+  ordre       Int     @default(0) // Ordre d'affichage
+  actif       Boolean @default(true) // Si le poste est actif (peut être utilisé)
+
+  // Valeurs par défaut pour ce type de poste
+  nombreMandatsDefaut Int  @default(1)
+  dureeMandatDefaut   Int? // Durée en mois
+
+  // Relations
+  positions Position[] // Positions utilisant ce template
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String // ID de l'utilisateur qui a créé le poste
+  CreatedBy User     @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@map("postes_templates")
+}
+
 enum CandidacyStatus {
   EnAttente
   Validee
@@ -97,7 +122,6 @@ enum VoteStatus {
   Invalide
   Blanc
 }
-
 
 model Account {
   id                String  @id @default(cuid())
@@ -130,17 +154,27 @@ model Session {
 }
 
 model User {
-  id            String     @id @default(cuid())
-  name          String?
-  email         String?    @unique
-  emailVerified DateTime?  @map("email_verified")
-  password      String?
-  image         String?
-  accounts      Account[]
-  sessions      Session[]
-  adherent      Adherent?
-  role          UserRole   @default(Membre)
-  status        UserStatus @default(Inactif)
+  id                          String                       @id @default(cuid())
+  name                        String?
+  email                       String?                      @unique
+  emailVerified               DateTime?                    @map("email_verified")
+  password                    String?
+  image                       String?
+  accounts                    Account[]
+  sessions                    Session[]
+  adherent                    Adherent?
+  role                        UserRole                     @default(Membre)
+  status                      UserStatus                   @default(Inactif)
+  depenses                    Depense[] // Relation avec les dépenses
+  typesCotisationMensuelle    TypeCotisationMensuelle[] // Types de cotisation créés
+  cotisationsMensuelles       CotisationMensuelle[] // Cotisations mensuelles créées
+  relancesCotisationMensuelle RelanceCotisationMensuelle[] // Relances créées
+  evenements                  Evenement[] // Événements créés
+  conversations               Conversation[] // Conversations créées
+  conversationParticipants    ConversationParticipant[] // Participations aux conversations
+  messages                    Message[] // Messages envoyés
+  postesTemplates             PosteTemplate[] // Postes créés
+  messageReactions            MessageReaction[] // Réactions aux messages
 
   lastLogin DateTime? @updatedAt
   createdAt DateTime  @default(now())
@@ -193,21 +227,24 @@ model TwoFactorConfirmation {
 }
 
 model Adherent {
-  id                    String                 @id @default(cuid())
-  civility              Civilities?            @default(Monsieur)
-  firstname             String                 @db.VarChar(255)
-  lastname              String                 @db.VarChar(255)
-  Adresse               Adresse[]
-  Cotisations           Cotisation[]
-  Telephones            Telephone[]
-  ObligationsCotisation ObligationCotisation[]
-  Relances              Relance[]
-  Candidacies           Candidacy[]
-  Votes                 Vote[]
-  created_at            DateTime?              @db.Timestamp(0)
-  updated_at            DateTime?              @db.Timestamp(0)
-  userId                String                 @unique
-  User                  User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id                          String                       @id @default(cuid())
+  civility                    Civilities?                  @default(Monsieur)
+  firstname                   String                       @db.VarChar(255)
+  lastname                    String                       @db.VarChar(255)
+  Adresse                     Adresse[]
+  Cotisations                 Cotisation[]
+  Telephones                  Telephone[]
+  ObligationsCotisation       ObligationCotisation[]
+  Relances                    Relance[]
+  Candidacies                 Candidacy[]
+  Votes                       Vote[]
+  CotisationsMensuelles       CotisationMensuelle[] // Cotisations mensuelles
+  RelancesCotisationMensuelle RelanceCotisationMensuelle[] // Relances cotisations mensuelles
+  InscriptionsEvenements      InscriptionEvenement[] // Inscriptions aux événements
+  created_at                  DateTime?                    @db.Timestamp(0)
+  updated_at                  DateTime?                    @db.Timestamp(0)
+  userId                      String                       @unique
+  User                        User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("adherent")
 }
@@ -335,9 +372,13 @@ model Election {
 model Position {
   id          String       @id @default(cuid())
   electionId  String
-  type        PositionType
+  type        PositionType // Conservé pour rétrocompatibilité
   titre       String       @db.VarChar(255)
   description String?      @db.Text
+
+  // Nouvelle référence au template de poste
+  posteTemplateId String? // Optionnel pour migration progressive
+  PosteTemplate   PosteTemplate? @relation(fields: [posteTemplateId], references: [id], onDelete: SetNull)
 
   // Configuration spécifique au poste
   nombreMandats Int     @default(1)
@@ -354,6 +395,7 @@ model Position {
   updatedAt DateTime @updatedAt
 
   @@unique([electionId, type])
+  @@index([posteTemplateId])
   @@map("positions")
 }
 
@@ -419,3 +461,255 @@ model Vote {
   @@map("votes")
 }
 
+model Depense {
+  id           String   @id @default(cuid())
+  libelle      String   @db.VarChar(200)
+  montant      Decimal  @db.Decimal(10, 2)
+  dateDepense  DateTime
+  categorie    String   @db.VarChar(100) // ex: "Frais de fonctionnement", "Événements", "Matériel"
+  description  String?  @db.Text
+  justificatif String?  @db.VarChar(500) // URL du fichier uploadé
+  statut       String   @default("EnAttente") // EnAttente, Valide, Rejete
+  createdBy    String // ID de l'admin qui a créé la dépense
+
+  // Relations
+  CreatedBy User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("depenses")
+}
+
+model TypeCotisationMensuelle {
+  id          String  @id @default(cuid())
+  nom         String  @db.VarChar(100) // ex: "Forfait", "Occasionnel", "Formation", etc.
+  description String? @db.Text
+  montant     Decimal @db.Decimal(10, 2)
+  obligatoire Boolean @default(true) // Si la cotisation est obligatoire
+  actif       Boolean @default(true) // Si le type est actuellement utilisé
+  ordre       Int     @default(0) // Ordre d'affichage
+  createdBy   String // ID de l'admin qui a créé le type
+
+  // Relations
+  CreatedBy             User                  @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  CotisationsMensuelles CotisationMensuelle[] // Les cotisations créées avec ce type
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("types_cotisation_mensuelle")
+}
+
+model CotisationMensuelle {
+  id               String   @id @default(cuid())
+  periode          String   @db.VarChar(50) // ex: "2024-01", "2024-02"
+  annee            Int
+  mois             Int
+  typeCotisationId String // Référence au type de cotisation
+  adherentId       String // Adhérent concerné
+  montantAttendu   Decimal  @db.Decimal(10, 2)
+  montantPaye      Decimal  @default(0) @db.Decimal(10, 2)
+  montantRestant   Decimal  @db.Decimal(10, 2)
+  dateEcheance     DateTime
+  statut           String   @default("EnAttente") // EnAttente, PartiellementPaye, Paye, EnRetard
+  description      String?  @db.Text
+  createdBy        String // ID de l'admin qui a créé la cotisation
+
+  // Relations
+  TypeCotisation TypeCotisationMensuelle      @relation(fields: [typeCotisationId], references: [id], onDelete: Cascade)
+  Adherent       Adherent                     @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  CreatedBy      User                         @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  Relances       RelanceCotisationMensuelle[]
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([periode, typeCotisationId, adherentId])
+  @@map("cotisations_mensuelles")
+}
+
+model RelanceCotisationMensuelle {
+  id                    String    @id @default(cuid())
+  cotisationMensuelleId String
+  adherentId            String
+  type                  String    @default("Email") // Email, SMS, Courrier
+  statut                String    @default("EnAttente") // EnAttente, Envoye, Lu, Repondu
+  dateEnvoi             DateTime?
+  dateRelance           DateTime?
+  contenu               String?   @db.Text
+  reponse               String?   @db.Text
+  montantRappele        Decimal?  @db.Decimal(10, 2)
+  createdBy             String // ID de l'admin qui a créé la relance
+
+  // Relations
+  CotisationMensuelle CotisationMensuelle @relation(fields: [cotisationMensuelleId], references: [id], onDelete: Cascade)
+  Adherent            Adherent            @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  CreatedBy           User                @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("relances_cotisation_mensuelle")
+}
+
+// Modèle pour la gestion des événements
+model Evenement {
+  id                    String    @id @default(cuid())
+  titre                 String    @db.VarChar(200)
+  description           String    @db.Text
+  contenu               String?   @db.Text // Contenu détaillé de l'événement
+  dateDebut             DateTime
+  dateFin               DateTime?
+  dateAffichage         DateTime // Date à partir de laquelle l'événement est visible
+  dateFinAffichage      DateTime // Date jusqu'à laquelle l'événement reste visible
+  lieu                  String?   @db.VarChar(200)
+  adresse               String?   @db.Text
+  categorie             String    @default("General") @db.VarChar(50) // General, Formation, Social, Sportif, Culturel
+  statut                String    @default("Brouillon") // Brouillon, Publie, Archive
+  imagePrincipale       String?   @db.VarChar(500) // URL de l'image principale
+  images                String?   @db.Text // JSON array des URLs d'images supplémentaires
+  prix                  Decimal?  @db.Decimal(10, 2) // Prix de participation (optionnel)
+  placesDisponibles     Int? // Nombre de places disponibles
+  placesReservees       Int       @default(0) // Nombre de places réservées
+  inscriptionRequis     Boolean   @default(false) // Si une inscription est requise
+  dateLimiteInscription DateTime? // Date limite pour s'inscrire
+  contactEmail          String?   @db.VarChar(100)
+  contactTelephone      String?   @db.VarChar(20)
+  tags                  String?   @db.Text // JSON array des tags
+  createdBy             String // ID de l'admin qui a créé l'événement
+
+  // Relations
+  CreatedBy     User                   @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  Inscriptions  InscriptionEvenement[] // Inscriptions à cet événement
+  Conversations Conversation[] // Conversations liées à cet événement
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("evenements")
+}
+
+// Modèle pour les inscriptions aux événements
+model InscriptionEvenement {
+  id              String   @id @default(cuid())
+  evenementId     String
+  adherentId      String? // Optionnel pour permettre les inscriptions de visiteurs
+  statut          String   @default("EnAttente") // EnAttente, Confirmee, Annulee
+  dateInscription DateTime @default(now())
+  commentaires    String?  @db.Text
+  nombrePersonnes Int      @default(1) // Nombre de personnes inscrites
+
+  // Informations du visiteur (pour les non-adhérents)
+  visiteurNom       String? @db.VarChar(255)
+  visiteurEmail     String? @db.VarChar(255)
+  visiteurTelephone String? @db.VarChar(20)
+
+  // Relations
+  Evenement Evenement @relation(fields: [evenementId], references: [id], onDelete: Cascade)
+  Adherent  Adherent? @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([evenementId, adherentId])
+  @@index([evenementId, visiteurEmail])
+  @@map("inscriptions_evenements")
+}
+
+// Modèle pour le système de chat
+model Conversation {
+  id          String  @id @default(cuid())
+  titre       String? @db.VarChar(200) // Titre optionnel pour les conversations de groupe
+  type        String  @default("Privee") // Privee, Groupe, Evenement
+  evenementId String? // Pour les conversations liées à un événement
+  createdBy   String // ID de l'utilisateur qui a créé la conversation
+
+  // Relations
+  CreatedBy    User                      @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  Evenement    Evenement?                @relation(fields: [evenementId], references: [id], onDelete: Cascade)
+  Participants ConversationParticipant[] // Participants à la conversation
+  Messages     Message[] // Messages de la conversation
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("conversations")
+}
+
+// Modèle pour les participants d'une conversation
+model ConversationParticipant {
+  id             String    @id @default(cuid())
+  conversationId String
+  userId         String
+  role           String    @default("Participant") // Participant, Admin, Modérateur
+  joinedAt       DateTime  @default(now())
+  leftAt         DateTime? // Si null, le participant est toujours dans la conversation
+
+  // Relations
+  Conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([conversationId, userId])
+  @@map("conversation_participants")
+}
+
+// Modèle pour les messages du chat
+model Message {
+  id             String    @id @default(cuid())
+  conversationId String
+  userId         String // ID de l'utilisateur qui a envoyé le message
+  content        String    @db.Text // Contenu du message
+  type           String    @default("Texte") // Texte, Image, Fichier, System
+  fileUrl        String?   @db.VarChar(500) // URL du fichier si type = Image ou Fichier
+  fileName       String?   @db.VarChar(255) // Nom du fichier original
+  replyToId      String? // ID du message auquel on répond (pour les réponses)
+  edited         Boolean   @default(false) // Si le message a été modifié
+  editedAt       DateTime? // Date de modification
+  deleted        Boolean   @default(false) // Si le message a été supprimé
+  deletedAt      DateTime? // Date de suppression
+
+  // Relations
+  Conversation Conversation      @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  User         User              @relation(fields: [userId], references: [id], onDelete: Cascade)
+  ReplyTo      Message?          @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  Replies      Message[]         @relation("MessageReplies")
+  Reactions    MessageReaction[] // Réactions aux messages
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([conversationId, createdAt])
+  @@index([userId])
+  @@map("messages")
+}
+
+// Modèle pour les réactions aux messages (emojis, likes, etc.)
+model MessageReaction {
+  id        String @id @default(cuid())
+  messageId String
+  userId    String
+  reaction  String @db.VarChar(10) // Emoji ou type de réaction (👍, ❤️, etc.)
+
+  // Relations
+  Message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  User    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+
+  @@unique([messageId, userId, reaction])
+  @@map("message_reactions")
+}

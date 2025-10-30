@@ -28,8 +28,9 @@ import {
   updateElectionStatus,
   createCustomPosition
 } from "@/actions/elections";
-import { POSTES_LABELS, getAllPostes } from "@/lib/elections-constants";
+import { POSTES_LABELS, getAllPostesFromDB } from "@/lib/elections-constants";
 import { ElectionStatus, PositionType } from "@prisma/client";
+import { getAllPostesTemplates } from "@/actions/postes";
 
 interface Election {
   id: string;
@@ -46,11 +47,21 @@ interface Election {
   };
 }
 
+interface PosteTemplate {
+  id: string;
+  code: string;
+  libelle: string;
+  description?: string;
+  ordre: number;
+  actif: boolean;
+}
+
 export default function ElectionsPage() {
   const [elections, setElections] = useState<Election[]>([]);
   const [loading, setLoading] = useState(true);
   const [showCreateForm, setShowCreateForm] = useState(false);
-  const [selectedPostes, setSelectedPostes] = useState<PositionType[]>([]);
+  const [selectedPostes, setSelectedPostes] = useState<string[]>([]); // IDs de PosteTemplate
+  const [postesTemplates, setPostesTemplates] = useState<PosteTemplate[]>([]);
 
   // Formulaire de création d'élection
   const [electionForm, setElectionForm] = useState({
@@ -75,10 +86,22 @@ export default function ElectionsPage() {
     conditions: "Être membre actif de l'association"
   });
 
-  // Charger les élections
+  // Charger les élections et les postes
   useEffect(() => {
     loadElections();
+    loadPostes();
   }, []);
+
+  const loadPostes = async () => {
+    try {
+      const result = await getAllPostesTemplates(true); // Seulement les actifs
+      if (result.success && result.data) {
+        setPostesTemplates(result.data as PosteTemplate[]);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des postes:", error);
+    }
+  };
 
   const loadElections = async () => {
     try {
@@ -161,11 +184,11 @@ export default function ElectionsPage() {
     }
   };
 
-  const togglePoste = (poste: PositionType) => {
+  const togglePoste = (posteId: string) => {
     setSelectedPostes(prev => 
-      prev.includes(poste) 
-        ? prev.filter(p => p !== poste)
-        : [...prev, poste]
+      prev.includes(posteId) 
+        ? prev.filter(p => p !== posteId)
+        : [...prev, posteId]
     );
   };
 
@@ -391,7 +414,7 @@ export default function ElectionsPage() {
                   <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-medium text-blue-800 dark:text-blue-200">
-                        Postes sélectionnés: {selectedPostes.length}/8
+                        Postes sélectionnés: {selectedPostes.length}/{postesTemplates.length}
                       </span>
                       {selectedPostes.length > 0 && (
                         <Button
@@ -408,33 +431,46 @@ export default function ElectionsPage() {
                   </div>
 
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {getAllPostes().map(([type, label]) => (
-                      <div 
-                        key={type} 
-                        className={`p-3 border rounded-lg transition-colors cursor-pointer ${
-                          selectedPostes.includes(type as PositionType)
-                            ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
-                            : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
-                        }`}
-                        onClick={() => togglePoste(type as PositionType)}
-                      >
-                        <div className="flex items-center space-x-3">
-                          <input
-                            type="checkbox"
-                            id={type}
-                            checked={selectedPostes.includes(type as PositionType)}
-                            onChange={(e) => {
-                              e.stopPropagation(); // Empêcher le double clic
-                              togglePoste(type as PositionType);
-                            }}
-                            className="rounded border-gray-300"
-                          />
-                          <Label htmlFor={type} className="text-sm font-medium cursor-pointer flex-1">
-                            {label}
-                          </Label>
-                        </div>
+                    {postesTemplates.length > 0 ? (
+                      postesTemplates
+                        .sort((a, b) => a.ordre - b.ordre || a.libelle.localeCompare(b.libelle))
+                        .map((poste) => (
+                          <div 
+                            key={poste.id} 
+                            className={`p-3 border rounded-lg transition-colors cursor-pointer ${
+                              selectedPostes.includes(poste.id)
+                                ? 'border-blue-500 bg-blue-50 dark:bg-blue-900/20'
+                                : 'border-gray-200 dark:border-gray-700 hover:border-gray-300 dark:hover:border-gray-600'
+                            }`}
+                            onClick={() => togglePoste(poste.id)}
+                          >
+                            <div className="flex items-center space-x-3">
+                              <input
+                                type="checkbox"
+                                id={poste.id}
+                                checked={selectedPostes.includes(poste.id)}
+                                onChange={(e) => {
+                                  e.stopPropagation(); // Empêcher le double clic
+                                  togglePoste(poste.id);
+                                }}
+                                className="rounded border-gray-300"
+                              />
+                              <Label htmlFor={poste.id} className="text-sm font-medium cursor-pointer flex-1">
+                                {poste.libelle}
+                                {poste.description && (
+                                  <span className="text-xs text-gray-500 dark:text-gray-400 block mt-1">
+                                    {poste.description}
+                                  </span>
+                                )}
+                              </Label>
+                            </div>
+                          </div>
+                        ))
+                    ) : (
+                      <div className="p-4 text-center text-gray-500">
+                        Aucun poste disponible. Veuillez créer des postes depuis la page de gestion des postes.
                       </div>
-                    ))}
+                    )}
                   </div>
 
                   {/* Message d'aide */}

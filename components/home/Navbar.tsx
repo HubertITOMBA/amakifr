@@ -13,18 +13,19 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 
 
 const navigation = [
-  { name: 'Accueil', href: '/' },
-  // { name: "L'amicale", href: '/amicale' },
+  // { name: 'Accueil', href: '/' },
+  { name: "L'amicale", href: '/amicale' },
+  { name: 'Election', href: '/extrat' },
+   { name: 'Agenda', href: '/agenda' },
   { name: 'Evénements', href: '/evenements' },
-  { name: 'Candidats', href: '/candidats' },
-  // { name: 'Agenda', href: '/agenda' },
-  // { name: 'Galerie', href: '/galerie' },
+ 
+  { name: 'Galerie', href: '/galerie' },
   // { name: 'Upload', href: '/upload' },
-  // { name: 'Contact', href: '/contact' },
+  { name: 'Contact', href: '/contact' },
  // { name: 'Résultats', href: '/resultats' },
-  { name: 'Elections', href: '/elections' },
-  { name: 'Candidatures', href: '/candidatures' },
-  { name: 'Vote', href: '/vote' },
+  // { name: 'Elections', href: '/elections' },
+  // { name: 'Candidatures', href: '/candidatures' },
+  // { name: 'Vote', href: '/vote' },
 ]
 
 
