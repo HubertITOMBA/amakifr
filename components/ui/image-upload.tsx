@@ -172,6 +172,7 @@ export function ImageUpload({
                       fill
                       className="object-cover"
                       sizes="(max-width: 768px) 100vw, 50vw"
+                      unoptimized={displayImage.startsWith('/')}
                     />
                     <button
                       type="button"
@@ -216,6 +217,7 @@ export function ImageUpload({
               fill
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
+              unoptimized={value.startsWith('/')}
               onError={() => {
                 toast.error("Impossible de charger l'image depuis cette URL");
               }}

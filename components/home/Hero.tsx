@@ -1,7 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import HeroImage from "@/public/images/favico_Amaki.jpeg";
-import { LoginButton } from "../auth/login-button";
+import { RegisterButton } from "../auth/register-button";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Users, Calendar, Award } from "lucide-react";
 
@@ -38,18 +38,18 @@ export function Hero() {
               <p className="text-xl lg:text-2xl text-blue-50 dark:text-slate-300 leading-relaxed">
                 L'Amicale des Anciens Élèves de Kipaku 
                 <span className="block font-semibold text-white">
-                  Unis par l'excellence, guidés par la solidarité, l'intégation, le respect ...
+                  Unis et guidés par l'intégration, le respect, la solidarité, l'excellence et l'entraide ...
                 </span>
               </p>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <LoginButton>
+              <RegisterButton mode="modal" asChild>
                 <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-8 py-4 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1">
                   Rejoindre AMAKI
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
-              </LoginButton>
+              </RegisterButton>
               
               <Link href="/evenements">
                 <Button 

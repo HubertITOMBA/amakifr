@@ -14,6 +14,7 @@ export const publicRoutes = [
     "/resultats",
     "/vote",
     "/elections",
+    "/candidatures", 
 ];
 
 /**
@@ -45,7 +46,7 @@ export const authRoutes = [
  "/auth/reset",
  "/auth/new-password",
  "/auth/new-verification",
-"/candidatures", 
+
 
 
   ];

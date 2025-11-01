@@ -950,10 +950,66 @@ export async function updateCandidacyStatus(
       return { success: false, error: "Accès refusé - Admin requis" };
     }
 
+    // Récupérer la candidature avec les informations nécessaires pour l'email
+    const candidacy = await prisma.candidacy.findUnique({
+      where: { id: candidacyId },
+      include: {
+        adherent: {
+          include: {
+            User: {
+              select: {
+                email: true,
+                name: true
+              }
+            }
+          }
+        },
+        position: {
+          include: {
+            election: {
+              select: {
+                titre: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    if (!candidacy) {
+      return { success: false, error: "Candidature non trouvée" };
+    }
+
+    // Mettre à jour le statut
     await prisma.candidacy.update({
       where: { id: candidacyId },
       data: { status }
     });
+
+    // Envoyer un email de notification
+    try {
+      const { sendCandidacyStatusEmail } = await import("@/lib/mail");
+      const statusLabels = {
+        [CandidacyStatus.Validee]: "Validée" as const,
+        [CandidacyStatus.Rejetee]: "Rejetée" as const,
+        [CandidacyStatus.EnAttente]: "En attente" as const,
+      };
+      const statusLabel = statusLabels[status] || "En attente";
+      const candidatNom = `${candidacy.adherent.civility || ''} ${candidacy.adherent.firstname || ''} ${candidacy.adherent.lastname || ''}`.trim();
+      
+      if (candidacy.adherent.User?.email) {
+        await sendCandidacyStatusEmail(
+          candidacy.adherent.User.email,
+          candidatNom,
+          candidacy.position.election.titre,
+          candidacy.position.titre,
+          statusLabel
+        );
+      }
+    } catch (emailError) {
+      console.error("Erreur lors de l'envoi de l'email:", emailError);
+      // Ne pas bloquer la mise à jour si l'email échoue
+    }
 
     return { success: true };
   } catch (error) {
@@ -1380,6 +1436,183 @@ export async function getElectionResults(electionId: string): Promise<{ success:
   }
 }
 
+// ========================= VOTES (ADMIN) =========================
+export async function getAllVotesForAdmin(): Promise<{ success: boolean; votes?: any[]; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    const votes = await prisma.vote.findMany({
+      include: {
+        election: { select: { id: true, titre: true, status: true } },
+        position: { select: { id: true, titre: true } },
+        adherent: { include: { User: { select: { id: true, name: true, email: true } } } },
+        candidacy: {
+          include: {
+            adherent: { include: { User: { select: { id: true, name: true, email: true } } } }
+          }
+        }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return { success: true, votes };
+  } catch (e) {
+    console.error("Erreur getAllVotesForAdmin:", e);
+    return { success: false, error: "Erreur lors de la récupération des votes" };
+  }
+}
+
+export async function adminCreateVote(data: { electionId: string; positionId: string; adherentId: string; candidacyId?: string | null; status?: "Valide" | "Blanc" | "Annule" }): Promise<{ success: boolean; vote?: any; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    // Vérifications de cohérence
+    const election = await prisma.election.findUnique({ where: { id: data.electionId } });
+    if (!election) return { success: false, error: "Élection introuvable" };
+
+    const position = await prisma.position.findFirst({ where: { id: data.positionId, electionId: data.electionId } });
+    if (!position) return { success: false, error: "Poste introuvable pour cette élection" };
+
+    const adherent = await prisma.adherent.findUnique({ where: { id: data.adherentId } });
+    if (!adherent) return { success: false, error: "Adhérent introuvable" };
+
+    if (data.candidacyId) {
+      const candOk = await prisma.candidacy.findFirst({ where: { id: data.candidacyId, electionId: data.electionId, positionId: data.positionId } });
+      if (!candOk) return { success: false, error: "Candidature invalide pour ce poste/élection" };
+    }
+
+    // Unicité (un vote par adhérent/poste/élection)
+    const exists = await prisma.vote.findFirst({ where: { electionId: data.electionId, positionId: data.positionId, adherentId: data.adherentId } });
+    if (exists) return { success: false, error: "Un vote existe déjà pour cet adhérent sur ce poste" };
+
+    const vote = await prisma.vote.create({
+      data: {
+        electionId: data.electionId,
+        positionId: data.positionId,
+        adherentId: data.adherentId,
+        candidacyId: data.candidacyId || null,
+        status: (data.status as any) || (data.candidacyId ? "Valide" : "Blanc")
+      },
+      include: {
+        election: { select: { id: true, titre: true, status: true } },
+        position: { select: { id: true, titre: true } },
+        adherent: { include: { User: { select: { id: true, name: true, email: true } } } },
+        candidacy: { include: { adherent: { include: { User: true } } } }
+      }
+    });
+
+    return { success: true, vote };
+  } catch (e) {
+    console.error("Erreur adminCreateVote:", e);
+    return { success: false, error: "Erreur lors de la création du vote" };
+  }
+}
+
+export async function adminUpdateVote(voteId: string, data: { candidacyId?: string | null; status?: "Valide" | "Blanc" | "Annule" }): Promise<{ success: boolean; vote?: any; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    const current = await prisma.vote.findUnique({ where: { id: voteId } });
+    if (!current) return { success: false, error: "Vote introuvable" };
+
+    if (typeof data.candidacyId !== 'undefined' && data.candidacyId) {
+      const candOk = await prisma.candidacy.findFirst({ where: { id: data.candidacyId, electionId: current.electionId, positionId: current.positionId } });
+      if (!candOk) return { success: false, error: "Candidature invalide pour ce poste/élection" };
+    }
+
+    const updated = await prisma.vote.update({
+      where: { id: voteId },
+      data: {
+        candidacyId: typeof data.candidacyId === 'undefined' ? undefined : (data.candidacyId || null),
+        status: data.status as any || undefined,
+      },
+      include: {
+        election: { select: { id: true, titre: true, status: true } },
+        position: { select: { id: true, titre: true } },
+        adherent: { include: { User: { select: { id: true, name: true, email: true } } } },
+        candidacy: { include: { adherent: { include: { User: true } } } }
+      }
+    });
+
+    return { success: true, vote: updated };
+  } catch (e) {
+    console.error("Erreur adminUpdateVote:", e);
+    return { success: false, error: "Erreur lors de la mise à jour du vote" };
+  }
+}
+
+export async function adminDeleteVote(voteId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    await prisma.vote.delete({ where: { id: voteId } });
+    return { success: true };
+  } catch (e) {
+    console.error("Erreur adminDeleteVote:", e);
+    return { success: false, error: "Erreur lors de la suppression du vote" };
+  }
+}
+
+export async function adminUpdateVoteStatus(voteId: string, status: "Valide" | "Blanc" | "Annule"): Promise<{ success: boolean; vote?: any; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    const updated = await prisma.vote.update({
+      where: { id: voteId },
+      data: { status: status as any },
+      include: {
+        election: { select: { id: true, titre: true, status: true } },
+        position: { select: { id: true, titre: true } },
+        adherent: { include: { User: { select: { id: true, name: true, email: true } } } },
+        candidacy: { include: { adherent: { include: { User: true } } } }
+      }
+    });
+    return { success: true, vote: updated };
+  } catch (e) {
+    console.error("Erreur adminUpdateVoteStatus:", e);
+    return { success: false, error: "Erreur lors de la mise à jour du statut" };
+  }
+}
+
+// Light candidatures par poste (pour sélectionner un candidat lors d’un vote)
+export async function getCandidaciesForPositionLight(positionId: string): Promise<{ success: boolean; candidacies?: Array<{ id: string; label: string }>; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const candidacies = await prisma.candidacy.findMany({
+      where: { positionId },
+      select: {
+        id: true,
+        adherent: { select: { id: true, User: { select: { name: true, email: true } } } }
+      },
+      orderBy: { createdAt: 'desc' }
+    });
+
+    return { success: true, candidacies: candidacies.map(c => ({ id: c.id, label: `${c.adherent.User?.name || ''} • ${c.adherent.User?.email || ''}`.trim() })) };
+  } catch (e) {
+    console.error("Erreur getCandidaciesForPositionLight:", e);
+    return { success: false, error: "Erreur lors de la récupération des candidatures" };
+  }
+}
+
 // Server Action pour récupérer l'historique des votes de l'utilisateur
 export async function getUserVoteHistory(): Promise<{ success: boolean; elections?: any[]; error?: string }> {
   try {
@@ -1456,7 +1689,7 @@ export async function getCandidacyById(candidacyId: string) {
         adherent: {
           include: {
             User: true,
-            adresse: true
+            Adresse: true
           }
         },
         position: {
@@ -1551,5 +1784,271 @@ export async function deletePosition(positionId: string): Promise<{ success: boo
   } catch (error) {
     console.error("Erreur lors de la suppression du poste:", error);
     return { success: false, error: "Erreur lors de la suppression du poste" };
+  }
+}
+
+export async function getElectionsLightForAdmin(): Promise<{ success: boolean; elections?: any[]; error?: string }> {
+  try {
+    const elections = await prisma.election.findMany({
+      select: {
+        id: true,
+        titre: true,
+        description: true,
+        status: true,
+        dateOuverture: true,
+        dateCloture: true,
+        dateScrutin: true,
+        nombreMandats: true,
+        quorumRequis: true,
+        majoriteRequis: true,
+        _count: {
+          select: { votes: true },
+        },
+      },
+      orderBy: { dateOuverture: 'desc' },
+    });
+
+    return { success: true, elections };
+  } catch (error) {
+    console.error("Erreur (light) lors de la récupération des élections:", error);
+    return { success: false, error: "Erreur lors de la récupération des élections" };
+  }
+}
+
+export async function adminCreateCandidacy(data: { electionId: string; positionId: string; adherentId: string; motivation?: string; programme?: string; status?: CandidacyStatus }) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    // Vérifications de base
+    const election = await prisma.election.findUnique({ where: { id: data.electionId } });
+    if (!election) return { success: false, error: "Élection introuvable" };
+
+    const position = await prisma.position.findFirst({ where: { id: data.positionId, electionId: data.electionId } });
+    if (!position) return { success: false, error: "Poste introuvable pour cette élection" };
+
+    const adherent = await prisma.adherent.findUnique({ where: { id: data.adherentId } });
+    if (!adherent) return { success: false, error: "Adhérent introuvable" };
+
+    // Unicité par adhérent/élection/poste
+    const exists = await prisma.candidacy.findFirst({ where: { adherentId: data.adherentId, electionId: data.electionId, positionId: data.positionId } });
+    if (exists) return { success: false, error: "Candidature déjà existante pour cet adhérent et ce poste" };
+
+    const candidacy = await prisma.candidacy.create({
+      data: {
+        electionId: data.electionId,
+        positionId: data.positionId,
+        adherentId: data.adherentId,
+        motivation: data.motivation || "",
+        programme: data.programme || "",
+        status: data.status || CandidacyStatus.EnAttente,
+      },
+      include: {
+        position: { include: { election: true } },
+        adherent: { include: { User: true } },
+      },
+    });
+
+    return { success: true, candidacy };
+  } catch (e) {
+    console.error("Erreur adminCreateCandidacy:", e);
+    return { success: false, error: "Erreur lors de la création" };
+  }
+}
+
+export async function adminUpdateCandidacy(candidacyId: string, data: { motivation?: string; programme?: string; status?: CandidacyStatus; positionId?: string }) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    // Récupérer la candidature actuelle avec toutes les infos nécessaires
+    const current = await prisma.candidacy.findUnique({ 
+      where: { id: candidacyId }, 
+      include: { 
+        position: { include: { election: { select: { titre: true, id: true } } } },
+        adherent: { 
+          select: {
+            id: true,
+            civility: true,
+            firstname: true,
+            lastname: true,
+            User: { select: { email: true, name: true } }
+          }
+        }
+      } 
+    });
+    if (!current) return { success: false, error: "Candidature introuvable" };
+
+    // Vérifier si le statut change
+    const statusChanged = data.status !== undefined && data.status !== current.status;
+
+    // Si changement de poste, vérifier cohérence d'élection et unicité
+    if (data.positionId && data.positionId !== current.positionId) {
+      const electionId = current.position.election.id;
+      const newPos = await prisma.position.findFirst({ where: { id: data.positionId, electionId } });
+      if (!newPos) return { success: false, error: "Nouveau poste invalide pour cette élection" };
+      const dup = await prisma.candidacy.findFirst({ where: { adherentId: current.adherent.id, electionId, positionId: data.positionId } });
+      if (dup) return { success: false, error: "Une candidature existe déjà pour ce poste" };
+    }
+
+    // Récupérer le nouveau poste si changement
+    let positionTitre = current.position.titre;
+    if (data.positionId && data.positionId !== current.positionId) {
+      const newPos = await prisma.position.findUnique({ 
+        where: { id: data.positionId },
+        select: { titre: true }
+      });
+      if (newPos) positionTitre = newPos.titre;
+    }
+
+    const updated = await prisma.candidacy.update({
+      where: { id: candidacyId },
+      data: {
+        motivation: data.motivation,
+        programme: data.programme,
+        status: data.status,
+        positionId: data.positionId || undefined,
+      },
+      include: {
+        position: { include: { election: true } },
+        adherent: { include: { User: true } },
+      },
+    });
+
+    // Envoyer un email si le statut a changé
+    if (statusChanged && data.status) {
+      try {
+        const { sendCandidacyStatusEmail } = await import("@/lib/mail");
+        const statusLabels = {
+          [CandidacyStatus.Validee]: "Validée" as const,
+          [CandidacyStatus.Rejetee]: "Rejetée" as const,
+          [CandidacyStatus.EnAttente]: "En attente" as const,
+        };
+        const statusLabel = statusLabels[data.status] || "En attente";
+        const candidatNom = `${current.adherent.civility || ''} ${current.adherent.firstname || ''} ${current.adherent.lastname || ''}`.trim();
+        
+        if (current.adherent.User?.email) {
+          await sendCandidacyStatusEmail(
+            current.adherent.User.email,
+            candidatNom,
+            current.position.election.titre,
+            positionTitre,
+            statusLabel
+          );
+        }
+      } catch (emailError) {
+        console.error("Erreur lors de l'envoi de l'email:", emailError);
+        // Ne pas bloquer la mise à jour si l'email échoue
+      }
+    }
+
+    return { success: true, candidacy: updated };
+  } catch (e) {
+    console.error("Erreur adminUpdateCandidacy:", e);
+    return { success: false, error: "Erreur lors de la mise à jour" };
+  }
+}
+
+export async function adminDeleteCandidacy(candidacyId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    await prisma.candidacy.delete({ where: { id: candidacyId } });
+    return { success: true };
+  } catch (e) {
+    console.error("Erreur adminDeleteCandidacy:", e);
+    return { success: false, error: "Erreur lors de la suppression" };
+  }
+}
+
+export async function getPositionsForElectionLight(electionId: string): Promise<{ success: boolean; positions?: Array<{ id: string; titre: string; type: string }>; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const positions = await prisma.position.findMany({
+      where: { electionId },
+      select: { id: true, titre: true, type: true },
+      orderBy: { titre: 'asc' }
+    });
+    return { success: true, positions };
+  } catch (e) {
+    console.error("Erreur getPositionsForElectionLight:", e);
+    return { success: false, error: "Erreur lors de la récupération des postes" };
+  }
+}
+
+export async function adminDeleteElection(electionId: string): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    await prisma.election.delete({ where: { id: electionId } });
+    return { success: true };
+  } catch (e) {
+    console.error("Erreur adminDeleteElection:", e);
+    return { success: false, error: "Erreur lors de la suppression de l'élection" };
+  }
+}
+
+export async function getElectionWithDetails(electionId: string): Promise<{ success: boolean; election?: any; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    const election = await prisma.election.findUnique({
+      where: { id: electionId },
+      include: {
+        positions: {
+          include: {
+            candidacies: {
+              include: {
+                adherent: {
+                  include: {
+                    User: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true
+                      }
+                    }
+                  }
+                }
+              },
+              orderBy: { createdAt: 'desc' }
+            }
+          },
+          orderBy: { titre: 'asc' }
+        },
+        _count: {
+          select: {
+            votes: true,
+            positions: true,
+            candidacies: true
+          }
+        }
+      }
+    });
+
+    return { success: true, election };
+  } catch (e) {
+    console.error("Erreur getElectionWithDetails:", e);
+    return { success: false, error: "Erreur lors de la récupération de l'élection" };
   }
 }

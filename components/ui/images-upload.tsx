@@ -215,6 +215,7 @@ export function ImagesUpload({
                   fill
                   className="object-cover"
                   sizes="(max-width: 768px) 50vw, 25vw"
+                  unoptimized={url.startsWith('/')}
                   onError={() => {
                     toast.error(`Impossible de charger l'image ${index + 1}`);
                   }}

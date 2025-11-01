@@ -227,43 +227,43 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
       return { success: false, error: "Aucun type de cotisation actif trouvé" };
     }
 
-    const cotisationsCreated = [];
+    const cotisationsCreated = [] as any[];
 
-    // Créer les cotisations mensuelles pour chaque adhérent et chaque type
+    // Construire le lot d'insertions
+    const bulkData = [] as any[];
     for (const adherent of adherents) {
       for (const typeCotisation of typesCotisation) {
-        const cotisationMensuelle = await prisma.cotisationMensuelle.create({
-          data: {
-            periode,
-            annee: validatedData.annee,
-            mois: validatedData.mois,
-            typeCotisationId: typeCotisation.id,
-            adherentId: adherent.id,
-            montantAttendu: typeCotisation.montant,
-            montantPaye: 0,
-            montantRestant: typeCotisation.montant,
-            dateEcheance: new Date(validatedData.annee, validatedData.mois - 1, 15), // 15 du mois
-            statut: "EnAttente",
-            description: `Cotisation ${typeCotisation.nom} - ${periode}`,
-            createdBy: session.user.id,
-          }
-        });
-
-        // Convertir les Decimal en Number
-        cotisationsCreated.push({
-          ...cotisationMensuelle,
-          montantAttendu: Number(cotisationMensuelle.montantAttendu),
-          montantPaye: Number(cotisationMensuelle.montantPaye),
-          montantRestant: Number(cotisationMensuelle.montantRestant)
+        bulkData.push({
+          periode,
+          annee: validatedData.annee,
+          mois: validatedData.mois,
+          typeCotisationId: typeCotisation.id,
+          adherentId: adherent.id,
+          montantAttendu: typeCotisation.montant,
+          montantPaye: 0,
+          montantRestant: typeCotisation.montant,
+          dateEcheance: new Date(validatedData.annee, validatedData.mois - 1, 15),
+          statut: "EnAttente",
+          description: `Cotisation ${typeCotisation.nom} - ${periode}`,
+          createdBy: session.user.id,
         });
       }
     }
 
+    // Insérer en lot en ignorant les doublons (index unique composite)
+    const createManyResult = await prisma.cotisationMensuelle.createMany({
+      data: bulkData,
+      skipDuplicates: true,
+    });
+
+    // Nous ne relisons pas tout pour des raisons de performance; nous renvoyons les compteurs
+    const createdCount = createManyResult.count;
+
     return { 
       success: true, 
-      message: `${cotisationsCreated.length} cotisations mensuelles créées pour ${adherents.length} adhérents`,
+      message: `${createdCount} cotisation(s) mensuelle(s) créées (doublons ignorés) pour ${adherents.length} adhérents`,
       data: {
-        cotisationsCreated: cotisationsCreated.length,
+        cotisationsCreated: createdCount,
         adherentsCount: adherents.length,
         typesCount: typesCotisation.length
       }

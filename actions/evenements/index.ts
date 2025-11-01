@@ -123,8 +123,23 @@ export async function createEvenement(data: z.infer<typeof EvenementSchema>) {
     const placesDisponibles = validatedData.placesDisponibles ? parseInt(validatedData.placesDisponibles) : null;
 
     // Parsing des données JSON
-    const images = validatedData.images ? JSON.parse(validatedData.images) : null;
-    const tags = validatedData.tags ? JSON.parse(validatedData.tags) : null;
+    let images = null;
+    if (validatedData.images && validatedData.images.trim()) {
+      try {
+        images = JSON.parse(validatedData.images);
+      } catch {
+        images = null;
+      }
+    }
+    
+    let tags = null;
+    if (validatedData.tags && validatedData.tags.trim()) {
+      try {
+        tags = JSON.parse(validatedData.tags);
+      } catch {
+        tags = null;
+      }
+    }
 
     // Création de l'événement
     const evenement = await prisma.evenement.create({
@@ -202,8 +217,23 @@ export async function updateEvenement(id: string, data: z.infer<typeof Evenement
     const placesDisponibles = validatedData.placesDisponibles ? parseInt(validatedData.placesDisponibles) : null;
 
     // Parsing des données JSON
-    const images = validatedData.images ? JSON.parse(validatedData.images) : null;
-    const tags = validatedData.tags ? JSON.parse(validatedData.tags) : null;
+    let images = null;
+    if (validatedData.images && validatedData.images.trim()) {
+      try {
+        images = JSON.parse(validatedData.images);
+      } catch {
+        images = null;
+      }
+    }
+    
+    let tags = null;
+    if (validatedData.tags && validatedData.tags.trim()) {
+      try {
+        tags = JSON.parse(validatedData.tags);
+      } catch {
+        tags = null;
+      }
+    }
 
     const evenement = await prisma.evenement.update({
       where: { id },
@@ -963,7 +993,7 @@ export async function uploadEvenementImage(formData: FormData): Promise<{ succes
     const buffer = Buffer.from(bytes);
 
     // Créer le dossier de destination s'il n'existe pas
-    const uploadDir = join(process.cwd(), "public", "evenements");
+    const uploadDir = join(process.cwd(), "public", "ressources", "evenements");
     
     if (!existsSync(uploadDir)) {
       mkdirSync(uploadDir, { recursive: true });
@@ -980,7 +1010,7 @@ export async function uploadEvenementImage(formData: FormData): Promise<{ succes
     await writeFilePromise(path, buffer);
 
     // Construire l'URL publique
-    const publicUrl = `/evenements/${fileName}`;
+    const publicUrl = `/ressources/evenements/${fileName}`;
 
     return { 
       success: true, 

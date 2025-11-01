@@ -3,7 +3,8 @@
 import { useRouter, usePathname } from "next/navigation";
 import { 
     Dialog, 
-    DialogContent, 
+    DialogContent,
+    DialogTitle,
     DialogTrigger } from "@/components/ui/dialog"
 import LoginForm from "@/components/auth/login-form";
 
@@ -37,6 +38,7 @@ export const LoginButton = ({
                         {children}
                     </DialogTrigger>
                     <DialogContent className="p-0 w-auto bg-transparent border-none">
+                        <DialogTitle className="sr-only">Connexion</DialogTitle>
                         <LoginForm />
                     </DialogContent>
                 </Dialog>

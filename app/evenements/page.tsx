@@ -31,6 +31,7 @@ import {
 import { toast } from "react-hot-toast";
 import { getPublicEvenements, inscrireEvenement, type EvenementData } from "@/actions/evenements";
 import { useSession } from "next-auth/react";
+import { EventsCarousel } from "@/components/evenements/EventsCarousel";
 
 interface InscriptionFormData {
   nombrePersonnes: number;
@@ -170,31 +171,43 @@ export default function PublicEvenementsPage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
       <Navbar />
       
-      {/* Hero Section */}
-      <section className="relative py-20 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
-        <div className="absolute inset-0 bg-black/20" />
-        <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex justify-center mb-8">
-            <div className="bg-white/20 backdrop-blur-sm rounded-full p-6 shadow-2xl">
-              <Calendar className="h-16 w-16 text-white" />
+      {/* Hero Section avec Carousel */}
+      <section className="relative py-12 md:py-16">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="mb-8 text-center">
+            <h1 className="text-4xl md:text-5xl font-bold mb-4 text-gray-900 dark:text-white">
+              Événements AMAKI
+            </h1>
+            <p className="text-xl text-gray-600 dark:text-gray-300">
+              Découvrez nos prochains événements et activités
+            </p>
+          </div>
+          
+          {/* Carousel des événements */}
+          {evenements.length > 0 ? (
+            <EventsCarousel 
+              events={evenements.slice(0, 10).map(ev => ({
+                id: ev.id,
+                titre: ev.titre,
+                description: ev.description,
+                imagePrincipale: ev.imagePrincipale,
+                dateDebut: new Date(ev.dateDebut),
+                lieu: ev.lieu,
+                categorie: ev.categorie,
+                placesDisponibles: ev.placesDisponibles,
+                placesReservees: ev.placesReservees || 0,
+              }))}
+              autoPlayInterval={6000}
+            />
+          ) : (
+            <div className="relative w-full h-[600px] overflow-hidden rounded-2xl shadow-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center">
+              <div className="text-center text-white z-10">
+                <Calendar className="h-24 w-24 mx-auto mb-6 opacity-50" />
+                <h2 className="text-3xl font-bold mb-4">Aucun événement disponible</h2>
+                <p className="text-xl opacity-90">Revenez bientôt pour découvrir nos prochains événements</p>
+              </div>
             </div>
-          </div>
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white drop-shadow-lg">
-            Événements AMAKI
-          </h1>
-          <p className="text-xl md:text-2xl mb-8 text-purple-100">
-            Découvrez nos prochains événements et activités. Rejoignez-nous pour des moments de partage et de découverte.
-          </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-lg px-6 py-3">
-              <Calendar className="h-5 w-5 mr-2" />
-              Événements
-            </Badge>
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-lg px-6 py-3">
-              <Users className="h-5 w-5 mr-2" />
-              Communauté
-            </Badge>
-          </div>
+          )}
         </div>
       </section>
 

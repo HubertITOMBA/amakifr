@@ -246,6 +246,45 @@ export async function getDepenseStats() {
   }
 }
 
+// Obtenir une dépense par ID
+export async function getDepenseById(id: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const depense = await prisma.depense.findUnique({
+      where: { id },
+      include: {
+        CreatedBy: {
+          select: {
+            id: true,
+            email: true,
+          }
+        }
+      }
+    });
+
+    if (!depense) {
+      return { success: false, error: "Dépense non trouvée" };
+    }
+
+    // Convertir les Decimal en Number
+    const depenseConverted = {
+      ...depense,
+      montant: Number(depense.montant),
+      dateDepense: depense.dateDepense.toISOString().split('T')[0]
+    };
+
+    return { success: true, data: depenseConverted };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la dépense:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
 // Filtrer les dépenses
 export async function filterDepenses(filters: {
   categorie?: string;

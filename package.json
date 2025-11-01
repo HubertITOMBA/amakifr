@@ -12,6 +12,7 @@
     "db:seed-financial": "tsx scripts/create-financial-fixtures.ts",
     "db:seed-types-cotisation": "tsx scripts/create-default-types-cotisation.ts",
     "db:seed-evenements": "tsx scripts/create-evenements-fixtures.ts",
+    "db:update-evenements-dates": "tsx scripts/update-evenements-dates.ts",
     "db:seed-all": "npm run db:seed && npm run db:seed-elections && npm run db:seed-financial && npm run db:seed-types-cotisation && npm run db:seed-evenements",
     "db:reset": "prisma migrate reset --force && npm run db:seed-all"
   },

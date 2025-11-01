@@ -624,3 +624,209 @@ export async function getAllCandidatesForProfile(): Promise<{ success: boolean; 
     return { success: false, error: "Erreur interne du serveur" };
   }
 }
+
+export async function getAdherentsLight(): Promise<{ success: boolean; adherents?: Array<{ id: string; firstname: string | null; lastname: string | null; email: string | null }> ; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    const adherents = await prisma.adherent.findMany({
+      include: { User: { select: { email: true } } },
+      orderBy: [ { lastname: 'asc' }, { firstname: 'asc' } ] as any
+    });
+
+    const mapped = adherents.map((a: any) => ({ id: a.id, firstname: a.firstname, lastname: a.lastname, email: a.User?.email || null }));
+    return { success: true, adherents: mapped };
+  } catch (e) {
+    console.error("Erreur getAdherentsLight:", e);
+    return { success: false, error: "Erreur lors du chargement des adhérents" };
+  }
+}
+
+// Server Action pour récupérer tous les utilisateurs pour l'admin
+export async function getAllUsersForAdmin(): Promise<{ success: boolean; users?: any[]; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    const users = await prisma.user.findMany({
+      include: {
+        adherent: {
+          include: {
+            Adresse: true,
+            Telephones: true
+          }
+        }
+      },
+      orderBy: [
+        { createdAt: 'desc' }
+      ]
+    });
+
+    return { success: true, users };
+  } catch (e) {
+    console.error("Erreur getAllUsersForAdmin:", e);
+    return { success: false, error: "Erreur lors du chargement des utilisateurs" };
+  }
+}
+
+// Server Action pour récupérer un utilisateur par ID
+export async function getUserByIdForAdmin(userId: string): Promise<{ success: boolean; user?: any; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        adherent: {
+          include: {
+            Adresse: true,
+            Telephones: true
+          }
+        }
+      }
+    });
+
+    if (!targetUser) return { success: false, error: "Utilisateur non trouvé" };
+
+    return { success: true, user: targetUser };
+  } catch (e) {
+    console.error("Erreur getUserByIdForAdmin:", e);
+    return { success: false, error: "Erreur lors du chargement de l'utilisateur" };
+  }
+}
+
+// Server Action pour changer le rôle d'un utilisateur
+export async function adminUpdateUserRole(userId: string, role: "Admin" | "Membre" | "Invite"): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    // Empêcher de changer son propre rôle
+    if (userId === session.user.id) {
+      return { success: false, error: "Vous ne pouvez pas modifier votre propre rôle" };
+    }
+
+    await prisma.user.update({
+      where: { id: userId },
+      data: { role }
+    });
+
+    return { success: true };
+  } catch (e) {
+    console.error("Erreur adminUpdateUserRole:", e);
+    return { success: false, error: "Erreur lors de la mise à jour du rôle" };
+  }
+}
+
+// Server Action pour changer le statut d'un utilisateur
+export async function adminUpdateUserStatus(userId: string, status: "Actif" | "Inactif"): Promise<{ success: boolean; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    // Empêcher de changer son propre statut
+    if (userId === session.user.id) {
+      return { success: false, error: "Vous ne pouvez pas modifier votre propre statut" };
+    }
+
+    // Récupérer l'utilisateur avec les infos nécessaires pour l'email
+    const targetUser = await prisma.user.findUnique({
+      where: { id: userId },
+      include: {
+        adherent: {
+          select: {
+            civility: true,
+            firstname: true,
+            lastname: true
+          }
+        }
+      }
+    });
+
+    if (!targetUser) {
+      return { success: false, error: "Utilisateur non trouvé" };
+    }
+
+    // Vérifier si le statut change
+    const statusChanged = targetUser.status !== status;
+
+    // Mettre à jour le statut
+    await prisma.user.update({
+      where: { id: userId },
+      data: { status }
+    });
+
+    // Envoyer un email si le statut a changé
+    if (statusChanged && targetUser.email) {
+      try {
+        const { sendUserStatusEmail } = await import("@/lib/mail");
+        const userName = targetUser.adherent 
+          ? `${targetUser.adherent.civility || ''} ${targetUser.adherent.firstname || ''} ${targetUser.adherent.lastname || ''}`.trim()
+          : targetUser.name || "Utilisateur";
+        
+        await sendUserStatusEmail(
+          targetUser.email,
+          userName,
+          status
+        );
+      } catch (emailError) {
+        console.error("Erreur lors de l'envoi de l'email:", emailError);
+        // Ne pas bloquer la mise à jour si l'email échoue
+      }
+    }
+
+    return { success: true };
+  } catch (e) {
+    console.error("Erreur adminUpdateUserStatus:", e);
+    return { success: false, error: "Erreur lors de la mise à jour du statut" };
+  }
+}
+
+// Server Action pour mettre à jour un utilisateur (admin)
+export async function adminUpdateUser(userId: string, data: { name?: string; email?: string }): Promise<{ success: boolean; user?: any; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    const updated = await prisma.user.update({
+      where: { id: userId },
+      data: {
+        ...(data.name !== undefined && { name: data.name }),
+        ...(data.email !== undefined && { email: data.email })
+      },
+      include: {
+        adherent: {
+          include: {
+            Adresse: true,
+            Telephones: true
+          }
+        }
+      }
+    });
+
+    return { success: true, user: updated };
+  } catch (e) {
+    console.error("Erreur adminUpdateUser:", e);
+    return { success: false, error: "Erreur lors de la mise à jour de l'utilisateur" };
+  }
+}

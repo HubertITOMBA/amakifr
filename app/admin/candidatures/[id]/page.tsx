@@ -41,12 +41,15 @@ interface CandidacyDetails {
     lastname: string;
     civility: string;
     telephone?: string;
-    adresse?: {
-      rue?: string;
-      ville?: string;
-      codePostal?: string;
-      pays?: string;
-    };
+    Adresse?: Array<{
+      id: string;
+      streetnum?: string;
+      street1?: string;
+      street2?: string;
+      codepost?: string;
+      city?: string;
+      country?: string;
+    }>;
     User: {
       id: string;
       name: string;
@@ -233,21 +236,33 @@ export default function CandidacyDetailPage() {
                   </div>
                 )}
 
-                {candidacy.adherent.adresse && (
+                {candidacy.adherent.Adresse && candidacy.adherent.Adresse.length > 0 && (
                   <div className="flex items-start gap-3">
                     <MapPin className="h-4 w-4 text-gray-500 mt-0.5" />
                     <div className="text-sm">
-                      {candidacy.adherent.adresse.rue && (
-                        <p>{candidacy.adherent.adresse.rue}</p>
-                      )}
-                      {(candidacy.adherent.adresse.ville || candidacy.adherent.adresse.codePostal) && (
-                        <p>
-                          {candidacy.adherent.adresse.codePostal} {candidacy.adherent.adresse.ville}
-                        </p>
-                      )}
-                      {candidacy.adherent.adresse.pays && (
-                        <p>{candidacy.adherent.adresse.pays}</p>
-                      )}
+                      {(() => {
+                        const adresse = candidacy.adherent.Adresse[0];
+                        return (
+                          <>
+                            {(adresse.street1 || adresse.street2) && (
+                              <p>
+                                {adresse.streetnum && `${adresse.streetnum} `}
+                                {adresse.street1 || ''}
+                                {adresse.street1 && adresse.street2 ? ' ' : ''}
+                                {adresse.street2 || ''}
+                              </p>
+                            )}
+                            {(adresse.city || adresse.codepost) && (
+                              <p>
+                                {adresse.codepost} {adresse.city}
+                              </p>
+                            )}
+                            {adresse.country && (
+                              <p>{adresse.country}</p>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                   </div>
                 )}

@@ -3,7 +3,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+// Navigation par menu latéral (remplace les Tabs)
 import { 
   Users, 
   Calendar, 
@@ -21,12 +21,15 @@ import {
   Clock
 } from "lucide-react";
 import { useState, useEffect } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { 
   getAllCandidaciesForAdmin, 
   getAllElectionsForAdmin, 
   updateCandidacyStatus, 
-  closeElection 
+  closeElection,
+  getElectionsLightForAdmin
 } from "@/actions/elections";
+import { getAllPostesTemplates } from "@/actions/postes";
 import { CandidacyStatus, ElectionStatus } from "@prisma/client";
 import { POSTES_LABELS } from "@/lib/elections-constants";
 import {
@@ -212,36 +215,93 @@ const upcomingEvents = [
 ];
 
 export default function AdminDashboard() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const initialSection = (searchParams?.get("section") || "dashboard");
   const [candidacies, setCandidacies] = useState<CandidacyData[]>([]);
   const [elections, setElections] = useState<ElectionData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [postes, setPostes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [activeTab, setActiveTab] = useState<string>(initialSection);
+  const [loadingElectionsTab, setLoadingElectionsTab] = useState(false);
+  const [loadingCandidaturesTab, setLoadingCandidaturesTab] = useState(false);
+  const [loadingPostesTab, setLoadingPostesTab] = useState(false);
 
-  // Charger les données
+  // Charger la section initiale à l’arrivée (si ce n’est pas le dashboard)
   useEffect(() => {
-    const loadData = async () => {
-      try {
-        const [candidaciesResult, electionsResult] = await Promise.all([
-          getAllCandidaciesForAdmin(),
-          getAllElectionsForAdmin()
-        ]);
-
-        if (candidaciesResult.success) {
-          setCandidacies(candidaciesResult.candidacies || []);
-        }
-        if (electionsResult.success) {
-          setElections(electionsResult.elections || []);
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des données:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadData();
+    if (initialSection === "elections") {
+      onNavigate("elections");
+    }
+    if (initialSection === "candidatures") {
+      onNavigate("candidatures");
+    }
+    if (initialSection === "postes") {
+      onNavigate("postes");
+    }
+    if (initialSection === "votes") {
+      onNavigate("votes");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const loadElectionsTab = async () => {
+    try {
+      setLoadingElectionsTab(true);
+      const [candidaciesResult, electionsResult] = await Promise.all([
+        getAllCandidaciesForAdmin(),
+        getElectionsLightForAdmin()
+      ]);
+
+      if (candidaciesResult.success) {
+        setCandidacies(candidaciesResult.candidacies || []);
+      }
+      if (electionsResult.success) {
+        setElections((electionsResult.elections as any) || []);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des données:", error);
+    } finally {
+      setLoadingElectionsTab(false);
+    }
+  };
+
+  const onNavigate = (value: string) => {
+    setActiveTab(value);
+    // Synchroniser l’URL (sans recharger la page)
+    const url = value === "dashboard" ? "/admin" : `/admin?section=${value}`;
+    router.replace(url);
+    if (value === "elections" && candidacies.length === 0 && elections.length === 0 && !loadingElectionsTab) {
+      loadElectionsTab();
+    }
+    if (value === "candidatures" && candidacies.length === 0 && !loadingCandidaturesTab) {
+      (async () => {
+        try {
+          setLoadingCandidaturesTab(true);
+          const res = await getAllCandidaciesForAdmin();
+          if (res.success) setCandidacies(res.candidacies || []);
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setLoadingCandidaturesTab(false);
+        }
+      })();
+    }
+    if (value === "postes" && postes.length === 0 && !loadingPostesTab) {
+      (async () => {
+        try {
+          setLoadingPostesTab(true);
+          const res = await getAllPostesTemplates();
+          if (res.success && res.data) setPostes(res.data as any[]);
+        } catch (e) {
+          console.error(e);
+        } finally {
+          setLoadingPostesTab(false);
+        }
+      })();
+    }
+  };
 
   // Fonction pour valider/rejeter une candidature
   const handleCandidacyStatusChange = async (candidacyId: string, status: CandidacyStatus) => {
@@ -405,17 +465,48 @@ export default function AdminDashboard() {
         </p>
       </div>
 
-      {/* Tabs Navigation */}
-      <Tabs defaultValue="dashboard" className="space-y-6">
-        <TabsList className="grid w-full grid-cols-3">
-          <TabsTrigger value="dashboard">Dashboard</TabsTrigger>
-          <TabsTrigger value="elections">Élections</TabsTrigger>
-          <TabsTrigger value="votes">Votes</TabsTrigger>
-        </TabsList>
+      <div className="flex gap-6">
+        {/* Menu latéral */}
+        <aside className="w-56 flex-shrink-0">
+          <div className="border rounded-lg overflow-hidden">
+            <button
+              className={`w-full text-left px-4 py-3 border-b hover:bg-gray-50 dark:hover:bg-gray-800 ${activeTab === "dashboard" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}`}
+              onClick={() => onNavigate("dashboard")}
+            >
+              Dashboard
+            </button>
+            <button
+              className={`w-full text-left px-4 py-3 border-b hover:bg-gray-50 dark:hover:bg-gray-800 ${activeTab === "elections" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}`}
+              onClick={() => onNavigate("elections")}
+            >
+              Élections
+            </button>
+            <button
+              className={`w-full text-left px-4 py-3 border-b hover:bg-gray-50 dark:hover:bg-gray-800 ${activeTab === "candidatures" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}`}
+              onClick={() => onNavigate("candidatures")}
+            >
+              Candidatures
+            </button>
+            <button
+              className={`w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 ${activeTab === "postes" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}`}
+              onClick={() => onNavigate("postes")}
+            >
+              Postes
+            </button>
+            <button
+              className={`w-full text-left px-4 py-3 hover:bg-gray-50 dark:hover:bg-gray-800 ${activeTab === "votes" ? "bg-gray-100 dark:bg-gray-800 font-medium" : ""}`}
+              onClick={() => onNavigate("votes")}
+            >
+              Votes
+            </button>
+          </div>
+        </aside>
 
-        {/* Dashboard Tab */}
-        <TabsContent value="dashboard" className="space-y-6">
-
+        {/* Contenu principal */}
+        <main className="flex-1 space-y-6">
+          {activeTab === "dashboard" && (
+            <div className="space-y-6">
+ 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {stats.map((stat, index) => {
@@ -450,7 +541,7 @@ export default function AdminDashboard() {
           );
         })}
       </div>
-
+ 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Activités récentes */}
         <Card>
@@ -475,7 +566,7 @@ export default function AdminDashboard() {
                       return <MessageSquare className="h-4 w-4" />;
                   }
                 };
-
+ 
                 const getStatusColor = () => {
                   switch (activity.status) {
                     case "success":
@@ -486,7 +577,7 @@ export default function AdminDashboard() {
                       return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
                   }
                 };
-
+ 
                 return (
                   <div key={activity.id} className="flex items-center space-x-3">
                     <div className={`p-2 rounded-full ${getStatusColor()}`}>
@@ -506,7 +597,7 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-
+ 
         {/* Événements à venir */}
         <Card>
           <CardHeader>
@@ -528,7 +619,7 @@ export default function AdminDashboard() {
                       return <Badge variant="secondary">Inconnu</Badge>;
                   }
                 };
-
+ 
                 return (
                   <div key={event.id} className="flex items-center justify-between p-3 border border-gray-200 dark:border-gray-700 rounded-lg">
                     <div className="flex-1">
@@ -552,7 +643,7 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
       </div>
-
+ 
       {/* Actions rapides */}
       <Card>
         <CardHeader>
@@ -586,66 +677,24 @@ export default function AdminDashboard() {
           </div>
         </CardContent>
       </Card>
-        </TabsContent>
+            </div>
+          )}
 
-        {/* Elections Tab */}
-        <TabsContent value="elections" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Vote className="h-5 w-5 mr-2 text-blue-600" />
-                Gestion des Élections
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {/* Liste des élections */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Élections en cours</h3>
-                    <div className="space-y-3">
-                      {elections.map((election) => (
-                        <div key={election.id} className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
-                          <div className="flex items-center justify-between">
-                            <div>
-                              <h4 className="font-semibold text-gray-900 dark:text-white">
-                                {election.titre}
-                              </h4>
-                              <p className="text-sm text-gray-600 dark:text-gray-300">
-                                Du {new Date(election.dateOuverture).toLocaleDateString()} au {new Date(election.dateCloture).toLocaleDateString()}
-                              </p>
-                              <div className="flex items-center space-x-4 mt-2">
-                                <Badge className={`${getStatusColor(election.status)} text-xs`}>
-                                  {election.status}
-                                </Badge>
-                                <span className="text-xs text-gray-500">
-                                  {election.positions.reduce((acc, pos) => acc + pos.candidacies.length, 0)} candidatures
-                                </span>
-                              </div>
-                            </div>
-                            {election.status === ElectionStatus.Ouverte && (
-                              <Button
-                                variant="outline"
-                                className="text-red-600 border-red-600 hover:bg-red-50"
-                                onClick={() => handleCloseElection(election.id)}
-                              >
-                                <Clock className="h-4 w-4 mr-1" />
-                                Clôturer
-                              </Button>
-                            )}
-                          </div>
-                        </div>
-                      ))}
+          {activeTab === "candidatures" && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Users className="h-5 w-5 mr-2" />
+                    Candidatures
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingCandidaturesTab ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
                     </div>
-                  </div>
-
-                  {/* Table des candidatures */}
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">Candidatures</h3>
+                  ) : (
                     <div className="border rounded-lg overflow-hidden">
                       <table className="w-full">
                         <thead className="bg-gray-50 dark:bg-gray-800">
@@ -680,36 +729,177 @@ export default function AdminDashboard() {
                         </tbody>
                       </table>
                     </div>
-                  </div>
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </TabsContent>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
 
-        {/* Votes Tab */}
-        <TabsContent value="votes" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center">
-                <Award className="h-5 w-5 mr-2 text-green-600" />
-                Gestion des Votes
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-center py-8">
-                <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
-                  Fonctionnalité en développement
-                </h3>
-                <p className="text-gray-600 dark:text-gray-300">
-                  La gestion des votes sera bientôt disponible
-                </p>
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-      </Tabs>
+          {activeTab === "postes" && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Award className="h-5 w-5 mr-2" />
+                    Postes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingPostesTab ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      {postes.length === 0 ? (
+                        <div className="text-sm text-gray-500">Aucun poste</div>
+                      ) : (
+                        postes.map((p: any) => (
+                          <div key={p.id} className="flex items-center justify-between p-3 border rounded">
+                            <div>
+                              <div className="font-medium">{p.libelle}</div>
+                              <div className="text-xs text-gray-500">{p.code} {p.description ? `• ${p.description}` : ""}</div>
+                            </div>
+                            <Badge className={p.actif ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"}>
+                              {p.actif ? "Actif" : "Inactif"}
+                            </Badge>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {activeTab === "elections" && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Vote className="h-5 w-5 mr-2 text-blue-600" />
+                    Gestion des Élections
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {loadingElectionsTab ? (
+                    <div className="flex items-center justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-6">
+                      {/* Liste des élections */}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">Élections en cours</h3>
+                        <div className="space-y-3">
+                          {elections.map((election) => (
+                            <div key={election.id} className="border rounded-lg p-4 bg-gray-50 dark:bg-gray-800">
+                              <div className="flex items-center justify-between">
+                                <div>
+                                  <h4 className="font-semibold text-gray-900 dark:text-white">
+                                    {election.titre}
+                                  </h4>
+                                  <p className="text-sm text-gray-600 dark:text-gray-300">
+                                    Du {new Date(election.dateOuverture).toLocaleDateString()} au {new Date(election.dateCloture).toLocaleDateString()}
+                                  </p>
+                                  <div className="flex items-center space-x-4 mt-2">
+                                    <Badge className={`${getStatusColor(election.status)} text-xs`}>
+                                      {election.status}
+                                    </Badge>
+                                    {((election as any)._count?.votes ?? null) !== null && (
+                                      <span className="text-xs text-gray-500">
+                                        {(election as any)._count?.votes ?? 0} votes
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                                {election.status === ElectionStatus.Ouverte && (
+                                  <Button
+                                    variant="outline"
+                                    className="text-red-600 border-red-600 hover:bg-red-50"
+                                    onClick={() => handleCloseElection(election.id)}
+                                  >
+                                    <Clock className="h-4 w-4 mr-1" />
+                                    Clôturer
+                                  </Button>
+                                )}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Table des candidatures */}
+                      <div>
+                        <h3 className="text-lg font-semibold mb-4">Candidatures</h3>
+                        <div className="border rounded-lg overflow-hidden">
+                          <table className="w-full">
+                            <thead className="bg-gray-50 dark:bg-gray-800">
+                              {candidacyTable.getHeaderGroups().map(headerGroup => (
+                                <tr key={headerGroup.id}>
+                                  {headerGroup.headers.map(header => (
+                                    <th
+                                      key={header.id}
+                                      className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                                    >
+                                      {header.isPlaceholder
+                                        ? null
+                                        : flexRender(
+                                            header.column.columnDef.header,
+                                            header.getContext()
+                                          )}
+                                    </th>
+                                  ))}
+                                </tr>
+                              ))}
+                            </thead>
+                            <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                              {candidacyTable.getRowModel().rows.map(row => (
+                                <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                                  {row.getVisibleCells().map(cell => (
+                                    <td key={cell.id} className="px-6 py-4 whitespace-nowrap">
+                                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                                    </td>
+                                  ))}
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {activeTab === "votes" && (
+            <div className="space-y-6">
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center">
+                    <Award className="h-5 w-5 mr-2 text-green-600" />
+                    Gestion des Votes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-center py-8">
+                    <Award className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                      Fonctionnalité en développement
+                    </h3>
+                    <p className="text-gray-600 dark:text-gray-300">
+                      La gestion des votes sera bientôt disponible
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+        </main>
+      </div>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import {
   ColumnDef,
   flexRender,
@@ -150,6 +150,19 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
   const [isExporting, setIsExporting] = useState(false);
   const [searchCotisations, setSearchCotisations] = useState("");
   const [searchObligations, setSearchObligations] = useState("");
+  const [activeTab, setActiveTab] = useState<string>("cotisations");
+
+  // Debounce recherches
+  const [searchCotisationsDebounced, setSearchCotisationsDebounced] = useState("");
+  const [searchObligationsDebounced, setSearchObligationsDebounced] = useState("");
+  useEffect(() => {
+    const t = setTimeout(() => setSearchCotisationsDebounced(searchCotisations), 300);
+    return () => clearTimeout(t);
+  }, [searchCotisations]);
+  useEffect(() => {
+    const t = setTimeout(() => setSearchObligationsDebounced(searchObligations), 300);
+    return () => clearTimeout(t);
+  }, [searchObligations]);
 
   // Mettre à jour les données filtrées quand les données originales changent
   React.useEffect(() => {
@@ -159,6 +172,40 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
   React.useEffect(() => {
     setFilteredObligations(obligations);
   }, [obligations]);
+
+  // Recherche côté client (debounced)
+  useEffect(() => {
+    const term = searchCotisationsDebounced.trim();
+    if (term === "") {
+      setFilteredCotisations(cotisations);
+    } else {
+      const filtered = cotisations.filter(cotisation => 
+        cotisation.type.toLowerCase().includes(term.toLowerCase()) ||
+        cotisation.statut.toLowerCase().includes(term.toLowerCase()) ||
+        cotisation.reference?.toLowerCase().includes(term.toLowerCase()) ||
+        cotisation.moyenPaiement.toLowerCase().includes(term.toLowerCase()) ||
+        cotisation.montant.toString().includes(term)
+      );
+      setFilteredCotisations(filtered);
+    }
+  }, [searchCotisationsDebounced, cotisations]);
+
+  useEffect(() => {
+    const term = searchObligationsDebounced.trim();
+    if (term === "") {
+      setFilteredObligations(obligations);
+    } else {
+      const filtered = obligations.filter(obligation => 
+        obligation.type.toLowerCase().includes(term.toLowerCase()) ||
+        obligation.statut.toLowerCase().includes(term.toLowerCase()) ||
+        obligation.periode.toLowerCase().includes(term.toLowerCase()) ||
+        obligation.montantAttendu.toString().includes(term) ||
+        obligation.montantPaye.toString().includes(term) ||
+        obligation.montantRestant.toString().includes(term)
+      );
+      setFilteredObligations(filtered);
+    }
+  }, [searchObligationsDebounced, obligations]);
 
   // Fonction pour appliquer les filtres aux cotisations
   const handleFilterCotisations = async () => {
@@ -193,41 +240,6 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
       toast.error("Erreur lors du filtrage des obligations");
     } finally {
       setIsFiltering(false);
-    }
-  };
-
-  // Fonction pour rechercher dans les cotisations
-  const handleSearchCotisations = (searchTerm: string) => {
-    setSearchCotisations(searchTerm);
-    if (searchTerm.trim() === "") {
-      setFilteredCotisations(cotisations);
-    } else {
-      const filtered = cotisations.filter(cotisation => 
-        cotisation.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cotisation.statut.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cotisation.reference?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cotisation.moyenPaiement.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        cotisation.montant.toString().includes(searchTerm)
-      );
-      setFilteredCotisations(filtered);
-    }
-  };
-
-  // Fonction pour rechercher dans les obligations
-  const handleSearchObligations = (searchTerm: string) => {
-    setSearchObligations(searchTerm);
-    if (searchTerm.trim() === "") {
-      setFilteredObligations(obligations);
-    } else {
-      const filtered = obligations.filter(obligation => 
-        obligation.type.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        obligation.statut.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        obligation.periode.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        obligation.montantAttendu.toString().includes(searchTerm) ||
-        obligation.montantPaye.toString().includes(searchTerm) ||
-        obligation.montantRestant.toString().includes(searchTerm)
-      );
-      setFilteredObligations(filtered);
     }
   };
 
@@ -618,7 +630,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
 
   return (
     <div className="space-y-6">
-      <Tabs defaultValue="cotisations" className="w-full">
+      <Tabs defaultValue="cotisations" className="w-full" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
           <TabsTrigger 
             value="cotisations" 
@@ -637,93 +649,95 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         </TabsList>
 
         <TabsContent value="cotisations" className="space-y-4">
-          <Card className="border-blue-200 dark:border-blue-800">
-            <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
-              <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                <Receipt className="h-5 w-5" />
-                Cotisations Payées
-              </CardTitle>
-              <CardDescription>
-                Historique de vos cotisations avec détails de paiement
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {/* Barre de recherche */}
-              <div className="p-4 border-b">
-                  <div className="flex items-center gap-4">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        placeholder="Rechercher par type, montant, statut..."
-                        value={searchCotisations}
-                        onChange={(event) => handleSearchCotisations(event.target.value)}
-                        className="pl-10"
-                      />
+          {/* même contenu mais on rend seulement si onglet actif */}
+          {activeTab === "cotisations" && (
+            <Card className="border-blue-200 dark:border-blue-800">
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+                <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
+                  <Receipt className="h-5 w-5" />
+                  Cotisations Payées
+                </CardTitle>
+                <CardDescription>
+                  Historique de vos cotisations avec détails de paiement
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                {/* Barre de recherche */}
+                <div className="p-4 border-b">
+                    <div className="flex items-center gap-4">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Rechercher par type, montant, statut..."
+                          value={searchCotisations}
+                          onChange={(event) => setSearchCotisations(event.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleFilterCotisations}
+                        disabled={isFiltering}
+                      >
+                        <Filter className="h-4 w-4 mr-2" />
+                        {isFiltering ? "Filtrage..." : "Filtres"}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleExportCotisations}
+                        disabled={isExporting}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        {isExporting ? "Export..." : "Export"}
+                      </Button>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleFilterCotisations}
-                      disabled={isFiltering}
-                    >
-                      <Filter className="h-4 w-4 mr-2" />
-                      {isFiltering ? "Filtrage..." : "Filtres"}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleExportCotisations}
-                      disabled={isExporting}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      {isExporting ? "Export..." : "Export"}
-                    </Button>
-                  </div>
-              </div>
+                </div>
 
-              {/* Table */}
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    {cotisationsTable.getHeaderGroups().map((headerGroup) => (
-                      <TableRow key={headerGroup.id} className="bg-gray-50 dark:bg-gray-800">
-                        {headerGroup.headers.map((header) => (
-                          <TableHead key={header.id} className="font-semibold">
-                            {header.isPlaceholder
-                              ? null
-                              : flexRender(header.column.columnDef.header, header.getContext())}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableHeader>
-                  <TableBody>
-                    {cotisationsTable.getRowModel().rows?.length ? (
-                      cotisationsTable.getRowModel().rows.map((row) => (
-                        <TableRow
-                          key={row.id}
-                          className="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                        >
-                          {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id}>
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      {cotisationsTable.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id} className="bg-gray-50 dark:bg-gray-800">
+                          {headerGroup.headers.map((header) => (
+                            <TableHead key={header.id} className="font-semibold">
+                              {header.isPlaceholder
+                                ? null
+                                : flexRender(header.column.columnDef.header, header.getContext())}
+                            </TableHead>
                           ))}
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={cotisationsColumns.length} className="h-24 text-center">
-                          <div className="flex flex-col items-center gap-2">
-                            <Receipt className="h-8 w-8 text-gray-400" />
-                            <p className="text-gray-500">Aucune cotisation trouvée.</p>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                      ))}
+                    </TableHeader>
+                    <TableBody>
+                      {cotisationsTable.getRowModel().rows?.length ? (
+                        cotisationsTable.getRowModel().rows.map((row) => (
+                          <TableRow
+                            key={row.id}
+                            className="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                          >
+                            {row.getVisibleCells().map((cell) => (
+                              <TableCell key={cell.id}>
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={cotisationsColumns.length} className="h-24 text-center">
+                            <div className="flex flex-col items-center gap-2">
+                              <Receipt className="h-8 w-8 text-gray-400" />
+                              <p className="text-gray-500">Aucune cotisation trouvée.</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
 
               {/* Totaux */}
               <div className="p-4 border-t bg-blue-50 dark:bg-blue-900/10">
@@ -782,96 +796,98 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
               </div>
             </CardContent>
           </Card>
+        )}
         </TabsContent>
 
         <TabsContent value="obligations" className="space-y-4">
-          <Card className="border-orange-200 dark:border-orange-800">
-            <CardHeader className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20">
-              <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
-                <AlertCircle className="h-5 w-5" />
-                Obligations de Cotisation
-              </CardTitle>
-              <CardDescription>
-                Suivi de vos obligations avec montants attendus et restants
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="p-0">
-              {/* Barre de recherche */}
-              <div className="p-4 border-b">
-                  <div className="flex items-center gap-4">
-                    <div className="relative flex-1">
-                      <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                      <Input
-                        placeholder="Rechercher par type, statut, période..."
-                        value={searchObligations}
-                        onChange={(event) => handleSearchObligations(event.target.value)}
-                        className="pl-10"
-                      />
+          {activeTab === "obligations" && (
+            <Card className="border-orange-200 dark:border-orange-800">
+              <CardHeader className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20">
+                <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
+                  <AlertCircle className="h-5 w-5" />
+                  Obligations de Cotisation
+                </CardTitle>
+                <CardDescription>
+                  Suivi de vos obligations avec montants attendus et restants
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="p-0">
+                {/* Barre de recherche */}
+                <div className="p-4 border-b">
+                    <div className="flex items-center gap-4">
+                      <div className="relative flex-1">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Rechercher par type, statut, période..."
+                          value={searchObligations}
+                          onChange={(event) => setSearchObligations(event.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleFilterObligations}
+                        disabled={isFiltering}
+                      >
+                        <Filter className="h-4 w-4 mr-2" />
+                        {isFiltering ? "Filtrage..." : "Filtres"}
+                      </Button>
+                      <Button 
+                        variant="outline" 
+                        size="sm"
+                        onClick={handleExportObligations}
+                        disabled={isExporting}
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        {isExporting ? "Export..." : "Export"}
+                      </Button>
                     </div>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleFilterObligations}
-                      disabled={isFiltering}
-                    >
-                      <Filter className="h-4 w-4 mr-2" />
-                      {isFiltering ? "Filtrage..." : "Filtres"}
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      size="sm"
-                      onClick={handleExportObligations}
-                      disabled={isExporting}
-                    >
-                      <Download className="h-4 w-4 mr-2" />
-                      {isExporting ? "Export..." : "Export"}
-                    </Button>
-                  </div>
-              </div>
+                </div>
 
-              {/* Table */}
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    {obligationsTable.getHeaderGroups().map((headerGroup) => (
-                      <TableRow key={headerGroup.id} className="bg-gray-50 dark:bg-gray-800">
-                        {headerGroup.headers.map((header) => (
-                          <TableHead key={header.id} className="font-semibold">
-                            {header.isPlaceholder
-                              ? null
-                              : flexRender(header.column.columnDef.header, header.getContext())}
-                          </TableHead>
-                        ))}
-                      </TableRow>
-                    ))}
-                  </TableHeader>
-                  <TableBody>
-                    {obligationsTable.getRowModel().rows?.length ? (
-                      obligationsTable.getRowModel().rows.map((row) => (
-                        <TableRow
-                          key={row.id}
-                          className="hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
-                        >
-                          {row.getVisibleCells().map((cell) => (
-                            <TableCell key={cell.id}>
-                              {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                            </TableCell>
+                {/* Table */}
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      {obligationsTable.getHeaderGroups().map((headerGroup) => (
+                        <TableRow key={headerGroup.id} className="bg-gray-50 dark:bg-gray-800">
+                          {headerGroup.headers.map((header) => (
+                            <TableHead key={header.id} className="font-semibold">
+                              {header.isPlaceholder
+                                ? null
+                                : flexRender(header.column.columnDef.header, header.getContext())}
+                            </TableHead>
                           ))}
                         </TableRow>
-                      ))
-                    ) : (
-                      <TableRow>
-                        <TableCell colSpan={obligationsColumns.length} className="h-24 text-center">
-                          <div className="flex flex-col items-center gap-2">
-                            <AlertCircle className="h-8 w-8 text-gray-400" />
-                            <p className="text-gray-500">Aucune obligation trouvée.</p>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )}
-                  </TableBody>
-                </Table>
-              </div>
+                      ))}
+                    </TableHeader>
+                    <TableBody>
+                      {obligationsTable.getRowModel().rows?.length ? (
+                        obligationsTable.getRowModel().rows.map((row) => (
+                          <TableRow
+                            key={row.id}
+                            className="hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                          >
+                            {row.getVisibleCells().map((cell) => (
+                              <TableCell key={cell.id}>
+                                {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                              </TableCell>
+                            ))}
+                          </TableRow>
+                        ))
+                      ) : (
+                        <TableRow>
+                          <TableCell colSpan={obligationsColumns.length} className="h-24 text-center">
+                            <div className="flex flex-col items-center gap-2">
+                              <AlertCircle className="h-8 w-8 text-gray-400" />
+                              <p className="text-gray-500">Aucune obligation trouvée.</p>
+                            </div>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
 
               {/* Totaux */}
               <div className="p-4 border-t bg-orange-50 dark:bg-orange-900/10">
@@ -934,6 +950,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
               </div>
             </CardContent>
           </Card>
+        )}
         </TabsContent>
       </Tabs>
     </div>
