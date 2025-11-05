@@ -10,6 +10,7 @@ interface ElectionData {
   description?: string;
   dateOuverture: Date;
   dateCloture: Date;
+  dateClotureCandidature: Date; // Obligatoire: dateOuverture < dateClotureCandidature < dateScrutin < dateCloture
   dateScrutin: Date;
   nombreMandats?: number;
   quorumRequis?: number;
@@ -33,7 +34,7 @@ interface CandidacyData {
   documents?: string[];
 }
 
-import { POSTES_LABELS, getPosteLabel } from "@/lib/elections-constants";
+import { POSTES_LABELS, getPosteLabel, POSITION_TYPE_TO_CODE } from "@/lib/elections-constants";
 import { getAllPostesTemplates } from "@/actions/postes";
 
 // Server Action pour créer une élection avec ses postes
@@ -63,15 +64,53 @@ export async function createElection(
       return { success: false, error: "Veuillez sélectionner au moins un poste" };
     }
 
+    // Validation des dates selon les règles:
+    // 1. dateOuverture < dateClotureCandidature
+    // 2. dateClotureCandidature < dateScrutin
+    // 3. dateCloture > dateScrutin
+    if (!electionData.dateClotureCandidature) {
+      return { success: false, error: "La date de clôture des candidatures est obligatoire" };
+    }
+
+    const dateOuverture = new Date(electionData.dateOuverture);
+    const dateClotureCandidature = new Date(electionData.dateClotureCandidature);
+    const dateScrutin = new Date(electionData.dateScrutin);
+    const dateCloture = new Date(electionData.dateCloture);
+
+    if (dateOuverture >= dateClotureCandidature) {
+      return { success: false, error: "La date d'ouverture doit être antérieure à la date de clôture des candidatures" };
+    }
+
+    if (dateClotureCandidature >= dateScrutin) {
+      return { success: false, error: "La date de clôture des candidatures doit être antérieure à la date du scrutin" };
+    }
+
+    if (dateCloture <= dateScrutin) {
+      return { success: false, error: "La date de clôture doit être postérieure à la date du scrutin" };
+    }
+
     // Créer l'élection avec ses postes en une transaction
     const result = await prisma.$transaction(async (tx) => {
+      // Préparer les données en excluant les champs undefined
+      const electionCreateData: any = {
+        titre: electionData.titre,
+        dateOuverture: electionData.dateOuverture,
+        dateCloture: electionData.dateCloture,
+        dateClotureCandidature: electionData.dateClotureCandidature,
+        dateScrutin: electionData.dateScrutin,
+        createdBy: session.user.id!,
+        status: ElectionStatus.Preparation
+      };
+
+      // Ajouter les champs optionnels seulement s'ils sont définis
+      if (electionData.description !== undefined) electionCreateData.description = electionData.description;
+      if (electionData.nombreMandats !== undefined) electionCreateData.nombreMandats = electionData.nombreMandats;
+      if (electionData.quorumRequis !== undefined) electionCreateData.quorumRequis = electionData.quorumRequis;
+      if (electionData.majoriteRequis !== undefined) electionCreateData.majoriteRequis = electionData.majoriteRequis;
+
       // Créer l'élection
       const election = await tx.election.create({
-        data: {
-          ...electionData,
-          createdBy: session.user.id!,
-          status: ElectionStatus.Preparation
-        }
+        data: electionCreateData
       });
 
       // Récupérer les postes depuis la base de données
@@ -90,10 +129,17 @@ export async function createElection(
             // Essayer de convertir en PositionType si c'est une valeur d'enum
             const posteType = posteId as PositionType;
             if (Object.values(PositionType).includes(posteType)) {
-              // Trouver le template correspondant au type
+              // Trouver le template correspondant au type en utilisant le mapping
+              // Essayer d'abord avec le nouveau code (6 caractères), puis l'ancien pour rétrocompatibilité
+              const newCode = POSITION_TYPE_TO_CODE[posteType];
+              const oldCode = posteType.toLowerCase().replace(/([A-Z])/g, '_$1').toLowerCase();
+              
               const template = await prisma.posteTemplate.findFirst({
                 where: {
-                  code: posteType.toLowerCase().replace(/([A-Z])/g, '_$1').toLowerCase()
+                  OR: [
+                    { code: newCode },
+                    { code: oldCode }
+                  ]
                 }
               });
 
@@ -122,6 +168,16 @@ export async function createElection(
         postesTemplates.map(async (template) => {
           // Mapper le code du template à un PositionType pour la rétrocompatibilité
           const codeToTypeMap: Record<string, PositionType> = {
+            // Nouveaux codes (6 caractères)
+            'PRESID': PositionType.President,
+            'VICEPR': PositionType.VicePresident,
+            'SECRET': PositionType.Secretaire,
+            'VICESE': PositionType.ViceSecretaire,
+            'TRESOR': PositionType.Tresorier,
+            'VICETR': PositionType.ViceTresorier,
+            'COMCPT': PositionType.CommissaireComptes,
+            'MEMCDI': PositionType.MembreComiteDirecteur,
+            // Anciens codes (pour rétrocompatibilité)
             'president': PositionType.President,
             'vice_president': PositionType.VicePresident,
             'secretaire': PositionType.Secretaire,
@@ -132,7 +188,7 @@ export async function createElection(
             'membre_comite_directeur': PositionType.MembreComiteDirecteur,
           };
 
-          const positionType = codeToTypeMap[template.code] || PositionType.MembreComiteDirecteur;
+          const positionType = codeToTypeMap[template.code.toUpperCase()] || codeToTypeMap[template.code] || PositionType.MembreComiteDirecteur;
 
           return await tx.position.create({
             data: {
@@ -281,6 +337,11 @@ export async function createCandidacy(candidacyData: CandidacyData): Promise<{ s
       return { success: false, error: "L'élection n'est pas ouverte aux candidatures" };
     }
 
+    // Vérifier que la date de clôture des candidatures n'est pas dépassée
+    if (election.dateClotureCandidature && new Date() > new Date(election.dateClotureCandidature)) {
+      return { success: false, error: "La période de candidature est fermée. La date limite était le " + new Date(election.dateClotureCandidature).toLocaleDateString('fr-FR') };
+    }
+
     // Vérifier que l'adhérent n'a pas déjà postulé pour ce poste spécifique
     const existingCandidacy = await prisma.candidacy.findFirst({
       where: {
@@ -368,6 +429,11 @@ export async function createMultipleCandidacies(
 
     if (!election || election.status !== ElectionStatus.Ouverte) {
       return { success: false, error: "L'élection n'est pas ouverte aux candidatures" };
+    }
+
+    // Vérifier que la date de clôture des candidatures n'est pas dépassée
+    if (election.dateClotureCandidature && new Date() > new Date(election.dateClotureCandidature)) {
+      return { success: false, error: "La période de candidature est fermée. La date limite était le " + new Date(election.dateClotureCandidature).toLocaleDateString('fr-FR') };
     }
 
     // Vérifier que tous les postes existent et appartiennent à cette élection
@@ -1055,6 +1121,9 @@ export async function closeElection(electionId: string): Promise<{ success: bool
 export async function getAllElectionsForAdmin(): Promise<{ success: boolean; elections?: any[]; error?: string }> {
   try {
     const elections = await prisma.election.findMany({
+      orderBy: {
+        dateScrutin: 'desc' // Trier par date de scrutin décroissante
+      },
       include: {
         positions: {
           include: {
@@ -1727,11 +1796,51 @@ export async function updateElection(
       return { success: false, error: "Seuls les administrateurs peuvent modifier une élection" };
     }
 
+    // Récupérer l'élection actuelle pour valider avec les nouvelles dates
+    const currentElection = await prisma.election.findUnique({
+      where: { id: electionId }
+    });
+
+    if (!currentElection) {
+      return { success: false, error: "Élection introuvable" };
+    }
+
+    // Préparer les dates pour la validation
+    const dateOuverture = data.dateOuverture ? new Date(data.dateOuverture) : new Date(currentElection.dateOuverture);
+    // Si dateClotureCandidature est null dans la base (cas de migration), calculer à partir de dateScrutin
+    const currentDateClotureCandidature = currentElection.dateClotureCandidature 
+      ? new Date(currentElection.dateClotureCandidature)
+      : (() => {
+          const calculated = new Date(currentElection.dateScrutin);
+          calculated.setDate(calculated.getDate() - 10);
+          return calculated;
+        })();
+    const dateClotureCandidature = data.dateClotureCandidature ? new Date(data.dateClotureCandidature) : currentDateClotureCandidature;
+    const dateScrutin = data.dateScrutin ? new Date(data.dateScrutin) : new Date(currentElection.dateScrutin);
+    const dateCloture = data.dateCloture ? new Date(data.dateCloture) : new Date(currentElection.dateCloture);
+
+    // Validation des dates selon les règles:
+    // 1. dateOuverture < dateClotureCandidature
+    // 2. dateClotureCandidature < dateScrutin
+    // 3. dateCloture > dateScrutin
+    if (dateOuverture >= dateClotureCandidature) {
+      return { success: false, error: "La date d'ouverture doit être antérieure à la date de clôture des candidatures" };
+    }
+
+    if (dateClotureCandidature >= dateScrutin) {
+      return { success: false, error: "La date de clôture des candidatures doit être antérieure à la date du scrutin" };
+    }
+
+    if (dateCloture <= dateScrutin) {
+      return { success: false, error: "La date de clôture doit être postérieure à la date du scrutin" };
+    }
+
     const allowedData: any = {};
     if (typeof data.titre !== "undefined") allowedData.titre = data.titre;
     if (typeof data.description !== "undefined") allowedData.description = data.description;
     if (typeof data.dateOuverture !== "undefined") allowedData.dateOuverture = data.dateOuverture;
     if (typeof data.dateCloture !== "undefined") allowedData.dateCloture = data.dateCloture;
+    if (typeof data.dateClotureCandidature !== "undefined") allowedData.dateClotureCandidature = data.dateClotureCandidature;
     if (typeof data.dateScrutin !== "undefined") allowedData.dateScrutin = data.dateScrutin;
     if (typeof data.nombreMandats !== "undefined") allowedData.nombreMandats = data.nombreMandats;
     if (typeof data.quorumRequis !== "undefined") allowedData.quorumRequis = data.quorumRequis;

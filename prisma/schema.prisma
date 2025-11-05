@@ -88,7 +88,7 @@ enum PositionType {
 // Modèle pour historiser les postes électoraux
 model PosteTemplate {
   id          String  @id @default(cuid())
-  code        String  @unique @db.VarChar(100) // Code unique (ex: "president")
+  code        String  @unique @db.VarChar(6) // Code unique de 6 caractères généré automatiquement
   libelle     String  @db.VarChar(255) // Libellé français (ex: "Président")
   description String? @db.Text // Description du poste
   ordre       Int     @default(0) // Ordre d'affichage
@@ -347,9 +347,10 @@ model Election {
   status      ElectionStatus @default(Preparation)
 
   // Dates importantes
-  dateOuverture DateTime
-  dateCloture   DateTime
-  dateScrutin   DateTime
+  dateOuverture          DateTime
+  dateCloture            DateTime
+  dateClotureCandidature DateTime // Date limite pour postuler (obligatoire: dateOuverture < dateClotureCandidature < dateScrutin < dateCloture)
+  dateScrutin            DateTime
 
   // Configuration
   nombreMandats  Int     @default(1) // Nombre de postes à pourvoir
@@ -609,6 +610,7 @@ model InscriptionEvenement {
   visiteurNom       String? @db.VarChar(255)
   visiteurEmail     String? @db.VarChar(255)
   visiteurTelephone String? @db.VarChar(20)
+  visiteurAdresse   String? @db.Text
 
   // Relations
   Evenement Evenement @relation(fields: [evenementId], references: [id], onDelete: Cascade)

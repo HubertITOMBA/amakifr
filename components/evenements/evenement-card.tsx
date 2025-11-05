@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -98,11 +99,17 @@ export function EvenementCard({
     <Card className="hover:shadow-xl transition-all duration-300 hover:-translate-y-1">
       <div className="relative">
         {evenement.imagePrincipale && (
-          <div className="h-48 bg-gray-200 dark:bg-gray-700 rounded-t-lg overflow-hidden">
-            <img
+          <div className="relative h-48 bg-gray-200 dark:bg-gray-700 rounded-t-lg overflow-hidden">
+            <Image
               src={evenement.imagePrincipale}
               alt={evenement.titre}
-              className="w-full h-full object-cover"
+              fill
+              className="object-cover"
+              sizes="(max-width: 768px) 100vw, 33vw"
+              unoptimized={evenement.imagePrincipale.startsWith('/')}
+              onError={(e) => {
+                console.error('Erreur de chargement d\'image:', evenement.imagePrincipale);
+              }}
             />
           </div>
         )}

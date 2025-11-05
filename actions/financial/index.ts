@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import jsPDF from "jspdf";
+import { addPDFHeader, addPDFFooter } from "@/lib/pdf-helpers";
 
 // Schémas de validation pour les filtres
 const CotisationFilterSchema = z.object({
@@ -191,25 +192,20 @@ export async function exportCotisationsPDF() {
     // Créer le PDF
     const doc = new jsPDF();
     
-    // En-tête avec couleur bleue
-    doc.setFillColor(59, 130, 246); // blue-500
-    doc.rect(0, 0, 210, 40, 'F');
+    // Ajouter l'en-tête avec logo sur la première page uniquement
+    addPDFHeader(doc, 'Historique des Cotisations');
     
-    doc.setTextColor(255, 255, 255); // Blanc pour le texte sur fond bleu
-    doc.setFontSize(20);
-    doc.text('Historique des Cotisations', 20, 25);
-    
-    // Informations adhérent avec fond gris clair
-    doc.setFillColor(248, 250, 252); // slate-50
-    doc.rect(0, 40, 210, 30, 'F');
-    
-    doc.setTextColor(0, 0, 0); // Noir pour le texte
+    // Informations adhérent
+    let yPosition = 60; // Commencer après l'en-tête
     doc.setFontSize(12);
-    doc.text(`Adhérent: ${adherent.firstname} ${adherent.lastname}`, 20, 55);
-    doc.text(`Date de génération: ${new Date().toLocaleDateString('fr-FR')}`, 20, 65);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Adhérent: ${adherent.firstname} ${adherent.lastname}`, 20, yPosition);
+    yPosition += 8;
+    doc.text(`Date de génération: ${new Date().toLocaleDateString('fr-FR')}`, 20, yPosition);
+    yPosition += 12;
     
     // Tableau des cotisations
-    let yPosition = 80;
     const pageHeight = doc.internal.pageSize.height;
     
     // En-têtes du tableau avec fond bleu clair
@@ -235,10 +231,10 @@ export async function exportCotisationsPDF() {
     
     // Données des cotisations
     cotisations.forEach((cotisation: any, index: any) => {
-      // Vérifier si on doit passer à la page suivante
-      if (yPosition > pageHeight - 30) {
+      // Vérifier si on doit passer à la page suivante (réduit pour laisser de la place au pied de page)
+      if (yPosition > pageHeight - 40) {
         doc.addPage();
-        yPosition = 30;
+        yPosition = 20; // Pas d'en-tête sur les pages suivantes
       }
       
       doc.setFontSize(9);
@@ -310,6 +306,9 @@ export async function exportCotisationsPDF() {
     doc.setTextColor(234, 179, 8); // yellow-500
     doc.text(`Total en attente: ${totalEnAttente.toFixed(2).replace('.', ',')} €`, 20, yPosition);
     
+    // Ajouter le pied de page sur toutes les pages
+    addPDFFooter(doc);
+    
     // Générer le nom du fichier
     const fileName = `cotisations_${adherent.firstname.toLowerCase()}_${adherent.lastname.toLowerCase()}.pdf`;
     
@@ -357,25 +356,20 @@ export async function exportObligationsPDF() {
     // Créer le PDF
     const doc = new jsPDF();
     
-    // En-tête avec couleur orange
-    doc.setFillColor(249, 115, 22); // orange-500
-    doc.rect(0, 0, 210, 40, 'F');
+    // Ajouter l'en-tête avec logo sur la première page uniquement
+    addPDFHeader(doc, 'Obligations de Cotisation');
     
-    doc.setTextColor(255, 255, 255); // Blanc pour le texte sur fond orange
-    doc.setFontSize(20);
-    doc.text('Obligations de Cotisation', 20, 25);
-    
-    // Informations adhérent avec fond gris clair
-    doc.setFillColor(248, 250, 252); // slate-50
-    doc.rect(0, 40, 210, 30, 'F');
-    
-    doc.setTextColor(0, 0, 0); // Noir pour le texte
+    // Informations adhérent
+    let yPosition = 60; // Commencer après l'en-tête
     doc.setFontSize(12);
-    doc.text(`Adhérent: ${adherent.firstname} ${adherent.lastname}`, 20, 55);
-    doc.text(`Date de génération: ${new Date().toLocaleDateString('fr-FR')}`, 20, 65);
+    doc.setTextColor(0, 0, 0);
+    doc.setFont('helvetica', 'normal');
+    doc.text(`Adhérent: ${adherent.firstname} ${adherent.lastname}`, 20, yPosition);
+    yPosition += 8;
+    doc.text(`Date de génération: ${new Date().toLocaleDateString('fr-FR')}`, 20, yPosition);
+    yPosition += 12;
     
     // Tableau des obligations
-    let yPosition = 80;
     const pageHeight = doc.internal.pageSize.height;
     
     // En-têtes du tableau avec fond orange clair
@@ -402,10 +396,10 @@ export async function exportObligationsPDF() {
     
     // Données des obligations
     obligations.forEach((obligation: any, index: any) => {
-      // Vérifier si on doit passer à la page suivante
-      if (yPosition > pageHeight - 30) {
+      // Vérifier si on doit passer à la page suivante (réduit pour laisser de la place au pied de page)
+      if (yPosition > pageHeight - 40) {
         doc.addPage();
-        yPosition = 30;
+        yPosition = 20; // Pas d'en-tête sur les pages suivantes
       }
       
       doc.setFontSize(9);
@@ -489,6 +483,9 @@ export async function exportObligationsPDF() {
     // Total en retard en rouge
     doc.setTextColor(239, 68, 68); // red-500
     doc.text(`Total en retard: ${totalEnRetard.toFixed(2).replace('.', ',')} €`, 20, yPosition);
+    
+    // Ajouter le pied de page sur toutes les pages
+    addPDFFooter(doc);
     
     // Générer le nom du fichier
     const fileName = `obligations_${adherent.firstname.toLowerCase()}_${adherent.lastname.toLowerCase()}.pdf`;

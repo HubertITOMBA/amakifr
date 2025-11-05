@@ -12,9 +12,14 @@
     "db:seed-financial": "tsx scripts/create-financial-fixtures.ts",
     "db:seed-types-cotisation": "tsx scripts/create-default-types-cotisation.ts",
     "db:seed-evenements": "tsx scripts/create-evenements-fixtures.ts",
+    "db:seed-postes": "tsx scripts/create-test-postes.ts",
     "db:update-evenements-dates": "tsx scripts/update-evenements-dates.ts",
+    "db:migrate-poste-codes": "tsx scripts/migrate-poste-codes-to-6-chars.ts",
+    "db:update-elections-date-cloture": "tsx scripts/update-elections-date-cloture-candidature.ts",
+    "db:migrate-elections-dates-validation": "tsx scripts/migrate-elections-dates-validation.ts",
     "db:seed-all": "npm run db:seed && npm run db:seed-elections && npm run db:seed-financial && npm run db:seed-types-cotisation && npm run db:seed-evenements",
-    "db:reset": "prisma migrate reset --force && npm run db:seed-all"
+    "db:reset": "prisma migrate reset --force --skip-seed && prisma db push --accept-data-loss && npm run db:seed-all",
+    "export-manual": "tsx scripts/export-manual-to-pdf.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",

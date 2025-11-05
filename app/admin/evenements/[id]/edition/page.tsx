@@ -127,6 +127,29 @@ export default function EditionEvenementPage() {
 
   const handleSave = async () => {
     if (!evenement) return;
+    
+    // Validation côté client des champs obligatoires
+    if (!form.titre.trim()) {
+      toast.error("Le titre est obligatoire");
+      return;
+    }
+    if (!form.description.trim()) {
+      toast.error("La description est obligatoire");
+      return;
+    }
+    if (!form.dateDebut) {
+      toast.error("La date de début est obligatoire");
+      return;
+    }
+    if (!form.dateAffichage) {
+      toast.error("La date d'affichage est obligatoire");
+      return;
+    }
+    if (!form.dateFinAffichage) {
+      toast.error("La date de fin d'affichage est obligatoire");
+      return;
+    }
+    
     try {
       const submissionData = {
         ...form,
@@ -192,32 +215,76 @@ export default function EditionEvenementPage() {
       <div className="space-y-4 max-h-[80vh] overflow-y-auto">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div className="md:col-span-2 space-y-2">
-            <Label htmlFor="titre">Titre *</Label>
-            <Input id="titre" value={form.titre} onChange={(e) => setForm({ ...form, titre: e.target.value })} required />
+            <Label htmlFor="titre" className="flex items-center gap-1">
+              Titre <span className="text-red-500">*</span>
+            </Label>
+            <Input 
+              id="titre" 
+              value={form.titre} 
+              onChange={(e) => setForm({ ...form, titre: e.target.value })} 
+              required 
+              className={!form.titre.trim() ? "border-red-300 focus:border-red-500" : ""}
+            />
           </div>
           <div className="md:col-span-2 space-y-2">
-            <Label htmlFor="description">Description *</Label>
-            <Textarea id="description" rows={2} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
+            <Label htmlFor="description" className="flex items-center gap-1">
+              Description <span className="text-red-500">*</span>
+            </Label>
+            <Textarea 
+              id="description" 
+              rows={2} 
+              value={form.description} 
+              onChange={(e) => setForm({ ...form, description: e.target.value })} 
+              required 
+              className={!form.description.trim() ? "border-red-300 focus:border-red-500" : ""}
+            />
           </div>
           <div className="md:col-span-2 space-y-2">
             <Label htmlFor="contenu">Contenu</Label>
             <Textarea id="contenu" rows={4} value={form.contenu} onChange={(e) => setForm({ ...form, contenu: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="dateDebut">Date de début *</Label>
-            <Input id="dateDebut" type="datetime-local" value={form.dateDebut} onChange={(e) => setForm({ ...form, dateDebut: e.target.value })} required />
+            <Label htmlFor="dateDebut" className="flex items-center gap-1">
+              Date de début <span className="text-red-500">*</span>
+            </Label>
+            <Input 
+              id="dateDebut" 
+              type="datetime-local" 
+              value={form.dateDebut} 
+              onChange={(e) => setForm({ ...form, dateDebut: e.target.value })} 
+              required 
+              className={!form.dateDebut ? "border-red-300 focus:border-red-500" : ""}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="dateFin">Date de fin</Label>
             <Input id="dateFin" type="datetime-local" value={form.dateFin} onChange={(e) => setForm({ ...form, dateFin: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="dateAffichage">Date d'affichage *</Label>
-            <Input id="dateAffichage" type="datetime-local" value={form.dateAffichage} onChange={(e) => setForm({ ...form, dateAffichage: e.target.value })} required />
+            <Label htmlFor="dateAffichage" className="flex items-center gap-1">
+              Date d'affichage <span className="text-red-500">*</span>
+            </Label>
+            <Input 
+              id="dateAffichage" 
+              type="datetime-local" 
+              value={form.dateAffichage} 
+              onChange={(e) => setForm({ ...form, dateAffichage: e.target.value })} 
+              required 
+              className={!form.dateAffichage ? "border-red-300 focus:border-red-500" : ""}
+            />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="dateFinAffichage">Date de fin d'affichage *</Label>
-            <Input id="dateFinAffichage" type="datetime-local" value={form.dateFinAffichage} onChange={(e) => setForm({ ...form, dateFinAffichage: e.target.value })} required />
+            <Label htmlFor="dateFinAffichage" className="flex items-center gap-1">
+              Date de fin d'affichage <span className="text-red-500">*</span>
+            </Label>
+            <Input 
+              id="dateFinAffichage" 
+              type="datetime-local" 
+              value={form.dateFinAffichage} 
+              onChange={(e) => setForm({ ...form, dateFinAffichage: e.target.value })} 
+              required 
+              className={!form.dateFinAffichage ? "border-red-300 focus:border-red-500" : ""}
+            />
           </div>
           <div className="space-y-2">
             <Label htmlFor="lieu">Lieu</Label>
@@ -228,9 +295,11 @@ export default function EditionEvenementPage() {
             <Input id="adresse" value={form.adresse} onChange={(e) => setForm({ ...form, adresse: e.target.value })} />
           </div>
           <div className="space-y-2">
-            <Label htmlFor="categorie">Catégorie *</Label>
+            <Label htmlFor="categorie" className="flex items-center gap-1">
+              Catégorie <span className="text-red-500">*</span>
+            </Label>
             <Select value={form.categorie} onValueChange={(v) => setForm({ ...form, categorie: v as any })}>
-              <SelectTrigger>
+              <SelectTrigger className={!form.categorie ? "border-red-300 focus:border-red-500" : ""}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -241,9 +310,11 @@ export default function EditionEvenementPage() {
             </Select>
           </div>
           <div className="space-y-2">
-            <Label htmlFor="statut">Statut *</Label>
+            <Label htmlFor="statut" className="flex items-center gap-1">
+              Statut <span className="text-red-500">*</span>
+            </Label>
             <Select value={form.statut} onValueChange={(v) => setForm({ ...form, statut: v as any })}>
-              <SelectTrigger>
+              <SelectTrigger className={!form.statut ? "border-red-300 focus:border-red-500" : ""}>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>

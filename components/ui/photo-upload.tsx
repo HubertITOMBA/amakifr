@@ -13,6 +13,7 @@ interface PhotoUploadProps {
   onImageChange: (imageUrl: string) => void;
   disabled?: boolean;
   size?: "sm" | "md" | "lg";
+  maxSize?: number; // en MB
 }
 
 export function PhotoUpload({ 
@@ -20,7 +21,8 @@ export function PhotoUpload({
   userName, 
   onImageChange, 
   disabled = false,
-  size = "md"
+  size = "md",
+  maxSize = 5 // 5MB par défaut
 }: PhotoUploadProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
@@ -48,8 +50,9 @@ export function PhotoUpload({
       return;
     }
 
-    if (file.size > 5 * 1024 * 1024) { // 5MB max
-      toast.error("L'image ne doit pas dépasser 5MB");
+    const maxSizeBytes = maxSize * 1024 * 1024;
+    if (file.size > maxSizeBytes) {
+      toast.error(`L'image ne doit pas dépasser ${maxSize}MB`);
       return;
     }
 
@@ -137,6 +140,7 @@ export function PhotoUpload({
         onChange={handleFileSelect}
         className="hidden"
         disabled={uploading}
+        title={`Format: JPG, PNG, GIF, WEBP • Taille max: ${maxSize}MB`}
       />
     </div>
   );

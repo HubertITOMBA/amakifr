@@ -22,7 +22,7 @@ export const Social = () => {
         <div className="items-center justify-between w-auto">
             <Button
                 size="sm"
-                className="w-full"
+                className="w-full border-gray-300 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800"
                 variant="outline"
                 onClick={() => onClick("google")}
              >

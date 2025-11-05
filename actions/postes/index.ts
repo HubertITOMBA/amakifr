@@ -5,9 +5,55 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 
+// Fonction pour générer un code unique de 6 caractères
+async function generateUniqueCode(libelle: string): Promise<string> {
+  // Normaliser le libellé : enlever accents, mettre en majuscules
+  const normalized = libelle
+    .toUpperCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^A-Z0-9]/g, "");
+  
+  // Prendre les premières lettres du libellé (max 6)
+  let base = normalized.substring(0, 6);
+  
+  // Compléter jusqu'à 6 caractères avec des caractères aléatoires si nécessaire
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+  while (base.length < 6) {
+    base += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  
+  // Vérifier l'unicité et régénérer si nécessaire
+  let attempts = 0;
+  let code = base;
+  while (attempts < 100) {
+    const existing = await prisma.posteTemplate.findUnique({
+      where: { code },
+    });
+    
+    if (!existing) {
+      return code;
+    }
+    
+    // Générer un nouveau code complètement aléatoire
+    code = '';
+    for (let i = 0; i < 6; i++) {
+      code += chars.charAt(Math.floor(Math.random() * chars.length));
+    }
+    attempts++;
+  }
+  
+  // Fallback : code aléatoire complet (ne devrait jamais arriver ici)
+  code = '';
+  for (let i = 0; i < 6; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
+
 // Schéma de validation pour un poste
 const PosteTemplateSchema = z.object({
-  code: z.string().min(1, "Le code est requis").max(100, "Le code ne peut pas dépasser 100 caractères"),
+  code: z.string().length(6, "Le code doit contenir exactement 6 caractères").optional(),
   libelle: z.string().min(1, "Le libellé est requis").max(255, "Le libellé ne peut pas dépasser 255 caractères"),
   description: z.string().optional(),
   ordre: z.number().int().default(0),
@@ -17,7 +63,7 @@ const PosteTemplateSchema = z.object({
 });
 
 const UpdatePosteTemplateSchema = PosteTemplateSchema.partial().extend({
-  code: z.string().min(1).max(100).optional(),
+  code: z.string().length(6, "Le code doit contenir exactement 6 caractères").optional(),
 });
 
 // Types TypeScript
@@ -151,19 +197,33 @@ export async function createPosteTemplate(data: z.infer<typeof PosteTemplateSche
 
     const validatedData = PosteTemplateSchema.parse(data);
 
+    // Générer automatiquement le code si non fourni
+    let codeToUse = validatedData.code;
+    if (!codeToUse || codeToUse.length !== 6) {
+      codeToUse = await generateUniqueCode(validatedData.libelle);
+    }
+
     // Vérifier que le code n'existe pas déjà
     const existingPoste = await prisma.posteTemplate.findUnique({
-      where: { code: validatedData.code },
+      where: { code: codeToUse },
     });
 
     if (existingPoste) {
-      return { success: false, error: "Un poste avec ce code existe déjà" };
+      // Régénérer un nouveau code si collision
+      codeToUse = await generateUniqueCode(validatedData.libelle);
+      const secondCheck = await prisma.posteTemplate.findUnique({
+        where: { code: codeToUse },
+      });
+      if (secondCheck) {
+        return { success: false, error: "Impossible de générer un code unique. Veuillez réessayer." };
+      }
     }
 
     // Créer le poste
     const poste = await prisma.posteTemplate.create({
       data: {
         ...validatedData,
+        code: codeToUse,
         createdBy: session.user.id,
       },
       include: {
@@ -219,21 +279,14 @@ export async function updatePosteTemplate(
 
     const validatedData = UpdatePosteTemplateSchema.parse(data);
 
-    // Si le code est modifié, vérifier qu'il n'existe pas déjà
-    if (validatedData.code && validatedData.code !== existingPoste.code) {
-      const codeExists = await prisma.posteTemplate.findUnique({
-        where: { code: validatedData.code },
-      });
+    // Le code ne peut pas être modifié après la création
+    // Retirer le code des données à mettre à jour
+    const { code, ...updateData } = validatedData;
 
-      if (codeExists) {
-        return { success: false, error: "Un poste avec ce code existe déjà" };
-      }
-    }
-
-    // Mettre à jour le poste
+    // Mettre à jour le poste (sans le code)
     const poste = await prisma.posteTemplate.update({
       where: { id },
-      data: validatedData,
+      data: updateData,
       include: {
         CreatedBy: {
           select: {

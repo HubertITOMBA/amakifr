@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import Image from "next/image";
 import { Navbar } from "@/components/home/Navbar";
 import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -28,12 +29,21 @@ import {
   AlertCircle,
   X
 } from "lucide-react";
-import { toast } from "react-hot-toast";
-import { getPublicEvenements, inscrireEvenement, type EvenementData } from "@/actions/evenements";
+import { toast } from "sonner";
+import { getPublicEvenements, inscrireEvenement, inscrireVisiteurEvenement, type EvenementData } from "@/actions/evenements";
 import { useSession } from "next-auth/react";
 import { EventsCarousel } from "@/components/evenements/EventsCarousel";
 
 interface InscriptionFormData {
+  nombrePersonnes: number;
+  commentaires: string;
+}
+
+interface InscriptionVisiteurFormData {
+  nom: string;
+  email: string;
+  telephone: string;
+  adresse: string;
   nombrePersonnes: number;
   commentaires: string;
 }
@@ -47,6 +57,14 @@ export default function PublicEvenementsPage() {
   const [showInscriptionModal, setShowInscriptionModal] = useState(false);
   const [inscriptionLoading, setInscriptionLoading] = useState(false);
   const [inscriptionData, setInscriptionData] = useState<InscriptionFormData>({
+    nombrePersonnes: 1,
+    commentaires: "",
+  });
+  const [inscriptionVisiteurData, setInscriptionVisiteurData] = useState<InscriptionVisiteurFormData>({
+    nom: "",
+    email: "",
+    telephone: "",
+    adresse: "",
     nombrePersonnes: 1,
     commentaires: "",
   });
@@ -85,33 +103,111 @@ export default function PublicEvenementsPage() {
   const handleInscription = async () => {
     if (!selectedEvenement) return;
 
-    if (!session) {
-      toast.error("Vous devez être connecté pour vous inscrire");
-      return;
-    }
-
-    try {
-      setInscriptionLoading(true);
-      const result = await inscrireEvenement({
-        evenementId: selectedEvenement.id,
-        nombrePersonnes: inscriptionData.nombrePersonnes,
-        commentaires: inscriptionData.commentaires,
-      });
-
-      if (result.success) {
-        toast.success("Inscription réussie !");
-        setShowInscriptionModal(false);
-        setSelectedEvenement(null);
-        setInscriptionData({ nombrePersonnes: 1, commentaires: "" });
-        loadEvenements(); // Recharger pour mettre à jour les places disponibles
-      } else {
-        toast.error(result.error || "Erreur lors de l'inscription");
+    // Si l'utilisateur est connecté, utiliser la fonction d'inscription normale
+    if (session) {
+      if (inscriptionData.nombrePersonnes < 1) {
+        toast.error("Le nombre de personnes doit être au moins 1");
+        return;
       }
-    } catch (error) {
-      console.error("Erreur lors de l'inscription:", error);
-      toast.error("Erreur lors de l'inscription");
-    } finally {
-      setInscriptionLoading(false);
+
+      // Vérifier les places disponibles
+      if (selectedEvenement.placesDisponibles) {
+        const placesRestantes = selectedEvenement.placesDisponibles - (selectedEvenement.placesReservees || 0);
+        if (inscriptionData.nombrePersonnes > placesRestantes) {
+          toast.error(`Il ne reste que ${placesRestantes} place(s) disponible(s)`);
+          return;
+        }
+      }
+
+      try {
+        setInscriptionLoading(true);
+        const result = await inscrireEvenement({
+          evenementId: selectedEvenement.id,
+          nombrePersonnes: inscriptionData.nombrePersonnes,
+          commentaires: inscriptionData.commentaires,
+        });
+
+        if (result.success) {
+          toast.success("Inscription réussie !");
+          setShowInscriptionModal(false);
+          setSelectedEvenement(null);
+          setInscriptionData({ nombrePersonnes: 1, commentaires: "" });
+          loadEvenements(); // Recharger pour mettre à jour les places disponibles
+        } else {
+          toast.error(result.error || "Erreur lors de l'inscription");
+        }
+      } catch (error) {
+        console.error("Erreur lors de l'inscription:", error);
+        toast.error("Erreur lors de l'inscription");
+      } finally {
+        setInscriptionLoading(false);
+      }
+    } else {
+      // Si l'utilisateur n'est pas connecté, utiliser la fonction d'inscription visiteur
+      if (!inscriptionVisiteurData.nom.trim()) {
+        toast.error("Le nom est requis");
+        return;
+      }
+      if (!inscriptionVisiteurData.email.trim()) {
+        toast.error("L'email est requis");
+        return;
+      }
+      if (!inscriptionVisiteurData.telephone.trim()) {
+        toast.error("Le téléphone est requis");
+        return;
+      }
+      if (!inscriptionVisiteurData.adresse.trim()) {
+        toast.error("L'adresse est requise");
+        return;
+      }
+      if (inscriptionVisiteurData.nombrePersonnes < 1) {
+        toast.error("Le nombre de personnes doit être au moins 1");
+        return;
+      }
+
+      // Vérifier les places disponibles
+      if (selectedEvenement.placesDisponibles) {
+        const placesRestantes = selectedEvenement.placesDisponibles - (selectedEvenement.placesReservees || 0);
+        if (inscriptionVisiteurData.nombrePersonnes > placesRestantes) {
+          toast.error(`Il ne reste que ${placesRestantes} place(s) disponible(s)`);
+          return;
+        }
+      }
+
+      try {
+        setInscriptionLoading(true);
+        const result = await inscrireVisiteurEvenement({
+          evenementId: selectedEvenement.id,
+          nom: inscriptionVisiteurData.nom,
+          email: inscriptionVisiteurData.email,
+          telephone: inscriptionVisiteurData.telephone,
+          adresse: inscriptionVisiteurData.adresse,
+          nombrePersonnes: inscriptionVisiteurData.nombrePersonnes,
+          commentaires: inscriptionVisiteurData.commentaires,
+        });
+
+        if (result.success) {
+          toast.success(result.message || "Votre inscription a été enregistrée avec succès !");
+          setShowInscriptionModal(false);
+          setSelectedEvenement(null);
+          setInscriptionVisiteurData({
+            nom: "",
+            email: "",
+            telephone: "",
+            adresse: "",
+            nombrePersonnes: 1,
+            commentaires: "",
+          });
+          loadEvenements(); // Recharger pour mettre à jour les places disponibles
+        } else {
+          toast.error(result.error || "Erreur lors de l'inscription");
+        }
+      } catch (error) {
+        console.error("Erreur lors de l'inscription:", error);
+        toast.error("Erreur lors de l'inscription");
+      } finally {
+        setInscriptionLoading(false);
+      }
     }
   };
 
@@ -158,14 +254,6 @@ export default function PublicEvenementsPage() {
     if (evenement.placesDisponibles && evenement.placesReservees >= evenement.placesDisponibles) return false;
     return true;
   };
-
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
@@ -256,16 +344,35 @@ export default function PublicEvenementsPage() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
 
           {/* Liste des événements */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {getFilteredEvenements().map((evenement) => (
+          {loading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <Card key={i} className="overflow-hidden animate-pulse">
+                  <div className="h-48 bg-gray-200 dark:bg-gray-700" />
+                  <CardContent className="p-6">
+                    <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded mb-2" />
+                    <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              {getFilteredEvenements().map((evenement) => (
               <Card key={evenement.id} className="overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group bg-white dark:bg-slate-800 border-0 shadow-lg">
                 <div className="relative">
                   {evenement.imagePrincipale && (
-                    <div className="h-48 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 overflow-hidden">
-                      <img
+                    <div className="relative h-48 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 overflow-hidden">
+                      <Image
                         src={evenement.imagePrincipale}
                         alt={evenement.titre}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                        fill
+                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        sizes="(max-width: 768px) 100vw, 33vw"
+                        unoptimized={evenement.imagePrincipale.startsWith('/')}
+                        onError={(e) => {
+                          console.error('Erreur de chargement d\'image:', evenement.imagePrincipale);
+                        }}
                       />
                     </div>
                   )}
@@ -382,10 +489,11 @@ export default function PublicEvenementsPage() {
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
 
-          {getFilteredEvenements().length === 0 && (
+          {!loading && getFilteredEvenements().length === 0 && (
             <div className="text-center py-16">
               <div className="bg-white dark:bg-slate-800 rounded-2xl p-12 shadow-lg max-w-md mx-auto">
                 <div className="bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900 rounded-full w-24 h-24 flex items-center justify-center mx-auto mb-6">
@@ -418,9 +526,10 @@ export default function PublicEvenementsPage() {
       {/* Modal d'inscription */}
       {showInscriptionModal && selectedEvenement && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full max-h-[90vh] overflow-hidden shadow-2xl">
-            <div className="p-8">
-              <div className="flex justify-between items-center mb-6">
+          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-md w-full max-h-[90vh] flex flex-col overflow-hidden shadow-2xl">
+            {/* Header */}
+            <div className="p-8 flex-shrink-0 border-b border-gray-200 dark:border-gray-700">
+              <div className="flex justify-between items-center">
                 <div className="flex-1">
                   <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
                     Inscription à l'événement
@@ -435,13 +544,24 @@ export default function PublicEvenementsPage() {
                     setShowInscriptionModal(false);
                     setSelectedEvenement(null);
                     setInscriptionData({ nombrePersonnes: 1, commentaires: "" });
+                    setInscriptionVisiteurData({
+                      nom: "",
+                      email: "",
+                      telephone: "",
+                      adresse: "",
+                      nombrePersonnes: 1,
+                      commentaires: "",
+                    });
                   }}
                   className="bg-gray-100 dark:bg-gray-800 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-full p-2 transition-colors"
                 >
                   <X className="h-6 w-6 text-gray-600 dark:text-gray-400" />
                 </button>
               </div>
+            </div>
 
+            {/* Body - Scrollable */}
+            <div className="flex-1 overflow-y-auto p-8">
               <div className="space-y-6">
                 <div className="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20 rounded-lg p-4">
                   <h3 className="font-semibold text-gray-900 dark:text-white mb-2">
@@ -452,18 +572,97 @@ export default function PublicEvenementsPage() {
                   </p>
                 </div>
 
+                {!session && (
+                  <div className="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
+                    <p className="text-sm text-blue-800 dark:text-blue-200">
+                      Vous n'êtes pas connecté. Veuillez remplir vos informations ci-dessous. Vous recevrez une confirmation par email une fois votre inscription validée.
+                    </p>
+                  </div>
+                )}
+
                 <div className="space-y-4">
+                  {!session && (
+                    <>
+                      <div>
+                        <Label htmlFor="nom" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Nom complet *
+                        </Label>
+                        <Input
+                          id="nom"
+                          type="text"
+                          value={inscriptionVisiteurData.nom}
+                          onChange={(e) => setInscriptionVisiteurData({ ...inscriptionVisiteurData, nom: e.target.value })}
+                          placeholder="Votre nom complet"
+                          className="mt-1 bg-white dark:bg-slate-800 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="email" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Email *
+                        </Label>
+                        <Input
+                          id="email"
+                          type="email"
+                          value={inscriptionVisiteurData.email}
+                          onChange={(e) => setInscriptionVisiteurData({ ...inscriptionVisiteurData, email: e.target.value })}
+                          placeholder="votre@email.com"
+                          className="mt-1 bg-white dark:bg-slate-800 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="telephone" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Téléphone *
+                        </Label>
+                        <Input
+                          id="telephone"
+                          type="tel"
+                          value={inscriptionVisiteurData.telephone}
+                          onChange={(e) => setInscriptionVisiteurData({ ...inscriptionVisiteurData, telephone: e.target.value })}
+                          placeholder="01 23 45 67 89"
+                          className="mt-1 bg-white dark:bg-slate-800 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
+                          required
+                        />
+                      </div>
+
+                      <div>
+                        <Label htmlFor="adresse" className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Adresse *
+                        </Label>
+                        <textarea
+                          id="adresse"
+                          className="w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                          rows={3}
+                          value={inscriptionVisiteurData.adresse}
+                          onChange={(e) => setInscriptionVisiteurData({ ...inscriptionVisiteurData, adresse: e.target.value })}
+                          placeholder="Rue, Code postal, Ville, Pays"
+                          required
+                        />
+                      </div>
+                    </>
+                  )}
+
                   <div>
                     <Label htmlFor="nombrePersonnes" className="text-sm font-medium text-gray-700 dark:text-gray-300">
-                      Nombre de personnes
+                      Nombre de personnes *
                     </Label>
                     <Input
                       id="nombrePersonnes"
                       type="number"
                       min="1"
                       max={selectedEvenement.placesDisponibles ? selectedEvenement.placesDisponibles - selectedEvenement.placesReservees : undefined}
-                      value={inscriptionData.nombrePersonnes}
-                      onChange={(e) => setInscriptionData({ ...inscriptionData, nombrePersonnes: parseInt(e.target.value) || 1 })}
+                      value={session ? inscriptionData.nombrePersonnes : inscriptionVisiteurData.nombrePersonnes}
+                      onChange={(e) => {
+                        const value = parseInt(e.target.value) || 1;
+                        if (session) {
+                          setInscriptionData({ ...inscriptionData, nombrePersonnes: value });
+                        } else {
+                          setInscriptionVisiteurData({ ...inscriptionVisiteurData, nombrePersonnes: value });
+                        }
+                      }}
                       className="mt-1 bg-white dark:bg-slate-800 border-gray-300 dark:border-gray-600 focus:ring-2 focus:ring-blue-500"
                     />
                     {selectedEvenement.placesDisponibles && (
@@ -481,8 +680,14 @@ export default function PublicEvenementsPage() {
                       id="commentaires"
                       className="w-full mt-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-slate-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                       rows={3}
-                      value={inscriptionData.commentaires}
-                      onChange={(e) => setInscriptionData({ ...inscriptionData, commentaires: e.target.value })}
+                      value={session ? inscriptionData.commentaires : inscriptionVisiteurData.commentaires}
+                      onChange={(e) => {
+                        if (session) {
+                          setInscriptionData({ ...inscriptionData, commentaires: e.target.value });
+                        } else {
+                          setInscriptionVisiteurData({ ...inscriptionVisiteurData, commentaires: e.target.value });
+                        }
+                      }}
                       placeholder="Ajoutez des commentaires ou des informations supplémentaires..."
                     />
                   </div>
@@ -492,44 +697,53 @@ export default function PublicEvenementsPage() {
                       <div className="flex items-center gap-2">
                         <Euro className="h-5 w-5 text-green-600 dark:text-green-400" />
                         <p className="text-sm font-semibold text-green-800 dark:text-green-200">
-                          Prix total : {(selectedEvenement.prix * inscriptionData.nombrePersonnes).toFixed(2).replace('.', ',')} €
+                          Prix total : {(selectedEvenement.prix * (session ? inscriptionData.nombrePersonnes : inscriptionVisiteurData.nombrePersonnes)).toFixed(2).replace('.', ',')} €
                         </p>
                       </div>
                     </div>
                   )}
                 </div>
-
-                <div className="flex gap-3 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowInscriptionModal(false);
-                      setSelectedEvenement(null);
-                      setInscriptionData({ nombrePersonnes: 1, commentaires: "" });
-                    }}
-                    className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300 dark:border-gray-600"
-                  >
-                    Annuler
-                  </Button>
-                  <Button
-                    onClick={handleInscription}
-                    disabled={inscriptionLoading}
-                    className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                  >
-                    {inscriptionLoading ? (
-                      <>
-                        <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                        Inscription...
-                      </>
-                    ) : (
-                      <>
-                        <UserPlus className="h-4 w-4 mr-2" />
-                        Confirmer l'inscription
-                      </>
-                    )}
-                  </Button>
-                </div>
               </div>
+            </div>
+
+            {/* Footer */}
+            <div className="flex gap-3 pt-4 px-8 pb-8 flex-shrink-0 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowInscriptionModal(false);
+                  setSelectedEvenement(null);
+                  setInscriptionData({ nombrePersonnes: 1, commentaires: "" });
+                  setInscriptionVisiteurData({
+                    nom: "",
+                    email: "",
+                    telephone: "",
+                    adresse: "",
+                    nombrePersonnes: 1,
+                    commentaires: "",
+                  });
+                }}
+                className="flex-1 bg-gray-50 hover:bg-gray-100 text-gray-700 border-gray-300 dark:bg-gray-800 dark:hover:bg-gray-700 dark:text-gray-300 dark:border-gray-600"
+              >
+                Annuler
+              </Button>
+              <Button
+                onClick={handleInscription}
+                disabled={inscriptionLoading}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                {inscriptionLoading ? (
+                  <>
+                    <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Inscription...
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="h-4 w-4 mr-2" />
+                    Confirmer l'inscription
+                  </>
+                )}
+              </Button>
             </div>
           </div>
         </div>

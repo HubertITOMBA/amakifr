@@ -10,7 +10,6 @@ import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
 type FormState = {
-  code: string;
   libelle: string;
   description: string;
   ordre: number;
@@ -23,7 +22,6 @@ export default function GestionPostesPage() {
   const router = useRouter();
   const [isDirty, setIsDirty] = useState(false);
   const [formData, setFormData] = useState<FormState>({
-    code: "",
     libelle: "",
     description: "",
     ordre: 0,
@@ -37,21 +35,11 @@ export default function GestionPostesPage() {
     setIsDirty(JSON.stringify(formData) !== JSON.stringify(initialForm));
   }, [formData, initialForm]);
 
-  const generateCode = (libelle: string) => {
-    return libelle
-      .toLowerCase()
-      .normalize("NFD")
-      .replace(/[\u0300-\u036f]/g, "")
-      .replace(/[^a-z0-9]/g, "_")
-      .replace(/_+/g, "_")
-      .replace(/^_|_$/g, "");
-  };
-
   const handleLibelleChange = (libelle: string) => {
     setFormData((prev) => ({
       ...prev,
       libelle,
-      code: prev.code || generateCode(libelle),
+      // Le code sera généré automatiquement côté serveur
     }));
   };
 
@@ -83,7 +71,7 @@ export default function GestionPostesPage() {
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="libelle">Libellé *</Label>
             <Input
               id="libelle"
@@ -92,16 +80,7 @@ export default function GestionPostesPage() {
               placeholder="Ex: Président"
             />
           </div>
-          <div>
-            <Label htmlFor="code">Code *</Label>
-            <Input
-              id="code"
-              value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
-              placeholder="Ex: president"
-            />
-          </div>
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
@@ -111,7 +90,7 @@ export default function GestionPostesPage() {
               placeholder="Description du poste"
             />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="ordre">Ordre d'affichage</Label>
             <Input
               id="ordre"
@@ -120,7 +99,7 @@ export default function GestionPostesPage() {
               onChange={(e) => setFormData({ ...formData, ordre: parseInt(e.target.value) || 0 })}
             />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="nombreMandatsDefaut">Nombre de mandats par défaut</Label>
             <Input
               id="nombreMandatsDefaut"
@@ -130,7 +109,7 @@ export default function GestionPostesPage() {
               onChange={(e) => setFormData({ ...formData, nombreMandatsDefaut: parseInt(e.target.value) || 1 })}
             />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="dureeMandatDefaut">Durée du mandat (en mois)</Label>
             <Input
               id="dureeMandatDefaut"

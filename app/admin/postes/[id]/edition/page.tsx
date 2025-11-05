@@ -119,7 +119,7 @@ export default function EditionPostePage() {
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="libelle">Libellé *</Label>
             <Input
               id="libelle"
@@ -127,15 +127,19 @@ export default function EditionPostePage() {
               onChange={(e) => setFormData({ ...formData, libelle: e.target.value })}
             />
           </div>
-          <div>
-            <Label htmlFor="code">Code *</Label>
+          <div className="space-y-2">
+            <Label htmlFor="code">Code (6 caractères)</Label>
             <Input
               id="code"
               value={formData.code}
-              onChange={(e) => setFormData({ ...formData, code: e.target.value })}
+              disabled
+              readOnly
+              maxLength={6}
+              className="bg-gray-50 dark:bg-gray-800 cursor-not-allowed"
+              title="Le code ne peut pas être modifié après la création"
             />
           </div>
-          <div className="md:col-span-2">
+          <div className="md:col-span-2 space-y-2">
             <Label htmlFor="description">Description</Label>
             <Textarea
               id="description"
@@ -144,7 +148,7 @@ export default function EditionPostePage() {
               rows={3}
             />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="ordre">Ordre d'affichage</Label>
             <Input
               id="ordre"
@@ -153,7 +157,7 @@ export default function EditionPostePage() {
               onChange={(e) => setFormData({ ...formData, ordre: parseInt(e.target.value) || 0 })}
             />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="nombreMandatsDefaut">Nombre de mandats par défaut</Label>
             <Input
               id="nombreMandatsDefaut"
@@ -163,7 +167,7 @@ export default function EditionPostePage() {
               onChange={(e) => setFormData({ ...formData, nombreMandatsDefaut: parseInt(e.target.value) || 1 })}
             />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="dureeMandatDefaut">Durée du mandat (en mois)</Label>
             <Input
               id="dureeMandatDefaut"

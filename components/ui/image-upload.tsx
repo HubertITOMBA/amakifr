@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload, X, Image as ImageIcon, Loader2, Link as LinkIcon } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { uploadFile } from "@/actions/user";
 import { uploadEvenementImage } from "@/actions/evenements";
 import Image from "next/image";
@@ -106,7 +106,12 @@ export function ImageUpload({
 
   return (
     <div className="space-y-2">
-      <Label>{label}</Label>
+      <Label>
+        {label}
+        <span className="text-xs font-normal text-gray-500 dark:text-gray-400 ml-2">
+          (Taille max: {maxSize}MB)
+        </span>
+      </Label>
       
       {/* Sélecteur de mode */}
       <div className="flex gap-2 mb-3">
@@ -197,8 +202,8 @@ export function ImageUpload({
                     <Upload className="h-4 w-4 mr-2" />
                     Sélectionner une image
                   </Button>
-                  <p className="text-xs text-gray-500 text-center">
-                    Formats acceptés: JPG, PNG, GIF, WEBP (max {maxSize}MB)
+                  <p className="text-xs text-gray-500 dark:text-gray-400 text-center">
+                    Formats acceptés: JPG, PNG, GIF, WEBP • Taille maximale: <strong>{maxSize}MB</strong>
                   </p>
                 </>
               )}

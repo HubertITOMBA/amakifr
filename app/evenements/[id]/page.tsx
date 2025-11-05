@@ -57,7 +57,7 @@ import {
   Plus,
   Loader2
 } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import { 
   getEvenementById, 
   inscrireEvenement,
@@ -93,6 +93,7 @@ interface InscriptionVisiteurFormData {
   nom: string;
   email: string;
   telephone: string;
+  adresse: string;
   nombrePersonnes: number;
   commentaires: string;
 }
@@ -115,6 +116,7 @@ export default function EvenementDetailPage() {
     nom: "",
     email: "",
     telephone: "",
+    adresse: "",
     nombrePersonnes: 1,
     commentaires: "",
   });
@@ -280,6 +282,10 @@ export default function EvenementDetailPage() {
         toast.error("Le téléphone est requis");
         return;
       }
+      if (!inscriptionVisiteurData.adresse.trim()) {
+        toast.error("L'adresse est requise");
+        return;
+      }
       if (inscriptionVisiteurData.nombrePersonnes < 1) {
         toast.error("Le nombre de personnes doit être au moins 1");
         return;
@@ -301,6 +307,7 @@ export default function EvenementDetailPage() {
           nom: inscriptionVisiteurData.nom,
           email: inscriptionVisiteurData.email,
           telephone: inscriptionVisiteurData.telephone,
+          adresse: inscriptionVisiteurData.adresse,
           nombrePersonnes: inscriptionVisiteurData.nombrePersonnes,
           commentaires: inscriptionVisiteurData.commentaires,
         });
@@ -312,6 +319,7 @@ export default function EvenementDetailPage() {
             nom: "",
             email: "",
             telephone: "",
+            adresse: "",
             nombrePersonnes: 1,
             commentaires: "",
           });
@@ -397,16 +405,15 @@ export default function EvenementDetailPage() {
     if (!evenement) return;
 
     try {
-      // Import dynamique de jsPDF
+      // Import dynamique de jsPDF et des helpers
       const { default: jsPDF } = await import('jspdf');
+      const { addPDFHeader, addPDFFooter } = await import('@/lib/pdf-helpers-client');
       const doc = new jsPDF();
       
-      let yPos = 20;
+      // Ajouter l'en-tête avec logo sur la première page uniquement
+      await addPDFHeader(doc, evenement.titre);
       
-      // Titre
-      doc.setFontSize(20);
-      doc.text(evenement.titre, 20, yPos);
-      yPos += 10;
+      let yPos = 60; // Commencer après l'en-tête
       
       // Catégorie et statut
       doc.setFontSize(12);
@@ -464,6 +471,9 @@ export default function EvenementDetailPage() {
       doc.setTextColor(0, 0, 255);
       doc.textWithLink(`Plus d'informations: ${window.location.href}`, 20, yPos, { url: window.location.href });
       
+      // Ajouter le pied de page sur toutes les pages
+      addPDFFooter(doc);
+      
       doc.save(`${evenement.titre.replace(/[^a-z0-9]/gi, '_')}.pdf`);
       toast.success("PDF téléchargé avec succès !");
     } catch (error) {
@@ -472,13 +482,6 @@ export default function EvenementDetailPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
-      </div>
-    );
-  }
 
   if (!evenement) {
     return (
@@ -530,7 +533,32 @@ export default function EvenementDetailPage() {
           </Button>
         </Link>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {loading ? (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-pulse">
+            <div className="lg:col-span-2 space-y-6">
+              <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
+              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6" />
+            </div>
+            <div className="space-y-4">
+              <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+              <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded-lg" />
+            </div>
+          </div>
+        ) : !evenement ? (
+          <Card>
+            <CardContent className="p-12 text-center">
+              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+              <h2 className="text-2xl font-bold mb-2">Événement non trouvé</h2>
+              <p className="text-gray-600 mb-4">L'événement que vous recherchez n'existe pas ou a été supprimé.</p>
+              <Button onClick={() => router.push("/evenements")}>
+                Retour aux événements
+              </Button>
+            </CardContent>
+          </Card>
+        ) : (
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Colonne principale */}
           <div className="lg:col-span-2 space-y-6">
             {/* Galerie d'images */}
@@ -545,7 +573,7 @@ export default function EvenementDetailPage() {
                       className="object-cover"
                       sizes="(max-width: 768px) 100vw, 66vw"
                       priority
-                      unoptimized={allImages[currentImageIndex]?.startsWith('http') && !allImages[currentImageIndex]?.includes('localhost')}
+                      unoptimized={allImages[currentImageIndex]?.startsWith('/')}
                       onError={(e) => {
                         console.error('Erreur de chargement d\'image:', allImages[currentImageIndex]);
                       }}
@@ -603,6 +631,7 @@ export default function EvenementDetailPage() {
                               fill
                               className="object-cover"
                               sizes="80px"
+                              unoptimized={img.startsWith('/')}
                             />
                           </button>
                         ))}
@@ -1006,7 +1035,7 @@ export default function EvenementDetailPage() {
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => router.push(`/admin/evenements?edit=${evenement.id}`)}
+                    onClick={() => router.push(`/admin/evenements/${evenement.id}/edition`)}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Modifier l'événement
@@ -1168,6 +1197,7 @@ export default function EvenementDetailPage() {
             )}
           </div>
         </div>
+        )}
       </main>
 
       {/* Modal d'inscription */}
@@ -1187,6 +1217,7 @@ export default function EvenementDetailPage() {
                       nom: "",
                       email: "",
                       telephone: "",
+                      adresse: "",
                       nombrePersonnes: 1,
                       commentaires: "",
                     });
@@ -1248,6 +1279,21 @@ export default function EvenementDetailPage() {
                         telephone: e.target.value
                       })}
                       placeholder="01 23 45 67 89"
+                      required
+                    />
+                  </div>
+
+                  <div>
+                    <Label htmlFor="adresse">Adresse *</Label>
+                    <Textarea
+                      id="adresse"
+                      rows={3}
+                      value={inscriptionVisiteurData.adresse}
+                      onChange={(e) => setInscriptionVisiteurData({
+                        ...inscriptionVisiteurData,
+                        adresse: e.target.value
+                      })}
+                      placeholder="Rue, Code postal, Ville, Pays"
                       required
                     />
                   </div>
@@ -1317,6 +1363,7 @@ export default function EvenementDetailPage() {
                       nom: "",
                       email: "",
                       telephone: "",
+                      adresse: "",
                       nombrePersonnes: 1,
                       commentaires: "",
                     });

@@ -33,8 +33,10 @@ import {
   getSortedRowModel,
   SortingState,
   getFilteredRowModel,
+  VisibilityState,
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/admin/DataTable";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 
 type ElectionData = {
   id: string;
@@ -43,6 +45,7 @@ type ElectionData = {
   status: ElectionStatus;
   dateOuverture: string;
   dateCloture: string;
+  dateClotureCandidature?: string | null;
   dateScrutin: string;
   nombreMandats: number;
   quorumRequis: number;
@@ -83,6 +86,21 @@ export default function AdminElectionsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [sorting, setSorting] = useState<SortingState>([]);
+  
+  // Visibilité des colonnes - charger depuis localStorage ou utiliser les valeurs par défaut
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-elections-column-visibility");
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences de colonnes:", error);
+      }
+    }
+    return {};
+  });
 
   // Charger les élections
   const loadElections = async () => {
@@ -183,6 +201,7 @@ export default function AdminElectionsPage() {
     columnHelper.display({
       id: "select",
       header: "",
+      meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
       cell: ({ row }) => (
         <Button
           size="sm"
@@ -196,14 +215,7 @@ export default function AdminElectionsPage() {
     columnHelper.accessor("titre", {
       header: "Titre",
       cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span className="font-medium">{row.original.titre}</span>
-          {row.original.description && (
-            <span className="text-sm text-gray-500 dark:text-gray-400 truncate max-w-xs">
-              {row.original.description}
-            </span>
-          )}
-        </div>
+        <span className="font-medium">{row.original.titre}</span>
       ),
     }),
     columnHelper.accessor("status", {
@@ -223,6 +235,20 @@ export default function AdminElectionsPage() {
     columnHelper.accessor("dateOuverture", {
       header: "Date ouverture",
       cell: ({ row }) => new Date(row.original.dateOuverture).toLocaleDateString("fr-FR"),
+    }),
+    columnHelper.accessor("dateClotureCandidature", {
+      header: "Clôture candidatures",
+      cell: ({ row }) => {
+        const date = row.original.dateClotureCandidature;
+        if (!date) return <span className="text-gray-400 italic">Non définie</span>;
+        return new Date(date).toLocaleDateString("fr-FR", {
+          day: '2-digit',
+          month: '2-digit',
+          year: 'numeric',
+          hour: '2-digit',
+          minute: '2-digit'
+        });
+      },
     }),
     columnHelper.accessor("dateCloture", {
       header: "Date clôture",
@@ -247,6 +273,7 @@ export default function AdminElectionsPage() {
     columnHelper.display({
       id: "actions",
       header: "Actions",
+      meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
       cell: ({ row }) => {
         const election = row.original;
         return (
@@ -290,8 +317,21 @@ export default function AdminElectionsPage() {
   const table = useReactTable({
     data: filteredElections,
     columns,
-    state: { sorting },
+    state: { 
+      sorting,
+      columnVisibility,
+    },
     onSortingChange: setSorting,
+    onColumnVisibilityChange: (updater) => {
+      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(newVisibility);
+      // Sauvegarder dans localStorage
+      try {
+        localStorage.setItem("admin-elections-column-visibility", JSON.stringify(newVisibility));
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde des préférences:", error);
+      }
+    },
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -317,12 +357,18 @@ export default function AdminElectionsPage() {
                 <Calendar className="h-5 w-5" />
                 Gestion des Élections
               </CardTitle>
-              <Link href="/admin/elections/gestion">
-                <Button>
-                  <Calendar className="h-4 w-4 mr-2" />
-                  Créer une élection
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2">
+                <ColumnVisibilityToggle 
+                  table={table} 
+                  storageKey="admin-elections-column-visibility"
+                />
+                <Link href="/admin/elections/gestion">
+                  <Button>
+                    <Calendar className="h-4 w-4 mr-2" />
+                    Créer une élection
+                  </Button>
+                </Link>
+              </div>
             </div>
           </CardHeader>
           <CardContent>

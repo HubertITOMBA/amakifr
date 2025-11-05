@@ -76,7 +76,7 @@ const LoginForm = () => {
   return (
 
     // <div className="inset-0 w-auto bg-transparent p-4"> 
-   <div className="fixed inset-0  bg-accent-foreground flex items-center justify-center p-4"> 
+   <div className="fixed inset-0 bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4"> 
         <CardWrapper
             labelBox= "Connexion"
             headerLabel="Content de vous revoir !"
@@ -148,7 +148,7 @@ const LoginForm = () => {
                                       size="sm"
                                       variant="link"
                                       asChild
-                                      className="px-0 font-normal"
+                                      className="px-0 font-normal text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
                                   >
                                       <Link href="/auth/reset">Mot de passe oublié ?</Link>
                                   </Button>

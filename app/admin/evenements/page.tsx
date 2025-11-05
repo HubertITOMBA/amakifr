@@ -5,12 +5,15 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Calendar, Plus, Eye, Edit, Trash2 } from "lucide-react";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Calendar, Plus, Eye, Edit, Trash2, Search, Filter, Mail } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getAllEvenements, deleteEvenement } from "@/actions/evenements";
 import { toast } from "sonner";
-import { createColumnHelper, flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, useReactTable, SortingState, ColumnFiltersState } from "@tanstack/react-table";
+import { createColumnHelper, flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, useReactTable, SortingState, ColumnFiltersState, VisibilityState } from "@tanstack/react-table";
 import type { EvenementData } from "@/actions/evenements";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+import { EventInvitationModal } from "@/components/admin/EventInvitationModal";
 
 const columnHelper = createColumnHelper<EvenementData>();
 
@@ -44,9 +47,27 @@ export default function AdminEvenementsPage() {
   const router = useRouter();
   const [evenements, setEvenements] = useState<EvenementData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState("");
+  const [globalFilter, setGlobalFilter] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [categorieFilter, setCategorieFilter] = useState<string>("all");
+  const [statutFilter, setStatutFilter] = useState<string>("all");
+  const [selectedEvenementForInvitation, setSelectedEvenementForInvitation] = useState<{ id: string; titre: string } | null>(null);
+  
+  // Visibilité des colonnes - charger depuis localStorage
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-evenements-column-visibility");
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences de colonnes:", error);
+      }
+    }
+    return {};
+  });
 
   const loadAll = async () => {
     const res = await getAllEvenements();
@@ -102,6 +123,7 @@ export default function AdminEvenementsPage() {
     columnHelper.display({
       id: "actions",
       header: "Actions",
+      meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
       cell: ({ row }) => {
         const e = row.original;
         return (
@@ -120,6 +142,14 @@ export default function AdminEvenementsPage() {
             >
               <Edit className="h-4 w-4" />
             </Button>
+            <Button 
+              size="sm" 
+              variant="outline"
+              onClick={() => setSelectedEvenementForInvitation({ id: e.id, titre: e.titre })}
+              title="Envoyer des invitations"
+            >
+              <Mail className="h-4 w-4" />
+            </Button>
             <Button size="sm" variant="outline" onClick={() => handleDelete(e.id)}>
               <Trash2 className="h-4 w-4" />
             </Button>
@@ -129,44 +159,116 @@ export default function AdminEvenementsPage() {
     }),
   ], []);
 
+  // Filtrer les données avant de les passer à la table
+  const filteredData = useMemo(() => {
+    return evenements.filter(e => {
+      // Filtre global (recherche)
+      if (globalFilter.trim()) {
+        const q = globalFilter.trim().toLowerCase();
+        const searchText = [
+          e.titre || "",
+          e.description || "",
+          e.categorie || "",
+          e.statut || "",
+          e.lieu || "",
+        ].join(" ").toLowerCase();
+        if (!searchText.includes(q)) return false;
+      }
+      
+      // Filtre par catégorie
+      if (categorieFilter !== "all" && e.categorie !== categorieFilter) {
+        return false;
+      }
+      
+      // Filtre par statut
+      if (statutFilter !== "all" && e.statut !== statutFilter) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [evenements, globalFilter, categorieFilter, statutFilter]);
+
   const table = useReactTable({
-    data: evenements.filter(e => {
-      const q = search.trim().toLowerCase();
-      if (!q) return true;
-      return [
-        e.titre || "",
-        e.description || "",
-        e.categorie || "",
-        e.statut || "",
-        e.lieu || "",
-      ].join(" ").toLowerCase().includes(q);
-    }),
+    data: filteredData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    state: { sorting, columnFilters },
+    onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(newVisibility);
+      try {
+        localStorage.setItem("admin-evenements-column-visibility", JSON.stringify(newVisibility));
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde des préférences:", error);
+      }
+    },
+    state: { sorting, columnFilters, globalFilter, columnVisibility },
+    globalFilterFn: "includesString",
   });
 
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center justify-between">
+          <CardTitle className="flex items-center justify-between mb-4">
             <span className="flex items-center">
               <Calendar className="h-5 w-5 mr-2" />
               Gestion des Événements
             </span>
             <div className="flex items-center gap-2">
-              <Input placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-56" />
+              <ColumnVisibilityToggle 
+                table={table} 
+                storageKey="admin-evenements-column-visibility"
+              />
               <Button onClick={() => router.push("/admin/evenements/gestion")}>
                 <Plus className="h-4 w-4 mr-2" />
                 Nouvel événement
               </Button>
             </div>
           </CardTitle>
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="flex items-center gap-2 flex-1 min-w-[200px]">
+              <Search className="h-4 w-4 text-gray-400" />
+              <Input 
+                placeholder="Rechercher par titre, description, lieu..." 
+                value={globalFilter} 
+                onChange={(e) => setGlobalFilter(e.target.value)} 
+                className="flex-1"
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <Filter className="h-4 w-4 text-gray-400" />
+              <Select value={categorieFilter} onValueChange={setCategorieFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Catégorie" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Toutes les catégories</SelectItem>
+                  <SelectItem value="General">Général</SelectItem>
+                  <SelectItem value="Formation">Formation</SelectItem>
+                  <SelectItem value="Social">Social</SelectItem>
+                  <SelectItem value="Sportif">Sportif</SelectItem>
+                  <SelectItem value="Culturel">Culturel</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={statutFilter} onValueChange={setStatutFilter}>
+                <SelectTrigger className="w-[150px]">
+                  <SelectValue placeholder="Statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="Brouillon">Brouillon</SelectItem>
+                  <SelectItem value="Publie">Publié</SelectItem>
+                  <SelectItem value="Archive">Archivé</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -203,6 +305,20 @@ export default function AdminEvenementsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal d'envoi d'invitations */}
+      {selectedEvenementForInvitation && (
+        <EventInvitationModal
+          open={!!selectedEvenementForInvitation}
+          onOpenChange={(open) => {
+            if (!open) {
+              setSelectedEvenementForInvitation(null);
+            }
+          }}
+          evenementId={selectedEvenementForInvitation.id}
+          evenementTitre={selectedEvenementForInvitation.titre}
+        />
+      )}
     </div>
   );
 }

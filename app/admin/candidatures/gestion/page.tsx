@@ -93,7 +93,7 @@ export default function GestionCandidaturesPage() {
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div>
+          <div className="space-y-2">
             <Label>Adhérent</Label>
             <Input placeholder="Rechercher un adhérent..." className="mb-2" value={adherentSearch} onChange={(e) => setAdherentSearch(e.target.value)} />
             <Select value={form.adherentId} onValueChange={(v) => setForm({ ...form, adherentId: v })}>
@@ -107,7 +107,7 @@ export default function GestionCandidaturesPage() {
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="space-y-2">
             <Label>Élection</Label>
             <Input placeholder="Rechercher une élection..." className="mb-2" value={electionSearch} onChange={(e) => setElectionSearch(e.target.value)} />
             <Select value={form.electionId} onValueChange={(v) => setForm({ ...form, electionId: v, positionId: "" })}>
@@ -121,7 +121,7 @@ export default function GestionCandidaturesPage() {
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="space-y-2">
             <Label>Poste</Label>
             <Input placeholder="Rechercher un poste..." className="mb-2" value={positionSearch} onChange={(e) => setPositionSearch(e.target.value)} disabled={!form.electionId} />
             <Select value={form.positionId} onValueChange={(v) => setForm({ ...form, positionId: v })} disabled={!form.electionId}>
@@ -137,11 +137,11 @@ export default function GestionCandidaturesPage() {
           </div>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="motivation">Motivation</Label>
             <Textarea id="motivation" rows={3} value={form.motivation} onChange={(e) => setForm({ ...form, motivation: e.target.value })} />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="programme">Programme</Label>
             <Textarea id="programme" rows={3} value={form.programme} onChange={(e) => setForm({ ...form, programme: e.target.value })} />
           </div>

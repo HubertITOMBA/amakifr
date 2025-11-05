@@ -74,8 +74,18 @@ export function isValidPoste(type: string): type is PositionType {
   return Object.values(PositionType).includes(type as PositionType);
 }
 
-// Mapping code -> PositionType pour la compatibilité
+// Mapping code -> PositionType pour la compatibilité (codes de 6 caractères)
 export const CODE_TO_POSITION_TYPE: Record<string, PositionType> = {
+  // Nouveaux codes (6 caractères)
+  'PRESID': PositionType.President,
+  'VICEPR': PositionType.VicePresident,
+  'SECRET': PositionType.Secretaire,
+  'VICESE': PositionType.ViceSecretaire,
+  'TRESOR': PositionType.Tresorier,
+  'VICETR': PositionType.ViceTresorier,
+  'COMCPT': PositionType.CommissaireComptes,
+  'MEMCDI': PositionType.MembreComiteDirecteur,
+  // Anciens codes (pour rétrocompatibilité avec données existantes)
   'president': PositionType.President,
   'vice_president': PositionType.VicePresident,
   'secretaire': PositionType.Secretaire,
@@ -86,14 +96,14 @@ export const CODE_TO_POSITION_TYPE: Record<string, PositionType> = {
   'membre_comite_directeur': PositionType.MembreComiteDirecteur,
 };
 
-// Mapping PositionType -> code
+// Mapping PositionType -> code (nouveaux codes de 6 caractères)
 export const POSITION_TYPE_TO_CODE: Record<PositionType, string> = {
-  [PositionType.President]: 'president',
-  [PositionType.VicePresident]: 'vice_president',
-  [PositionType.Secretaire]: 'secretaire',
-  [PositionType.ViceSecretaire]: 'vice_secretaire',
-  [PositionType.Tresorier]: 'tresorier',
-  [PositionType.ViceTresorier]: 'vice_tresorier',
-  [PositionType.CommissaireComptes]: 'commissaire_comptes',
-  [PositionType.MembreComiteDirecteur]: 'membre_comite_directeur',
+  [PositionType.President]: 'PRESID',
+  [PositionType.VicePresident]: 'VICEPR',
+  [PositionType.Secretaire]: 'SECRET',
+  [PositionType.ViceSecretaire]: 'VICESE',
+  [PositionType.Tresorier]: 'TRESOR',
+  [PositionType.ViceTresorier]: 'VICETR',
+  [PositionType.CommissaireComptes]: 'COMCPT',
+  [PositionType.MembreComiteDirecteur]: 'MEMCDI',
 };

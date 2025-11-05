@@ -11,6 +11,7 @@ const testElections = [
     dateOuverture: new Date('2024-01-01'),
     dateCloture: new Date('2024-12-31'),
     dateScrutin: new Date('2024-12-31'),
+    // dateClotureCandidature sera calculée automatiquement (10 jours avant dateScrutin)
     createdBy: 'admin-user-id', // Sera remplacé par l'ID réel de l'admin
     positions: [
       {
@@ -62,6 +63,7 @@ const testElections = [
     dateOuverture: new Date('2023-01-01'),
     dateCloture: new Date('2023-12-31'),
     dateScrutin: new Date('2023-12-31'),
+    // dateClotureCandidature sera calculée automatiquement (10 jours avant dateScrutin)
     createdBy: 'admin-user-id', // Sera remplacé par l'ID réel de l'admin
     positions: [
       {
@@ -120,14 +122,35 @@ async function createTestElections() {
     for (const electionData of testElections) {
       console.log(`🗳️ Création de l'élection: ${electionData.titre}`);
       
+      // Calculer les dates selon les règles:
+      // 1. dateOuverture < dateClotureCandidature
+      // 2. dateClotureCandidature < dateScrutin
+      // 3. dateCloture > dateScrutin
+      const dateOuverture = new Date(electionData.dateOuverture);
+      const dateScrutin = new Date(electionData.dateScrutin);
+      
+      // Calculer la date de clôture des candidatures (10 jours avant le scrutin)
+      const dateClotureCandidature = new Date(dateScrutin);
+      dateClotureCandidature.setDate(dateScrutin.getDate() - 10);
+      
+      // S'assurer que dateClotureCandidature est après dateOuverture
+      if (dateClotureCandidature <= dateOuverture) {
+        dateClotureCandidature.setDate(dateOuverture.getDate() + 1);
+      }
+      
+      // Ajuster dateCloture pour qu'elle soit après dateScrutin
+      const dateCloture = new Date(dateScrutin);
+      dateCloture.setDate(dateScrutin.getDate() + 1);
+
       const election = await prisma.election.create({
         data: {
           titre: electionData.titre,
           description: electionData.description,
           status: electionData.status,
-          dateOuverture: electionData.dateOuverture,
-          dateCloture: electionData.dateCloture,
-          dateScrutin: electionData.dateScrutin,
+          dateOuverture: dateOuverture,
+          dateCloture: dateCloture,
+          dateClotureCandidature: dateClotureCandidature,
+          dateScrutin: dateScrutin,
           createdBy: admin.id,
           positions: {
             create: electionData.positions.map(position => ({

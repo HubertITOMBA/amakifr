@@ -151,7 +151,7 @@ export function AboutSection() {
           >
             {/* Decorative frame around image */}
             <div className="relative p-4 bg-gradient-to-br from-blue-100/60 via-indigo-100/60 to-purple-100/60 dark:from-blue-900/30 dark:via-indigo-900/30 dark:to-purple-900/30 rounded-3xl shadow-2xl">
-              <div className="relative h-96 rounded-2xl overflow-hidden border-4 border-white/50 dark:border-slate-700/50">
+              {/* <div className="relative h-96 rounded-2xl overflow-hidden border-4 border-white/50 dark:border-slate-700/50">
                 <Image
                   src="/images/logoAmaki.jpeg"
                   alt="Équipe AMAKI"
@@ -163,7 +163,7 @@ export function AboutSection() {
                   <h3 className="text-xl font-bold drop-shadow-lg">Notre Équipe</h3>
                   <p className="text-sm opacity-90 font-medium">Ensemble pour l'excellence</p>
                 </div>
-              </div>
+              </div> */}
               
               {/* Enhanced decorative elements - opacité réduite */}
               <div className="absolute -top-2 -right-2 w-16 h-16 bg-gradient-to-br from-blue-400/40 to-indigo-500/40 dark:from-blue-600/20 dark:to-indigo-600/20 rounded-full opacity-70 animate-pulse shadow-lg blur-sm" />

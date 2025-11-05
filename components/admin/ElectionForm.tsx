@@ -51,6 +51,7 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
     description: "",
     dateOuverture: "",
     dateCloture: "",
+    dateClotureCandidature: "",
     dateScrutin: "",
     nombreMandats: 1,
     quorumRequis: 0,
@@ -76,6 +77,7 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
             description: e.description || "",
             dateOuverture: e.dateOuverture ? new Date(e.dateOuverture).toISOString().slice(0, 16) : "",
             dateCloture: e.dateCloture ? new Date(e.dateCloture).toISOString().slice(0, 16) : "",
+            dateClotureCandidature: e.dateClotureCandidature ? new Date(e.dateClotureCandidature).toISOString().slice(0, 16) : "",
             dateScrutin: e.dateScrutin ? new Date(e.dateScrutin).toISOString().slice(0, 16) : "",
             nombreMandats: e.nombreMandats || 1,
             quorumRequis: e.quorumRequis || 0,
@@ -86,6 +88,7 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
             description: e.description || "",
             dateOuverture: e.dateOuverture ? new Date(e.dateOuverture).toISOString().slice(0, 16) : "",
             dateCloture: e.dateCloture ? new Date(e.dateCloture).toISOString().slice(0, 16) : "",
+            dateClotureCandidature: e.dateClotureCandidature ? new Date(e.dateClotureCandidature).toISOString().slice(0, 16) : "",
             dateScrutin: e.dateScrutin ? new Date(e.dateScrutin).toISOString().slice(0, 16) : "",
             nombreMandats: e.nombreMandats || 1,
             quorumRequis: e.quorumRequis || 0,
@@ -135,6 +138,7 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
           initialForm.description === electionForm.description &&
           initialForm.dateOuverture === electionForm.dateOuverture &&
           initialForm.dateCloture === electionForm.dateCloture &&
+          initialForm.dateClotureCandidature === electionForm.dateClotureCandidature &&
           initialForm.dateScrutin === electionForm.dateScrutin &&
           initialForm.nombreMandats === electionForm.nombreMandats &&
           initialForm.quorumRequis === electionForm.quorumRequis &&
@@ -143,11 +147,38 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
           alert("Aucune modification détectée");
           return;
         }
+        // Validation côté client des dates
+        if (!electionForm.dateClotureCandidature) {
+          alert("La date de clôture des candidatures est obligatoire");
+          return;
+        }
+
+        const dateOuverture = new Date(electionForm.dateOuverture);
+        const dateClotureCandidature = new Date(electionForm.dateClotureCandidature);
+        const dateScrutin = new Date(electionForm.dateScrutin);
+        const dateCloture = new Date(electionForm.dateCloture);
+
+        if (dateOuverture >= dateClotureCandidature) {
+          alert("La date d'ouverture doit être antérieure à la date de clôture des candidatures");
+          return;
+        }
+
+        if (dateClotureCandidature >= dateScrutin) {
+          alert("La date de clôture des candidatures doit être antérieure à la date du scrutin");
+          return;
+        }
+
+        if (dateCloture <= dateScrutin) {
+          alert("La date de clôture doit être postérieure à la date du scrutin");
+          return;
+        }
+
         const res = await updateElection(electionId!, {
           titre: electionForm.titre,
           description: electionForm.description,
           dateOuverture: new Date(electionForm.dateOuverture),
           dateCloture: new Date(electionForm.dateCloture),
+          dateClotureCandidature: new Date(electionForm.dateClotureCandidature),
           dateScrutin: new Date(electionForm.dateScrutin),
           nombreMandats: electionForm.nombreMandats,
           quorumRequis: electionForm.quorumRequis,
@@ -163,12 +194,40 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
           alert("Veuillez sélectionner au moins un poste pour créer l'élection");
           return;
         }
+
+        // Validation côté client des dates
+        if (!electionForm.dateClotureCandidature) {
+          alert("La date de clôture des candidatures est obligatoire");
+          return;
+        }
+
+        const dateOuverture = new Date(electionForm.dateOuverture);
+        const dateClotureCandidature = new Date(electionForm.dateClotureCandidature);
+        const dateScrutin = new Date(electionForm.dateScrutin);
+        const dateCloture = new Date(electionForm.dateCloture);
+
+        if (dateOuverture >= dateClotureCandidature) {
+          alert("La date d'ouverture doit être antérieure à la date de clôture des candidatures");
+          return;
+        }
+
+        if (dateClotureCandidature >= dateScrutin) {
+          alert("La date de clôture des candidatures doit être antérieure à la date du scrutin");
+          return;
+        }
+
+        if (dateCloture <= dateScrutin) {
+          alert("La date de clôture doit être postérieure à la date du scrutin");
+          return;
+        }
+
         const res = await createElection(
           {
             titre: electionForm.titre,
             description: electionForm.description,
             dateOuverture: new Date(electionForm.dateOuverture),
             dateCloture: new Date(electionForm.dateCloture),
+            dateClotureCandidature: new Date(electionForm.dateClotureCandidature),
             dateScrutin: new Date(electionForm.dateScrutin),
             nombreMandats: electionForm.nombreMandats,
             quorumRequis: electionForm.quorumRequis,
@@ -191,6 +250,16 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
   };
 
   const codeToTypeMap: Record<string, PositionType> = {
+    // Nouveaux codes (6 caractères)
+    'PRESID': PositionType.President,
+    'VICEPR': PositionType.VicePresident,
+    'SECRET': PositionType.Secretaire,
+    'VICESE': PositionType.ViceSecretaire,
+    'TRESOR': PositionType.Tresorier,
+    'VICETR': PositionType.ViceTresorier,
+    'COMCPT': PositionType.CommissaireComptes,
+    'MEMCDI': PositionType.MembreComiteDirecteur,
+    // Anciens codes (pour rétrocompatibilité)
     'president': PositionType.President,
     'vice_president': PositionType.VicePresident,
     'secretaire': PositionType.Secretaire,
@@ -221,7 +290,7 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
     }
 
     const positionsData = newTemplates.map(t => ({
-      type: codeToTypeMap[t.code] || PositionType.MembreComiteDirecteur,
+      type: codeToTypeMap[t.code.toUpperCase()] || codeToTypeMap[t.code] || PositionType.MembreComiteDirecteur,
       titre: t.libelle,
       description: t.description || `Poste de ${t.libelle.toLowerCase()}`,
       nombreMandats: (t as any).nombreMandatsDefaut || 1,
@@ -298,8 +367,10 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
       <CardContent>
         <form ref={formRef} onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <Label htmlFor="titre">Titre de l'élection</Label>
+            <div className="space-y-2">
+              <Label htmlFor="titre" className="flex items-center gap-1">
+                Titre de l'élection <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="titre"
                 value={electionForm.titre}
@@ -308,7 +379,7 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
                 required
               />
             </div>
-            <div>
+            <div className="space-y-2">
               <Label htmlFor="description">Description</Label>
               <Textarea
                 id="description"
@@ -320,8 +391,10 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div>
-              <Label htmlFor="dateOuverture">Date d'ouverture</Label>
+            <div className="space-y-2">
+              <Label htmlFor="dateOuverture" className="flex items-center gap-1">
+                Date d'ouverture <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="dateOuverture"
                 type="datetime-local"
@@ -330,8 +403,10 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
                 required
               />
             </div>
-            <div>
-              <Label htmlFor="dateCloture">Date de clôture</Label>
+            <div className="space-y-2">
+              <Label htmlFor="dateCloture" className="flex items-center gap-1">
+                Date de clôture <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="dateCloture"
                 type="datetime-local"
@@ -340,8 +415,22 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
                 required
               />
             </div>
-            <div>
-              <Label htmlFor="dateScrutin">Date du scrutin</Label>
+            <div className="space-y-2">
+              <Label htmlFor="dateClotureCandidature" className="flex items-center gap-1">
+                Date de clôture des candidatures <span className="text-red-500">*</span>
+              </Label>
+              <Input
+                id="dateClotureCandidature"
+                type="datetime-local"
+                value={electionForm.dateClotureCandidature}
+                onChange={(e) => { setElectionForm({ ...electionForm, dateClotureCandidature: e.target.value }); markDirty(); }}
+                required
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="dateScrutin" className="flex items-center gap-1">
+                Date du scrutin <span className="text-red-500">*</span>
+              </Label>
               <Input
                 id="dateScrutin"
                 type="datetime-local"
@@ -475,11 +564,11 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
                   {positions.length > 0 ? positions.map((p) => (
                     <div key={p.id} className="p-3 border rounded-lg">
                       <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
-                        <div>
+                        <div className="space-y-2">
                           <Label>Titre</Label>
                           <Input defaultValue={p.titre} onBlur={(e) => e.target.value !== p.titre && handleUpdatePosition(p, { titre: e.target.value })} />
                         </div>
-                        <div>
+                        <div className="space-y-2">
                           <Label>Nombre de mandats</Label>
                           <Input type="number" min={1} defaultValue={p.nombreMandats || 1} onBlur={(e) => Number(e.target.value) !== (p.nombreMandats||1) && handleUpdatePosition(p, { nombreMandats: Number(e.target.value) })} />
                         </div>
@@ -527,23 +616,23 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
                   <Button type="button" variant="outline" onClick={() => setShowCustomPositionForm(true)}>Ajouter un poste personnalisé</Button>
                 ) : (
                   <form onSubmit={handleCreateCustom} className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                    <div>
+                    <div className="space-y-2">
                       <Label>Titre</Label>
                       <Input value={customPositionForm.titre} onChange={(e) => setCustomPositionForm({ ...customPositionForm, titre: e.target.value })} required />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label>Nombre de mandats</Label>
                       <Input type="number" min={1} value={customPositionForm.nombreMandats} onChange={(e) => setCustomPositionForm({ ...customPositionForm, nombreMandats: Number(e.target.value) })} />
                     </div>
-                    <div className="md:col-span-2">
+                    <div className="md:col-span-2 space-y-2">
                       <Label>Description</Label>
                       <Textarea value={customPositionForm.description} onChange={(e) => setCustomPositionForm({ ...customPositionForm, description: e.target.value })} rows={2} />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label>Durée (mois)</Label>
                       <Input type="number" min={1} value={customPositionForm.dureeMandat} onChange={(e) => setCustomPositionForm({ ...customPositionForm, dureeMandat: Number(e.target.value) })} />
                     </div>
-                    <div>
+                    <div className="space-y-2">
                       <Label>Conditions</Label>
                       <Textarea rows={2} value={customPositionForm.conditions} onChange={(e) => setCustomPositionForm({ ...customPositionForm, conditions: e.target.value })} />
                     </div>

@@ -140,12 +140,12 @@ export default function EditionUserPage() {
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          <div className="space-y-2">
             <Label>Nom complet (depuis adhérent)</Label>
             <Input value={fullName} disabled />
             <p className="text-xs text-gray-500 mt-1">Le nom est géré via le profil adhérent</p>
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input 
               id="email" 
@@ -154,7 +154,7 @@ export default function EditionUserPage() {
               onChange={(e) => setForm({ ...form, email: e.target.value })} 
             />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label htmlFor="name">Nom d'affichage</Label>
             <Input 
               id="name" 
@@ -162,7 +162,7 @@ export default function EditionUserPage() {
               onChange={(e) => setForm({ ...form, name: e.target.value })} 
             />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label>Rôle</Label>
             <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as UserRole })}>
               <SelectTrigger>
@@ -175,7 +175,7 @@ export default function EditionUserPage() {
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="space-y-2">
             <Label>Statut</Label>
             <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as UserStatus })}>
               <SelectTrigger>

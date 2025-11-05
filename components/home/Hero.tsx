@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import HeroImage from "@/public/images/favico_Amaki.jpeg";
+import HeroImage from "@/public/images/amakifav.jpeg";
 import { RegisterButton } from "../auth/register-button";
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Users, Calendar, Award } from "lucide-react";

@@ -10,8 +10,10 @@ import {
   getPaginationRowModel,
   SortingState,
   ColumnFiltersState,
+  VisibilityState,
   useReactTable,
 } from "@tanstack/react-table";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -36,13 +38,15 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAdherentsWithCotisations, createManualCotisation, updateCotisation } from "@/actions/cotisations";
+import { Modal } from "@/components/Modal";
+import { Label } from "@/components/ui/label";
 
 interface AdherentWithCotisations {
   id: string;
   firstname: string;
   lastname: string;
-  email: string;
-  civility: string;
+  email?: string;
+  civility?: string;
   User: {
     id: string;
     email: string;
@@ -69,7 +73,25 @@ export default function AdminCotisationManagement() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [selectedAdherent, setSelectedAdherent] = useState<AdherentWithCotisations | null>(null);
+  
+  // Visibilité des colonnes - charger depuis localStorage
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-cotisations-column-visibility");
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences de colonnes:", error);
+      }
+    }
+    return {};
+  });
   const [showManualForm, setShowManualForm] = useState(false);
+  const [showViewModal, setShowViewModal] = useState(false);
+  const [adherentDetails, setAdherentDetails] = useState<any>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
   const [manualFormData, setManualFormData] = useState({
     type: "Forfait",
     montant: 15,
@@ -86,10 +108,10 @@ export default function AdminCotisationManagement() {
     try {
       setLoading(true);
       const result = await getAdherentsWithCotisations();
-      if (result.success) {
-        setAdherents(result.data);
+      if (result.success && result.data) {
+        setAdherents(result.data as unknown as AdherentWithCotisations[]);
       } else {
-        toast.error(result.error);
+        toast.error(result.error || "Erreur lors du chargement");
       }
     } catch (error) {
       toast.error("Erreur lors du chargement des adhérents");
@@ -116,7 +138,6 @@ export default function AdminCotisationManagement() {
                 <p className="font-medium text-gray-900 dark:text-white">
                   {adherent.civility} {adherent.firstname} {adherent.lastname}
                 </p>
-                <p className="text-sm text-gray-500">{adherent.User.email}</p>
               </div>
             </div>
           );
@@ -204,28 +225,9 @@ export default function AdminCotisationManagement() {
         },
       },
       {
-        accessorKey: "lastLogin",
-        header: "Dernière Connexion",
-        cell: ({ row }) => {
-          const adherent = row.original;
-          const lastLogin = adherent.User.lastLogin;
-          return (
-            <div className="text-sm text-gray-500">
-              {lastLogin ? (
-                <div className="flex items-center space-x-1">
-                  <Calendar className="h-3 w-3" />
-                  <span>{new Date(lastLogin).toLocaleDateString('fr-FR')}</span>
-                </div>
-              ) : (
-                <span className="text-gray-400">Jamais</span>
-              )}
-            </div>
-          );
-        },
-      },
-      {
         id: "actions",
         header: "Actions",
+        meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
         cell: ({ row }) => {
           const adherent = row.original;
           return (
@@ -245,7 +247,24 @@ export default function AdminCotisationManagement() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setSelectedAdherent(adherent)}
+                onClick={async () => {
+                  setLoadingDetails(true);
+                  setShowViewModal(true);
+                  try {
+                    // Récupérer les détails complets de l'adhérent
+                    const result = await getAdherentsWithCotisations();
+                    if (result.success && result.data) {
+                      const found = (result.data as unknown as AdherentWithCotisations[]).find(a => a.id === adherent.id);
+                      if (found) {
+                        setAdherentDetails(found);
+                      }
+                    }
+                  } catch (error) {
+                    toast.error("Erreur lors du chargement des détails");
+                  } finally {
+                    setLoadingDetails(false);
+                  }
+                }}
                 className="text-green-600 hover:text-green-700"
               >
                 <Eye className="h-3 w-3 mr-1" />
@@ -279,10 +298,20 @@ export default function AdminCotisationManagement() {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(newVisibility);
+      try {
+        localStorage.setItem("admin-cotisations-column-visibility", JSON.stringify(newVisibility));
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde des préférences:", error);
+      }
+    },
     state: {
       sorting,
       columnFilters,
       globalFilter,
+      columnVisibility,
     },
   });
 
@@ -419,7 +448,94 @@ export default function AdminCotisationManagement() {
               </CardDescription>
             </div>
             <div className="flex items-center space-x-2">
-              <Button variant="outline" size="sm">
+              <ColumnVisibilityToggle 
+                table={table} 
+                storageKey="admin-cotisations-column-visibility"
+              />
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={async () => {
+                  try {
+                    toast.loading("Génération du PDF en cours...");
+                    // Import dynamique de jsPDF et des helpers
+                    const { default: jsPDF } = await import('jspdf');
+                    const { addPDFHeader, addPDFFooter } = await import('@/lib/pdf-helpers-client');
+                    const doc = new jsPDF();
+                    
+                    // Ajouter l'en-tête avec logo sur la première page uniquement
+                    await addPDFHeader(doc, 'Rapport des Cotisations - Tous les Adhérents');
+                    
+                    let yPos = 60; // Commencer après l'en-tête
+                    
+                    // Date de génération
+                    doc.setFontSize(12);
+                    doc.setTextColor(100, 100, 100);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text(`Date de génération: ${new Date().toLocaleDateString('fr-FR')}`, 20, yPos);
+                    yPos += 10;
+                    
+                    // En-têtes du tableau
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('Adhérent', 20, yPos);
+                    doc.text('Dette Totale', 100, yPos);
+                    doc.text('Mois Retard', 140, yPos);
+                    doc.text('Statut', 170, yPos);
+                    yPos += 8;
+                    
+                    // Ligne de séparation
+                    doc.setDrawColor(200, 200, 200);
+                    doc.line(20, yPos, 190, yPos);
+                    yPos += 5;
+                    
+                    // Données
+                    doc.setFont('helvetica', 'normal');
+                    adherents.forEach((adherent) => {
+                      if (yPos > 250) { // Réduit pour laisser de la place au pied de page
+                        doc.addPage();
+                        yPos = 20; // Pas d'en-tête sur les pages suivantes
+                      }
+                      
+                      doc.setFontSize(9);
+                      doc.text(`${adherent.civility || ''} ${adherent.firstname} ${adherent.lastname}`.trim(), 20, yPos);
+                      doc.text(`${adherent.totalDette.toFixed(2).replace('.', ',')} €`, 100, yPos);
+                      doc.text(`${adherent.moisDeRetard}`, 140, yPos);
+                      doc.setTextColor(adherent.enRetard ? 255 : 0, adherent.enRetard ? 0 : 200, 0);
+                      doc.text(adherent.enRetard ? 'En retard' : 'À jour', 170, yPos);
+                      doc.setTextColor(0, 0, 0);
+                      yPos += 7;
+                    });
+                    
+                    // Totaux
+                    yPos += 5;
+                    doc.setDrawColor(200, 200, 200);
+                    doc.line(20, yPos, 190, yPos);
+                    yPos += 5;
+                    
+                    doc.setFont('helvetica', 'bold');
+                    doc.setFontSize(10);
+                    doc.text(`Total adhérents: ${adherents.length}`, 20, yPos);
+                    yPos += 6;
+                    doc.text(`En retard: ${adherentsEnRetard}`, 20, yPos);
+                    yPos += 6;
+                    doc.text(`Total dettes: ${totalDettes.toFixed(2).replace('.', ',')} €`, 20, yPos);
+                    
+                    // Ajouter le pied de page sur toutes les pages
+                    addPDFFooter(doc);
+                    
+                    // Télécharger le PDF
+                    doc.save(`cotisations_rapport_${new Date().toISOString().split('T')[0]}.pdf`);
+                    toast.dismiss();
+                    toast.success("PDF exporté avec succès");
+                  } catch (error) {
+                    console.error("Erreur lors de l'export PDF:", error);
+                    toast.dismiss();
+                    toast.error("Erreur lors de l'export PDF");
+                  }
+                }}
+              >
                 <Download className="h-4 w-4 mr-2" />
                 Exporter PDF
               </Button>
@@ -610,6 +726,130 @@ export default function AdminCotisationManagement() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {/* Modal de consultation */}
+      {showViewModal && (
+        <Modal 
+          title="Détails de l'adhérent" 
+          confirmOnClose={false}
+          showClose={true}
+          onCancel={() => {
+            setShowViewModal(false);
+            setAdherentDetails(null);
+          }}
+        >
+          {loadingDetails ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : adherentDetails ? (
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label>Nom complet</Label>
+                  <div className="text-sm mt-1">
+                    {adherentDetails.civility} {adherentDetails.firstname} {adherentDetails.lastname}
+                  </div>
+                </div>
+                <div>
+                  <Label>Email</Label>
+                  <div className="text-sm mt-1">{adherentDetails.User.email}</div>
+                </div>
+                <div>
+                  <Label>Statut</Label>
+                  <div className="text-sm mt-1">
+                    <Badge 
+                      className={
+                        adherentDetails.User.status === "Actif" 
+                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
+                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                      }
+                    >
+                      {adherentDetails.User.status}
+                    </Badge>
+                  </div>
+                </div>
+                <div>
+                  <Label>Dette totale</Label>
+                  <div className={`text-sm mt-1 font-bold ${adherentDetails.totalDette > 0 ? 'text-red-600' : 'text-green-600'}`}>
+                    {adherentDetails.totalDette.toFixed(2).replace('.', ',')} €
+                  </div>
+                </div>
+                <div>
+                  <Label>Mois de retard</Label>
+                  <div className="text-sm mt-1">
+                    {adherentDetails.moisDeRetard > 0 ? (
+                      <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                        {adherentDetails.moisDeRetard} mois
+                      </Badge>
+                    ) : (
+                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                        À jour
+                      </Badge>
+                    )}
+                  </div>
+                </div>
+                <div>
+                  <Label>Montant forfait</Label>
+                  <div className="text-sm mt-1">
+                    {adherentDetails.montantForfait.toFixed(2).replace('.', ',')} €
+                  </div>
+                </div>
+                <div>
+                  <Label>Montant occasionnel</Label>
+                  <div className="text-sm mt-1">
+                    {adherentDetails.montantOccasionnel.toFixed(2).replace('.', ',')} €
+                  </div>
+                </div>
+                <div>
+                  <Label>Nombre de cotisations</Label>
+                  <div className="text-sm mt-1">
+                    {adherentDetails._count.Cotisations}
+                  </div>
+                </div>
+              </div>
+              
+              {adherentDetails.Cotisations && adherentDetails.Cotisations.length > 0 && (
+                <div className="mt-6">
+                  <Label className="text-base font-semibold">Dernières cotisations</Label>
+                  <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
+                    {adherentDetails.Cotisations.map((cotisation: any, index: number) => (
+                      <Card key={index} className="p-3">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="font-medium">{cotisation.type}</div>
+                            <div className="text-sm text-gray-500">
+                              {new Date(cotisation.dateCotisation).toLocaleDateString('fr-FR')}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className="font-bold">{Number(cotisation.montant).toFixed(2).replace('.', ',')} €</div>
+                            <Badge 
+                              className={
+                                cotisation.statut === 'Valide' 
+                                  ? 'bg-green-100 text-green-800' 
+                                  : cotisation.statut === 'EnAttente'
+                                  ? 'bg-yellow-100 text-yellow-800'
+                                  : 'bg-red-100 text-red-800'
+                              }
+                            >
+                              {cotisation.statut}
+                            </Badge>
+                          </div>
+                        </div>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-gray-500">
+              Aucune donnée disponible
+            </div>
+          )}
+        </Modal>
       )}
     </div>
   );

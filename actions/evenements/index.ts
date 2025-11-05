@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { writeFile, mkdirSync, existsSync } from "fs";
 import { writeFile as writeFilePromise } from "fs/promises";
 import { join } from "path";
-import { sendVisiteurInscriptionEmail } from "@/lib/mail";
+import { sendVisiteurInscriptionEmail, sendAdherentInscriptionConfirmationEmail, sendVisiteurInscriptionConfirmationEmail } from "@/lib/mail";
 
 // Schémas de validation
 const EvenementSchema = z.object({
@@ -44,6 +44,7 @@ const InscriptionVisiteurSchema = z.object({
   nom: z.string().min(1, "Le nom est requis"),
   email: z.string().email("Email invalide"),
   telephone: z.string().min(1, "Le téléphone est requis"),
+  adresse: z.string().min(1, "L'adresse est requise"),
   nombrePersonnes: z.number().min(1, "Au moins une personne doit être inscrite"),
   commentaires: z.string().optional(),
 });
@@ -482,18 +483,25 @@ export async function getEvenementById(id: string) {
 // Server Actions pour les inscriptions
 
 /**
- * S'inscrire à un événement
+ * S'inscrire à un événement (public, pour adhérents connectés)
  */
 export async function inscrireEvenement(data: z.infer<typeof InscriptionEvenementSchema>) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
-      return { success: false, error: "Vous devez être connecté pour vous inscrire" };
+      return { success: false, error: "Vous devez être connecté pour vous inscrire en tant qu'adhérent" };
     }
 
     // Récupérer l'adhérent
     const adherent = await prisma.adherent.findUnique({
       where: { userId: session.user.id },
+      include: {
+        User: {
+          select: {
+            email: true,
+          }
+        }
+      }
     });
 
     if (!adherent) {
@@ -554,6 +562,21 @@ export async function inscrireEvenement(data: z.infer<typeof InscriptionEvenemen
         },
       },
     });
+
+    // Envoyer un email de confirmation à l'adhérent
+    try {
+      await sendAdherentInscriptionConfirmationEmail(
+        adherent.User.email,
+        `${adherent.civility || ''} ${adherent.firstname} ${adherent.lastname}`.trim(),
+        evenement.titre,
+        evenement.dateDebut,
+        evenement.lieu,
+        validatedData.nombrePersonnes
+      );
+    } catch (emailError) {
+      console.error("Erreur lors de l'envoi de l'email de confirmation:", emailError);
+      // Ne pas bloquer l'inscription si l'email échoue
+    }
 
     revalidatePath("/evenements");
     revalidatePath("/user/profile");
@@ -857,6 +880,7 @@ export async function inscrireVisiteurEvenement(data: z.infer<typeof Inscription
         visiteurNom: validatedData.nom,
         visiteurEmail: validatedData.email,
         visiteurTelephone: validatedData.telephone,
+        visiteurAdresse: validatedData.adresse,
         nombrePersonnes: validatedData.nombrePersonnes,
         commentaires: validatedData.commentaires,
         statut: "EnAttente", // En attente de confirmation par l'admin
@@ -880,12 +904,28 @@ export async function inscrireVisiteurEvenement(data: z.infer<typeof Inscription
         validatedData.nom,
         validatedData.email,
         validatedData.telephone,
+        validatedData.adresse,
         validatedData.nombrePersonnes,
         validatedData.commentaires
       );
     } catch (emailError) {
-      console.error("Erreur lors de l'envoi de l'email:", emailError);
-      // Ne pas bloquer l'inscription si l'email échoue, mais logger l'erreur
+      console.error("Erreur lors de l'envoi de l'email à l'admin:", emailError);
+      // Ne pas bloquer l'inscription si l'email échoue
+    }
+
+    // Envoyer un email de confirmation au visiteur
+    try {
+      await sendVisiteurInscriptionConfirmationEmail(
+        validatedData.email,
+        validatedData.nom,
+        evenement.titre,
+        evenement.dateDebut,
+        evenement.lieu,
+        validatedData.nombrePersonnes
+      );
+    } catch (emailError) {
+      console.error("Erreur lors de l'envoi de l'email de confirmation:", emailError);
+      // Ne pas bloquer l'inscription si l'email échoue
     }
 
     revalidatePath(`/evenements/${validatedData.evenementId}`);
@@ -893,7 +933,7 @@ export async function inscrireVisiteurEvenement(data: z.infer<typeof Inscription
 
     return { 
       success: true, 
-      message: "Votre inscription a été enregistrée avec succès. Vous recevrez une confirmation par email une fois votre inscription validée par l'administrateur." 
+      message: "Votre inscription a été enregistrée avec succès. Un email de confirmation vous a été envoyé." 
     };
   } catch (error) {
     console.error("Erreur lors de l'inscription du visiteur:", error);

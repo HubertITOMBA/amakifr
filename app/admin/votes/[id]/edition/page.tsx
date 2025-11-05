@@ -125,19 +125,19 @@ export default function EditionVotePage() {
     >
       <div className="space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
+          <div className="space-y-2">
             <Label>Adhérent</Label>
             <Input value={vote.adherent?.User?.name || vote.adherent?.User?.email || ""} disabled />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label>Élection</Label>
             <Input value={vote.election?.titre || ""} disabled />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label>Poste</Label>
             <Input value={vote.position?.titre || ""} disabled />
           </div>
-          <div>
+          <div className="space-y-2">
             <Label>Candidat (changer)</Label>
             <Input placeholder="Rechercher un candidat..." className="mb-2" value={candidacySearch} onChange={(e) => setCandidacySearch(e.target.value)} />
             <Select value={form.candidacyId || ""} onValueChange={(v) => setForm({ ...form, candidacyId: v || null })}>
@@ -152,7 +152,7 @@ export default function EditionVotePage() {
               </SelectContent>
             </Select>
           </div>
-          <div>
+          <div className="space-y-2">
             <Label>Statut du vote</Label>
             <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v })}>
               <SelectTrigger>

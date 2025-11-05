@@ -9,7 +9,8 @@ import { Receipt, Euro, Plus, Eye, Edit, Trash2, DollarSign } from "lucide-react
 import Link from "next/link";
 import { getAllDepenses, deleteDepense, getDepenseStats } from "@/actions/depenses";
 import { toast } from "sonner";
-import { createColumnHelper, flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, useReactTable, SortingState, ColumnFiltersState } from "@tanstack/react-table";
+import { createColumnHelper, flexRender, getCoreRowModel, getFilteredRowModel, getSortedRowModel, useReactTable, SortingState, ColumnFiltersState, VisibilityState } from "@tanstack/react-table";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 
 interface Depense {
   id: string;
@@ -47,6 +48,21 @@ export default function AdminDepensesPage() {
   const [search, setSearch] = useState("");
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  
+  // Visibilité des colonnes - charger depuis localStorage
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-depenses-column-visibility");
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences de colonnes:", error);
+      }
+    }
+    return {};
+  });
 
   const loadAll = async () => {
     const res = await getAllDepenses();
@@ -99,6 +115,7 @@ export default function AdminDepensesPage() {
     columnHelper.display({
       id: "actions",
       header: "Actions",
+      meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
       cell: ({ row }) => {
         const d = row.original;
         return (
@@ -139,7 +156,16 @@ export default function AdminDepensesPage() {
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
-    state: { sorting, columnFilters },
+    onColumnVisibilityChange: (updater) => {
+      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(newVisibility);
+      try {
+        localStorage.setItem("admin-depenses-column-visibility", JSON.stringify(newVisibility));
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde des préférences:", error);
+      }
+    },
+    state: { sorting, columnFilters, columnVisibility },
   });
 
   return (
@@ -152,6 +178,10 @@ export default function AdminDepensesPage() {
               Gestion des Dépenses
             </span>
             <div className="flex items-center gap-2">
+              <ColumnVisibilityToggle 
+                table={table} 
+                storageKey="admin-depenses-column-visibility"
+              />
               <Input placeholder="Rechercher..." value={search} onChange={(e) => setSearch(e.target.value)} className="w-56" />
               <Link href="/admin/depenses/gestion">
                 <Button>

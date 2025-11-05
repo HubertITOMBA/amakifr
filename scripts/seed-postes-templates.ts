@@ -25,10 +25,10 @@ async function seedPostesTemplates() {
       return;
     }
 
-    // Mapping des postes existants
+    // Mapping des postes existants avec codes de 6 caractères
     const postesToCreate = [
       {
-        code: "president",
+        code: "PRESID",
         libelle: "Président",
         description: "Responsable de la direction de l'association",
         ordre: 1,
@@ -36,7 +36,7 @@ async function seedPostesTemplates() {
         dureeMandatDefaut: 24,
       },
       {
-        code: "vice_president",
+        code: "VICEPR",
         libelle: "Vice-Président",
         description: "Assiste le président dans ses fonctions",
         ordre: 2,
@@ -44,7 +44,7 @@ async function seedPostesTemplates() {
         dureeMandatDefaut: 24,
       },
       {
-        code: "secretaire",
+        code: "SECRET",
         libelle: "Secrétaire",
         description: "Gère l'administration et la communication de l'association",
         ordre: 3,
@@ -52,7 +52,7 @@ async function seedPostesTemplates() {
         dureeMandatDefaut: 24,
       },
       {
-        code: "vice_secretaire",
+        code: "VICESE",
         libelle: "Vice-Secrétaire",
         description: "Assiste le secrétaire dans ses fonctions",
         ordre: 4,
@@ -60,7 +60,7 @@ async function seedPostesTemplates() {
         dureeMandatDefaut: 24,
       },
       {
-        code: "tresorier",
+        code: "TRESOR",
         libelle: "Trésorier",
         description: "Gère les finances de l'association",
         ordre: 5,
@@ -68,7 +68,7 @@ async function seedPostesTemplates() {
         dureeMandatDefaut: 24,
       },
       {
-        code: "vice_tresorier",
+        code: "VICETR",
         libelle: "Vice-Trésorier",
         description: "Assiste le trésorier dans ses fonctions",
         ordre: 6,
@@ -76,7 +76,7 @@ async function seedPostesTemplates() {
         dureeMandatDefaut: 24,
       },
       {
-        code: "commissaire_comptes",
+        code: "COMCPT",
         libelle: "Commissaire aux comptes",
         description: "Contrôle les comptes de l'association",
         ordre: 7,
@@ -84,7 +84,7 @@ async function seedPostesTemplates() {
         dureeMandatDefaut: 24,
       },
       {
-        code: "membre_comite_directeur",
+        code: "MEMCDI",
         libelle: "Membre du comité directeur",
         description: "Membre du comité directeur de l'association",
         ordre: 8,

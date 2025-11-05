@@ -212,6 +212,7 @@ export const sendVisiteurInscriptionEmail = async(
   visiteurNom: string,
   visiteurEmail: string,
   visiteurTelephone: string,
+  visiteurAdresse: string,
   nombrePersonnes: number,
   commentaires?: string
 ) => {
@@ -229,6 +230,7 @@ export const sendVisiteurInscriptionEmail = async(
       <p style="margin: 10px 0;"><strong>Nom :</strong> ${visiteurNom}</p>
       <p style="margin: 10px 0;"><strong>Email :</strong> <a href="mailto:${visiteurEmail}" style="color: #4a90e2;">${visiteurEmail}</a></p>
       <p style="margin: 10px 0;"><strong>Téléphone :</strong> <a href="tel:${visiteurTelephone}" style="color: #4a90e2;">${visiteurTelephone}</a></p>
+      <p style="margin: 10px 0;"><strong>Adresse :</strong> ${visiteurAdresse}</p>
       <p style="margin: 10px 0;"><strong>Nombre de personnes :</strong> ${nombrePersonnes}</p>
       ${commentaires ? `<p style="margin: 10px 0;"><strong>Commentaires :</strong><br /><div style="background-color: #f9f9f9; padding: 10px; border-radius: 5px; margin-top: 5px; white-space: pre-wrap; color: #666;">${commentaires}</div></p>` : ''}
     </div>
@@ -378,6 +380,281 @@ export const sendUserStatusEmail = async(
     from: 'noreply@amaki.fr',
     to: email,
     subject: `Statut de votre compte AMAKI France`,
+    html: wrapEmailContent(content)
+  });
+
+  if (error) {
+    console.log("RESEND_ERROR", error);
+    throw error;
+  }
+}
+
+/**
+ * Envoyer un email de confirmation d'inscription à un événement pour un adhérent
+ */
+export const sendAdherentInscriptionConfirmationEmail = async(
+  email: string,
+  adherentNom: string,
+  evenementTitre: string,
+  evenementDateDebut: Date,
+  evenementLieu?: string | null,
+  nombrePersonnes: number = 1
+) => {
+  const dateDebut = new Date(evenementDateDebut).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Confirmation d'inscription</h1>
+    
+    <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+      <h2 style="color: #333; margin-top: 0;">Votre inscription a été confirmée !</h2>
+      <p style="color: #666; margin: 10px 0;">Nous avons bien reçu votre demande d'inscription à l'événement.</p>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 10px;">Détails de votre inscription</h3>
+      <p style="margin: 10px 0;"><strong>Adhérent :</strong> ${adherentNom}</p>
+      <p style="margin: 10px 0;"><strong>Événement :</strong> ${evenementTitre}</p>
+      <p style="margin: 10px 0;"><strong>Date :</strong> ${dateDebut}</p>
+      ${evenementLieu ? `<p style="margin: 10px 0;"><strong>Lieu :</strong> ${evenementLieu}</p>` : ''}
+      <p style="margin: 10px 0;"><strong>Nombre de personnes :</strong> ${nombrePersonnes}</p>
+    </div>
+    
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <p style="margin: 0; color: #666;"><strong>Rappel :</strong> Nous vous rappelons la date et l'heure de l'événement. N'hésitez pas à nous contacter si vous avez des questions.</p>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Pour toute question, n'hésitez pas à nous contacter.
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  const { error } = await resend.emails.send({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: `Confirmation d'inscription : ${evenementTitre}`,
+    html: wrapEmailContent(content)
+  });
+
+  if (error) {
+    console.log("RESEND_ERROR", error);
+    throw error;
+  }
+}
+
+/**
+ * Envoyer un email de confirmation d'inscription à un événement pour un visiteur
+ */
+export const sendVisiteurInscriptionConfirmationEmail = async(
+  email: string,
+  visiteurNom: string,
+  evenementTitre: string,
+  evenementDateDebut: Date,
+  evenementLieu?: string | null,
+  nombrePersonnes: number = 1
+) => {
+  const dateDebut = new Date(evenementDateDebut).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Confirmation d'inscription</h1>
+    
+    <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+      <h2 style="color: #333; margin-top: 0;">Votre inscription a été enregistrée !</h2>
+      <p style="color: #666; margin: 10px 0;">Nous avons bien reçu votre demande d'inscription à l'événement.</p>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 10px;">Détails de votre inscription</h3>
+      <p style="margin: 10px 0;"><strong>Nom :</strong> ${visiteurNom}</p>
+      <p style="margin: 10px 0;"><strong>Événement :</strong> ${evenementTitre}</p>
+      <p style="margin: 10px 0;"><strong>Date :</strong> ${dateDebut}</p>
+      ${evenementLieu ? `<p style="margin: 10px 0;"><strong>Lieu :</strong> ${evenementLieu}</p>` : ''}
+      <p style="margin: 10px 0;"><strong>Nombre de personnes :</strong> ${nombrePersonnes}</p>
+    </div>
+    
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+      <p style="margin: 0; color: #856404;"><strong>Note importante :</strong> Votre inscription est en attente de confirmation par notre équipe. Vous recevrez un email de confirmation une fois votre inscription validée.</p>
+    </div>
+    
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <p style="margin: 0; color: #666;"><strong>Rappel :</strong> Nous vous rappelons la date et l'heure de l'événement. N'hésitez pas à nous contacter si vous avez des questions.</p>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Pour toute question, n'hésitez pas à nous contacter.
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  const { error } = await resend.emails.send({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: `Confirmation d'inscription : ${evenementTitre}`,
+    html: wrapEmailContent(content)
+  });
+
+  if (error) {
+    console.log("RESEND_ERROR", error);
+    throw error;
+  }
+}
+
+/**
+ * Envoyer un email personnalisé à un utilisateur
+ */
+export const sendCustomEmailToUsers = async(
+  email: string,
+  userName: string,
+  subject: string,
+  body: string
+) => {
+  // Convertir les retours à la ligne en HTML
+  const bodyHtml = body
+    .split('\n')
+    .map(line => line.trim() === '' ? '<br/>' : `<p style="margin: 10px 0; color: #333;">${line}</p>`)
+    .join('');
+
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Message de l'association AMAKI France</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${userName},</p>
+    </div>
+    
+    <div style="margin-bottom: 20px; background-color: #f9f9f9; padding: 20px; border-radius: 5px; border-left: 4px solid #4a90e2;">
+      ${bodyHtml}
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Pour toute question, n'hésitez pas à nous contacter.
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email vous a été envoyé par l'administration de l'association AMAKI France.
+    </p>
+  `;
+
+  const { error } = await resend.emails.send({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: subject,
+    html: wrapEmailContent(content)
+  });
+
+  if (error) {
+    console.log("RESEND_ERROR", error);
+    throw error;
+  }
+}
+
+/**
+ * Envoyer un email d'invitation à un événement
+ */
+export const sendEventInvitationEmail = async(
+  email: string,
+  userName: string,
+  evenementTitre: string,
+  evenementDescription: string,
+  dateDebut: Date,
+  dateFin: Date | null,
+  lieu: string | null,
+  adresse: string | null
+) => {
+  const dateDebutFormatted = new Date(dateDebut).toLocaleDateString('fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+
+  const dateFinFormatted = dateFin 
+    ? new Date(dateFin).toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })
+    : null;
+
+  // Créer le lien Google Maps
+  let googleMapsLink = "";
+  if (adresse || lieu) {
+    const addressForMaps = adresse || lieu || "";
+    // Encoder l'adresse pour l'URL
+    const encodedAddress = encodeURIComponent(addressForMaps);
+    googleMapsLink = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
+  }
+
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Invitation à un événement</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${userName},</p>
+      <p style="margin: 10px 0; color: #666;">Nous avons le plaisir de vous inviter à notre événement.</p>
+    </div>
+    
+    <div style="background-color: #f0f7ff; padding: 20px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <h2 style="color: #333; margin-top: 0; font-size: 20px;">${evenementTitre}</h2>
+      <div style="margin-top: 15px; color: #666;">
+        ${evenementDescription ? `<p style="margin: 10px 0;">${evenementDescription}</p>` : ''}
+        
+        <div style="margin-top: 15px;">
+          <p style="margin: 8px 0;"><strong>📅 Date de début :</strong> ${dateDebutFormatted}</p>
+          ${dateFinFormatted ? `<p style="margin: 8px 0;"><strong>📅 Date de fin :</strong> ${dateFinFormatted}</p>` : ''}
+          ${lieu ? `<p style="margin: 8px 0;"><strong>📍 Lieu :</strong> ${lieu}</p>` : ''}
+          ${adresse ? `<p style="margin: 8px 0;"><strong>📍 Adresse :</strong> ${adresse}</p>` : ''}
+        </div>
+      </div>
+    </div>
+    
+    ${googleMapsLink ? `
+    <div style="margin-bottom: 20px; text-align: center;">
+      <a href="${googleMapsLink}" 
+         target="_blank" 
+         rel="noopener noreferrer"
+         style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px;">
+        🗺️ Obtenir l'itinéraire : cliquez ici
+      </a>
+    </div>
+    ` : ''}
+    
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+      <p style="margin: 0; color: #856404;"><strong>💡 Note :</strong> Vous pouvez vous inscrire à cet événement en vous connectant à votre espace membre sur le site de l'association.</p>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Nous espérons vous voir nombreux à cet événement !
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email vous a été envoyé par l'administration de l'association AMAKI France.
+    </p>
+  `;
+
+  const { error } = await resend.emails.send({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: `Invitation : ${evenementTitre}`,
     html: wrapEmailContent(content)
   });
 

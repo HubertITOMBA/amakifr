@@ -14,7 +14,8 @@ import {
   Shield,
   UserCheck,
   UserX,
-  Plus
+  Plus,
+  Mail
 } from "lucide-react";
 import { UserRole, UserStatus } from "@prisma/client";
 import { 
@@ -25,6 +26,7 @@ import {
   SortingState,
   getFilteredRowModel,
   ColumnFiltersState,
+  VisibilityState,
 } from "@tanstack/react-table";
 import { 
   getAllUsersForAdmin,
@@ -34,6 +36,9 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 import { DataTable } from "@/components/admin/DataTable";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+import { SendEmailModal } from "@/components/admin/SendEmailModal";
+import { Checkbox } from "@/components/ui/checkbox";
 
 type UserData = {
   id: string;
@@ -119,6 +124,23 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
+  const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  
+  // Visibilité des colonnes - charger depuis localStorage
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-users-column-visibility");
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences de colonnes:", error);
+      }
+    }
+    return {};
+  });
 
   // Debounce pour la recherche
   useEffect(() => {
@@ -189,6 +211,28 @@ export default function AdminUsersPage() {
 
   // Colonnes du tableau
   const columns = useMemo(() => [
+    columnHelper.display({
+      id: "select",
+      header: ({ table }) => (
+        <Checkbox
+          checked={table.getIsAllPageRowsSelected()}
+          onCheckedChange={(value) => {
+            table.toggleAllPageRowsSelected(!!value);
+          }}
+          aria-label="Sélectionner tout"
+        />
+      ),
+      cell: ({ row }) => (
+        <Checkbox
+          checked={row.getIsSelected()}
+          onCheckedChange={(value) => {
+            row.toggleSelected(!!value);
+          }}
+          aria-label="Sélectionner la ligne"
+        />
+      ),
+      meta: { forceVisible: true },
+    }),
     columnHelper.accessor((row) => {
       return row.adherent 
         ? `${row.adherent.civility || ''} ${row.adherent.firstname || ''} ${row.adherent.lastname || ''}`.trim()
@@ -264,6 +308,7 @@ export default function AdminUsersPage() {
     columnHelper.display({
       id: "actions",
       header: "Actions",
+      meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
       cell: ({ row }) => {
         const user = row.original;
         return (
@@ -307,7 +352,9 @@ export default function AdminUsersPage() {
         );
       },
     }),
-  ], [handleRoleChange, handleStatusChange]);
+  ], [handleRoleChange, handleStatusChange, filteredUsers]);
+
+  const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
   const table = useReactTable({
     data: filteredUsers,
@@ -315,11 +362,29 @@ export default function AdminUsersPage() {
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    enableRowSelection: true,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
-    state: { sorting, columnFilters, globalFilter },
+    onRowSelectionChange: setRowSelection,
+    onColumnVisibilityChange: (updater) => {
+      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(newVisibility);
+      try {
+        localStorage.setItem("admin-users-column-visibility", JSON.stringify(newVisibility));
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde des préférences:", error);
+      }
+    },
+    state: { sorting, columnFilters, globalFilter, columnVisibility, rowSelection },
   });
+
+  // Synchroniser selectedUserIds avec rowSelection
+  useEffect(() => {
+    const selectedRows = table.getSelectedRowModel().rows;
+    const ids = selectedRows.map(row => row.original.id);
+    setSelectedUserIds(ids);
+  }, [rowSelection, table]);
 
   // Statistiques
   const stats = useMemo(() => {
@@ -346,12 +411,24 @@ export default function AdminUsersPage() {
             Gérez les membres de l'association
           </p>
         </div>
-        <Link href="/admin/users/gestion">
-          <Button className="flex items-center space-x-2">
-            <Plus className="h-4 w-4" />
-            <span>Ajouter un adhérent</span>
-          </Button>
-        </Link>
+        <div className="flex items-center gap-2">
+          {selectedUserIds.length > 0 && (
+            <Button 
+              variant="default" 
+              className="flex items-center space-x-2"
+              onClick={() => setIsEmailModalOpen(true)}
+            >
+              <Mail className="h-4 w-4" />
+              <span>Envoyer un email ({selectedUserIds.length})</span>
+            </Button>
+          )}
+          <Link href="/admin/users/gestion">
+            <Button className="flex items-center space-x-2">
+              <Plus className="h-4 w-4" />
+              <span>Ajouter un adhérent</span>
+            </Button>
+          </Link>
+        </div>
       </div>
 
       {/* Stats Cards */}
@@ -416,10 +493,16 @@ export default function AdminUsersPage() {
       {/* Table */}
       <Card>
         <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Users className="h-5 w-5" />
-            Liste des Adhérents
-          </CardTitle>
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <Users className="h-5 w-5" />
+              Liste des Adhérents
+            </CardTitle>
+            <ColumnVisibilityToggle 
+              table={table} 
+              storageKey="admin-users-column-visibility"
+            />
+          </div>
         </CardHeader>
         <CardContent>
           {/* Filtres */}
@@ -470,6 +553,21 @@ export default function AdminUsersPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Modal d'envoi d'email */}
+      <SendEmailModal
+        open={isEmailModalOpen}
+        onOpenChange={(open) => {
+          setIsEmailModalOpen(open);
+          if (!open) {
+            setSelectedUserIds([]);
+            // Désélectionner toutes les lignes du tableau
+            table.toggleAllPageRowsSelected(false);
+          }
+        }}
+        selectedUserIds={selectedUserIds}
+        selectedUsersCount={selectedUserIds.length}
+      />
     </div>
   );
 }

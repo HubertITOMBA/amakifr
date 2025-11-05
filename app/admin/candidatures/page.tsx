@@ -16,6 +16,7 @@ import {
   SortingState,
   getFilteredRowModel,
   ColumnFiltersState,
+  VisibilityState,
 } from "@tanstack/react-table";
 import { 
   getAllCandidaciesForAdmin, 
@@ -25,6 +26,7 @@ import { POSTES_LABELS } from "@/lib/elections-constants";
 import Link from "next/link";
 import { toast } from "sonner";
 import { DataTable } from "@/components/admin/DataTable";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 
 type CandidacyData = {
   id: string;
@@ -86,6 +88,21 @@ export default function AdminCandidaturesPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [electionFilter, setElectionFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  
+  // Visibilité des colonnes - charger depuis localStorage
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-candidatures-column-visibility");
+        if (saved) {
+          return JSON.parse(saved);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences de colonnes:", error);
+      }
+    }
+    return {};
+  });
 
   // Debounce pour la recherche
   useEffect(() => {
@@ -205,6 +222,7 @@ export default function AdminCandidaturesPage() {
     columnHelper.display({
       id: "actions",
       header: "Actions",
+      meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
       cell: ({ row }) => {
         const c = row.original as any;
         return (
@@ -244,7 +262,16 @@ export default function AdminCandidaturesPage() {
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,
-    state: { sorting, columnFilters, globalFilter },
+    onColumnVisibilityChange: (updater) => {
+      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(newVisibility);
+      try {
+        localStorage.setItem("admin-candidatures-column-visibility", JSON.stringify(newVisibility));
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde des préférences:", error);
+      }
+    },
+    state: { sorting, columnFilters, globalFilter, columnVisibility },
   });
 
   return (
@@ -255,12 +282,18 @@ export default function AdminCandidaturesPage() {
             <Users className="h-5 w-5 mr-2" />
             Candidatures
           </CardTitle>
-          <Link href="/admin/candidatures/gestion">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Nouvelle candidature
-            </Button>
-          </Link>
+          <div className="flex items-center gap-2">
+            <ColumnVisibilityToggle 
+              table={table} 
+              storageKey="admin-candidatures-column-visibility"
+            />
+            <Link href="/admin/candidatures/gestion">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nouvelle candidature
+              </Button>
+            </Link>
+          </div>
         </CardHeader>
         <CardContent>
           {/* Filtres */}

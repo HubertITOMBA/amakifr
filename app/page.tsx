@@ -34,44 +34,7 @@ export default function Home() {
           <Hero />
         </motion.div>
         
-        {/* Carousel Section with decorative frame */}
-        <section className="py-20 relative">
-          {/* Decorative frame elements */}
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-white/50 to-white dark:via-slate-900/50 dark:to-slate-900" />
-          
-          {/* Top decorative border */}
-          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-blue-400/40 dark:via-blue-600/20 to-transparent opacity-30" />
-          
-          <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-            {/* Frame wrapper with decorative border */}
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.6 }}
-              className="relative"
-            >
-              {/* Decorative corner elements - couleurs plus subtiles */}
-              <div className="absolute -top-4 -left-4 w-20 h-20 border-t-4 border-l-4 border-blue-400/30 dark:border-blue-600/20 rounded-tl-3xl opacity-50" />
-              <div className="absolute -top-4 -right-4 w-20 h-20 border-t-4 border-r-4 border-indigo-400/30 dark:border-indigo-600/20 rounded-tr-3xl opacity-50" />
-              <div className="absolute -bottom-4 -left-4 w-20 h-20 border-b-4 border-l-4 border-purple-400/30 dark:border-purple-600/20 rounded-bl-3xl opacity-50" />
-              <div className="absolute -bottom-4 -right-4 w-20 h-20 border-b-4 border-r-4 border-pink-400/30 dark:border-pink-600/20 rounded-br-3xl opacity-50" />
-              
-              {/* Content with frame border - gradient wrapper plus subtil */}
-              <div className="p-1 bg-gradient-to-r from-blue-200/50 via-indigo-200/50 to-purple-200/50 dark:from-blue-900/30 dark:via-indigo-900/30 dark:to-purple-900/30 rounded-3xl">
-                <div className="relative bg-white/80 dark:bg-slate-900/90 backdrop-blur-lg rounded-3xl p-8 md:p-12 shadow-2xl">
-                  <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-indigo-50/30 to-purple-50/30 dark:from-blue-950/20 dark:via-indigo-950/20 dark:to-purple-950/20 rounded-3xl" />
-                  <div className="relative z-10">
-                    <Emblacarousel />
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-          </div>
-          
-          {/* Bottom decorative border */}
-          <div className="absolute bottom-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-indigo-400/40 dark:via-indigo-600/20 to-transparent opacity-30" />
-        </section>
+      
         
         {/* About Section */}
         <AboutSection />

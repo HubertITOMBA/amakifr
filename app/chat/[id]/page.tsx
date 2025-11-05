@@ -27,7 +27,7 @@ import {
   Loader2,
   History,
 } from "lucide-react";
-import { toast } from "react-hot-toast";
+import { toast } from "sonner";
 import {
   getConversationById,
   sendMessage,
@@ -248,59 +248,59 @@ export default function ConversationPage() {
     }
   };
 
-  if (loading) {
-    return (
-      <div className="container mx-auto p-6">
-        <Card>
-          <CardContent className="p-6 text-center">
-            <p>Chargement...</p>
-          </CardContent>
-        </Card>
-      </div>
-    );
-  }
-
-  if (!conversation) {
-    return null;
-  }
-
-  const otherParticipants = (conversation as any).Participants?.filter(
+15
+  const otherParticipants = conversation ? (conversation as any).Participants?.filter(
     (p: any) => p.User.id !== session?.user?.id
-  ) || [];
+  ) || [] : [];
   
-  const displayName = conversation.titre ||
+  const displayName = conversation ? (conversation.titre ||
     otherParticipants.map((p: any) => p.User.name || p.User.email).join(", ") ||
-    "Conversation sans titre";
+    "Conversation sans titre") : "";
 
   return (
     <div className="container mx-auto p-6 max-w-7xl">
-      <div className="flex flex-col h-[calc(100vh-8rem)]">
-        {/* En-tête */}
-        <Card className="mb-4">
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-4">
-                <Link href="/chat">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                  >
-                    <ArrowLeft className="h-4 w-4 mr-2" />
-                    Retour
-                  </Button>
-                </Link>
-                <div className="flex items-center gap-3">
-                  <Avatar className="h-10 w-10">
-                    {otherParticipants.length === 1 && otherParticipants[0].User.image ? (
-                      <AvatarImage src={otherParticipants[0].User.image} />
-                    ) : (
-                      <AvatarFallback>
-                        <Users className="h-5 w-5" />
-                      </AvatarFallback>
-                    )}
-                  </Avatar>
-                  <div>
-                    <CardTitle className="text-lg">{displayName}</CardTitle>
+      {loading ? (
+        <Card>
+          <CardContent className="p-6">
+            <div className="flex items-center justify-center py-12">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          </CardContent>
+        </Card>
+      ) : !conversation ? (
+        <Card>
+          <CardContent className="p-6 text-center">
+            <p className="text-muted-foreground">Conversation non trouvée</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="flex flex-col h-[calc(100vh-8rem)]">
+          {/* En-tête */}
+          <Card className="mb-4">
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <Link href="/chat">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                    >
+                      <ArrowLeft className="h-4 w-4 mr-2" />
+                      Retour
+                    </Button>
+                  </Link>
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-10 w-10">
+                      {otherParticipants.length === 1 && otherParticipants[0].User.image ? (
+                        <AvatarImage src={otherParticipants[0].User.image} />
+                      ) : (
+                        <AvatarFallback>
+                          <Users className="h-5 w-5" />
+                        </AvatarFallback>
+                      )}
+                    </Avatar>
+                    <div>
+                      <CardTitle className="text-lg">{displayName}</CardTitle>
                     {conversation.type === "Groupe" && (
                       <p className="text-sm text-muted-foreground">
                         {(conversation as any).Participants?.length || 0} participants
@@ -519,6 +519,7 @@ export default function ConversationPage() {
           </CardContent>
         </Card>
       </div>
+      )}
     </div>
   );
 }
