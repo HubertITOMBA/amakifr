@@ -8,7 +8,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ArrowLeft, Save, User, MapPin, Building, Phone, Plus, Trash2 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ArrowLeft, Save, User, MapPin, Building, Phone, Plus, Trash2, Calendar, Users, Briefcase, Heart, Shield, Mail, Info } from "lucide-react";
 import Link from "next/link";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { toast } from "sonner";
@@ -25,6 +26,14 @@ interface AdherentData {
   civility: string;
   firstname: string;
   lastname: string;
+  dateNaissance?: string;
+  typeAdhesion?: string;
+  profession?: string;
+  centresInteret?: string;
+  autorisationImage: boolean;
+  accepteCommunications: boolean;
+  nombreEnfants: number;
+  evenementsFamiliaux: string[];
 }
 
 interface AdresseData {
@@ -44,6 +53,13 @@ interface TelephoneData {
   description?: string;
 }
 
+interface EnfantData {
+  id?: string;
+  prenom: string;
+  dateNaissance?: string;
+  age?: number;
+}
+
 export default function UpdateUserPage() {
   const router = useRouter();
   const user = useCurrentUser();
@@ -60,7 +76,11 @@ export default function UpdateUserPage() {
   const [adherentData, setAdherentData] = useState<AdherentData>({
     civility: "Monsieur",
     firstname: "",
-    lastname: ""
+    lastname: "",
+    autorisationImage: false,
+    accepteCommunications: true,
+    nombreEnfants: 0,
+    evenementsFamiliaux: []
   });
   
   const [adresseData, setAdresseData] = useState<AdresseData>({
@@ -73,6 +93,7 @@ export default function UpdateUserPage() {
   });
   
   const [telephonesData, setTelephonesData] = useState<TelephoneData[]>([]);
+  const [enfantsData, setEnfantsData] = useState<EnfantData[]>([]);
 
   // Charger les données utilisateur
   useEffect(() => {
@@ -89,14 +110,23 @@ export default function UpdateUserPage() {
           });
           
           if (user.adherent) {
+            const adherent = user.adherent;
             setAdherentData({
-              civility: user.adherent.civility || "Monsieur",
-              firstname: user.adherent.firstname || "",
-              lastname: user.adherent.lastname || ""
+              civility: adherent.civility || "Monsieur",
+              firstname: adherent.firstname || "",
+              lastname: adherent.lastname || "",
+              dateNaissance: adherent.dateNaissance ? new Date(adherent.dateNaissance).toISOString().split('T')[0] : "",
+              typeAdhesion: adherent.typeAdhesion || "",
+              profession: adherent.profession || "",
+              centresInteret: adherent.centresInteret || "",
+              autorisationImage: adherent.autorisationImage || false,
+              accepteCommunications: adherent.accepteCommunications !== false,
+              nombreEnfants: adherent.nombreEnfants || 0,
+              evenementsFamiliaux: adherent.evenementsFamiliaux ? JSON.parse(adherent.evenementsFamiliaux) : []
             });
             
-            if (user.adherent.Adresse && user.adherent.Adresse.length > 0) {
-              const adresse = user.adherent.Adresse[0];
+            if (adherent.Adresse && adherent.Adresse.length > 0) {
+              const adresse = adherent.Adresse[0];
               setAdresseData({
                 streetnum: adresse.streetnum || "",
                 street1: adresse.street1 || "",
@@ -107,13 +137,22 @@ export default function UpdateUserPage() {
               });
             }
             
-            if (user.adherent.Telephones && user.adherent.Telephones.length > 0) {
-              setTelephonesData(user.adherent.Telephones.map((tel: any) => ({
+            if (adherent.Telephones && adherent.Telephones.length > 0) {
+              setTelephonesData(adherent.Telephones.map((tel: any) => ({
                 id: tel.id,
                 numero: tel.numero,
                 type: tel.type as "Mobile" | "Fixe" | "Professionnel",
                 estPrincipal: tel.estPrincipal,
                 description: tel.description || ""
+              })));
+            }
+
+            if (adherent.Enfants && adherent.Enfants.length > 0) {
+              setEnfantsData(adherent.Enfants.map((enfant: any) => ({
+                id: enfant.id,
+                prenom: enfant.prenom,
+                dateNaissance: enfant.dateNaissance ? new Date(enfant.dateNaissance).toISOString().split('T')[0] : "",
+                age: enfant.age || undefined
               })));
             }
           }
@@ -140,7 +179,8 @@ export default function UpdateUserPage() {
         userData,
         adherentData,
         adresseData,
-        telephonesData
+        telephonesData,
+        enfantsData
       );
 
       if (result.success) {
@@ -169,7 +209,6 @@ export default function UpdateUserPage() {
 
   const removeTelephone = (index: number) => {
     const newTelephones = telephonesData.filter((_, i) => i !== index);
-    // Si on supprime le téléphone principal, le premier devient principal
     if (telephonesData[index].estPrincipal && newTelephones.length > 0) {
       newTelephones[0].estPrincipal = true;
     }
@@ -180,7 +219,6 @@ export default function UpdateUserPage() {
     const newTelephones = [...telephonesData];
     newTelephones[index] = { ...newTelephones[index], [field]: value };
     
-    // Si on marque un téléphone comme principal, les autres ne le sont plus
     if (field === 'estPrincipal' && value === true) {
       newTelephones.forEach((tel, i) => {
         if (i !== index) tel.estPrincipal = false;
@@ -190,8 +228,55 @@ export default function UpdateUserPage() {
     setTelephonesData(newTelephones);
   };
 
+  // Fonctions pour gérer les enfants
+  const addEnfant = () => {
+    setEnfantsData([...enfantsData, {
+      prenom: "",
+      dateNaissance: "",
+      age: undefined
+    }]);
+  };
+
+  const removeEnfant = (index: number) => {
+    setEnfantsData(enfantsData.filter((_, i) => i !== index));
+  };
+
+  const updateEnfant = (index: number, field: keyof EnfantData, value: any) => {
+    const newEnfants = [...enfantsData];
+    newEnfants[index] = { ...newEnfants[index], [field]: value };
+    
+    // Calculer l'âge si la date de naissance est fournie
+    if (field === 'dateNaissance' && value) {
+      const birthDate = new Date(value);
+      const today = new Date();
+      let age = today.getFullYear() - birthDate.getFullYear();
+      const monthDiff = today.getMonth() - birthDate.getMonth();
+      if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+        age--;
+      }
+      newEnfants[index].age = age;
+    }
+    
+    setEnfantsData(newEnfants);
+  };
+
   const handleImageChange = (imageUrl: string) => {
     setUserData({ ...userData, image: imageUrl });
+  };
+
+  const toggleEvenementFamilial = (type: string) => {
+    const current = adherentData.evenementsFamiliaux || [];
+    if (current.includes(type)) {
+      setAdherentData({
+        ...adherentData,
+        evenementsFamiliaux: current.filter(t => t !== type)
+      });
+    } else {
+      setAdherentData({
+        ...adherentData,
+        evenementsFamiliaux: [...current, type]
+      });
+    }
   };
 
   if (loading) {
@@ -219,10 +304,10 @@ export default function UpdateUserPage() {
           </Link>
           
           <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
-            Mise à jour des informations
+            Fiche d'adhésion - Informations complètes
           </h1>
           <p className="text-gray-600 dark:text-gray-300">
-            Modifiez vos informations personnelles, d'adhérent et d'adresse
+            Complétez vos informations personnelles selon la fiche d'adhésion de l'association
           </p>
         </div>
 
@@ -245,45 +330,12 @@ export default function UpdateUserPage() {
             </CardContent>
           </Card>
 
-          {/* Informations utilisateur */}
+          {/* 1. Informations personnelles */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <User className="h-5 w-5" />
-                Informations utilisateur
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label htmlFor="name">Nom complet</Label>
-                  <Input
-                    id="name"
-                    value={userData.name}
-                    onChange={(e) => setUserData({ ...userData, name: e.target.value })}
-                    placeholder="Votre nom complet"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="email">Email</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={userData.email}
-                    onChange={(e) => setUserData({ ...userData, email: e.target.value })}
-                    placeholder="votre@email.com"
-                  />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Informations adhérent */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Building className="h-5 w-5" />
-                Informations adhérent
+                1. Informations personnelles
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-4">
@@ -326,11 +378,33 @@ export default function UpdateUserPage() {
                     placeholder="Votre nom de famille"
                   />
                 </div>
+                <div>
+                  <Label htmlFor="dateNaissance">Date de naissance</Label>
+                  <Input
+                    id="dateNaissance"
+                    type="date"
+                    value={adherentData.dateNaissance || ""}
+                    onChange={(e) => setAdherentData({ ...adherentData, dateNaissance: e.target.value })}
+                  />
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="email">E-mail</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={userData.email}
+                    onChange={(e) => setUserData({ ...userData, email: e.target.value })}
+                    placeholder="votre@email.com"
+                  />
+                </div>
               </div>
             </CardContent>
           </Card>
 
-          {/* Informations d'adresse */}
+          {/* Adresse */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -401,7 +475,7 @@ export default function UpdateUserPage() {
             </CardContent>
           </Card>
 
-          {/* Informations téléphones */}
+          {/* Téléphones */}
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
@@ -489,6 +563,252 @@ export default function UpdateUserPage() {
                 <Plus className="h-4 w-4" />
                 Ajouter un téléphone
               </Button>
+            </CardContent>
+          </Card>
+
+          {/* 2. Type d'adhésion */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Building className="h-5 w-5" />
+                2. Type d'adhésion
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="typeAdhesion">Type d'adhésion</Label>
+                <Select
+                  value={adherentData.typeAdhesion || ""}
+                  onValueChange={(value) => setAdherentData({ ...adherentData, typeAdhesion: value })}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Sélectionner un type d'adhésion" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="AdhesionAnnuelle">Adhésion annuelle</SelectItem>
+                    <SelectItem value="Renouvellement">Renouvellement</SelectItem>
+                    <SelectItem value="Autre">Autre</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 3. Informations familiales */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                3. Informations familiales
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="nombreEnfants">Nombre d'enfants</Label>
+                <Input
+                  id="nombreEnfants"
+                  type="number"
+                  min="0"
+                  value={adherentData.nombreEnfants}
+                  onChange={(e) => {
+                    const count = parseInt(e.target.value) || 0;
+                    setAdherentData({ ...adherentData, nombreEnfants: count });
+                    // Ajuster la liste des enfants
+                    const currentCount = enfantsData.length;
+                    if (count > currentCount) {
+                      const newEnfants = [...enfantsData];
+                      for (let i = currentCount; i < count; i++) {
+                        newEnfants.push({ prenom: "", dateNaissance: "", age: undefined });
+                      }
+                      setEnfantsData(newEnfants);
+                    } else if (count < currentCount) {
+                      setEnfantsData(enfantsData.slice(0, count));
+                    }
+                  }}
+                />
+              </div>
+
+              {enfantsData.length > 0 && (
+                <div className="space-y-4">
+                  <Label>Enfants (prénoms et dates de naissance / âges)</Label>
+                  {enfantsData.map((enfant, index) => (
+                    <div key={index} className="border rounded-lg p-4 space-y-4">
+                      <div className="flex justify-between items-center">
+                        <h4 className="font-medium text-gray-900 dark:text-white">
+                          Enfant {index + 1}
+                        </h4>
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => removeEnfant(index)}
+                          className="text-red-600 hover:text-red-800"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                        <div>
+                          <Label htmlFor={`enfant-prenom-${index}`}>Prénom</Label>
+                          <Input
+                            id={`enfant-prenom-${index}`}
+                            value={enfant.prenom}
+                            onChange={(e) => updateEnfant(index, 'prenom', e.target.value)}
+                            placeholder="Prénom de l'enfant"
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`enfant-date-${index}`}>Date de naissance</Label>
+                          <Input
+                            id={`enfant-date-${index}`}
+                            type="date"
+                            value={enfant.dateNaissance || ""}
+                            onChange={(e) => updateEnfant(index, 'dateNaissance', e.target.value)}
+                          />
+                        </div>
+                        <div>
+                          <Label htmlFor={`enfant-age-${index}`}>Âge</Label>
+                          <Input
+                            id={`enfant-age-${index}`}
+                            type="number"
+                            min="0"
+                            value={enfant.age || ""}
+                            onChange={(e) => updateEnfant(index, 'age', parseInt(e.target.value) || undefined)}
+                            placeholder="Âge"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <div className="space-y-2">
+                <Label>Événements familiaux nécessitant l'assistance de l'association</Label>
+                <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="mariage-enfant"
+                      checked={adherentData.evenementsFamiliaux.includes("MariageEnfant")}
+                      onCheckedChange={() => toggleEvenementFamilial("MariageEnfant")}
+                    />
+                    <Label htmlFor="mariage-enfant" className="font-normal cursor-pointer">
+                      Mariage d'un enfant
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="deces-famille"
+                      checked={adherentData.evenementsFamiliaux.includes("DecesFamille")}
+                      onCheckedChange={() => toggleEvenementFamilial("DecesFamille")}
+                    />
+                    <Label htmlFor="deces-famille" className="font-normal cursor-pointer">
+                      Décès dans la famille
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="anniversaire-salle"
+                      checked={adherentData.evenementsFamiliaux.includes("AnniversaireSalle")}
+                      onCheckedChange={() => toggleEvenementFamilial("AnniversaireSalle")}
+                    />
+                    <Label htmlFor="anniversaire-salle" className="font-normal cursor-pointer">
+                      Anniversaire organisé en salle
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="autre-evenement"
+                      checked={adherentData.evenementsFamiliaux.includes("Autre")}
+                      onCheckedChange={() => toggleEvenementFamilial("Autre")}
+                    />
+                    <Label htmlFor="autre-evenement" className="font-normal cursor-pointer">
+                      Autre
+                    </Label>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 4. Informations complémentaires */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Briefcase className="h-5 w-5" />
+                4. Informations complémentaires
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div>
+                <Label htmlFor="profession">Profession (optionnel)</Label>
+                <Input
+                  id="profession"
+                  value={adherentData.profession || ""}
+                  onChange={(e) => setAdherentData({ ...adherentData, profession: e.target.value })}
+                  placeholder="Votre profession"
+                />
+              </div>
+              <div>
+                <Label htmlFor="centresInteret">Centres d'intérêt</Label>
+                <Textarea
+                  id="centresInteret"
+                  value={adherentData.centresInteret || ""}
+                  onChange={(e) => setAdherentData({ ...adherentData, centresInteret: e.target.value })}
+                  placeholder="Vos centres d'intérêt..."
+                  rows={4}
+                />
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* 5. Autorisations */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Shield className="h-5 w-5" />
+                5. Autorisations
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="autorisation-image"
+                  checked={adherentData.autorisationImage}
+                  onCheckedChange={(checked) => setAdherentData({ ...adherentData, autorisationImage: checked as boolean })}
+                />
+                <Label htmlFor="autorisation-image" className="font-normal cursor-pointer">
+                  J'autorise l'association à utiliser mon image dans le cadre de ses activités.
+                </Label>
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="accepte-communications"
+                  checked={adherentData.accepteCommunications}
+                  onCheckedChange={(checked) => setAdherentData({ ...adherentData, accepteCommunications: checked as boolean })}
+                />
+                <Label htmlFor="accepte-communications" className="font-normal cursor-pointer">
+                  J'accepte de recevoir les communications de l'association.
+                </Label>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Mention RGPD */}
+          <Card className="border-2 border-blue-300 dark:border-blue-600 bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-blue-900/20 shadow-lg !py-0">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <div className="p-2 bg-white/20 rounded-lg">
+                  <Info className="h-5 w-5" />
+                </div>
+                <span>Mention d'information RGPD</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-6 pb-6 px-6">
+              <p className="text-sm leading-relaxed text-gray-800 dark:text-gray-200">
+                Les informations recueillies sur ce formulaire sont enregistrées par l'association afin de gérer les adhésions et d'assurer l'assistance prévue dans les statuts, notamment lors des événements familiaux (mariage d'un enfant, décès, anniversaire). Les données collectées sont limitées à ce qui est strictement nécessaire. Elles sont destinées exclusivement aux membres du bureau de l'association et ne seront jamais transmises à des tiers sans votre accord. Vous pouvez exercer votre droit d'accès, de rectification ou de suppression de vos données en contactant l'association.
+              </p>
             </CardContent>
           </Card>
 

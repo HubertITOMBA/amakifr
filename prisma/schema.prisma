@@ -31,6 +31,19 @@ enum Civilities {
   Partenaire
 }
 
+enum TypeAdhesion {
+  AdhesionAnnuelle
+  Renouvellement
+  Autre
+}
+
+enum TypeEvenementFamilial {
+  MariageEnfant
+  DecesFamille
+  AnniversaireSalle
+  Autre
+}
+
 enum TypeCotisation {
   Forfait
   Assistance
@@ -229,25 +242,34 @@ model TwoFactorConfirmation {
 model Adherent {
   id                          String                       @id @default(cuid())
   civility                    Civilities?                  @default(Monsieur)
-  firstname                   String                       @db.VarChar(255)
-  lastname                    String                       @db.VarChar(255)
-  Adresse                     Adresse[]
-  Cotisations                 Cotisation[]
-  Telephones                  Telephone[]
-  ObligationsCotisation       ObligationCotisation[]
-  Relances                    Relance[]
-  Candidacies                 Candidacy[]
-  Votes                       Vote[]
-  CotisationsMensuelles       CotisationMensuelle[] // Cotisations mensuelles
+  firstname                    String                       @db.VarChar(255)
+  lastname                   String                       @db.VarChar(255)
+  dateNaissance              DateTime?                    // Date de naissance
+  typeAdhesion               TypeAdhesion?                // Type d'adhésion
+  profession                 String?                     @db.VarChar(255) // Profession (optionnel)
+  centresInteret             String?                     @db.Text // Centres d'intérêt
+  autorisationImage          Boolean                      @default(false) // Autorisation d'utilisation de l'image
+  accepteCommunications      Boolean                      @default(true) // Acceptation des communications
+  nombreEnfants              Int                          @default(0) // Nombre d'enfants
+  evenementsFamiliaux        String?                     @db.Text // JSON array des types d'événements familiaux
+  Adresse                    Adresse[]
+  Cotisations                Cotisation[]
+  Telephones                 Telephone[]
+  ObligationsCotisation      ObligationCotisation[]
+  Relances                   Relance[]
+  Candidacies                Candidacy[]
+  Votes                      Vote[]
+  CotisationsMensuelles      CotisationMensuelle[] // Cotisations mensuelles
   RelancesCotisationMensuelle RelanceCotisationMensuelle[] // Relances cotisations mensuelles
-  InscriptionsEvenements      InscriptionEvenement[] // Inscriptions aux événements
-  idees                       Idee[] // Idées soumises par l'adhérent
-  commentairesIdee            CommentaireIdee[] // Commentaires sur les idées
+  InscriptionsEvenements     InscriptionEvenement[] // Inscriptions aux événements
+  idees                      Idee[] // Idées soumises par l'adhérent
+  commentairesIdee           CommentaireIdee[] // Commentaires sur les idées
   approbationsIdee            ApprobationIdee[] // Approbations des idées
-  created_at                  DateTime?                    @db.Timestamp(0)
-  updated_at                  DateTime?                    @db.Timestamp(0)
-  userId                      String                       @unique
-  User                        User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Enfants                    Enfant[] // Enfants de l'adhérent
+  created_at                 DateTime?                    @db.Timestamp(0)
+  updated_at                 DateTime?                    @db.Timestamp(0)
+  userId                     String                       @unique
+  User                       User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("adherent")
 }
@@ -300,6 +322,21 @@ model Telephone {
   Adherent Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
 
   @@map("telephones")
+}
+
+// Modèle pour les enfants des adhérents
+model Enfant {
+  id                String    @id @default(cuid())
+  adherentId        String
+  prenom            String     @db.VarChar(255)
+  dateNaissance     DateTime?  // Date de naissance
+  age               Int?       // Âge (calculé ou saisi)
+  createdAt         DateTime   @default(now())
+  updatedAt         DateTime   @updatedAt
+
+  Adherent Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+
+  @@map("enfants")
 }
 
 model ObligationCotisation {

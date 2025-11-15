@@ -169,7 +169,8 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
             Adresse: true,
             Telephones: true,
             Cotisations: true,
-            ObligationsCotisation: true
+            ObligationsCotisation: true,
+            Enfants: true
           }
         }
       }
@@ -209,7 +210,8 @@ export async function updateUserData(
   userData: any,
   adherentData: any,
   adresseData: any,
-  telephonesData: any[]
+  telephonesData: any[],
+  enfantsData: any[] = []
 ): Promise<UpdateResult> {
   try {
     const session = await auth();
@@ -246,21 +248,47 @@ export async function updateUserData(
 
     // Mise à jour ou création des données adhérent
     let adherent;
+    const adherentUpdateData: any = {
+      civility: adherentData.civility as Civilities,
+      firstname: adherentData.firstname,
+      lastname: adherentData.lastname,
+    };
+
+    // Ajouter les nouveaux champs s'ils sont présents
+    if (adherentData.dateNaissance !== undefined) {
+      adherentUpdateData.dateNaissance = adherentData.dateNaissance ? new Date(adherentData.dateNaissance) : null;
+    }
+    if (adherentData.typeAdhesion !== undefined) {
+      adherentUpdateData.typeAdhesion = adherentData.typeAdhesion || null;
+    }
+    if (adherentData.profession !== undefined) {
+      adherentUpdateData.profession = adherentData.profession || null;
+    }
+    if (adherentData.centresInteret !== undefined) {
+      adherentUpdateData.centresInteret = adherentData.centresInteret || null;
+    }
+    if (adherentData.autorisationImage !== undefined) {
+      adherentUpdateData.autorisationImage = adherentData.autorisationImage || false;
+    }
+    if (adherentData.accepteCommunications !== undefined) {
+      adherentUpdateData.accepteCommunications = adherentData.accepteCommunications !== false;
+    }
+    if (adherentData.nombreEnfants !== undefined) {
+      adherentUpdateData.nombreEnfants = adherentData.nombreEnfants || 0;
+    }
+    if (adherentData.evenementsFamiliaux !== undefined) {
+      adherentUpdateData.evenementsFamiliaux = adherentData.evenementsFamiliaux ? JSON.stringify(adherentData.evenementsFamiliaux) : null;
+    }
+
     if (user.adherent) {
       adherent = await prisma.adherent.update({
         where: { userId: session.user.id },
-        data: {
-          civility: adherentData.civility as Civilities,
-          firstname: adherentData.firstname,
-          lastname: adherentData.lastname,
-        }
+        data: adherentUpdateData
       });
     } else {
       adherent = await prisma.adherent.create({
         data: {
-          civility: adherentData.civility as Civilities,
-          firstname: adherentData.firstname,
-          lastname: adherentData.lastname,
+          ...adherentUpdateData,
           userId: session.user.id,
         }
       });
@@ -311,7 +339,7 @@ export async function updateUserData(
 
       // Créer les nouveaux téléphones
       for (const telData of telephonesData) {
-        if (telData.numero.trim()) { // Seulement si le numéro n'est pas vide
+        if (telData.numero && telData.numero.trim()) { // Seulement si le numéro n'est pas vide
           await prisma.telephone.create({
             data: {
               adherentId: adherent.id,
@@ -319,6 +347,28 @@ export async function updateUserData(
               type: telData.type as TypeTelephone,
               estPrincipal: telData.estPrincipal,
               description: telData.description || null
+            }
+          });
+        }
+      }
+    }
+
+    // Gestion des enfants
+    if (enfantsData && enfantsData.length > 0) {
+      // Supprimer tous les enfants existants
+      await prisma.enfant.deleteMany({
+        where: { adherentId: adherent.id }
+      });
+
+      // Créer les nouveaux enfants
+      for (const enfantData of enfantsData) {
+        if (enfantData.prenom && enfantData.prenom.trim()) {
+          await prisma.enfant.create({
+            data: {
+              adherentId: adherent.id,
+              prenom: enfantData.prenom,
+              dateNaissance: enfantData.dateNaissance ? new Date(enfantData.dateNaissance) : null,
+              age: enfantData.age || null
             }
           });
         }
@@ -691,7 +741,8 @@ export async function getUserByIdForAdmin(userId: string): Promise<{ success: bo
         adherent: {
           include: {
             Adresse: true,
-            Telephones: true
+            Telephones: true,
+            Enfants: true
           }
         }
       }
