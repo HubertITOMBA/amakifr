@@ -45,7 +45,12 @@ import {
   X,
   DollarSign,
   AlertCircle,
-  CheckCircle2
+  CheckCircle2,
+  Lightbulb,
+  MessageSquare,
+  ThumbsUp,
+  Trash2,
+  Pencil
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUserProfile } from "@/hooks/use-user-profile";
@@ -53,9 +58,17 @@ import { PhotoUpload } from "@/components/ui/photo-upload";
 import { updateUserData, getUserCandidatures, getUserVotes, getAllCandidatesForProfile } from "@/actions/user";
 import { toast } from "sonner";
 import { FinancialTables } from "@/components/financial/financial-tables";
+import { getIdeesByUser, createIdee, updateIdee, deleteIdee } from "@/actions/idees";
+import { StatutIdee } from "@prisma/client";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 // Types pour les sections du menu
-type MenuSection = 'profile' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'settings';
+type MenuSection = 'profile' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'idees' | 'settings';
 
 export default function UserProfilePage() {
   const user = useCurrentUser();
@@ -78,6 +91,13 @@ export default function UserProfilePage() {
   const [votesSelectedElection, setVotesSelectedElection] = useState<string>('all');
   const [votesSortBy, setVotesSortBy] = useState<'date' | 'name' | 'election' | 'position'>('date');
   const [votesGroupByElection, setVotesGroupByElection] = useState(true);
+  // États pour la section Mes Idées
+  const [idees, setIdees] = useState<any[]>([]);
+  const [ideesLoading, setIdeesLoading] = useState(false);
+  const [showCreateIdeeDialog, setShowCreateIdeeDialog] = useState(false);
+  const [showEditIdeeDialog, setShowEditIdeeDialog] = useState(false);
+  const [editingIdee, setEditingIdee] = useState<any>(null);
+  const [ideeFormData, setIdeeFormData] = useState({ titre: '', description: '' });
 
   // Synchroniser l'image avec les données utilisateur
   useEffect(() => {
@@ -120,6 +140,16 @@ export default function UserProfilePage() {
             if (candidatesResult.success) {
               setCandidates(candidatesResult.candidates || []);
             }
+            break;
+          case 'idees':
+            setIdeesLoading(true);
+            const ideesResult = await getIdeesByUser(user.id);
+            if (ideesResult.success && ideesResult.data) {
+              setIdees(ideesResult.data || []);
+            } else {
+              toast.error(ideesResult.error || "Erreur lors du chargement des idées");
+            }
+            setIdeesLoading(false);
             break;
         }
       } catch (error) {
@@ -450,6 +480,12 @@ export default function UserProfilePage() {
       label: 'Liste des Candidats',
       icon: Users,
       description: 'Voir tous les candidats'
+    },
+    {
+      id: 'idees' as MenuSection,
+      label: 'Mes Idées',
+      icon: Lightbulb,
+      description: 'Gérer mes idées'
     },
     {
       id: 'settings' as MenuSection,
@@ -1489,6 +1525,332 @@ export default function UserProfilePage() {
                 </CardContent>
               </Card>
             </div>
+          </div>
+        );
+
+      case 'idees':
+        const handleCreateIdee = async () => {
+          if (!ideeFormData.titre.trim() || !ideeFormData.description.trim()) {
+            toast.error("Veuillez remplir tous les champs");
+            return;
+          }
+
+          try {
+            setIdeesLoading(true);
+            const formData = new FormData();
+            formData.append("titre", ideeFormData.titre);
+            formData.append("description", ideeFormData.description);
+
+            const result = await createIdee(formData);
+            if (result.success) {
+              toast.success(result.message || "Idée créée avec succès");
+              setIdeeFormData({ titre: '', description: '' });
+              setShowCreateIdeeDialog(false);
+              // Recharger les idées
+              if (user?.id) {
+                const ideesResult = await getIdeesByUser(user.id);
+                if (ideesResult.success && ideesResult.data) {
+                  setIdees(ideesResult.data || []);
+                }
+              }
+            } else {
+              toast.error(result.error || "Erreur lors de la création de l'idée");
+            }
+          } catch (error) {
+            console.error("Erreur lors de la création de l'idée:", error);
+            toast.error("Erreur lors de la création de l'idée");
+          } finally {
+            setIdeesLoading(false);
+          }
+        };
+
+        const handleEditIdee = async () => {
+          if (!ideeFormData.titre.trim() || !ideeFormData.description.trim()) {
+            toast.error("Veuillez remplir tous les champs");
+            return;
+          }
+
+          if (!editingIdee) return;
+
+          try {
+            setIdeesLoading(true);
+            const formData = new FormData();
+            formData.append("id", editingIdee.id);
+            formData.append("titre", ideeFormData.titre);
+            formData.append("description", ideeFormData.description);
+
+            const result = await updateIdee(formData);
+            if (result.success) {
+              toast.success(result.message || "Idée mise à jour avec succès");
+              setIdeeFormData({ titre: '', description: '' });
+              setEditingIdee(null);
+              setShowEditIdeeDialog(false);
+              // Recharger les idées
+              if (user?.id) {
+                const ideesResult = await getIdeesByUser(user.id);
+                if (ideesResult.success && ideesResult.data) {
+                  setIdees(ideesResult.data || []);
+                }
+              }
+            } else {
+              toast.error(result.error || "Erreur lors de la mise à jour de l'idée");
+            }
+          } catch (error) {
+            console.error("Erreur lors de la mise à jour de l'idée:", error);
+            toast.error("Erreur lors de la mise à jour de l'idée");
+          } finally {
+            setIdeesLoading(false);
+          }
+        };
+
+        const handleDeleteIdee = async (ideeId: string) => {
+          if (!confirm("Êtes-vous sûr de vouloir supprimer cette idée ?")) {
+            return;
+          }
+
+          try {
+            setIdeesLoading(true);
+            const result = await deleteIdee(ideeId);
+            if (result.success) {
+              toast.success(result.message || "Idée supprimée avec succès");
+              // Recharger les idées
+              if (user?.id) {
+                const ideesResult = await getIdeesByUser(user.id);
+                if (ideesResult.success && ideesResult.data) {
+                  setIdees(ideesResult.data || []);
+                }
+              }
+            } else {
+              toast.error(result.error || "Erreur lors de la suppression de l'idée");
+            }
+          } catch (error) {
+            console.error("Erreur lors de la suppression de l'idée:", error);
+            toast.error("Erreur lors de la suppression de l'idée");
+          } finally {
+            setIdeesLoading(false);
+          }
+        };
+
+        const getStatutBadge = (statut: StatutIdee) => {
+          switch (statut) {
+            case StatutIdee.Validee:
+              return <Badge className="bg-green-500">Validée</Badge>;
+            case StatutIdee.EnAttente:
+              return <Badge className="bg-yellow-500">En attente</Badge>;
+            case StatutIdee.Rejetee:
+              return <Badge className="bg-red-500">Rejetée</Badge>;
+            case StatutIdee.Bloquee:
+              return <Badge className="bg-red-600">Bloquée</Badge>;
+            default:
+              return null;
+          }
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mes Idées</h2>
+                <p className="text-gray-600 dark:text-gray-300">Gérez vos idées soumises à la boîte à idées</p>
+              </div>
+              <Dialog open={showCreateIdeeDialog} onOpenChange={setShowCreateIdeeDialog}>
+                <DialogTrigger asChild>
+                  <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Proposer une idée
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Proposer une nouvelle idée</DialogTitle>
+                    <DialogDescription>
+                      Partagez votre idée avec l'association. Elle sera examinée par l'administration.
+                    </DialogDescription>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="titre">Titre *</Label>
+                      <Input
+                        id="titre"
+                        value={ideeFormData.titre}
+                        onChange={(e) => setIdeeFormData({ ...ideeFormData, titre: e.target.value })}
+                        placeholder="Titre de votre idée"
+                        maxLength={255}
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="description">Description *</Label>
+                      <Textarea
+                        id="description"
+                        value={ideeFormData.description}
+                        onChange={(e) => setIdeeFormData({ ...ideeFormData, description: e.target.value })}
+                        placeholder="Décrivez votre idée en détail..."
+                        rows={6}
+                      />
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                      <Button variant="outline" onClick={() => {
+                        setShowCreateIdeeDialog(false);
+                        setIdeeFormData({ titre: '', description: '' });
+                      }}>
+                        Annuler
+                      </Button>
+                      <Button onClick={handleCreateIdee} disabled={ideesLoading} className="bg-blue-600 hover:bg-blue-700">
+                        {ideesLoading ? "Création..." : "Créer l'idée"}
+                      </Button>
+                    </div>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {ideesLoading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : idees.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <Lightbulb className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-300 text-lg mb-4">
+                    Vous n'avez pas encore soumis d'idée
+                  </p>
+                  <Button onClick={() => setShowCreateIdeeDialog(true)} className="bg-blue-600 hover:bg-blue-700">
+                    <Plus className="h-4 w-4 mr-2" />
+                    Proposer une idée
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="space-y-4">
+                {idees.map((idee) => (
+                  <Card key={idee.id} className="shadow-md">
+                    <CardHeader>
+                      <div className="flex items-start justify-between">
+                        <div className="flex-1">
+                          <CardTitle className="text-lg mb-2">{idee.titre}</CardTitle>
+                          <div className="flex items-center gap-3 text-sm text-gray-500">
+                            <div className="flex items-center gap-1">
+                              <Calendar className="h-4 w-4" />
+                              <span>
+                                {format(new Date(idee.dateCreation), "d MMMM yyyy", { locale: fr })}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <MessageSquare className="h-4 w-4" />
+                              <span>{idee.nombreCommentaires} commentaire{idee.nombreCommentaires !== 1 ? "s" : ""}</span>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <ThumbsUp className="h-4 w-4" />
+                              <span>{idee.nombreApprobations} approbation{idee.nombreApprobations !== 1 ? "s" : ""}</span>
+                            </div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getStatutBadge(idee.statut)}
+                        </div>
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      <p className="text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-wrap">
+                        {idee.description}
+                      </p>
+                      {idee.raisonRejet && (
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4">
+                          <p className="text-sm text-red-700 dark:text-red-300">
+                            <strong>Raison du rejet/blocage :</strong> {idee.raisonRejet}
+                          </p>
+                        </div>
+                      )}
+                      <div className="flex gap-2">
+                        {idee.statut === StatutIdee.EnAttente && !idee.estLue && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => {
+                                setEditingIdee(idee);
+                                setIdeeFormData({ titre: idee.titre, description: idee.description });
+                                setShowEditIdeeDialog(true);
+                              }}
+                            >
+                              <Pencil className="h-4 w-4 mr-2" />
+                              Modifier
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteIdee(idee.id)}
+                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                            >
+                              <Trash2 className="h-4 w-4 mr-2" />
+                              Supprimer
+                            </Button>
+                          </>
+                        )}
+                        {idee.estLue && (
+                          <p className="text-sm text-gray-500 italic">
+                            Cette idée ne peut plus être modifiée ou supprimée car elle a déjà été lue. Contactez l'administration si nécessaire.
+                          </p>
+                        )}
+                        <Link href="/idees" className="ml-auto">
+                          <Button variant="outline" size="sm">
+                            <Eye className="h-4 w-4 mr-2" />
+                            Voir sur le site
+                          </Button>
+                        </Link>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            )}
+
+            {/* Dialog d'édition */}
+            <Dialog open={showEditIdeeDialog} onOpenChange={setShowEditIdeeDialog}>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Modifier l'idée</DialogTitle>
+                  <DialogDescription>
+                    Modifiez votre idée. Notez que si elle a déjà été lue, vous devrez contacter l'administration.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="edit-titre">Titre *</Label>
+                    <Input
+                      id="edit-titre"
+                      value={ideeFormData.titre}
+                      onChange={(e) => setIdeeFormData({ ...ideeFormData, titre: e.target.value })}
+                      placeholder="Titre de votre idée"
+                      maxLength={255}
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="edit-description">Description *</Label>
+                    <Textarea
+                      id="edit-description"
+                      value={ideeFormData.description}
+                      onChange={(e) => setIdeeFormData({ ...ideeFormData, description: e.target.value })}
+                      placeholder="Décrivez votre idée en détail..."
+                      rows={6}
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end">
+                    <Button variant="outline" onClick={() => {
+                      setShowEditIdeeDialog(false);
+                      setEditingIdee(null);
+                      setIdeeFormData({ titre: '', description: '' });
+                    }}>
+                      Annuler
+                    </Button>
+                    <Button onClick={handleEditIdee} disabled={ideesLoading} className="bg-blue-600 hover:bg-blue-700">
+                      {ideesLoading ? "Mise à jour..." : "Mettre à jour"}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         );
 

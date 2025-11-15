@@ -1,0 +1,923 @@
+# Règles de développement - Portail HARP
+
+## Langue et communication
+- **TOUJOURS répondre en français** pour toutes les communications
+- Utiliser un langage professionnel et clair
+- Expliquer les décisions techniques de manière concise
+
+## Architecture et structure
+
+### Server Actions vs API Routes
+- **PRÉFÉRER les Server Actions** (`"use server"`) aux API Routes (`/api/*`)
+- Les Server Actions doivent être dans `actions/` ou `lib/actions/`
+- Utiliser les Server Actions pour :
+  - CRUD operations (create, update, delete)
+  - Récupération de données depuis la base
+  - Opérations serveur qui nécessitent l'accès à la base de données
+- N'utiliser les API Routes que si nécessaire (webhooks externes, etc.)
+
+### Structure des fichiers
+- **Server Actions** : `actions/*.ts` ou `lib/actions/*.tsx`
+- **Composants** : `components/[entity]/[ComponentName].tsx`
+- **Pages** : `app/(dashboard)/list/[entity]/page.tsx`
+- **Colonnes de table** : `app/(dashboard)/list/[entity]/columns.tsx`
+
+### Naming conventions
+- **Composants** : PascalCase (`ViewRoleContent.tsx`)
+- **Server Actions** : camelCase (`createRole`, `updateRole`, `getRoleById`)
+- **Fichiers** : kebab-case pour les pages, PascalCase pour les composants
+- **Types/Interfaces** : PascalCase (`RoleList`, `ViewRoleContentProps`)
+
+## Patterns de code
+
+### Server Actions
+```typescript
+"use server"
+
+import { db } from "@/lib/db";
+import { revalidatePath } from "next/cache";
+import { z } from "zod";
+
+// 1. Définir le schéma Zod
+const CreateEntitySchema = z.object({
+  field: z.string().min(1, "Message d'erreur").max(32),
+  // ...
+});
+
+/**
+ * Crée une nouvelle entité dans la base de données
+ * 
+ * @param formData - Les données du formulaire contenant les champs de l'entité
+ * @returns Un objet avec success (boolean), message (string) en cas de succès, 
+ *          ou error (string) en cas d'échec, et id (number) de l'entité créée
+ */
+// 2. Fonction avec validation
+export async function createEntity(formData: FormData) {
+  try {
+    const rawData = {
+      field: formData.get("field") as string,
+      // ...
+    };
+
+    const validatedData = CreateEntitySchema.parse(rawData);
+
+    // 3. Vérifier les doublons si nécessaire
+    const existing = await db.table.findFirst({
+      where: { field: validatedData.field },
+    });
+
+    if (existing) {
+      return { success: false, error: "Message d'erreur" };
+    }
+
+    // 4. Créer l'entité
+    const newEntity = await db.table.create({
+      data: { /* ... */ },
+    });
+
+    return { 
+      success: true, 
+      message: `Message de succès`,
+      id: newEntity.id 
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Erreur:", error);
+    return { success: false, error: "Message d'erreur générique" };
+  } finally {
+    revalidatePath("/list/entity");
+  }
+}
+```
+
+### Composants ViewContent
+- Utiliser le style uniforme pour les labels et inputs :
+  - **Labels** : `text-[9px] sm:text-[10px] font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 px-2 py-1 rounded-t-md`
+  - **Données** : `p-2 sm:p-2.5 bg-blue-50 rounded-md rounded-tl-none border border-blue-200 border-t-0 text-xs font-medium text-slate-900 font-mono shadow-sm`
+  - **Espacement** : `space-y-1` entre les champs
+
+### Composants ViewDialog
+- Bouton "Retour à la liste" : `bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-700 hover:text-slate-900 text-xs sm:text-sm shadow-sm`
+- Bordures : `border-slate-200` au lieu de `border-gray-200`
+- Toujours inclure un état de chargement avec `Loader2`
+- Gérer les erreurs avec un message approprié
+
+### Composants Actions (boutons d'action)
+- Structure standard :
+```typescript
+"use client";
+
+import { ViewDialog, EditDialog, CreateDialog } from './...';
+import { Eye, Pencil, Plus, Ban } from "lucide-react";
+
+/**
+ * Composant d'actions pour une entité (voir, éditer, supprimer, etc.)
+ * 
+ * @param entity - L'entité pour laquelle afficher les actions
+ */
+export function EntityActions({ entity }: EntityActionsProps) {
+  return (
+    <div className="flex items-center gap-1 sm:gap-2">
+      <ViewDialog entity={entity} />
+      <EditDialog entity={entity} />
+      <Button /* toggle status */ />
+    </div>
+  );
+}
+```
+
+- Tailles des boutons : `h-7 w-7 sm:h-8 sm:w-8 p-0`
+- Couleurs :
+  - Voir : `border-blue-300 hover:bg-blue-50`
+  - Éditer : `border-blue-300 hover:bg-blue-50`
+  - Créer : `border-blue-300 hover:bg-blue-50`
+  - Désactiver : `border-red-300 hover:bg-red-50`
+  - Réactiver : `border-blue-300 hover:bg-blue-50`
+
+### Pages de liste
+- **Style uniforme et professionnel** avec gradient et Card :
+```typescript
+<div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
+  <Card className="mx-auto max-w-7xl shadow-lg border-blue-200">
+    <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+      <CardTitle className="flex items-center gap-2">
+        <Icon className="h-5 w-5" />
+        Titre ({count})
+      </CardTitle>
+    </CardHeader>
+    <CardContent>
+      <DataTable data={data} columns={columns} />
+    </CardContent>
+  </Card>
+</div>
+```
+
+- **Toujours appliquer ce style** pour toutes les pages de liste
+- Tri par défaut : spécifier dans la requête Prisma avec `orderBy`
+- Compter les entités : `const count = await db.table.count()`
+- Ajouter des transitions et effets hover pour une meilleure UX
+
+## Base de données et Prisma
+
+### Requêtes
+- Toujours utiliser `db` depuis `@/lib/db`
+- Pour les clés primaires composites, utiliser `findFirst` avec `where: { field1, field2, field3 }`
+- Pour les mises à jour avec clés primaires composites, supprimer l'ancien et créer le nouveau
+
+### Validation
+- **TOUJOURS valider avec Zod** avant d'insérer/mettre à jour
+- **OBLIGATOIRE** : Toutes les Server Actions doivent utiliser Zod pour valider les données
+- Messages d'erreur en français
+- Vérifier les doublons avant création
+- Utiliser des schémas Zod spécifiques pour chaque action (Create, Update)
+- Valider tous les champs, même optionnels (utiliser `.optional()` ou `.nullable()`)
+
+### Revalidation
+- Toujours appeler `revalidatePath("/list/entity")` dans le `finally` des Server Actions
+
+## Styling et UI
+
+### Tailwind CSS
+- **TOUJOURS utiliser Tailwind CSS** pour tous les styles
+- **INTERDIT** : Ne jamais utiliser de CSS inline (`style={{}}`) sauf cas exceptionnels
+- **INTERDIT** : Ne jamais créer de fichiers CSS personnalisés sauf pour les configurations globales
+- Utiliser les classes Tailwind, éviter le CSS inline
+- Responsive : `sm:`, `md:`, `lg:` pour les breakpoints
+- Couleurs principales :
+  - Bleu : `blue-50`, `blue-200`, `blue-300`, `blue-500`, `blue-600`, `blue-700`
+  - Rouge : `red-50`, `red-200`, `red-300`, `red-500`, `red-600`, `red-700`
+  - Blanc : `white`, `bg-white`
+  - Slate : `slate-50`, `slate-100`, `slate-200`, `slate-300`, `slate-700`, `slate-900`
+
+### Design professionnel et esthétique
+- **TOUJOURS créer des pages avec un style professionnel et joli**
+- Utiliser des gradients subtils pour les arrière-plans : `bg-gradient-to-br from-blue-50 via-white to-blue-50`
+- Ajouter des ombres pour la profondeur : `shadow-lg`, `shadow-sm`
+- Utiliser des bordures arrondies : `rounded-md`, `rounded-lg`
+- Espacement cohérent : `p-4`, `gap-2`, `space-y-3`
+- Transitions fluides : `transition-colors`, `hover:bg-*`
+- Hiérarchie visuelle claire avec des tailles de texte variées
+- Contraste suffisant pour la lisibilité
+- Utiliser des couleurs cohérentes avec la charte graphique
+
+### Composants Shadcn/ui
+- Utiliser les composants depuis `@/components/ui/*`
+- Dialog, Button, Card, Label, Input, Select, Table, etc.
+- Personnaliser les composants avec les classes Tailwind plutôt que de modifier le code source
+
+### Icônes
+- Utiliser `lucide-react` pour les icônes
+- Tailles : `h-3 w-3 sm:h-4 sm:w-4` pour les petits boutons
+- Tailles : `h-5 w-5` pour les titres
+- Utiliser des icônes cohérentes et significatives
+
+### Standards de design pour les pages
+- **Pages de liste** :
+  - Gradient de fond subtil
+  - Card avec ombre et bordure arrondie
+  - Header avec gradient coloré et texte blanc
+  - Espacement généreux entre les éléments
+  - Responsive design (mobile-first)
+
+- **Formulaires** :
+  - Labels clairs et bien espacés
+  - Inputs avec bordures arrondies et focus visible
+  - Boutons avec états hover et active
+  - Messages d'erreur visibles mais non intrusifs
+
+- **Dialogs/Modals** :
+  - Fond semi-transparent (backdrop)
+  - Contenu centré avec max-width
+  - Animations d'ouverture/fermeture fluides
+  - Boutons d'action bien visibles
+
+- **Tableaux** :
+  - Alternance de couleurs pour les lignes (zebra striping)
+  - Headers avec fond légèrement différent
+  - Hover sur les lignes pour l'interactivité
+  - Bordures subtiles
+
+## Gestion des erreurs
+
+### Server Actions
+- Retourner `{ success: boolean, error?: string, message?: string }`
+- Logger les erreurs avec `console.error`
+- Gérer les erreurs Zod spécifiquement
+
+### Composants Client
+- **TOUJOURS utiliser `react-toastify`** pour afficher les messages à l'utilisateur
+- **OBLIGATOIRE** : Utiliser `toast` pour tous les messages (succès, erreur, avertissement, info)
+- **JAMAIS** utiliser `alert()`, `confirm()` ou `console.log()` pour informer l'utilisateur
+- Gérer les états de chargement avec `useState` et `Loader2`
+
+### Utilisation de toast avec les couleurs appropriées
+- **Succès** : `toast.success(message)` - Affiche un message vert pour les opérations réussies
+  ```typescript
+  if (result.success) {
+    toast.success(result.message);
+  }
+  ```
+
+- **Erreur** : `toast.error(message)` - Affiche un message rouge pour les erreurs
+  ```typescript
+  if (!result.success) {
+    toast.error(result.error || "Message d'erreur par défaut");
+  }
+  ```
+
+- **Avertissement** : `toast.warning(message)` - Affiche un message rouge/jaune pour les avertissements
+  ```typescript
+  toast.warning("Attention : cette action est irréversible");
+  ```
+
+- **Information** : `toast.info(message)` - Affiche un message bleu pour les informations
+  ```typescript
+  toast.info("L'opération est en cours de traitement");
+  ```
+
+### Bonnes pratiques pour les toasts
+- Toujours fournir un message clair et en français
+- Utiliser le message retourné par la Server Action quand disponible
+- Fournir un message par défaut si la Server Action n'en retourne pas
+- Importer `toast` depuis `react-toastify` : `import { toast } from 'react-toastify';`
+- Les toasts doivent être non-bloquants et disparaître automatiquement
+- Utiliser des messages concis mais informatifs
+
+## Navigation et routing
+
+### Navigation client
+- Utiliser `useRouter` de `next/navigation`
+- Appeler `router.refresh()` après les mutations
+- Pour les liens problématiques, créer un composant client avec `router.push()` et `router.refresh()`
+
+### Validation des paramètres
+- Toujours valider les paramètres de route (IDs, etc.)
+- Utiliser `notFound()` si l'entité n'existe pas
+- Vérifier que les IDs sont des nombres valides
+
+## Formulaires
+
+### Select components
+- **JAMAIS** de `SelectItem` avec `value=""` (vide)
+- Utiliser `undefined` ou `null` pour les valeurs non sélectionnées
+- Afficher un `placeholder` quand aucune valeur n'est sélectionnée
+- Pour les Select contrôlés, utiliser `useState` et `onValueChange`
+
+### Champs contrôlés
+- Utiliser `useState` pour les valeurs des Select
+- Initialiser avec les valeurs existantes pour les formulaires d'édition
+- Réinitialiser après soumission réussie
+
+### Upload de fichiers
+- Sauvegarder dans `public/icones/` ou `public/ressources/`
+- Utiliser des Server Actions pour l'upload
+- Valider le type et la taille des fichiers
+
+## Imports et dépendances
+
+### Ordre des imports
+1. React et Next.js
+2. Composants UI
+3. Composants locaux
+4. Actions/API
+5. Utilitaires
+6. Types
+7. Styles
+
+### Exemple
+```typescript
+"use client"
+
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
+import { Button } from "@/components/ui/button";
+import { ViewContent } from './ViewContent';
+import { getEntityById } from '@/lib/actions/entity-actions';
+import { toast } from 'react-toastify';
+```
+
+## Tests et qualité
+
+### Avant de soumettre
+- Vérifier les erreurs de linter avec `read_lints`
+- S'assurer que tous les types sont corrects
+- Tester les cas d'erreur (doublons, validations, etc.)
+- Vérifier la responsivité (mobile/desktop)
+
+### Bonnes pratiques
+- Éviter les `any` types
+- Utiliser des interfaces TypeScript pour les props
+- Commenter le code complexe
+- Grouper les imports logiquement
+
+## Refactoring et bonnes pratiques React
+
+### Principe général
+- **TOUJOURS prévoir de refactoriser** le code pour le rendre plus lisible et conforme aux bonnes pratiques React
+- Identifier les opportunités de refactoring lors de la révision du code
+- Améliorer progressivement la qualité du code existant
+
+### Bonnes pratiques React
+
+#### Composants
+- **Séparation des responsabilités** : Un composant doit avoir une seule responsabilité
+- **Composants petits et réutilisables** : Extraire la logique répétée dans des composants réutilisables
+- **Composants purs** : Éviter les effets de bord dans les composants de présentation
+- **Nommage explicite** : Utiliser des noms de composants et de fonctions clairs et descriptifs
+
+#### Hooks
+- **Utiliser les hooks appropriés** : `useState` pour l'état local, `useEffect` pour les effets de bord
+- **Éviter les dépendances inutiles** : Optimiser les tableaux de dépendances de `useEffect`
+- **Créer des hooks personnalisés** : Extraire la logique réutilisable dans des hooks personnalisés
+- **Éviter les hooks conditionnels** : Toujours appeler les hooks dans le même ordre
+
+#### Performance
+- **Mémorisation** : Utiliser `useMemo` et `useCallback` pour optimiser les performances quand nécessaire
+- **Lazy loading** : Utiliser `React.lazy()` et `Suspense` pour le chargement différé des composants
+- **Éviter les re-renders inutiles** : Utiliser `React.memo()` pour les composants coûteux
+- **Optimiser les listes** : Utiliser des clés stables et uniques pour les éléments de liste
+
+#### Gestion d'état
+- **État local vs global** : Utiliser l'état local (`useState`) quand possible, état global seulement si nécessaire
+- **Lifting state up** : Remonter l'état au composant parent le plus proche qui en a besoin
+- **Éviter le prop drilling** : Utiliser Context API ou un gestionnaire d'état pour les props profondes
+
+#### Code propre
+- **DRY (Don't Repeat Yourself)** : Éviter la duplication de code, extraire dans des fonctions/composants
+- **KISS (Keep It Simple, Stupid)** : Préférer des solutions simples et claires
+- **Composants fonctionnels** : Utiliser des composants fonctionnels plutôt que des classes
+- **Destructuration** : Utiliser la destructuration pour les props et les objets
+- **Early returns** : Utiliser des retours précoces pour réduire la complexité conditionnelle
+
+#### Structure du code
+- **Organisation logique** : Grouper les imports, les hooks, les fonctions, le JSX
+- **Extraction de fonctions** : Extraire la logique complexe dans des fonctions séparées
+- **Constantes** : Définir les constantes en dehors des composants
+- **Types et interfaces** : Définir les types près de leur utilisation ou dans des fichiers dédiés
+
+### Exemples de refactoring
+
+#### Avant (code complexe)
+```typescript
+export function UserList({ users }) {
+  const [filtered, setFiltered] = useState([]);
+  const [search, setSearch] = useState("");
+  
+  useEffect(() => {
+    const filtered = users.filter(u => 
+      u.name.includes(search) || u.email.includes(search)
+    );
+    setFiltered(filtered);
+  }, [users, search]);
+  
+  return (
+    <div>
+      <input value={search} onChange={e => setSearch(e.target.value)} />
+      {filtered.map(u => <div key={u.id}>{u.name}</div>)}
+    </div>
+  );
+}
+```
+
+#### Après (code refactorisé)
+```typescript
+// Hook personnalisé
+function useFilteredUsers(users: User[], search: string) {
+  return useMemo(() => {
+    if (!search) return users;
+    return users.filter(u => 
+      u.name.toLowerCase().includes(search.toLowerCase()) ||
+      u.email.toLowerCase().includes(search.toLowerCase())
+    );
+  }, [users, search]);
+}
+
+// Composant simplifié
+export function UserList({ users }: UserListProps) {
+  const [search, setSearch] = useState("");
+  const filteredUsers = useFilteredUsers(users, search);
+  
+  return (
+    <div>
+      <SearchInput value={search} onChange={setSearch} />
+      <UserListItems users={filteredUsers} />
+    </div>
+  );
+}
+```
+
+### Checklist de refactoring
+- [ ] Le code est-il lisible et facile à comprendre ?
+- [ ] Y a-t-il de la duplication de code à extraire ?
+- [ ] Les composants sont-ils trop gros et doivent-ils être divisés ?
+- [ ] La logique peut-elle être extraite dans des hooks personnalisés ?
+- [ ] Les noms de variables/fonctions sont-ils explicites ?
+- [ ] Y a-t-il des optimisations de performance possibles ?
+- [ ] Le code respecte-t-il les principes SOLID ?
+- [ ] Les types TypeScript sont-ils corrects et complets ?
+
+## Documentation et commentaires
+
+### Documentation des fonctions publiques
+- **OBLIGATOIRE** : Toutes les fonctions publiques (exportées) doivent être documentées
+- Utiliser des commentaires JSDoc pour les fonctions publiques
+- Inclure :
+  - Description de la fonction
+  - Paramètres avec leurs types et descriptions
+  - Valeur de retour avec type et description
+  - Exemples d'utilisation si nécessaire
+  - Exceptions/erreurs possibles
+
+### Format de documentation JSDoc
+```typescript
+/**
+ * Crée une nouvelle entité dans la base de données
+ * 
+ * @param formData - Les données du formulaire contenant les champs de l'entité
+ * @returns Un objet avec success (boolean), message (string) en cas de succès, 
+ *          ou error (string) en cas d'échec, et id (number) de l'entité créée
+ * @throws {z.ZodError} Si les données ne respectent pas le schéma de validation
+ * 
+ * @example
+ * ```typescript
+ * const formData = new FormData();
+ * formData.append("field", "value");
+ * const result = await createEntity(formData);
+ * if (result.success) {
+ *   console.log(result.message);
+ * }
+ * ```
+ */
+export async function createEntity(formData: FormData) {
+  // ...
+}
+```
+
+### Commentaires dans le code
+- **Commenter chaque fonction publique** (exportée) avec JSDoc
+- Commenter les sections de code complexes ou non évidentes
+- Expliquer le "pourquoi" plutôt que le "quoi" quand c'est nécessaire
+- Utiliser des commentaires en français
+- Éviter les commentaires redondants (le code doit être auto-documenté)
+
+### Documentation des composants
+- Documenter les props des composants avec des interfaces TypeScript
+- Ajouter des commentaires JSDoc pour les composants complexes
+- Documenter les hooks personnalisés
+
+### Exemple de composant documenté
+```typescript
+/**
+ * Composant d'affichage des détails d'une entité
+ * 
+ * @param entity - L'objet entité à afficher avec tous ses champs
+ * @param onClose - Fonction callback appelée lors de la fermeture
+ */
+export function ViewEntityContent({ 
+  entity, 
+  onClose 
+}: ViewEntityContentProps) {
+  // ...
+}
+```
+
+### Documentation des Server Actions
+- **TOUJOURS** documenter les Server Actions avec JSDoc
+- Expliquer la logique métier si elle est complexe
+- Documenter les validations Zod utilisées
+- Mentionner les effets de bord (revalidation, etc.)
+
+### Exemple de Server Action documentée
+```typescript
+/**
+ * Récupère une entité par son identifiant unique
+ * 
+ * @param id - L'identifiant numérique de l'entité à récupérer
+ * @returns L'entité trouvée ou null si elle n'existe pas
+ * @throws {Error} Si une erreur survient lors de la requête à la base de données
+ */
+export async function getEntityById(id: number) {
+  // ...
+}
+```
+
+## Spécificités du projet
+
+### Tables avec préfixe `harp`
+- Les tables commençant par `harp` sont les nouvelles tables
+- Les tables `psadm_*` sont les anciennes tables à migrer
+- Vérifier si une table `harp*` est vide avant import
+
+### Migration automatique
+- Vérifier si les tables sont vides avant import
+- Exécuter les imports séquentiellement
+- Afficher un message de progression
+- Empêcher la connexion utilisateur pendant la migration
+
+### Protocole mylaunch://
+- Utilisé pour lancer des applications Windows depuis le navigateur
+- Format : `mylaunch://application/path`
+
+## Exemples de patterns récurrents
+
+### Création d'une entité complète
+1. Créer la Server Action dans `actions/create-entity.ts`
+2. Créer le composant `CreateEntityDialog.tsx`
+3. Créer le composant `EntityActions.tsx`
+4. Mettre à jour `columns.tsx` pour utiliser `EntityActions`
+5. Ajouter le bouton de création dans la page de liste
+
+### Ajout d'une action "voir"
+1. Créer `lib/actions/entity-actions.tsx` avec `getEntityById`
+2. Créer `ViewEntityContent.tsx` avec le style uniforme
+3. Créer `ViewEntityDialog.tsx` avec gestion du chargement
+4. Ajouter dans `EntityActions.tsx`
+
+### Application du style de `/list/roles`
+1. Ajouter le gradient et la Card
+2. Ajouter l'icône et le compteur dans le header
+3. Définir le tri par défaut dans la requête
+4. Créer les actions nécessaires
+5. Mettre à jour les colonnes
+
+## Tables et listes avec TanStack Table
+
+### Standard obligatoire pour toutes les listes
+- **TOUJOURS utiliser TanStack Table** (`@tanstack/react-table`) pour toutes les listes de données
+- **OBLIGATOIRE** : Toutes les pages de liste doivent inclure les fonctionnalités suivantes :
+  1. **Recherche globale** avec debounce (300ms)
+  2. **Filtres spécifiques** (statut, catégorie, etc.) selon le contexte
+  3. **Tri sur toutes les colonnes** cliquables
+  4. **Choix des colonnes visibles** avec persistance dans localStorage
+  5. **Redimensionnement des colonnes** (drag & drop)
+  6. **Pagination complète** avec sélection du nombre de lignes par page
+  7. **En-têtes de colonnes centrés** (`text-center`)
+  8. **Lignes compactes** (`compact={true}` dans DataTable)
+
+### Structure standard d'une page de liste
+
+```typescript
+"use client";
+
+import { useState, useEffect, useMemo, useCallback } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { Search, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  useReactTable,
+  getSortedRowModel,
+  SortingState,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  ColumnFiltersState,
+  VisibilityState,
+} from "@tanstack/react-table";
+import { DataTable } from "@/components/admin/DataTable";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+
+const columnHelper = createColumnHelper<EntityType>();
+
+export default function AdminEntityPage() {
+  const [data, setData] = useState<EntityType[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-entity-column-visibility");
+        if (saved) return JSON.parse(saved);
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences:", error);
+      }
+    }
+    return {};
+  });
+
+  // Debounce pour la recherche
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setGlobalFilter(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const loadData = useCallback(async () => {
+    try {
+      setLoading(true);
+      const res = await getAllEntities();
+      if (res.success && res.data) {
+        setData(res.data);
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Filtrer les données
+  const filteredData = useMemo(() => {
+    return data.filter(item => {
+      // Filtre global (recherche)
+      if (globalFilter.trim()) {
+        const q = globalFilter.trim().toLowerCase();
+        const searchText = [
+          item.field1 || "",
+          item.field2 || "",
+          // ... autres champs
+        ].join(" ").toLowerCase();
+        if (!searchText.includes(q)) return false;
+      }
+      
+      // Filtre par statut
+      if (statusFilter !== "all" && item.status !== statusFilter) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [data, globalFilter, statusFilter]);
+
+  const columns = useMemo(() => [
+    columnHelper.accessor("field1", {
+      header: "Champ 1",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-900 dark:text-gray-100">
+          {row.getValue("field1")}
+        </span>
+      ),
+      size: 200,
+      minSize: 150,
+      maxSize: 300,
+      enableResizing: true,
+    }),
+    // ... autres colonnes
+    columnHelper.display({
+      id: "actions",
+      header: "Actions",
+      meta: { forceVisible: true },
+      enableResizing: false,
+      cell: ({ row }) => {
+        const item = row.original;
+        return (
+          <div className="flex items-center space-x-2">
+            {/* Boutons d'action */}
+          </div>
+        );
+      },
+      size: 200,
+      minSize: 180,
+      maxSize: 250,
+    }),
+  ], [/* dépendances */]);
+
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(newVisibility);
+      try {
+        localStorage.setItem("admin-entity-column-visibility", JSON.stringify(newVisibility));
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde des préférences:", error);
+      }
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+    state: { sorting, columnFilters, globalFilter, columnVisibility },
+    defaultColumn: {
+      minSize: 50,
+      maxSize: 800,
+    },
+  });
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex items-center justify-between">
+          <CardTitle className="flex items-center">
+            <Icon className="h-5 w-5 mr-2" />
+            Gestion des Entités
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            <ColumnVisibilityToggle 
+              table={table} 
+              storageKey="admin-entity-column-visibility"
+            />
+            <Link href="/admin/entity/create">
+              <Button>
+                <Plus className="h-4 w-4 mr-2" />
+                Nouvelle entité
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {/* Filtres et recherche */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Input
+                placeholder="Rechercher..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="pl-10"
+              />
+            </div>
+            <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <SelectTrigger className="w-full sm:w-48">
+                <SelectValue placeholder="Filtrer par statut" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Tous les statuts</SelectItem>
+                <SelectItem value="actif">Actifs</SelectItem>
+                <SelectItem value="inactif">Inactifs</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
+          {loading ? (
+            <div className="flex items-center justify-center py-8">
+              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            </div>
+          ) : (
+            <>
+              <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+                {filteredData.length} entité(s) trouvée(s)
+              </div>
+              <DataTable table={table} emptyMessage="Aucune entité trouvée" compact={true} />
+              
+              {/* Pagination */}
+              <div className="bg-white dark:bg-gray-800 mt-5 flex items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
+                <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+                  {table.getFilteredRowModel().rows.length} ligne(s) au total
+                </div>
+
+                <div className="flex items-center space-x-6 lg:space-x-8">
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+                    <Select
+                      value={`${table.getState().pagination.pageSize}`}
+                      onValueChange={(value) => {
+                        table.setPageSize(Number(value));
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[70px]">
+                        <SelectValue placeholder={table.getState().pagination.pageSize} />
+                      </SelectTrigger>
+                      <SelectContent side="top">
+                        {[10, 20, 30, 40, 50].map((pageSize) => (
+                          <SelectItem key={pageSize} value={`${pageSize}`}>
+                            {pageSize}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex w-[100px] items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300">
+                    Page {table.getState().pagination.pageIndex + 1} sur{" "}
+                    {table.getPageCount()}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      className="hidden h-8 w-8 p-0 lg:flex"
+                      onClick={() => table.setPageIndex(0)}
+                      disabled={!table.getCanPreviousPage()}
+                    >
+                      <span className="sr-only">Aller à la première page</span>
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                      onClick={() => table.previousPage()}
+                      disabled={!table.getCanPreviousPage()}
+                    >
+                      <span className="sr-only">Page précédente</span>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                      onClick={() => table.nextPage()}
+                      disabled={!table.getCanNextPage()}
+                    >
+                      <span className="sr-only">Page suivante</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="hidden h-8 w-8 p-0 lg:flex"
+                      onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                      disabled={!table.getCanNextPage()}
+                    >
+                      <span className="sr-only">Aller à la dernière page</span>
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+```
+
+### Composants requis
+- **DataTable** : Composant réutilisable dans `@/components/admin/DataTable`
+- **ColumnVisibilityToggle** : Composant pour gérer la visibilité des colonnes dans `@/components/admin/ColumnVisibilityToggle`
+- **SortButton** : Composant pour le tri dans `@/components/admin/SortButton`
+
+### Configuration des colonnes
+- **Taille par défaut** : Définir `size`, `minSize`, `maxSize` pour chaque colonne
+- **Redimensionnement** : Activer avec `enableResizing: true` (sauf pour la colonne Actions)
+- **Tri** : Activé par défaut, désactiver avec `enableSorting: false` si nécessaire
+- **Colonnes d'actions** : Toujours définir `meta: { forceVisible: true }` et `enableResizing: false`
+
+### Persistance des préférences
+- Utiliser `localStorage` avec une clé unique par page (ex: `admin-entity-column-visibility`)
+- Gérer les erreurs de parsing JSON avec try/catch
+- Charger les préférences au montage du composant
+
+### Style de pagination
+- Utiliser le style standard avec fond blanc/gris foncé, ombre et bordures arrondies
+- Inclure : compteur total, sélecteur de lignes par page, numéro de page, boutons de navigation
+- Boutons "première/dernière page" masqués sur mobile (`hidden lg:flex`)
+
+## Notes importantes
+- Toujours vérifier le schéma Prisma avant de créer des requêtes
+- Respecter les contraintes de clés primaires composites
+- Les dates doivent être formatées avec `Intl.DateTimeFormat("fr-FR")`
+- Les champs nullable doivent être gérés avec `|| null` ou `|| undefined`
+

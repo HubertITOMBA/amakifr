@@ -184,43 +184,43 @@ export const NewVerificationForm = () => {
                                                 <span>Code de vérification</span>
                                             </FormLabel>
                                             <FormControl>
-                                                <div className="flex items-center justify-center gap-1 sm:gap-2">
-                                                    <div className="transform transition-all duration-300 hover:scale-105">
+                                                <div className="flex items-center justify-center gap-1 sm:gap-2 flex-wrap">
+                                                    <div className="transform transition-all duration-300 hover:scale-105 w-full flex justify-center">
                                                         <InputOTP 
                                                             maxLength={6} 
                                                             {...field}
-                                                            containerClassName="justify-center"
+                                                            containerClassName="justify-center w-full max-w-fit"
                                                         >
-                                                            <InputOTPGroup className="gap-1 sm:gap-2">
+                                                            <InputOTPGroup className="gap-0.5 sm:gap-1">
                                                                 <InputOTPSlot 
                                                                     index={0} 
-                                                                    className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
+                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
                                                                 />
                                                                 <InputOTPSlot 
                                                                     index={1} 
-                                                                    className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
+                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
                                                                 />
                                                             </InputOTPGroup>
-                                                            <InputOTPSeparator className="mx-1 sm:mx-2 text-gray-400 font-bold text-sm sm:text-base">-</InputOTPSeparator>
-                                                            <InputOTPGroup className="gap-1 sm:gap-2">
+                                                            <InputOTPSeparator className="mx-0.5 sm:mx-1 text-gray-400 font-bold text-xs sm:text-sm">-</InputOTPSeparator>
+                                                            <InputOTPGroup className="gap-0.5 sm:gap-1">
                                                                 <InputOTPSlot 
                                                                     index={2} 
-                                                                    className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
+                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
                                                                 />
                                                                 <InputOTPSlot 
                                                                     index={3} 
-                                                                    className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
+                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
                                                                 />
                                                             </InputOTPGroup>
-                                                            <InputOTPSeparator className="mx-1 sm:mx-2 text-gray-400 font-bold text-sm sm:text-base">-</InputOTPSeparator>
-                                                            <InputOTPGroup className="gap-1 sm:gap-2">
+                                                            <InputOTPSeparator className="mx-0.5 sm:mx-1 text-gray-400 font-bold text-xs sm:text-sm">-</InputOTPSeparator>
+                                                            <InputOTPGroup className="gap-0.5 sm:gap-1">
                                                                 <InputOTPSlot 
                                                                     index={4} 
-                                                                    className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
+                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
                                                                 />
                                                                 <InputOTPSlot 
                                                                     index={5} 
-                                                                    className="h-10 w-10 sm:h-12 sm:w-12 text-base sm:text-lg font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
+                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
                                                                 />
                                                             </InputOTPGroup>
                                                         </InputOTP>

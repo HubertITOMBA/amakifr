@@ -5,7 +5,7 @@ import * as z from 'zod'
 import bcrypt from "bcryptjs"
 import { db } from "@/lib/db"
 import { getUserByEmail } from "."
-import { sendTwoFactorTokenEmail } from "@/lib/mail"
+import { sendTwoFactorTokenEmail, sendNewUserNotificationEmail, sendUserRegistrationThankYouEmail } from "@/lib/mail"
 import { generateVerificationToken } from "@/lib/token"
 
 
@@ -44,6 +44,17 @@ export const register = async (
     //     }  
     // })
 
+    // Envoyer les emails de notification et de remerciement
+    try {
+        // Email aux administrateurs
+        await sendNewUserNotificationEmail(email, name);
+        
+        // Email de remerciement à l'utilisateur
+        await sendUserRegistrationThankYouEmail(email, name);
+    } catch (error) {
+        console.error("Erreur lors de l'envoi des emails:", error);
+        // Ne pas bloquer l'inscription si l'envoi d'email échoue
+    }
    
     const verificationToken = await generateVerificationToken(email)
     await sendTwoFactorTokenEmail(
@@ -51,5 +62,5 @@ export const register = async (
         verificationToken.token,
     )
 
-    return { success: "Code OTP envoyé !", twoFactor: true }
+    return { success: "Code OTP envoyé !", twoFactor: true }
 } 

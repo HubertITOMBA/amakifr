@@ -663,3 +663,330 @@ export const sendEventInvitationEmail = async(
     throw error;
   }
 }
+
+/**
+ * Envoyer un email de validation d'idée à un adhérent
+ */
+export const sendIdeeValidationEmail = async(
+  email: string,
+  userName: string,
+  ideeTitre: string
+) => {
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Votre idée a été validée !</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${userName},</p>
+      <p style="margin: 10px 0; color: #666;">
+        Nous avons le plaisir de vous informer que votre idée <strong>"${ideeTitre}"</strong> a été validée par l'administration.
+      </p>
+    </div>
+    
+    <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #28a745;">
+      <p style="margin: 0; color: #155724;">
+        <strong>✅ Votre idée est maintenant visible par tous les adhérents.</strong>
+      </p>
+      <p style="margin: 10px 0 0 0; color: #155724;">
+        Les autres membres peuvent maintenant la consulter, la commenter et l'approuver. Si elle reçoit suffisamment d'approbations, elle pourra être soumise au vote pour devenir un projet.
+      </p>
+    </div>
+    
+    <div style="margin-top: 30px;">
+      <a href="${domain}/idees" 
+         target="_blank" 
+         rel="noopener noreferrer"
+         style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px;">
+        Voir ma idée
+      </a>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Pour toute question, n'hésitez pas à nous contacter.
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  const { error } = await resend.emails.send({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: `Votre idée "${ideeTitre}" a été validée`,
+    html: wrapEmailContent(content)
+  });
+
+  if (error) {
+    console.log("RESEND_ERROR", error);
+    throw error;
+  }
+}
+
+/**
+ * Envoyer un email de rejet d'idée à un adhérent
+ */
+export const sendIdeeRejetEmail = async(
+  email: string,
+  userName: string,
+  ideeTitre: string,
+  raisonRejet: string
+) => {
+  const content = `
+    <h1 style="color: #dc3545; margin-bottom: 20px; margin-top: 0;">Votre idée a été rejetée</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${userName},</p>
+      <p style="margin: 10px 0; color: #666;">
+        Nous vous informons que votre idée <strong>"${ideeTitre}"</strong> a été rejetée par l'administration.
+      </p>
+    </div>
+    
+    <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #dc3545;">
+      <p style="margin: 0; color: #721c24;">
+        <strong>❌ Raison du rejet :</strong>
+      </p>
+      <p style="margin: 10px 0 0 0; color: #721c24;">
+        ${raisonRejet}
+      </p>
+    </div>
+    
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+      <p style="margin: 0; color: #856404;">
+        <strong>💡 Note importante :</strong>
+      </p>
+      <p style="margin: 10px 0 0 0; color: #856404;">
+        Votre idée a été rejetée car elle viole l'éthique de l'association, contient des propos diffamatoires ou irrespectueux. Nous vous invitons à soumettre une nouvelle idée qui respecte les valeurs et les règles de notre association.
+      </p>
+    </div>
+    
+    <div style="margin-top: 30px;">
+      <a href="${domain}/user/profile" 
+         target="_blank" 
+         rel="noopener noreferrer"
+         style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px;">
+        Soumettre une nouvelle idée
+      </a>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Pour toute question, n'hésitez pas à nous contacter.
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  const { error } = await resend.emails.send({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: `Votre idée "${ideeTitre}" a été rejetée`,
+    html: wrapEmailContent(content)
+  });
+
+  if (error) {
+    console.log("RESEND_ERROR", error);
+    throw error;
+  }
+}
+
+/**
+ * Envoyer un email de notification de suppression de commentaire à un adhérent
+ */
+export const sendCommentaireSupprimeEmail = async(
+  email: string,
+  userName: string,
+  ideeTitre: string,
+  raisonSuppression: string
+) => {
+  const content = `
+    <h1 style="color: #dc3545; margin-bottom: 20px; margin-top: 0;">Votre commentaire a été supprimé</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${userName},</p>
+      <p style="margin: 10px 0; color: #666;">
+        Nous vous informons que votre commentaire sur l'idée <strong>"${ideeTitre}"</strong> a été supprimé par l'administration.
+      </p>
+    </div>
+    
+    <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #dc3545;">
+      <p style="margin: 0; color: #721c24;">
+        <strong>❌ Raison de la suppression :</strong>
+      </p>
+      <p style="margin: 10px 0 0 0; color: #721c24;">
+        ${raisonSuppression}
+      </p>
+    </div>
+    
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+      <p style="margin: 0; color: #856404;">
+        <strong>💡 Note importante :</strong>
+      </p>
+      <p style="margin: 10px 0 0 0; color: #856404;">
+        Votre commentaire a été supprimé car il viole l'éthique de l'association, contient des propos diffamatoires ou irrespectueux. Nous vous invitons à respecter les valeurs et les règles de notre association dans vos futurs commentaires.
+      </p>
+    </div>
+    
+    <div style="margin-top: 30px;">
+      <a href="${domain}/idees" 
+         target="_blank" 
+         rel="noopener noreferrer"
+         style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px;">
+        Voir les idées
+      </a>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Pour toute question, n'hésitez pas à nous contacter.
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  const { error } = await resend.emails.send({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: `Votre commentaire sur "${ideeTitre}" a été supprimé`,
+    html: wrapEmailContent(content)
+  });
+
+  if (error) {
+    console.log("RESEND_ERROR", error);
+    throw error;
+  }
+}
+
+/**
+ * Envoyer un email aux administrateurs pour notifier d'une nouvelle inscription
+ * 
+ * @param userEmail - L'email de l'utilisateur qui vient de s'inscrire
+ * @param userName - Le nom de l'utilisateur qui vient de s'inscrire
+ */
+export const sendNewUserNotificationEmail = async(
+  userEmail: string,
+  userName: string
+) => {
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Nouvelle inscription sur le portail AMAKI</h1>
+    
+    <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+      <h2 style="color: #333; margin-top: 0;">Un nouvel utilisateur vient de s'inscrire</h2>
+      <p style="color: #666; margin: 10px 0;">Un nouveau compte a été créé sur le portail AMAKI France.</p>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 10px;">Informations du nouvel utilisateur</h3>
+      <p style="margin: 10px 0;"><strong>Nom :</strong> ${userName}</p>
+      <p style="margin: 10px 0;"><strong>Email :</strong> <a href="mailto:${userEmail}" style="color: #4a90e2;">${userEmail}</a></p>
+      <p style="margin: 10px 0;"><strong>Date d'inscription :</strong> ${new Date().toLocaleDateString('fr-FR', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit'
+      })}</p>
+    </div>
+    
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <p style="margin: 0; color: #666;"><strong>Note :</strong> L'utilisateur a reçu un email de remerciement l'invitant à compléter ses informations d'adhérent pour devenir membre effectif.</p>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Vous pouvez consulter le profil de cet utilisateur depuis l'interface d'administration.
+    </p>
+  `;
+
+  // Envoyer à plusieurs destinataires
+  const recipients = ["asso.amaki@gmail.com", "hubert.itomba@orange.fr","f3sbtevry@gmail.com"];
+  
+  for (const recipient of recipients) {
+    const { error } = await resend.emails.send({
+      from: 'noreply@amaki.fr',
+      to: recipient,
+      subject: `Nouvelle inscription : ${userName}`,
+      html: wrapEmailContent(content)
+    });
+
+    if (error) {
+      console.log("RESEND_ERROR pour", recipient, error);
+      // Ne pas throw pour ne pas bloquer l'inscription si l'email échoue
+    }
+  }
+}
+
+/**
+ * Envoyer un email de remerciement à un nouvel utilisateur qui vient de s'inscrire
+ * 
+ * @param email - L'email de l'utilisateur
+ * @param userName - Le nom de l'utilisateur
+ */
+export const sendUserRegistrationThankYouEmail = async(
+  email: string,
+  userName: string
+) => {
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Bienvenue sur le portail AMAKI France !</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${userName},</p>
+      <p style="margin: 10px 0; color: #666;">Nous vous remercions de votre inscription sur le portail AMAKI France !</p>
+    </div>
+    
+    <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+      <h2 style="color: #333; margin-top: 0;">Votre compte a été créé avec succès</h2>
+      <p style="color: #666; margin: 10px 0;">Vous pouvez maintenant accéder à votre espace membre et découvrir toutes les fonctionnalités du portail.</p>
+    </div>
+    
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <h3 style="color: #333; margin-top: 0; font-size: 18px;">💡 Devenir membre effectif ou adhérent</h3>
+      <p style="color: #666; margin: 10px 0;">Si vous souhaitez devenir <strong>membre effectif</strong> ou <strong>adhérent</strong> de l'association AMAKI France, nous vous invitons à compléter vos informations d'adhérent dans votre profil.</p>
+      <p style="color: #666; margin: 10px 0;">Une fois votre compte validé par l'administration, vous recevrez par la suite votre <strong>passeport AMAKI</strong>.</p>
+    </div>
+    
+    <div style="margin-bottom: 20px; text-align: center;">
+      <a 
+        href="${domain}/user/profile" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 10px;">
+        Accéder à mon profil
+      </a>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 10px;">Prochaines étapes</h3>
+      <ol style="color: #666; padding-left: 20px;">
+        <li style="margin: 10px 0;">Connectez-vous à votre espace membre</li>
+        <li style="margin: 10px 0;">Complétez vos informations d'adhérent dans votre profil</li>
+        <li style="margin: 10px 0;">Attendez la validation de votre compte par l'administration</li>
+        <li style="margin: 10px 0;">Recevez votre passeport AMAKI une fois votre compte validé</li>
+      </ol>
+    </div>
+    
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+      <p style="margin: 0; color: #856404;"><strong>📋 Important :</strong> Pour bénéficier de tous les avantages en tant que membre effectif ou adhérent, n'oubliez pas de compléter vos informations d'adhérent dans votre profil.</p>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Pour toute question, n'hésitez pas à nous contacter à <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>.
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  const { error } = await resend.emails.send({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: 'Bienvenue sur le portail AMAKI France !',
+    html: wrapEmailContent(content)
+  });
+
+  if (error) {
+    console.log("RESEND_ERROR", error);
+    throw error;
+  }
+}

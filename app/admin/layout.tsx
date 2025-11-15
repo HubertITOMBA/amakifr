@@ -15,7 +15,8 @@ import {
   Shield,
   Home,
   Menu,
-  X
+  X,
+  Lightbulb
 } from "lucide-react";
 import Link from "next/link";
 
@@ -81,6 +82,12 @@ const adminMenuItems = [
     href: "/admin/votes",
     icon: Shield,
     description: "Votes et résultats"
+  },
+  {
+    title: "Boîte à idées",
+    href: "/admin/idees",
+    icon: Lightbulb,
+    description: "Gestion des idées soumises"
   },
   // {
   //   title: "Contenu",

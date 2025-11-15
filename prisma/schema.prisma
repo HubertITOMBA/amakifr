@@ -241,6 +241,9 @@ model Adherent {
   CotisationsMensuelles       CotisationMensuelle[] // Cotisations mensuelles
   RelancesCotisationMensuelle RelanceCotisationMensuelle[] // Relances cotisations mensuelles
   InscriptionsEvenements      InscriptionEvenement[] // Inscriptions aux événements
+  idees                       Idee[] // Idées soumises par l'adhérent
+  commentairesIdee            CommentaireIdee[] // Commentaires sur les idées
+  approbationsIdee            ApprobationIdee[] // Approbations des idées
   created_at                  DateTime?                    @db.Timestamp(0)
   updated_at                  DateTime?                    @db.Timestamp(0)
   userId                      String                       @unique
@@ -714,4 +717,96 @@ model MessageReaction {
 
   @@unique([messageId, userId, reaction])
   @@map("message_reactions")
+}
+
+// Enum pour le statut d'une idée
+enum StatutIdee {
+  EnAttente
+  Validee
+  Rejetee
+  Bloquee
+  DevenueProjet
+}
+
+// Modèle pour les idées de la boîte à idées
+model Idee {
+  id                 String     @id @default(cuid())
+  titre              String     @db.VarChar(255)
+  description        String     @db.Text
+  adherentId         String // Auteur de l'idée
+  statut             StatutIdee @default(EnAttente)
+  nombreCommentaires Int        @default(0) // Compteur de commentaires
+  nombreApprobations Int        @default(0) // Compteur d'approbations
+
+  // Dates importantes
+  dateCreation   DateTime  @default(now())
+  dateValidation DateTime? // Date de validation par l'admin
+  dateRejet      DateTime? // Date de rejet par l'admin
+  dateBlocage    DateTime? // Date de blocage par l'admin
+
+  // Raison du rejet ou du blocage
+  raisonRejet String? @db.Text // Raison du rejet (viole l'éthique, propos diffamatoires, etc.)
+
+  // Admin qui a validé/rejeté/bloqué
+  valideePar String? // ID de l'admin qui a validé
+  rejeteePar String? // ID de l'admin qui a rejeté
+  bloqueePar String? // ID de l'admin qui a bloqué
+
+  // Si l'idée est déjà lue (pour empêcher la suppression directe)
+  estLue Boolean @default(false) // Si au moins un commentaire ou approbation existe
+
+  // Relations
+  Adherent     Adherent          @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  Commentaires CommentaireIdee[] // Commentaires sur cette idée
+  Approbations ApprobationIdee[] // Approbations de cette idée
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([adherentId])
+  @@index([statut])
+  @@index([dateCreation])
+  @@map("idees")
+}
+
+// Modèle pour les commentaires sur les idées
+model CommentaireIdee {
+  id                String  @id @default(cuid())
+  ideeId            String
+  adherentId        String // Auteur du commentaire
+  contenu           String  @db.Text
+  supprime          Boolean @default(false) // Si le commentaire a été supprimé par l'admin
+  raisonSuppression String? @db.Text // Raison de la suppression
+
+  // Relations
+  Idee     Idee     @relation(fields: [ideeId], references: [id], onDelete: Cascade)
+  Adherent Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([ideeId])
+  @@index([adherentId])
+  @@map("commentaires_idee")
+}
+
+// Modèle pour les approbations (votes/likes) des idées
+model ApprobationIdee {
+  id         String @id @default(cuid())
+  ideeId     String
+  adherentId String // Adhérent qui approuve
+
+  // Relations
+  Idee     Idee     @relation(fields: [ideeId], references: [id], onDelete: Cascade)
+  Adherent Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+
+  @@unique([ideeId, adherentId])
+  @@index([ideeId])
+  @@index([adherentId])
+  @@map("approbations_idee")
 }

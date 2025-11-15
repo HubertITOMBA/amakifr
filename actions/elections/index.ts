@@ -317,7 +317,9 @@ export async function createCandidacy(candidacyData: CandidacyData): Promise<{ s
     const adherent = await prisma.adherent.findUnique({
       where: { userId: session.user.id },
       include: {
-        User: true
+        User: true,
+        Adresse: true,
+        Telephones: true
       }
     });
 
@@ -325,6 +327,19 @@ export async function createCandidacy(candidacyData: CandidacyData): Promise<{ s
       return { 
         success: false, 
         error: "Vous devez être adhérent pour pouvoir postuler. Veuillez compléter votre profil adhérent depuis votre espace personnel." 
+      };
+    }
+
+    // Vérifier que l'adhérent a complété ses informations (adresse ou téléphone)
+    const hasAddress = adherent.Adresse && adherent.Adresse.length > 0 && 
+      adherent.Adresse.some(addr => addr.street1 && addr.city && addr.codepost);
+    const hasPhone = adherent.Telephones && adherent.Telephones.length > 0 &&
+      adherent.Telephones.some(tel => tel.numero && tel.numero.trim() !== "");
+
+    if (!hasAddress && !hasPhone) {
+      return { 
+        success: false, 
+        error: "Vous devez compléter vos informations personnelles (adresse ou téléphone) dans votre profil avant de pouvoir postuler à un poste." 
       };
     }
 
@@ -1288,11 +1303,28 @@ export async function vote(
 
     // Récupérer l'adhérent de l'utilisateur
     const adherent = await prisma.adherent.findUnique({
-      where: { userId: session.user.id }
+      where: { userId: session.user.id },
+      include: {
+        Adresse: true,
+        Telephones: true
+      }
     });
 
     if (!adherent) {
-      return { success: false, error: "Profil adhérent non trouvé" };
+      return { success: false, error: "Profil adhérent non trouvé. Veuillez compléter vos informations d'adhérent dans votre profil." };
+    }
+
+    // Vérifier que l'adhérent a complété ses informations (adresse ou téléphone)
+    const hasAddress = adherent.Adresse && adherent.Adresse.length > 0 && 
+      adherent.Adresse.some(addr => addr.street1 && addr.city && addr.codepost);
+    const hasPhone = adherent.Telephones && adherent.Telephones.length > 0 &&
+      adherent.Telephones.some(tel => tel.numero && tel.numero.trim() !== "");
+
+    if (!hasAddress && !hasPhone) {
+      return { 
+        success: false, 
+        error: "Vous devez compléter vos informations personnelles (adresse ou téléphone) dans votre profil avant de pouvoir voter." 
+      };
     }
 
     // Vérifier que l'élection est ouverte au vote

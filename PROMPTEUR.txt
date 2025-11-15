@@ -1,0 +1,254 @@
+Souhaitez-vous que le bouton « Enregistrer » déclenche aussi d’autres actions (ex. ajout de poste personnalisé si ce formulaire est ouvert), ou cette intégration vous suffit-elle pour l’instant ?
+
+
+==================
+
+Oui, c’est possible, mais il y a plusieurs options avec des compromis. La fermeture de session “à la fermeture du navigateur” n’est pas native avec NextAuth en mode JWT. Voici les solutions viables:
+Option simple et robuste (recommandée): supprimer la session côté serveur à la fermeture de l’onglet
+Implémentation: un endpoint API qui appelle signOut() (ou supprime la session si on passe en “database sessions”) et un listener côté client sur beforeunload qui envoie une requête avec keepalive (ou navigator.sendBeacon) pour fermer la session.
+Avantages: fonctionne à la fermeture du navigateur/onglet.
+Remarque: on contourne les contraintes CSRF de l’endpoint NextAuth par un endpoint custom.
+Option atténuée: réduire fortement session.maxAge (ex. 5–10 min) + rafraîchir la session seulement en activité
+Avantages: simple à mettre en place.
+Inconvénients: la session peut rester active quelques minutes après fermeture.
+Option “database sessions”: migrer session.strategy en “database”, et supprimer explicitement la session à la fermeture (même mécanique que l’option 1, mais suppression de la ligne en base). Permet aussi d’invalider sur d’autres signaux.
+Voulez-vous que je mette en place l’option 1 (endpoint custom + hook client) maintenant pour que la session soit fermée lorsqu’on quitte l’onglet/navigateur ?
+
+
+Je vais rechercher les pages avec des onglets pour appliquer le chargement paresseux et les contrôles de virtualisation, puis je ferai les modifications en lot.
+
+C’est appliqué.
+Admin Dashboard (app/admin/page.tsx)
+Plus de chargement global au montage.
+Les données (candidatures + élections) ne sont chargées que lorsqu’on ouvre l’onglet « Élections ».
+Loader dédié pour cet onglet.
+Liste des élections basée sur getElectionsLightForAdmin pour limiter la charge.
+Page Élections admin
+Déjà en mode paresseux avec debounce, contrôles de virtualisation et endpoints “light”.
+Souhaitez-vous que j’étende le même pattern aux autres pages à onglets (ex. composants financiers si présents) ?
+
+
+
+Ajouter également  le CRUD complet au composant app/admin/cadidatures/page.tsx avec un formulaire modale (consultation/création/édition/suppression) comme dans /admin/elections
+
+pour la création/édition/suppression et l’activation. je préfère une modale
+
+Ajouter également  le CRUD complet au composant app/admin/votes/page.tsx avec un formulaire modale (consultation/création/édition/suppression).
+L'admin doit ouvrir le vote, le cloturer, l'annuler, valider. Vérifier également les fonctions sur la liste de votes. La selection, la consultation, l'edition car rien ne marche
+le navigateur bloque sur cette page, je ne sais pas pourquoi 
+
+Toujours pas opérationnel, j'aimerai cette architecture / arboressence pour /admin/votes
+/admin/votes
+/admin/votes/[id]/consultation
+/admin/votes/[id]/edition
+/admin/votes/gestion
+
+cmha87rz6000bmeqf82q6glcq
+
+#update public.candidacies set stattus='EnAttente' where id='cmha87rz6000ameqfykf4mg78';
+#commit;
+
+
+Supprimer tout le comptenu de la page admin/elections/page.tsx Dans cette page, ajouter une liste des elections avec toutes les infos de la table, 
+ajouter les actions Validation, suppression, editions, consultation, et dans  la même page, Donner la possibilité Selectionner,  de rechecher, de filtre
+un menu lateral donnant : 
+ la posibiliter de voir la liste les postes associées à la 'election selecionnée
+ La Possibilité de voir la liste des candidats  à la 'election selecionnée 
+
+
+l'action voir et editer de la page /admin/candidatures renvoit le message suivant :Candidature introuvable. dans l même paaage, l'action supprimer n'est pas nécessaire ni utile puis ajouter une colonne
+pour l'election. Pas besoin d'afficher l'email du candidat mais ajouter l'envoi de mail lors que le statut de la candidature est changé. Toutes les infos du canditat seront dans le modal de details. Ajouter également les boutons de recherche et filtre
+
+
+Pour la page admin/users/ Gerer le CRUD comme pour toutes les pages dans admin/ : Lister tous les users/adherent act tout statut confondu. Denner à l'admin la possibilirter de modifier, editer, changer le statut, changer le role
+editer,  Surtout afficher les données venant de la base. Lister avec tanstack avec bouton de recherche, filtre
+
+
+
+Pouvez-vous generer une image d'un ateliir d'africains modernes dans une cuisine, pour une specimaité de cuisine africaisnes, avec sur le plan de travail, des produits alimentaires africains ?
+
+
+Options pour obtenir l’image
+Outils de génération d’images (IA) :
+DALL-E 3 (via ChatGPT Plus ou Bing Image Creator)
+Midjourney
+Stable Diffusion
+Adobe Firefly
+Leonardo.ai
+Services d’images de stock :
+Unsplash
+Pexels
+Shutterstock
+Getty Images
+Création manuelle :
+Faire appel à un photographe/designer
+Organiser une séance photo avec des membres
+
+
+Modern African culinary workshop, professional kitchen setting, diverse group of contemporary African chefs and participants working together, 
+African food products displayed on countertops (plantains, yams, cassava, palm oil, spices, traditional ingredients), modern equipment, warm lighting, 
+vibrant colors, professional photography style, high quality
+
+
+Dans la page admin/cotisation/gestion/ Sur la liste d'adhérent la colonne "dernière connexion"  et email ne sont pas importants
+
+
+cd /soft/dev/nextjs/amakifr && npx prisma migrate dev --name add_visiteur_adresse --create-only 2>&1 | head -30
+
+
+
+http://192.168.1.49:9052/evenements/cmhglxmrp0001meu1v1hjk2ex
+
+
+868  sudo npm i
+  869  sudo npm install -g npm@11.6.2
+  870  sudo npx prisma generate
+  871  sudo npm db:reset
+  872  sudo npm run db:reset
+  873* sudo npx migrate
+  874  sudo npx prisma generate
+  875  sudo npx prisma migrate
+  876  sudo npx prisma migrate deploy
+  877  sudo npm run db:reset
+  878  sudo npx prisma generate
+  879  sudo npx prisma migrate reset
+  880* 
+  881  sudo npx prisma migrate deploy
+  882  sudo npm run db:reset
+  883  sudo npx prisma generate
+  884  sudo npx prisma db push
+  885  sudo npm run db:reset
+  886  sudo npx prisma migrate deploy
+  887  sudo npm run db:reset
+  888  sudo npx prisma generate
+  889  sudo npx prisma db push
+  890  sudo npm run db:seed-all
+  891  history
+  892  sudo pm2 stop npm --name amakifr -- run start -- --port 9050
+  893  sudo pm2 start npm --name amakifr -- run start -- --port 9050
+  894  sudo pm2 stop npm --name amakifr -- run start -- --port 9050
+  895  sudo pm2 list
+  896  sudo pm2 stop npm --name amakifr -- run start -- --port 9050
+  897  sudo pm2 delete amakifr
+  898  sudo nginx -t
+  899  sudo systemctl status nginx
+  900  npm run build
+  901  sudo npm install -g npm@11.6.2
+  902  sudo pm2 start npm --name amakifr -- run start -- --port 9050
+  903  sudo su - postgres
+  904  sudo pm2 delete amakifr
+  905  sudo npm run build
+  906  sudo pm2 start npm --name amakifr -- run start -- --port 9050
+  907  sudo pm2 delete amakifr
+  908  ls -rtla
+  909  sudo rm -rf .next
+  910  ls -rtla
+  911  sudo npm run build
+  912  sudo pm2 start npm --name amakifr -- run start -- --port 9050
+  913  sudo su - postgres
+  914  sudo pm2 delete amakifr
+  915  ls -rtla
+  916  sudo rm -rf .next
+  917  sudo npx prisma generate
+  918  sudo npx prisma db push
+  919  sudo npm run build
+  920  sudo pm2 start npm --name amakifr -- run start -- --port 9050
+  921  sudo pm2 delete amakifr
+  922  sudo rm -rf .next
+
+
+
+
+
+
+
+
+
+
+
+
+
+sudo npx prisma migrate dev --name reduce_code_to_6_characters
+
+sudo npm run db:migrate-poste-codes
+sudo npx prisma db push
+
+sudo npm run db:update-elections-date-cloture
+sudo npx prisma migrate dev --name make-date-cloture-candidature-required
+sudo npm run db:migrate-elections-dates-validation
+
+===================================================================================================
+Pour les elections  applquer les règles suivantes.
+  dateOuverture doit toujours être inférieure à la date dateClotureCandidature         
+  dateClotureCandidature est obligatoire doit toujours être inférieure à la date dateScrutin 
+  dateCloture doit toujours être supérieure à la date dateScrutin  
+  Appliquer ces règles et mettre à jour la table dans la base de données et adaptyer les seed      
+
+
+
+Voici mon scenario :
+Docker est déjà installé sur mon VPS CentOs Stream 10. nginx (/etc/nginx/conf.d) et cerbot sont déjà configurés. 
+j'utilise plusieurs domaines avec un seul IP. Mes domaines sont sur /sites/
+Comment configurer docker pour deployer et mettre à jour mes sites . 
+Toutes mes applications sont écrites en nextjs, typeScript, tailwindcss, Prisma, PostgreSql et Resend.
+Merci de m'aider à deployer et ou mettre à jour mes sites avec docker.
+
+/sites/fmkin
+/sites/amakifr/
+
+=============================
+TO DO LIST
+=============================
+
+Pour l'admin/evenements, implementer ou ajouter une fonction pour envoyer un mail d'invitaion à un ou tous les membres actif ou non pour un evenement ou un evenement
+selectionné ou en cours. avec options de choix et le mieux que vous pouvez proposer. Ajouter également dans le mail la rubrique du genre 
+"Obtenir l’itinéraire : cliquez ici" afin d'afficher le map pour le lieu de l'evenement. 
+
+
+Dans admin/users, prévoir également l'option d'envoi de mail à un ou plusieurs adherent avec options d'editer l'objet et le corps du mail
+
+
+J'aiemrai deplyer mon application vers mon VPS (Centos Stream 10 ), distant dans le quel nginx et cerbot sont configuré pour plusieurs domaine un seul IP.
+mon application devra être deployé par docker déjà installé mais n'est pas encore configuré ni sur cette machine ni sur mon VPS?  Merci  de m'aider à le faire.
+
+
+
+Implementer un system de boite à idées pour les adhérents. l'adhérent connecté soumets son idées, les autres adhérents peuvent la lire mais pas la modifier,
+ils peuvent commenter et cet idée s'il a beaucoup d'approbation, peut être voté par les membres pour que cette idées devienne un projet. L'idée dans la boite à idée
+aura un id, un titre, une description, un auteur (l'adhérent), une date de creation, de validation ou de  rejet et un compteur pour noter le nombre de commantaires
+proposer moi une idée professionnel à implementér, l'utilisateur aura dans son profile pour aller créer ou modifier ou rétirer son idée. Si l'idée est déjà lu, il faut 
+qu'il demande à l'admin de le supprimer. l'admin a le droit de rejeter, de bloquer l'idée. l'adherent recoit un mail en cas de validation ou de rejet de son idée 
+
+
+Pour une idée rejetée, l'adhérent est notifié par mail parce que son idée est soit :
+viole l'ethique de l'association, contient de propos difamatoire, soit irrespectueux.
+On l'invite à refaire une idée propre. Paril pour un commenter, l'admin doit avoir la possibilité de
+supprimer le commentaire et notifier l'adhére pour les mêmes raisons. implementer cette logique 
+
+
+
+
+Pendant que vous redémarrez, vérifions que tout est en place. Créons aussi un script de test simple pour vérifier directement le token :
+
+
+[3 tools called]
+
+
+J'ai créé un script de test. Après le redémarrage, vous pouvez :
+
+1. **Tester le script** pour vérifier que le token fonctionne :
+```bash
+npx tsx scripts/test-new-password-action.ts
+```
+
+2. **Vérifier les logs serveur** — après avoir cliqué sur "Réinitialiser le mot de passe", vous devriez voir des logs avec 🔴 dans le terminal.
+
+**Si le problème persiste après le redémarrage**, essayons une approche différente : passer le token uniquement via FormData (sans paramètre séparé), car Next.js peut avoir des problèmes avec les paramètres optionnels des Server Actions.
+
+En attendant, le code actuel devrait fonctionner. Les logs avec 🔴 dans le terminal indiqueront où le token est perdu.
+
+**Après le redémarrage, partagez :**
+- Les logs du terminal serveur (avec les 🔴)
+- Le résultat du script de test si vous l'exécutez
+
+Cela permettra d'identifier précisément le problème.
