@@ -170,6 +170,51 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
             Telephones: true,
             Cotisations: true,
             ObligationsCotisation: true,
+            DettesInitiales: {
+              orderBy: {
+                annee: 'desc'
+              }
+            },
+            CotisationsMensuelles: {
+              orderBy: [
+                { annee: 'desc' },
+                { mois: 'desc' }
+              ],
+              include: {
+                TypeCotisation: true,
+                Paiements: {
+                  orderBy: {
+                    datePaiement: 'desc'
+                  },
+                  include: {
+                    CreatedBy: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            Assistances: {
+              where: {
+                dateEvenement: {
+                  gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+                  lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1)
+                }
+              }
+            },
+            Avoirs: {
+              where: {
+                statut: "Disponible",
+                montantRestant: { gt: 0 }
+              },
+              orderBy: {
+                createdAt: 'desc'
+              }
+            },
             Enfants: true
           }
         }
@@ -194,11 +239,144 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
           montantAttendu: Number(obligation.montantAttendu),
           montantPaye: Number(obligation.montantPaye),
           montantRestant: Number(obligation.montantRestant)
+        })) || [],
+        DettesInitiales: user.adherent.DettesInitiales?.map((dette: any) => ({
+          ...dette,
+          montant: Number(dette.montant),
+          montantPaye: Number(dette.montantPaye),
+          montantRestant: Number(dette.montantRestant)
+        })) || [],
+        CotisationsMensuelles: user.adherent.CotisationsMensuelles?.map((cot: any) => ({
+          ...cot,
+          montantAttendu: Number(cot.montantAttendu),
+          montantPaye: Number(cot.montantPaye),
+          montantRestant: Number(cot.montantRestant),
+          TypeCotisation: cot.TypeCotisation ? {
+            ...cot.TypeCotisation,
+            montant: Number(cot.TypeCotisation.montant)
+          } : null,
+          Paiements: cot.Paiements?.map((paiement: any) => ({
+            ...paiement,
+            montant: Number(paiement.montant),
+            CreatedBy: paiement.CreatedBy ? {
+              id: paiement.CreatedBy.id,
+              name: paiement.CreatedBy.name,
+              email: paiement.CreatedBy.email
+            } : null
+          })) || []
+        })) || [],
+        Assistances: user.adherent.Assistances?.map((ass: any) => ({
+          ...ass,
+          montant: Number(ass.montant),
+          montantPaye: Number(ass.montantPaye),
+          montantRestant: Number(ass.montantRestant)
+        })) || [],
+        Avoirs: user.adherent.Avoirs?.map((avoir: any) => ({
+          ...avoir,
+          montant: Number(avoir.montant),
+          montantUtilise: Number(avoir.montantUtilise),
+          montantRestant: Number(avoir.montantRestant)
         })) || []
       } : null
     };
 
-    return { success: true, user: userWithConvertedDecimals };
+    // Récupérer les données pour calculer la cotisation du mois prochain
+    let cotisationMoisProchain = null;
+    if (user.adherent) {
+      const moisProchain = new Date();
+      moisProchain.setMonth(moisProchain.getMonth() + 1);
+      const startOfNextMonth = new Date(moisProchain.getFullYear(), moisProchain.getMonth(), 1);
+      const endOfNextMonth = new Date(moisProchain.getFullYear(), moisProchain.getMonth() + 1, 0, 23, 59, 59);
+
+      // Récupérer toutes les assistances du mois prochain
+      const toutesAssistancesMoisProchain = await prisma.assistance.findMany({
+        where: {
+          dateEvenement: {
+            gte: startOfNextMonth,
+            lte: endOfNextMonth
+          },
+          statut: { not: "Annule" }
+        },
+        include: {
+          Adherent: {
+            select: {
+              id: true,
+              firstname: true,
+              lastname: true
+            }
+          }
+        }
+      });
+
+      // Trouver le type Forfait Mensuel
+      const typeForfait = await prisma.typeCotisationMensuelle.findFirst({
+        where: {
+          nom: { contains: "Forfait", mode: "insensitive" },
+          obligatoire: true,
+          actif: true
+        }
+      });
+
+      if (typeForfait) {
+        const montantForfait = Number(typeForfait.montant);
+        const adherentId = user.adherent.id;
+
+        // Vérifier si l'adhérent bénéficie d'une assistance
+        const assistancesBeneficiaires = toutesAssistancesMoisProchain.filter(
+          ass => ass.adherentId === adherentId
+        );
+        const isBeneficiaire = assistancesBeneficiaires.length > 0;
+
+        // Calculer le montant total
+        let montantTotal = montantForfait;
+        let description = `Cotisation ${moisProchain.getFullYear()}-${String(moisProchain.getMonth() + 1).padStart(2, '0')} : Forfait ${montantForfait.toFixed(2)}€`;
+
+        if (isBeneficiaire) {
+          const assistancesDetails = assistancesBeneficiaires.map(ass => 
+            `${ass.type} (bénéficiaire)`
+          ).join(", ");
+          description += ` - Bénéficiaire de: ${assistancesDetails} (ne paie pas l'assistance)`;
+        } else if (toutesAssistancesMoisProchain.length > 0) {
+          const montantAssistances = toutesAssistancesMoisProchain.reduce((sum, ass) => {
+            return sum + Number(ass.montantRestant > 0 ? ass.montantRestant : ass.montant);
+          }, 0);
+          montantTotal = montantForfait + montantAssistances;
+
+          const assistancesDetails = toutesAssistancesMoisProchain.map(ass => 
+            `${ass.type} pour ${ass.Adherent?.firstname || ''} ${ass.Adherent?.lastname || ''} (${Number(ass.montantRestant > 0 ? ass.montantRestant : ass.montant).toFixed(2)}€)`
+          ).join(", ");
+          description += ` + Assistances: ${assistancesDetails}`;
+          description += ` = Total: ${montantTotal.toFixed(2)}€`;
+        }
+
+        cotisationMoisProchain = {
+          periode: `${moisProchain.getFullYear()}-${String(moisProchain.getMonth() + 1).padStart(2, '0')}`,
+          nomMois: moisProchain.toLocaleDateString('fr-FR', { month: 'long' }).charAt(0).toUpperCase() + moisProchain.toLocaleDateString('fr-FR', { month: 'long' }).slice(1),
+          montantForfait,
+          montantTotal,
+          description,
+          assistances: toutesAssistancesMoisProchain.map((ass: any) => ({
+            id: ass.id,
+            type: ass.type,
+            montant: Number(ass.montant),
+            adherent: ass.Adherent ? {
+              id: ass.Adherent.id,
+              firstname: ass.Adherent.firstname,
+              lastname: ass.Adherent.lastname
+            } : null
+          })),
+          isBeneficiaire
+        };
+      }
+    }
+
+    return { 
+      success: true, 
+      user: {
+        ...userWithConvertedDecimals,
+        cotisationMoisProchain
+      }
+    };
   } catch (error) {
     console.error("Erreur lors de la récupération des données utilisateur:", error);
     return { success: false, error: "Erreur serveur" };

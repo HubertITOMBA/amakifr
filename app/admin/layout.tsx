@@ -89,6 +89,12 @@ const adminMenuItems = [
     icon: Lightbulb,
     description: "Gestion des idées soumises"
   },
+  {
+    title: "Finances",
+    href: "/admin/finances",
+    icon: Euro,
+    description: "Gestion financière"
+  },
   // {
   //   title: "Contenu",
   //   href: "/admin/content",

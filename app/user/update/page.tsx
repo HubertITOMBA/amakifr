@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
-import { ArrowLeft, Save, User, MapPin, Building, Phone, Plus, Trash2, Calendar, Users, Briefcase, Heart, Shield, Mail, Info } from "lucide-react";
+import { ArrowLeft, Save, User, MapPin, Building, Phone, Plus, Trash2, Calendar, Users, Briefcase, Heart, Shield, Mail, Info, Download } from "lucide-react";
 import Link from "next/link";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { toast } from "sonner";
@@ -291,36 +291,288 @@ export default function UpdateUserPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-      <div className="container mx-auto px-4 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="container mx-auto px-4 py-8 max-w-5xl">
         {/* Header */}
         <div className="mb-8">
-          <Link 
-            href="/user/profile" 
-            className="inline-flex items-center text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 mb-4"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Retour au profil
-          </Link>
+          <div className="flex justify-between items-start mb-6">
+            <Link 
+              href="/user/profile" 
+              className="inline-flex items-center text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour au profil
+            </Link>
+            
+            <Button
+              variant="outline"
+              onClick={async () => {
+                try {
+                  toast.loading("Génération du PDF en cours...");
+                  // Import dynamique de jsPDF et des helpers
+                  const { default: jsPDF } = await import('jspdf');
+                  const { addPDFHeader, addPDFFooter } = await import('@/lib/pdf-helpers-client');
+                  const doc = new jsPDF();
+                  
+                  // Ajouter l'en-tête avec logo
+                  await addPDFHeader(doc, 'Fiche d\'adhésion - Informations complètes');
+                  
+                  let yPos = 70; // Commencer après l'en-tête (augmenté car l'en-tête est plus haut avec le titre)
+                  
+                  // Date de génération
+                  doc.setFontSize(10);
+                  doc.setTextColor(100, 100, 100);
+                  doc.setFont('helvetica', 'normal');
+                  doc.text(`Date de génération: ${new Date().toLocaleDateString('fr-FR')}`, 20, yPos);
+                  yPos += 10;
+                  
+                  // 1. Informations personnelles
+                  doc.setFontSize(14);
+                  doc.setTextColor(37, 99, 235); // blue-600
+                  doc.setFont('helvetica', 'bold');
+                  doc.text('1. Informations personnelles', 20, yPos);
+                  yPos += 8;
+                  
+                  doc.setFontSize(10);
+                  doc.setTextColor(0, 0, 0);
+                  doc.setFont('helvetica', 'normal');
+                  doc.text(`Civilité: ${adherentData.civility}`, 20, yPos);
+                  yPos += 6;
+                  doc.text(`Prénom: ${adherentData.firstname || 'Non renseigné'}`, 20, yPos);
+                  yPos += 6;
+                  doc.text(`Nom: ${adherentData.lastname || 'Non renseigné'}`, 20, yPos);
+                  yPos += 6;
+                  if (adherentData.dateNaissance) {
+                    doc.text(`Date de naissance: ${new Date(adherentData.dateNaissance).toLocaleDateString('fr-FR')}`, 20, yPos);
+                    yPos += 6;
+                  }
+                  doc.text(`E-mail: ${userData.email || 'Non renseigné'}`, 20, yPos);
+                  yPos += 10;
+                  
+                  // 2. Adresse
+                  if (adresseData.street1 || adresseData.city) {
+                    doc.setFontSize(14);
+                    doc.setTextColor(22, 163, 74); // green-600
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('2. Adresse', 20, yPos);
+                    yPos += 8;
+                    
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont('helvetica', 'normal');
+                    const adresseParts = [];
+                    if (adresseData.streetnum) adresseParts.push(adresseData.streetnum);
+                    if (adresseData.street1) adresseParts.push(adresseData.street1);
+                    if (adresseData.street2) adresseParts.push(adresseData.street2);
+                    if (adresseParts.length > 0) {
+                      doc.text(adresseParts.join(' '), 20, yPos);
+                      yPos += 6;
+                    }
+                    if (adresseData.codepost || adresseData.city) {
+                      doc.text(`${adresseData.codepost || ''} ${adresseData.city || ''}`.trim(), 20, yPos);
+                      yPos += 6;
+                    }
+                    if (adresseData.country) {
+                      doc.text(`Pays: ${adresseData.country}`, 20, yPos);
+                      yPos += 6;
+                    }
+                    yPos += 4;
+                  }
+                  
+                  // 3. Téléphones
+                  if (telephonesData.length > 0) {
+                    doc.setFontSize(14);
+                    doc.setTextColor(147, 51, 234); // purple-600
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('3. Téléphones', 20, yPos);
+                    yPos += 8;
+                    
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont('helvetica', 'normal');
+                    telephonesData.forEach((tel, index) => {
+                      if (yPos > 250) {
+                        doc.addPage();
+                        yPos = 20;
+                      }
+                      const principal = tel.estPrincipal ? ' (Principal)' : '';
+                      doc.text(`${index + 1}. ${tel.numero || 'Non renseigné'} - ${tel.type}${principal}`, 20, yPos);
+                      yPos += 6;
+                      if (tel.description) {
+                        doc.text(`   Description: ${tel.description}`, 20, yPos);
+                        yPos += 6;
+                      }
+                    });
+                    yPos += 4;
+                  }
+                  
+                  // 4. Type d'adhésion
+                  if (adherentData.typeAdhesion) {
+                    doc.setFontSize(14);
+                    doc.setTextColor(249, 115, 22); // orange-600
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('4. Type d\'adhésion', 20, yPos);
+                    yPos += 8;
+                    
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont('helvetica', 'normal');
+                    const typeLabels: Record<string, string> = {
+                      'AdhesionAnnuelle': 'Adhésion annuelle',
+                      'Renouvellement': 'Renouvellement',
+                      'Autre': 'Autre'
+                    };
+                    doc.text(`Type: ${typeLabels[adherentData.typeAdhesion] || adherentData.typeAdhesion}`, 20, yPos);
+                    yPos += 10;
+                  }
+                  
+                  // 5. Informations familiales
+                  doc.setFontSize(14);
+                  doc.setTextColor(236, 72, 153); // pink-600
+                  doc.setFont('helvetica', 'bold');
+                  doc.text('5. Informations familiales', 20, yPos);
+                  yPos += 8;
+                  
+                  doc.setFontSize(10);
+                  doc.setTextColor(0, 0, 0);
+                  doc.setFont('helvetica', 'normal');
+                  doc.text(`Nombre d'enfants: ${adherentData.nombreEnfants}`, 20, yPos);
+                  yPos += 6;
+                  
+                  if (enfantsData.length > 0) {
+                    enfantsData.forEach((enfant, index) => {
+                      if (yPos > 250) {
+                        doc.addPage();
+                        yPos = 20;
+                      }
+                      if (enfant.prenom) {
+                        doc.text(`Enfant ${index + 1}: ${enfant.prenom}`, 20, yPos);
+                        yPos += 6;
+                        if (enfant.dateNaissance) {
+                          doc.text(`   Date de naissance: ${new Date(enfant.dateNaissance).toLocaleDateString('fr-FR')}`, 20, yPos);
+                          yPos += 6;
+                        }
+                        if (enfant.age) {
+                          doc.text(`   Âge: ${enfant.age} ans`, 20, yPos);
+                          yPos += 6;
+                        }
+                      }
+                    });
+                    yPos += 4;
+                  }
+                  
+                  if (adherentData.evenementsFamiliaux && adherentData.evenementsFamiliaux.length > 0) {
+                    const eventLabels: Record<string, string> = {
+                      'Naissance': 'Naissance',
+                      'MariageEnfant': 'Mariage d\'un enfant',
+                      'DecesFamille': 'Décès dans la famille',
+                      'AnniversaireSalle': 'Anniversaire organisé en salle',
+                      'Autre': 'Autre'
+                    };
+                    doc.text('Événements familiaux:', 20, yPos);
+                    yPos += 6;
+                    adherentData.evenementsFamiliaux.forEach((event: string) => {
+                      if (yPos > 250) {
+                        doc.addPage();
+                        yPos = 20;
+                      }
+                      doc.text(`  • ${eventLabels[event] || event}`, 20, yPos);
+                      yPos += 6;
+                    });
+                    yPos += 4;
+                  }
+                  
+                  // 6. Informations complémentaires
+                  if (adherentData.profession || adherentData.centresInteret) {
+                    doc.setFontSize(14);
+                    doc.setTextColor(99, 102, 241); // indigo-600
+                    doc.setFont('helvetica', 'bold');
+                    doc.text('6. Informations complémentaires', 20, yPos);
+                    yPos += 8;
+                    
+                    doc.setFontSize(10);
+                    doc.setTextColor(0, 0, 0);
+                    doc.setFont('helvetica', 'normal');
+                    if (adherentData.profession) {
+                      doc.text(`Profession: ${adherentData.profession}`, 20, yPos);
+                      yPos += 6;
+                    }
+                    if (adherentData.centresInteret) {
+                      const centresLines = doc.splitTextToSize(`Centres d'intérêt: ${adherentData.centresInteret}`, 170);
+                      doc.text(centresLines, 20, yPos);
+                      yPos += centresLines.length * 5;
+                    }
+                    yPos += 4;
+                  }
+                  
+                  // 7. Autorisations
+                  doc.setFontSize(14);
+                  doc.setTextColor(20, 184, 166); // teal-600
+                  doc.setFont('helvetica', 'bold');
+                  doc.text('7. Autorisations', 20, yPos);
+                  yPos += 8;
+                  
+                  doc.setFontSize(10);
+                  doc.setTextColor(0, 0, 0);
+                  doc.setFont('helvetica', 'normal');
+                  doc.text(`Autorisation d'image: ${adherentData.autorisationImage ? 'Oui' : 'Non'}`, 20, yPos);
+                  yPos += 6;
+                  doc.text(`Accepte les communications: ${adherentData.accepteCommunications ? 'Oui' : 'Non'}`, 20, yPos);
+                  yPos += 10;
+                  
+                  // Mention RGPD
+                  doc.setFontSize(12);
+                  doc.setTextColor(37, 99, 235); // blue-600
+                  doc.setFont('helvetica', 'bold');
+                  doc.text('Mention d\'information RGPD', 20, yPos);
+                  yPos += 8;
+                  
+                  doc.setFontSize(9);
+                  doc.setTextColor(0, 0, 0);
+                  doc.setFont('helvetica', 'normal');
+                  const rgpdText = "Les informations recueillies sur ce formulaire sont enregistrées par l'association afin de gérer les adhésions et d'assurer l'assistance prévue dans les statuts, notamment lors des événements familiaux (naissance, mariage d'un enfant, décès, anniversaire). Les données collectées sont limitées à ce qui est strictement nécessaire. Elles sont destinées exclusivement aux membres du bureau de l'association et ne seront jamais transmises à des tiers sans votre accord. Vous pouvez exercer votre droit d'accès, de rectification ou de suppression de vos données en contactant l'association.";
+                  const rgpdLines = doc.splitTextToSize(rgpdText, 170);
+                  doc.text(rgpdLines, 20, yPos);
+                  
+                  // Ajouter le pied de page sur toutes les pages
+                  addPDFFooter(doc);
+                  
+                  // Télécharger le PDF
+                  const fileName = `fiche_adhesion_${adherentData.firstname || 'user'}_${adherentData.lastname || 'unknown'}_${new Date().toISOString().split('T')[0]}.pdf`;
+                  doc.save(fileName);
+                  toast.dismiss();
+                  toast.success("PDF exporté avec succès");
+                } catch (error) {
+                  console.error("Erreur lors de l'export PDF:", error);
+                  toast.dismiss();
+                  toast.error("Erreur lors de l'export PDF");
+                }
+              }}
+              className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+            >
+              <Download className="h-4 w-4 mr-2" />
+              Exporter en PDF
+            </Button>
+          </div>
           
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white mb-2">
+          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent mb-3">
             Fiche d'adhésion - Informations complètes
           </h1>
-          <p className="text-gray-600 dark:text-gray-300">
+          <p className="text-gray-700 dark:text-gray-300 text-lg">
             Complétez vos informations personnelles selon la fiche d'adhésion de l'association
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-8">
+        <form onSubmit={handleSubmit} className="space-y-6">
           {/* Photo de profil */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="!py-0 shadow-xl border-blue-200 dark:border-blue-800">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <User className="h-5 w-5" />
                 Photo de profil
               </CardTitle>
             </CardHeader>
-            <CardContent className="flex justify-center">
+            <CardContent className="pt-6 pb-6 px-6 flex justify-center">
               <PhotoUpload
                 currentImage={userData.image || ""}
                 userName={userData.name || ""}
@@ -331,22 +583,22 @@ export default function UpdateUserPage() {
           </Card>
 
           {/* 1. Informations personnelles */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="!py-0 shadow-xl border-blue-200 dark:border-blue-800">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <User className="h-5 w-5" />
                 1. Informations personnelles
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-6 pb-6 px-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="civility">Civilité</Label>
+                  <Label htmlFor="civility" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Civilité</Label>
                   <Select
                     value={adherentData.civility}
                     onValueChange={(value) => setAdherentData({ ...adherentData, civility: value })}
                   >
-                    <SelectTrigger>
+                    <SelectTrigger className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                       <SelectValue placeholder="Sélectionner une civilité" />
                     </SelectTrigger>
                     <SelectContent>
@@ -358,46 +610,50 @@ export default function UpdateUserPage() {
                   </Select>
                 </div>
                 <div>
-                  <Label htmlFor="firstname">Prénom</Label>
+                  <Label htmlFor="firstname" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prénom</Label>
                   <Input
                     id="firstname"
                     value={adherentData.firstname}
                     onChange={(e) => setAdherentData({ ...adherentData, firstname: e.target.value })}
                     placeholder="Votre prénom"
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="lastname">Nom de famille</Label>
+                  <Label htmlFor="lastname" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Nom de famille</Label>
                   <Input
                     id="lastname"
                     value={adherentData.lastname}
                     onChange={(e) => setAdherentData({ ...adherentData, lastname: e.target.value })}
                     placeholder="Votre nom de famille"
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="dateNaissance">Date de naissance</Label>
+                  <Label htmlFor="dateNaissance" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Date de naissance</Label>
                   <Input
                     id="dateNaissance"
                     type="date"
                     value={adherentData.dateNaissance || ""}
                     onChange={(e) => setAdherentData({ ...adherentData, dateNaissance: e.target.value })}
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="email">E-mail</Label>
+                  <Label htmlFor="email" className="text-sm font-semibold text-gray-700 dark:text-gray-200">E-mail</Label>
                   <Input
                     id="email"
                     type="email"
                     value={userData.email}
                     onChange={(e) => setUserData({ ...userData, email: e.target.value })}
                     placeholder="votre@email.com"
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
               </div>
@@ -405,70 +661,76 @@ export default function UpdateUserPage() {
           </Card>
 
           {/* Adresse */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="!py-0 shadow-xl border-green-200 dark:border-green-800">
+            <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <MapPin className="h-5 w-5" />
                 Adresse
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-6 pb-6 px-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="streetnum">Numéro de rue</Label>
+                  <Label htmlFor="streetnum" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Numéro de rue</Label>
                   <Input
                     id="streetnum"
                     value={adresseData.streetnum}
                     onChange={(e) => setAdresseData({ ...adresseData, streetnum: e.target.value })}
                     placeholder="123"
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="street1">Rue</Label>
+                  <Label htmlFor="street1" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Rue</Label>
                   <Input
                     id="street1"
                     value={adresseData.street1}
                     onChange={(e) => setAdresseData({ ...adresseData, street1: e.target.value })}
                     placeholder="Rue de la Paix"
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="street2">Complément d'adresse</Label>
+                  <Label htmlFor="street2" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Complément d'adresse</Label>
                   <Input
                     id="street2"
                     value={adresseData.street2}
                     onChange={(e) => setAdresseData({ ...adresseData, street2: e.target.value })}
                     placeholder="Appartement, étage..."
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <Label htmlFor="codepost">Code postal</Label>
+                  <Label htmlFor="codepost" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Code postal</Label>
                   <Input
                     id="codepost"
                     value={adresseData.codepost}
                     onChange={(e) => setAdresseData({ ...adresseData, codepost: e.target.value })}
                     placeholder="75001"
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="city">Ville</Label>
+                  <Label htmlFor="city" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Ville</Label>
                   <Input
                     id="city"
                     value={adresseData.city}
                     onChange={(e) => setAdresseData({ ...adresseData, city: e.target.value })}
                     placeholder="Paris"
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
                 <div>
-                  <Label htmlFor="country">Pays</Label>
+                  <Label htmlFor="country" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Pays</Label>
                   <Input
                     id="country"
                     value={adresseData.country}
                     onChange={(e) => setAdresseData({ ...adresseData, country: e.target.value })}
                     placeholder="France"
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                   />
                 </div>
               </div>
@@ -476,27 +738,27 @@ export default function UpdateUserPage() {
           </Card>
 
           {/* Téléphones */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="!py-0 shadow-xl border-purple-200 dark:border-purple-800">
+            <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Phone className="h-5 w-5" />
                 Téléphones
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-6 pb-6 px-6 space-y-4">
               {telephonesData.map((telephone, index) => (
-                <div key={index} className="border rounded-lg p-4 space-y-4">
+                <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 bg-gray-50 dark:bg-gray-800/50">
                   <div className="flex justify-between items-center">
-                    <h4 className="font-medium text-gray-900 dark:text-white">
+                    <h4 className="font-semibold text-gray-900 dark:text-white">
                       Téléphone {index + 1}
                     </h4>
                     <div className="flex items-center gap-2">
-                      <label className="flex items-center gap-2 text-sm">
+                      <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200 font-medium">
                         <input
                           type="checkbox"
                           checked={telephone.estPrincipal}
                           onChange={(e) => updateTelephone(index, 'estPrincipal', e.target.checked)}
-                          className="rounded"
+                          className="rounded border-gray-300 dark:border-gray-600"
                         />
                         Principal
                       </label>
@@ -516,21 +778,22 @@ export default function UpdateUserPage() {
                   
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div>
-                      <Label htmlFor={`numero-${index}`}>Numéro</Label>
+                      <Label htmlFor={`numero-${index}`} className="text-sm font-semibold text-gray-700 dark:text-gray-200">Numéro</Label>
                       <Input
                         id={`numero-${index}`}
                         value={telephone.numero}
                         onChange={(e) => updateTelephone(index, 'numero', e.target.value)}
                         placeholder="06 12 34 56 78"
+                        className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                       />
                     </div>
                     <div>
-                      <Label htmlFor={`type-${index}`}>Type</Label>
+                      <Label htmlFor={`type-${index}`} className="text-sm font-semibold text-gray-700 dark:text-gray-200">Type</Label>
                       <Select
                         value={telephone.type}
                         onValueChange={(value) => updateTelephone(index, 'type', value)}
                       >
-                        <SelectTrigger>
+                        <SelectTrigger className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                           <SelectValue placeholder="Sélectionner un type" />
                         </SelectTrigger>
                         <SelectContent>
@@ -543,12 +806,13 @@ export default function UpdateUserPage() {
                   </div>
                   
                   <div>
-                    <Label htmlFor={`description-${index}`}>Description (optionnel)</Label>
+                    <Label htmlFor={`description-${index}`} className="text-sm font-semibold text-gray-700 dark:text-gray-200">Description (optionnel)</Label>
                     <Input
                       id={`description-${index}`}
                       value={telephone.description}
                       onChange={(e) => updateTelephone(index, 'description', e.target.value)}
                       placeholder="Ex: Bureau, Domicile..."
+                      className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                     />
                   </div>
                 </div>
@@ -558,7 +822,7 @@ export default function UpdateUserPage() {
                 type="button"
                 variant="outline"
                 onClick={addTelephone}
-                className="w-full flex items-center gap-2"
+                className="w-full flex items-center gap-2 border-purple-300 dark:border-purple-600 hover:bg-purple-50 dark:hover:bg-purple-900/20"
               >
                 <Plus className="h-4 w-4" />
                 Ajouter un téléphone
@@ -567,21 +831,21 @@ export default function UpdateUserPage() {
           </Card>
 
           {/* 2. Type d'adhésion */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="!py-0 shadow-xl border-orange-200 dark:border-orange-800">
+            <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Building className="h-5 w-5" />
                 2. Type d'adhésion
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-6 pb-6 px-6 space-y-4">
               <div>
-                <Label htmlFor="typeAdhesion">Type d'adhésion</Label>
+                <Label htmlFor="typeAdhesion" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Type d'adhésion</Label>
                 <Select
                   value={adherentData.typeAdhesion || ""}
                   onValueChange={(value) => setAdherentData({ ...adherentData, typeAdhesion: value })}
                 >
-                  <SelectTrigger>
+                  <SelectTrigger className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100">
                     <SelectValue placeholder="Sélectionner un type d'adhésion" />
                   </SelectTrigger>
                   <SelectContent>
@@ -595,16 +859,16 @@ export default function UpdateUserPage() {
           </Card>
 
           {/* 3. Informations familiales */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="!py-0 shadow-xl border-pink-200 dark:border-pink-800">
+            <CardHeader className="bg-gradient-to-r from-pink-500 to-pink-600 dark:from-pink-600 dark:to-pink-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Users className="h-5 w-5" />
                 3. Informations familiales
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-6 pb-6 px-6 space-y-4">
               <div>
-                <Label htmlFor="nombreEnfants">Nombre d'enfants</Label>
+                <Label htmlFor="nombreEnfants" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Nombre d'enfants</Label>
                 <Input
                   id="nombreEnfants"
                   type="number"
@@ -625,16 +889,17 @@ export default function UpdateUserPage() {
                       setEnfantsData(enfantsData.slice(0, count));
                     }
                   }}
+                  className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 />
               </div>
 
               {enfantsData.length > 0 && (
                 <div className="space-y-4">
-                  <Label>Enfants (prénoms et dates de naissance / âges)</Label>
+                  <Label className="text-sm font-semibold text-gray-700 dark:text-gray-200">Enfants (prénoms et dates de naissance / âges)</Label>
                   {enfantsData.map((enfant, index) => (
-                    <div key={index} className="border rounded-lg p-4 space-y-4">
+                    <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 bg-gray-50 dark:bg-gray-800/50">
                       <div className="flex justify-between items-center">
-                        <h4 className="font-medium text-gray-900 dark:text-white">
+                        <h4 className="font-semibold text-gray-900 dark:text-white">
                           Enfant {index + 1}
                         </h4>
                         <Button
@@ -650,25 +915,27 @@ export default function UpdateUserPage() {
                       
                       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                         <div>
-                          <Label htmlFor={`enfant-prenom-${index}`}>Prénom</Label>
+                          <Label htmlFor={`enfant-prenom-${index}`} className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prénom</Label>
                           <Input
                             id={`enfant-prenom-${index}`}
                             value={enfant.prenom}
                             onChange={(e) => updateEnfant(index, 'prenom', e.target.value)}
                             placeholder="Prénom de l'enfant"
+                            className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                           />
                         </div>
                         <div>
-                          <Label htmlFor={`enfant-date-${index}`}>Date de naissance</Label>
+                          <Label htmlFor={`enfant-date-${index}`} className="text-sm font-semibold text-gray-700 dark:text-gray-200">Date de naissance</Label>
                           <Input
                             id={`enfant-date-${index}`}
                             type="date"
                             value={enfant.dateNaissance || ""}
                             onChange={(e) => updateEnfant(index, 'dateNaissance', e.target.value)}
+                            className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                           />
                         </div>
                         <div>
-                          <Label htmlFor={`enfant-age-${index}`}>Âge</Label>
+                          <Label htmlFor={`enfant-age-${index}`} className="text-sm font-semibold text-gray-700 dark:text-gray-200">Âge</Label>
                           <Input
                             id={`enfant-age-${index}`}
                             type="number"
@@ -676,6 +943,7 @@ export default function UpdateUserPage() {
                             value={enfant.age || ""}
                             onChange={(e) => updateEnfant(index, 'age', parseInt(e.target.value) || undefined)}
                             placeholder="Âge"
+                            className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                           />
                         </div>
                       </div>
@@ -685,15 +953,25 @@ export default function UpdateUserPage() {
               )}
 
               <div className="space-y-2">
-                <Label>Événements familiaux nécessitant l'assistance de l'association</Label>
+                <Label className="text-sm font-semibold text-gray-700 dark:text-gray-200">Événements familiaux nécessitant l'assistance de l'association</Label>
                 <div className="space-y-2">
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="naissance"
+                      checked={adherentData.evenementsFamiliaux.includes("Naissance")}
+                      onCheckedChange={() => toggleEvenementFamilial("Naissance")}
+                    />
+                    <Label htmlFor="naissance" className="font-normal cursor-pointer text-gray-700 dark:text-gray-200">
+                      Naissance
+                    </Label>
+                  </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox
                       id="mariage-enfant"
                       checked={adherentData.evenementsFamiliaux.includes("MariageEnfant")}
                       onCheckedChange={() => toggleEvenementFamilial("MariageEnfant")}
                     />
-                    <Label htmlFor="mariage-enfant" className="font-normal cursor-pointer">
+                    <Label htmlFor="mariage-enfant" className="font-normal cursor-pointer text-gray-700 dark:text-gray-200">
                       Mariage d'un enfant
                     </Label>
                   </div>
@@ -703,7 +981,7 @@ export default function UpdateUserPage() {
                       checked={adherentData.evenementsFamiliaux.includes("DecesFamille")}
                       onCheckedChange={() => toggleEvenementFamilial("DecesFamille")}
                     />
-                    <Label htmlFor="deces-famille" className="font-normal cursor-pointer">
+                    <Label htmlFor="deces-famille" className="font-normal cursor-pointer text-gray-700 dark:text-gray-200">
                       Décès dans la famille
                     </Label>
                   </div>
@@ -713,7 +991,7 @@ export default function UpdateUserPage() {
                       checked={adherentData.evenementsFamiliaux.includes("AnniversaireSalle")}
                       onCheckedChange={() => toggleEvenementFamilial("AnniversaireSalle")}
                     />
-                    <Label htmlFor="anniversaire-salle" className="font-normal cursor-pointer">
+                    <Label htmlFor="anniversaire-salle" className="font-normal cursor-pointer text-gray-700 dark:text-gray-200">
                       Anniversaire organisé en salle
                     </Label>
                   </div>
@@ -723,7 +1001,7 @@ export default function UpdateUserPage() {
                       checked={adherentData.evenementsFamiliaux.includes("Autre")}
                       onCheckedChange={() => toggleEvenementFamilial("Autre")}
                     />
-                    <Label htmlFor="autre-evenement" className="font-normal cursor-pointer">
+                    <Label htmlFor="autre-evenement" className="font-normal cursor-pointer text-gray-700 dark:text-gray-200">
                       Autre
                     </Label>
                   </div>
@@ -733,52 +1011,54 @@ export default function UpdateUserPage() {
           </Card>
 
           {/* 4. Informations complémentaires */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="!py-0 shadow-xl border-indigo-200 dark:border-indigo-800">
+            <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Briefcase className="h-5 w-5" />
                 4. Informations complémentaires
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-6 pb-6 px-6 space-y-4">
               <div>
-                <Label htmlFor="profession">Profession (optionnel)</Label>
+                <Label htmlFor="profession" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Profession (optionnel)</Label>
                 <Input
                   id="profession"
                   value={adherentData.profession || ""}
                   onChange={(e) => setAdherentData({ ...adherentData, profession: e.target.value })}
                   placeholder="Votre profession"
+                  className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 />
               </div>
               <div>
-                <Label htmlFor="centresInteret">Centres d'intérêt</Label>
+                <Label htmlFor="centresInteret" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Centres d'intérêt</Label>
                 <Textarea
                   id="centresInteret"
                   value={adherentData.centresInteret || ""}
                   onChange={(e) => setAdherentData({ ...adherentData, centresInteret: e.target.value })}
                   placeholder="Vos centres d'intérêt..."
                   rows={4}
+                  className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                 />
               </div>
             </CardContent>
           </Card>
 
           {/* 5. Autorisations */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
+          <Card className="!py-0 shadow-xl border-teal-200 dark:border-teal-800">
+            <CardHeader className="bg-gradient-to-r from-teal-500 to-teal-600 dark:from-teal-600 dark:to-teal-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Shield className="h-5 w-5" />
                 5. Autorisations
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="pt-6 pb-6 px-6 space-y-4">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="autorisation-image"
                   checked={adherentData.autorisationImage}
                   onCheckedChange={(checked) => setAdherentData({ ...adherentData, autorisationImage: checked as boolean })}
                 />
-                <Label htmlFor="autorisation-image" className="font-normal cursor-pointer">
+                <Label htmlFor="autorisation-image" className="font-normal cursor-pointer text-gray-700 dark:text-gray-200">
                   J'autorise l'association à utiliser mon image dans le cadre de ses activités.
                 </Label>
               </div>
@@ -788,7 +1068,7 @@ export default function UpdateUserPage() {
                   checked={adherentData.accepteCommunications}
                   onCheckedChange={(checked) => setAdherentData({ ...adherentData, accepteCommunications: checked as boolean })}
                 />
-                <Label htmlFor="accepte-communications" className="font-normal cursor-pointer">
+                <Label htmlFor="accepte-communications" className="font-normal cursor-pointer text-gray-700 dark:text-gray-200">
                   J'accepte de recevoir les communications de l'association.
                 </Label>
               </div>
@@ -807,24 +1087,25 @@ export default function UpdateUserPage() {
             </CardHeader>
             <CardContent className="pt-6 pb-6 px-6">
               <p className="text-sm leading-relaxed text-gray-800 dark:text-gray-200">
-                Les informations recueillies sur ce formulaire sont enregistrées par l'association afin de gérer les adhésions et d'assurer l'assistance prévue dans les statuts, notamment lors des événements familiaux (mariage d'un enfant, décès, anniversaire). Les données collectées sont limitées à ce qui est strictement nécessaire. Elles sont destinées exclusivement aux membres du bureau de l'association et ne seront jamais transmises à des tiers sans votre accord. Vous pouvez exercer votre droit d'accès, de rectification ou de suppression de vos données en contactant l'association.
+                Les informations recueillies sur ce formulaire sont enregistrées par l'association afin de gérer les adhésions et d'assurer l'assistance prévue dans les statuts, notamment lors des événements familiaux (naissance, mariage d'un enfant, décès, anniversaire). Les données collectées sont limitées à ce qui est strictement nécessaire. Elles sont destinées exclusivement aux membres du bureau de l'association et ne seront jamais transmises à des tiers sans votre accord. Vous pouvez exercer votre droit d'accès, de rectification ou de suppression de vos données en contactant l'association.
               </p>
             </CardContent>
           </Card>
 
           {/* Boutons d'action */}
-          <div className="flex justify-end gap-4">
+          <div className="flex justify-end gap-4 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => router.push("/user/profile")}
+              className="px-6"
             >
               Annuler
             </Button>
             <Button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg px-6"
             >
               <Save className="h-4 w-4" />
               {saving ? "Sauvegarde..." : "Sauvegarder"}

@@ -629,7 +629,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-3">
       <Tabs defaultValue="cotisations" className="w-full" value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="grid w-full grid-cols-2 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
           <TabsTrigger 
@@ -648,23 +648,23 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
           </TabsTrigger>
         </TabsList>
 
-        <TabsContent value="cotisations" className="space-y-4">
+        <TabsContent value="cotisations" className="space-y-2">
           {/* même contenu mais on rend seulement si onglet actif */}
           {activeTab === "cotisations" && (
             <Card className="border-blue-200 dark:border-blue-800">
-              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
-                <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300">
-                  <Receipt className="h-5 w-5" />
+              <CardHeader className="bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 pb-3 pt-3 px-6 gap-0">
+                <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-300 text-base">
+                  <Receipt className="h-4 w-4" />
                   Cotisations Payées
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs mt-1">
                   Historique de vos cotisations avec détails de paiement
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 {/* Barre de recherche */}
-                <div className="p-4 border-b">
-                    <div className="flex items-center gap-4">
+                <div className="p-3 border-b">
+                    <div className="flex items-center gap-2">
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
@@ -740,8 +740,8 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
                 </div>
 
               {/* Totaux */}
-              <div className="p-4 border-t bg-blue-50 dark:bg-blue-900/10">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="p-3 border-t bg-blue-50 dark:bg-blue-900/10">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="text-center">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total des cotisations</p>
                     <p className="text-lg font-bold text-blue-700 dark:text-blue-300">
@@ -768,7 +768,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between p-4 border-t">
+              <div className="flex items-center justify-between p-3 border-t">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Page {cotisationsTable.getState().pagination.pageIndex + 1} sur{" "}
                   {cotisationsTable.getPageCount()}
@@ -799,22 +799,22 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         )}
         </TabsContent>
 
-        <TabsContent value="obligations" className="space-y-4">
+        <TabsContent value="obligations" className="space-y-2">
           {activeTab === "obligations" && (
             <Card className="border-orange-200 dark:border-orange-800">
-              <CardHeader className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20">
-                <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300">
-                  <AlertCircle className="h-5 w-5" />
+              <CardHeader className="bg-gradient-to-r from-orange-50 to-red-50 dark:from-orange-900/20 dark:to-red-900/20 pb-3 pt-3 px-6 gap-0">
+                <CardTitle className="flex items-center gap-2 text-orange-700 dark:text-orange-300 text-base">
+                  <AlertCircle className="h-4 w-4" />
                   Obligations de Cotisation
                 </CardTitle>
-                <CardDescription>
+                <CardDescription className="text-xs mt-1">
                   Suivi de vos obligations avec montants attendus et restants
                 </CardDescription>
               </CardHeader>
               <CardContent className="p-0">
                 {/* Barre de recherche */}
-                <div className="p-4 border-b">
-                    <div className="flex items-center gap-4">
+                <div className="p-3 border-b">
+                    <div className="flex items-center gap-2">
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                         <Input
@@ -890,8 +890,8 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
                 </div>
 
               {/* Totaux */}
-              <div className="p-4 border-t bg-orange-50 dark:bg-orange-900/10">
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className="p-3 border-t bg-orange-50 dark:bg-orange-900/10">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div className="text-center">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total attendu</p>
                     <p className="text-lg font-bold text-gray-700 dark:text-gray-300">
@@ -922,7 +922,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between p-4 border-t">
+              <div className="flex items-center justify-between p-3 border-t">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Page {obligationsTable.getState().pagination.pageIndex + 1} sur{" "}
                   {obligationsTable.getPageCount()}

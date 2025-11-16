@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Navbar } from "@/components/home/Navbar";
 import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -31,6 +31,7 @@ import {
   FileText,
   ChevronRight,
   ChevronDown,
+  ChevronUp,
   Award,
   TrendingUp,
   History,
@@ -50,7 +51,8 @@ import {
   MessageSquare,
   ThumbsUp,
   Trash2,
-  Pencil
+  Pencil,
+  Info
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUserProfile } from "@/hooks/use-user-profile";
@@ -66,9 +68,708 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
+  ColumnDef,
+  flexRender,
+  getCoreRowModel,
+  getSortedRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  useReactTable,
+  SortingState,
+  createColumnHelper,
+} from "@tanstack/react-table";
 
 // Types pour les sections du menu
 type MenuSection = 'profile' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'idees' | 'settings';
+
+// Type pour les dettes initiales
+interface DetteInitiale {
+  id: string;
+  annee: number;
+  montant: number;
+  montantPaye: number;
+  montantRestant: number;
+  description?: string | null;
+}
+
+// Composant Table pour les dettes initiales
+function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'annee', desc: true }]);
+
+  const columnHelper = createColumnHelper<DetteInitiale>();
+
+  const columns = useMemo<ColumnDef<DetteInitiale>[]>(
+    () => [
+      columnHelper.accessor('annee', {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="h-8 px-2 lg:px-3 font-semibold text-red-900 dark:text-red-300"
+          >
+            Année
+            {column.getIsSorted() === 'asc' ? (
+              <ChevronUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === 'desc' ? (
+              <ChevronDown className="ml-2 h-4 w-4" />
+            ) : null}
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2 justify-center">
+            <Calendar className="h-4 w-4 text-red-600 dark:text-red-400" />
+            <span className="font-medium">{row.getValue('annee')}</span>
+          </div>
+        ),
+      }),
+      columnHelper.accessor('montant', {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="h-8 px-2 lg:px-3 font-semibold text-gray-900 dark:text-gray-300"
+          >
+            Montant total
+            {column.getIsSorted() === 'asc' ? (
+              <ChevronUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === 'desc' ? (
+              <ChevronDown className="ml-2 h-4 w-4" />
+            ) : null}
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <span className="font-bold text-gray-900 dark:text-white">
+            {parseFloat(row.getValue('montant')).toFixed(2).replace('.', ',')} €
+          </span>
+        ),
+      }),
+      columnHelper.accessor('montantPaye', {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="h-8 px-2 lg:px-3 font-semibold text-green-900 dark:text-green-300"
+          >
+            Montant payé
+            {column.getIsSorted() === 'asc' ? (
+              <ChevronUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === 'desc' ? (
+              <ChevronDown className="ml-2 h-4 w-4" />
+            ) : null}
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <span className="font-bold text-green-600 dark:text-green-400">
+            {parseFloat(row.getValue('montantPaye')).toFixed(2).replace('.', ',')} €
+          </span>
+        ),
+      }),
+      columnHelper.accessor('montantRestant', {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="h-8 px-2 lg:px-3 font-semibold text-red-900 dark:text-red-300"
+          >
+            Montant restant
+            {column.getIsSorted() === 'asc' ? (
+              <ChevronUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === 'desc' ? (
+              <ChevronDown className="ml-2 h-4 w-4" />
+            ) : null}
+          </Button>
+        ),
+        cell: ({ row }) => {
+          const montant = parseFloat(row.getValue('montantRestant'));
+          return (
+            <span className={`font-bold ${
+              montant > 0 
+                ? 'text-red-600 dark:text-red-400' 
+                : 'text-green-600 dark:text-green-400'
+            }`}>
+              {montant.toFixed(2).replace('.', ',')} €
+            </span>
+          );
+        },
+      }),
+      columnHelper.accessor('description', {
+        header: 'Description',
+        cell: ({ row }) => (
+          <span className="text-sm text-gray-600 dark:text-gray-400">
+            {row.getValue('description') || '-'}
+          </span>
+        ),
+      }),
+      columnHelper.display({
+        id: 'statut',
+        header: 'Statut',
+        cell: ({ row }) => {
+          const montantRestant = parseFloat(row.original.montantRestant.toString());
+          return (
+            <Badge className={
+              montantRestant > 0
+                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                : 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+            }>
+              {montantRestant > 0 ? 'En cours' : 'Payée'}
+            </Badge>
+          );
+        },
+      }),
+    ],
+    []
+  );
+
+  const table = useReactTable({
+    data: dettes,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    state: {
+      sorting,
+    },
+  });
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="bg-red-50 dark:bg-red-900/20">
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id} className="font-semibold text-center">
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                className="hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className="text-center">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center">
+                <div className="flex flex-col items-center gap-2">
+                  <AlertCircle className="h-8 w-8 text-gray-400" />
+                  <p className="text-gray-500">Aucune dette initiale trouvée.</p>
+                </div>
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+// Composant Table pour l'historique des cotisations par mois
+interface HistoriqueCotisation {
+  id: string;
+  periode: string;
+  annee: number;
+  mois: number;
+  montantAttendu: number;
+  montantPaye: number;
+  montantRestant: number;
+  statut: string;
+  description?: string;
+  Paiements: Array<{
+    id: string;
+    montant: number;
+    datePaiement: Date | string;
+    moyenPaiement: string;
+    reference?: string;
+    description?: string;
+    CreatedBy?: {
+      id: string;
+      name: string;
+      email: string;
+    };
+  }>;
+}
+
+function HistoriqueCotisationsTable({ cotisations }: { cotisations: HistoriqueCotisation[] }) {
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'periode', desc: true }]);
+
+  const columnHelper = createColumnHelper<HistoriqueCotisation>();
+
+  const columns = useMemo<ColumnDef<HistoriqueCotisation>[]>(
+    () => [
+      columnHelper.accessor('periode', {
+        header: 'Mois',
+        cell: ({ row }) => {
+          const { annee, mois } = row.original;
+          const date = new Date(annee, mois - 1, 1);
+          const nomMois = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+          return (
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {nomMois.charAt(0).toUpperCase() + nomMois.slice(1)}
+            </span>
+          );
+        },
+      }),
+      columnHelper.accessor('montantAttendu', {
+        header: 'Montant Attendu',
+        cell: ({ row }) => {
+          const montant = row.getValue('montantAttendu') as number;
+          return (
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              {montant.toFixed(2).replace('.', ',')} €
+            </span>
+          );
+        },
+      }),
+      columnHelper.accessor('montantRestant', {
+        header: 'Restant',
+        cell: ({ row }) => {
+          const restant = row.getValue('montantRestant') as number;
+          return (
+            <span className={`text-sm font-medium ${restant > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+              {restant.toFixed(2).replace('.', ',')} €
+            </span>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'paiements',
+        header: 'Total Payé',
+        cell: ({ row }) => {
+          const paiements = row.original.Paiements || [];
+          const totalPaye = paiements.reduce((sum: number, p: any) => sum + p.montant, 0);
+          
+          if (totalPaye === 0) {
+            return (
+              <span className="text-xs text-gray-400 dark:text-gray-500">Aucun paiement</span>
+            );
+          }
+          
+          return (
+            <div className="text-center">
+              <span className="text-sm font-bold text-green-600 dark:text-green-400">
+                {totalPaye.toFixed(2).replace('.', ',')} €
+              </span>
+              {paiements.length > 1 && (
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                  ({paiements.length} paiement{paiements.length > 1 ? 's' : ''})
+                </div>
+              )}
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor('statut', {
+        header: 'Statut',
+        cell: ({ row }) => {
+          const statut = row.getValue('statut') as string;
+          const restant = row.original.montantRestant;
+          const getStatusBadge = () => {
+            if (restant === 0) {
+              return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200';
+            } else if (restant < row.original.montantAttendu) {
+              return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
+            } else {
+              return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
+            }
+          };
+          return (
+            <Badge className={getStatusBadge()}>
+              {restant === 0 ? 'Payée' : restant < row.original.montantAttendu ? 'Partielle' : 'En attente'}
+            </Badge>
+          );
+        },
+      }),
+    ],
+    []
+  );
+
+  const table = useReactTable({
+    data: cotisations,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    state: {
+      sorting,
+    },
+  });
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="bg-indigo-50 dark:bg-indigo-900/20">
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id} className="font-semibold text-center">
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows?.length ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className="text-center">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center">
+                <div className="flex flex-col items-center gap-2">
+                  <History className="h-8 w-8 text-gray-400" />
+                  <p className="text-gray-500">Aucun historique de cotisation disponible.</p>
+                </div>
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
+
+// Composant Table pour les cotisations du mois
+interface CotisationMois {
+  id: string;
+  type: string;
+  montant: number;
+  montantPaye: number;
+  montantRestant: number;
+  dateCotisation: string | Date;
+  periode: string;
+  statut: string;
+  description?: string;
+  moyenPaiement: string;
+  reference: string;
+  isCotisationMensuelle?: boolean;
+  isAssistance?: boolean;
+  cotisationMensuelleId?: string;
+  assistanceId?: string;
+}
+
+function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }) {
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'dateCotisation', desc: true }]);
+
+  const columnHelper = createColumnHelper<CotisationMois>();
+
+  const columns = useMemo<ColumnDef<CotisationMois>[]>(
+    () => [
+      columnHelper.accessor('type', {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="h-8 px-2 lg:px-3 font-semibold text-blue-900 dark:text-blue-300"
+          >
+            Type
+            {column.getIsSorted() === 'asc' ? (
+              <ChevronUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === 'desc' ? (
+              <ChevronDown className="ml-2 h-4 w-4" />
+            ) : null}
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2 justify-center">
+            <Receipt className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+            <span className="font-medium">{row.getValue('type')}</span>
+          </div>
+        ),
+      }),
+      columnHelper.accessor('montant', {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="h-8 px-2 lg:px-3 font-semibold text-gray-900 dark:text-gray-300"
+          >
+            Montant
+            {column.getIsSorted() === 'asc' ? (
+              <ChevronUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === 'desc' ? (
+              <ChevronDown className="ml-2 h-4 w-4" />
+            ) : null}
+          </Button>
+        ),
+        cell: ({ row }) => (
+          <span className="font-bold text-gray-900 dark:text-white">
+            {parseFloat(row.getValue('montant')).toFixed(2).replace('.', ',')} €
+          </span>
+        ),
+      }),
+      columnHelper.accessor('description', {
+        header: 'Détails',
+        cell: ({ row }) => {
+          const description = row.getValue('description') as string | undefined;
+          if (!description) return <span className="text-sm text-gray-500">-</span>;
+          
+          // Parser la description pour afficher de manière plus lisible
+          // Format attendu: "Cotisation 2024-11 : Forfait 15,00€ + Assistances: AnniversaireSalle pour Nom Prénom (50,00€) = Total: 65,00€"
+          // ou "Cotisation 2024-11 : Forfait 15,00€ - Bénéficiaire de: AnniversaireSalle (bénéficiaire) (ne paie pas l'assistance)"
+          
+          // Extraire les informations
+          const parts = description.split(' : ');
+          if (parts.length < 2) {
+            return <div className="text-xs text-gray-600 dark:text-gray-400">{description}</div>;
+          }
+          
+          const periode = parts[0];
+          const details = parts[1];
+          
+          // Vérifier si c'est un bénéficiaire ou un contributeur
+          const isBeneficiaire = details.includes('Bénéficiaire de:');
+          const hasAssistances = details.includes('+ Assistances:');
+          
+          return (
+            <div className="text-xs text-left max-w-lg space-y-1.5">
+              <div className="font-semibold text-blue-700 dark:text-blue-300">
+                {periode}
+              </div>
+              
+              {isBeneficiaire ? (
+                // Cas bénéficiaire : ne paie que le forfait
+                <div className="space-y-1 pl-2 border-l-2 border-green-300 dark:border-green-700">
+                  <div className="flex items-center gap-1">
+                    <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">
+                      Forfait mensuel: 15,00€
+                    </span>
+                  </div>
+                  <div className="text-gray-600 dark:text-gray-400 italic pl-4">
+                    {details.split('Bénéficiaire de:')[1]?.split('(ne paie pas')[0]?.trim() || ''}
+                  </div>
+                  <div className="text-green-600 dark:text-green-400 font-semibold text-[10px]">
+                    ✓ Vous êtes bénéficiaire, vous ne payez pas l'assistance
+                  </div>
+                </div>
+              ) : hasAssistances ? (
+                // Cas contributeur : paie forfait + assistances
+                <div className="space-y-1.5 pl-2 border-l-2 border-blue-300 dark:border-blue-700">
+                  <div className="flex items-center gap-1">
+                    <Euro className="h-3 w-3 text-gray-600 dark:text-gray-400" />
+                    <span className="text-gray-700 dark:text-gray-300 font-medium">
+                      Forfait mensuel: 15,00€
+                    </span>
+                  </div>
+                  
+                  {details.includes('+ Assistances:') && (
+                    <div className="space-y-1 pl-4">
+                      <div className="text-gray-600 dark:text-gray-400 font-medium">
+                        Assistances du mois:
+                      </div>
+                      {details.split('+ Assistances:')[1]?.split(' = ')[0]?.split(',').map((ass: string, idx: number) => (
+                        <div key={idx} className="text-gray-600 dark:text-gray-400 pl-2 text-[10px]">
+                          • {ass.trim()}
+                        </div>
+                      )) || (
+                        <div className="text-gray-600 dark:text-gray-400 pl-2 text-[10px]">
+                          • {details.split('+ Assistances:')[1]?.split(' = ')[0]?.trim()}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                  
+                  {details.includes(' = Total:') && (
+                    <div className="pt-1 border-t border-gray-200 dark:border-gray-700">
+                      <div className="font-bold text-blue-600 dark:text-blue-400">
+                        {details.split(' = ')[1]}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              ) : (
+                // Format simple
+                <div className="text-gray-600 dark:text-gray-400 pl-2">
+                  {details}
+                </div>
+              )}
+            </div>
+          );
+        },
+      }),
+      columnHelper.accessor('montantRestant', {
+        header: ({ column }) => (
+          <Button
+            variant="ghost"
+            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
+            className="h-8 px-2 lg:px-3 font-semibold text-red-900 dark:text-red-300"
+          >
+            Restant
+            {column.getIsSorted() === 'asc' ? (
+              <ChevronUp className="ml-2 h-4 w-4" />
+            ) : column.getIsSorted() === 'desc' ? (
+              <ChevronDown className="ml-2 h-4 w-4" />
+            ) : null}
+          </Button>
+        ),
+        cell: ({ row }) => {
+          const montant = parseFloat(row.getValue('montantRestant'));
+          return (
+            <span className={`font-bold ${
+              montant > 0 
+                ? 'text-red-600 dark:text-red-400' 
+                : 'text-green-600 dark:text-green-400'
+            }`}>
+              {montant.toFixed(2).replace('.', ',')} €
+            </span>
+          );
+        },
+      }),
+      columnHelper.accessor('statut', {
+        header: 'Statut',
+        cell: ({ row }) => {
+          const statut = row.getValue('statut');
+          const montantRestant = parseFloat(row.original.montantRestant.toString());
+          const isPaye = montantRestant === 0 || statut === 'Paye' || statut === 'Valide';
+          
+          return (
+            <Badge className={
+              isPaye
+                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                : statut === 'EnRetard'
+                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+            }>
+              {isPaye ? 'Payée' : statut === 'EnRetard' ? 'En retard' : 'En attente'}
+            </Badge>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'actions',
+        header: 'Action',
+        cell: ({ row }) => {
+          const montantRestant = parseFloat(row.original.montantRestant.toString());
+          const statut = row.original.statut;
+          const isPaye = montantRestant === 0 || statut === 'Paye' || statut === 'Valide';
+          
+          if (isPaye) {
+            return (
+              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                <CheckCircle2 className="h-3 w-3 mr-1" />
+                Payée
+              </Badge>
+            );
+          }
+          
+          // Déterminer le type de paiement
+          let paymentUrl = '/paiement?';
+          if (row.original.isCotisationMensuelle) {
+            paymentUrl += `type=cotisation-mensuelle&id=${row.original.cotisationMensuelleId}`;
+          } else if (row.original.isAssistance) {
+            paymentUrl += `type=assistance&id=${row.original.assistanceId}`;
+          } else {
+            paymentUrl += `type=cotisation&id=${row.original.id}`;
+          }
+          
+          return (
+            <a href={paymentUrl}>
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
+                <CreditCard className="h-4 w-4 mr-2" />
+                Payer
+              </Button>
+            </a>
+          );
+        },
+      }),
+    ],
+    []
+  );
+
+  const table = useReactTable({
+    data: cotisations,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    state: {
+      sorting,
+    },
+  });
+
+  return (
+    <div className="overflow-x-auto">
+      <Table>
+        <TableHeader>
+          {table.getHeaderGroups().map((headerGroup) => (
+            <TableRow key={headerGroup.id} className="bg-blue-50 dark:bg-blue-900/20">
+              {headerGroup.headers.map((header) => (
+                <TableHead key={header.id} className="font-semibold text-center">
+                  {header.isPlaceholder
+                    ? null
+                    : flexRender(header.column.columnDef.header, header.getContext())}
+                </TableHead>
+              ))}
+            </TableRow>
+          ))}
+        </TableHeader>
+        <TableBody>
+          {table.getRowModel().rows.length > 0 ? (
+            table.getRowModel().rows.map((row) => (
+              <TableRow
+                key={row.id}
+                className="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              >
+                {row.getVisibleCells().map((cell) => (
+                  <TableCell key={cell.id} className="text-center">
+                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                  </TableCell>
+                ))}
+              </TableRow>
+            ))
+          ) : (
+            <TableRow>
+              <TableCell colSpan={columns.length} className="h-24 text-center">
+                <div className="flex flex-col items-center gap-2">
+                  <Receipt className="h-8 w-8 text-gray-400" />
+                  <p className="text-gray-500">Aucune cotisation du mois en cours.</p>
+                </div>
+              </TableCell>
+            </TableRow>
+          )}
+        </TableBody>
+      </Table>
+    </div>
+  );
+}
 
 export default function UserProfilePage() {
   const user = useCurrentUser();
@@ -80,6 +781,11 @@ export default function UserProfilePage() {
   const [candidates, setCandidates] = useState<any[]>([]);
   const [cotisations, setCotisations] = useState<any[]>([]);
   const [obligationsCotisation, setObligationsCotisation] = useState<any[]>([]);
+  const [dettesInitiales, setDettesInitiales] = useState<any[]>([]);
+  const [cotisationsMois, setCotisationsMois] = useState<any[]>([]);
+  const [cotisationMoisProchain, setCotisationMoisProchain] = useState<any>(null);
+  const [avoirs, setAvoirs] = useState<any[]>([]);
+  const [historiqueCotisations, setHistoriqueCotisations] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedElection, setSelectedElection] = useState<string>('all');
@@ -117,10 +823,56 @@ export default function UserProfilePage() {
       try {
         switch (activeSection) {
           case 'cotisations':
-            // Charger les cotisations et obligations depuis le profil utilisateur
+            // Charger les cotisations, obligations, dettes initiales et cotisations du mois depuis le profil utilisateur
             if (userProfile?.adherent) {
-              setCotisations(userProfile.adherent.Cotisations || []);
-              setObligationsCotisation(userProfile.adherent.ObligationsCotisation || []);
+              setCotisations((userProfile.adherent as any).Cotisations || []);
+              setObligationsCotisation((userProfile.adherent as any).ObligationsCotisation || []);
+              setDettesInitiales((userProfile.adherent as any).DettesInitiales || []);
+              setAvoirs((userProfile.adherent as any).Avoirs || []);
+              
+              // Construire la liste des cotisations du mois : cotisations mensuelles + assistances du mois
+              const cotisationsMensuelles = ((userProfile.adherent as any).CotisationsMensuelles || []).map((cm: any) => ({
+                id: cm.id,
+                type: cm.TypeCotisation?.nom || 'Cotisation',
+                montant: Number(cm.montantAttendu),
+                montantPaye: Number(cm.montantPaye),
+                montantRestant: Number(cm.montantRestant),
+                dateCotisation: cm.dateEcheance,
+                periode: cm.periode,
+                statut: cm.statut,
+                description: cm.description,
+                moyenPaiement: 'Non payé',
+                reference: cm.id,
+                isCotisationMensuelle: true,
+                cotisationMensuelleId: cm.id
+              }));
+              
+              const assistances = ((userProfile.adherent as any).Assistances || []).map((ass: any) => ({
+                id: ass.id,
+                type: `Assistance ${ass.type}`,
+                montant: Number(ass.montant),
+                montantPaye: Number(ass.montantPaye),
+                montantRestant: Number(ass.montantRestant),
+                dateCotisation: ass.dateEvenement,
+                periode: `${new Date(ass.dateEvenement).getFullYear()}-${String(new Date(ass.dateEvenement).getMonth() + 1).padStart(2, '0')}`,
+                statut: ass.statut === 'EnAttente' ? 'EnAttente' : ass.statut === 'Paye' ? 'Valide' : 'EnAttente',
+                description: `Assistance pour ${ass.type}`,
+                moyenPaiement: 'Non payé',
+                reference: ass.id,
+                isAssistance: true,
+                assistanceId: ass.id
+              }));
+              
+              setCotisationsMois([...cotisationsMensuelles, ...assistances]);
+              
+              // Construire l'historique des cotisations mensuelles avec leurs paiements
+              const toutesCotisationsMensuelles = ((userProfile.adherent as any).CotisationsMensuelles || []);
+              setHistoriqueCotisations(toutesCotisationsMensuelles);
+              
+              // Récupérer la cotisation du mois prochain
+              if ((userProfile as any).cotisationMoisProchain) {
+                setCotisationMoisProchain((userProfile as any).cotisationMoisProchain);
+              }
             }
             break;
           case 'candidatures':
@@ -904,13 +1656,270 @@ export default function UserProfilePage() {
 
       case 'cotisations':
         return (
-          <div className="space-y-6">
-            <div className="flex justify-between items-center">
+          <div className="space-y-3">
+            <div className="flex justify-between items-center mb-2">
               <div>
                 <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mes Cotisations</h2>
-                <p className="text-gray-600 dark:text-gray-300">Historique des cotisations et obligations</p>
+                <p className="text-sm text-gray-600 dark:text-gray-300">Historique des cotisations et obligations</p>
               </div>
             </div>
+
+            {/* Afficher les avoirs disponibles */}
+            {avoirs.length > 0 && (
+              <Card className="border-green-200 dark:border-green-800 bg-white dark:bg-gray-900 !py-0">
+                <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 text-white pb-3 pt-3 px-6 gap-0">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <CheckCircle2 className="h-4 w-4" />
+                    Mes Avoirs (Crédits Disponibles)
+                  </CardTitle>
+                  <CardDescription className="text-green-100 dark:text-green-200 mt-1 text-xs">
+                    Crédits disponibles à utiliser pour vos prochains paiements
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-3 pb-4 px-6">
+                  <div className="space-y-2">
+                    {avoirs.map((avoir: any) => (
+                      <div key={avoir.id} className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <p className="text-sm font-semibold text-green-900 dark:text-green-100">
+                              {avoir.description || "Avoir disponible"}
+                            </p>
+                            <p className="text-xs text-green-700 dark:text-green-300 mt-1">
+                              Créé le {format(new Date(avoir.createdAt), "dd MMMM yyyy", { locale: fr })}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-lg font-bold text-green-600 dark:text-green-400">
+                              {avoir.montantRestant.toFixed(2).replace('.', ',')} €
+                            </p>
+                            {avoir.montantUtilise > 0 && (
+                              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
+                                Utilisé: {avoir.montantUtilise.toFixed(2).replace('.', ',')} €
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-start gap-2">
+                        <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-0.5">
+                            Comment utiliser vos avoirs ?
+                          </p>
+                          <p className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
+                            Vos avoirs sont automatiquement appliqués lors de vos prochains paiements. 
+                            Ils réduiront le montant à payer pour vos cotisations et dettes.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Afficher les dettes initiales en premier sous forme de table */}
+            {dettesInitiales.length > 0 && (
+              <Card className="border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 !py-0">
+                <CardHeader className="bg-gradient-to-r from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 text-white pb-3 pt-3 px-6 gap-0">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <AlertCircle className="h-4 w-4" />
+                    Dettes Initiales
+                  </CardTitle>
+                  <CardDescription className="text-red-100 dark:text-red-200 mt-1 text-xs">
+                    Dettes de l'adhérent envers l'association (2024, 2025, etc.)
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-3 pb-4 px-6">
+                  <DettesInitialesTable dettes={dettesInitiales} />
+                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                    <div className="flex items-start gap-2">
+                      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+                      <div>
+                        <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-0.5">
+                          Information importante
+                        </p>
+                        <p className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
+                          Ces dettes initiales représentent votre dette envers l'association pour les années précédentes (2024, 2025, etc.). 
+                          Vous pouvez effectuer des paiements partiels ou complets pour régulariser votre situation. 
+                          L'application a été mise en place le 1er janvier, ces dettes correspondent donc aux années antérieures.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Afficher les cotisations du mois en cours */}
+            {cotisationsMois.length > 0 && (() => {
+              // Extraire le nom du mois depuis la première cotisation
+              const premiereCotisation = cotisationsMois[0];
+              let nomMois = "en cours";
+              
+              if (premiereCotisation?.periode) {
+                // Format période: "2024-11"
+                const [annee, mois] = premiereCotisation.periode.split('-');
+                if (mois) {
+                  const date = new Date(parseInt(annee), parseInt(mois) - 1, 1);
+                  nomMois = date.toLocaleDateString('fr-FR', { month: 'long' });
+                  // Capitaliser la première lettre
+                  nomMois = nomMois.charAt(0).toUpperCase() + nomMois.slice(1);
+                }
+              } else if (premiereCotisation?.dateCotisation) {
+                const date = new Date(premiereCotisation.dateCotisation);
+                nomMois = date.toLocaleDateString('fr-FR', { month: 'long' });
+                nomMois = nomMois.charAt(0).toUpperCase() + nomMois.slice(1);
+              }
+              
+              return (
+                <Card className="border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 !py-0">
+                  <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white pb-3 pt-3 px-6 gap-0">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <Receipt className="h-4 w-4" />
+                      Cotisations du Mois de {nomMois}
+                    </CardTitle>
+                    <CardDescription className="text-blue-100 dark:text-blue-200 mt-1 text-xs">
+                      Cotisations mensuelles + assistances du mois
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-3 pb-4 px-6">
+                    <CotisationsMoisTable cotisations={cotisationsMois} />
+                  </CardContent>
+                </Card>
+              );
+            })()}
+
+            {/* Afficher la cotisation prévisionnelle du mois prochain */}
+            {cotisationMoisProchain && (
+              <Card className="border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-900 !py-0">
+                <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 text-white pb-3 pt-3 px-6 gap-0">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <Clock className="h-4 w-4" />
+                    Cotisation Prévisionnelle du Mois de {cotisationMoisProchain.nomMois}
+                  </CardTitle>
+                  <CardDescription className="text-purple-100 dark:text-purple-200 mt-1 text-xs">
+                    Estimation basée sur le forfait mensuel + assistances prévues
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-3 pb-4 px-6">
+                  <div className="space-y-3">
+                    <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between">
+                          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                            Forfait mensuel:
+                          </span>
+                          <span className="text-sm font-bold text-gray-900 dark:text-white">
+                            {cotisationMoisProchain.montantForfait.toFixed(2).replace('.', ',')} €
+                          </span>
+                        </div>
+                        
+                        {cotisationMoisProchain.assistances && cotisationMoisProchain.assistances.length > 0 && (
+                          <>
+                            {cotisationMoisProchain.isBeneficiaire ? (
+                              <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
+                                <div className="flex items-center gap-1 mb-1">
+                                  <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
+                                  <span className="text-xs font-semibold text-green-700 dark:text-green-300">
+                                    Vous êtes bénéficiaire
+                                  </span>
+                                </div>
+                                <div className="text-xs text-gray-600 dark:text-gray-400 pl-4">
+                                  {cotisationMoisProchain.assistances.map((ass: any) => (
+                                    <div key={ass.id} className="mb-1">
+                                      • {ass.type} - Vous ne payez pas cette assistance
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="mt-2 pt-2 border-t border-purple-200 dark:border-purple-800">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                      Total prévisionnel:
+                                    </span>
+                                    <span className="text-base font-bold text-green-600 dark:text-green-400">
+                                      {cotisationMoisProchain.montantForfait.toFixed(2).replace('.', ',')} €
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
+                                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
+                                  Assistances prévues:
+                                </div>
+                                <div className="space-y-1 pl-2">
+                                  {cotisationMoisProchain.assistances.map((ass: any) => (
+                                    <div key={ass.id} className="text-xs text-gray-600 dark:text-gray-400">
+                                      • {ass.type} pour {ass.adherent?.firstname} {ass.adherent?.lastname} ({ass.montant.toFixed(2).replace('.', ',')} €)
+                                    </div>
+                                  ))}
+                                </div>
+                                <div className="mt-2 pt-2 border-t border-purple-200 dark:border-purple-800">
+                                  <div className="flex items-center justify-between">
+                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                      Total prévisionnel:
+                                    </span>
+                                    <span className="text-base font-bold text-purple-600 dark:text-purple-400">
+                                      {cotisationMoisProchain.montantTotal.toFixed(2).replace('.', ',')} €
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            )}
+                          </>
+                        )}
+                        
+                        {(!cotisationMoisProchain.assistances || cotisationMoisProchain.assistances.length === 0) && (
+                          <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
+                            <div className="flex items-center justify-between">
+                              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
+                                Total prévisionnel:
+                              </span>
+                              <span className="text-base font-bold text-purple-600 dark:text-purple-400">
+                                {cotisationMoisProchain.montantForfait.toFixed(2).replace('.', ',')} €
+                              </span>
+                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
+                              Aucune assistance prévue pour ce mois
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
+                      <div className="flex items-start gap-2">
+                        <Info className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
+                        <p className="text-[10px] text-blue-800 dark:text-blue-200 leading-relaxed">
+                          Cette cotisation est une estimation. Le montant final sera calculé lors de la génération des cotisations mensuelles par l'administrateur.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Historique des cotisations par mois */}
+            {historiqueCotisations.length > 0 && (
+              <Card className="border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-900 !py-0">
+                <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white pb-3 pt-3 px-6 gap-0">
+                  <CardTitle className="flex items-center gap-2 text-base">
+                    <History className="h-4 w-4" />
+                    Historique des Cotisations par Mois
+                  </CardTitle>
+                  <CardDescription className="text-indigo-100 dark:text-indigo-200 mt-1 text-xs">
+                    Détail de vos cotisations mensuelles et paiements effectués
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="pt-3 pb-4 px-6">
+                  <HistoriqueCotisationsTable cotisations={historiqueCotisations} />
+                </CardContent>
+              </Card>
+            )}
 
             <FinancialTables 
               cotisations={cotisations}

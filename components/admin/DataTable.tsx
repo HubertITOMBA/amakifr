@@ -56,10 +56,22 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
             ))}
           </thead>
           <tbody>
-            {rows.map((row) => (
-              <tr key={row.id} className="border-b border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50">
+            {rows.map((row, index) => (
+              <tr 
+                key={row.id} 
+                className={`
+                  border-b border-gray-200 dark:border-gray-700 
+                  ${index % 2 === 0 
+                    ? 'bg-white dark:bg-gray-900' 
+                    : 'bg-gray-50/50 dark:bg-gray-800/30'
+                  }
+                  hover:bg-blue-50 dark:hover:bg-blue-900/20 
+                  hover:border-blue-200 dark:hover:border-blue-700
+                  transition-colors
+                `}
+              >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="p-4">
+                  <td key={cell.id} className="p-4 text-gray-900 dark:text-gray-100">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

@@ -38,6 +38,7 @@ enum TypeAdhesion {
 }
 
 enum TypeEvenementFamilial {
+  Naissance
   MariageEnfant
   DecesFamille
   AnniversaireSalle
@@ -182,6 +183,9 @@ model User {
   typesCotisationMensuelle    TypeCotisationMensuelle[] // Types de cotisation créés
   cotisationsMensuelles       CotisationMensuelle[] // Cotisations mensuelles créées
   relancesCotisationMensuelle RelanceCotisationMensuelle[] // Relances créées
+  dettesInitialesCreees       DetteInitiale[]              @relation("DetteInitialeCreatedBy") // Dettes initiales créées
+  paiementsCreees             PaiementCotisation[]         @relation("PaiementCreatedBy") // Paiements créés
+  assistancesCreees           Assistance[]                 @relation("AssistanceCreatedBy") // Assistances créées
   evenements                  Evenement[] // Événements créés
   conversations               Conversation[] // Conversations créées
   conversationParticipants    ConversationParticipant[] // Participations aux conversations
@@ -242,34 +246,38 @@ model TwoFactorConfirmation {
 model Adherent {
   id                          String                       @id @default(cuid())
   civility                    Civilities?                  @default(Monsieur)
-  firstname                    String                       @db.VarChar(255)
-  lastname                   String                       @db.VarChar(255)
-  dateNaissance              DateTime?                    // Date de naissance
-  typeAdhesion               TypeAdhesion?                // Type d'adhésion
-  profession                 String?                     @db.VarChar(255) // Profession (optionnel)
-  centresInteret             String?                     @db.Text // Centres d'intérêt
-  autorisationImage          Boolean                      @default(false) // Autorisation d'utilisation de l'image
-  accepteCommunications      Boolean                      @default(true) // Acceptation des communications
-  nombreEnfants              Int                          @default(0) // Nombre d'enfants
-  evenementsFamiliaux        String?                     @db.Text // JSON array des types d'événements familiaux
-  Adresse                    Adresse[]
-  Cotisations                Cotisation[]
-  Telephones                 Telephone[]
-  ObligationsCotisation      ObligationCotisation[]
-  Relances                   Relance[]
-  Candidacies                Candidacy[]
-  Votes                      Vote[]
-  CotisationsMensuelles      CotisationMensuelle[] // Cotisations mensuelles
+  firstname                   String                       @db.VarChar(255)
+  lastname                    String                       @db.VarChar(255)
+  dateNaissance               DateTime? // Date de naissance
+  typeAdhesion                TypeAdhesion? // Type d'adhésion
+  profession                  String?                      @db.VarChar(255) // Profession (optionnel)
+  centresInteret              String?                      @db.Text // Centres d'intérêt
+  autorisationImage           Boolean                      @default(false) // Autorisation d'utilisation de l'image
+  accepteCommunications       Boolean                      @default(true) // Acceptation des communications
+  nombreEnfants               Int                          @default(0) // Nombre d'enfants
+  evenementsFamiliaux         String?                      @db.Text // JSON array des types d'événements familiaux
+  Adresse                     Adresse[]
+  Cotisations                 Cotisation[]
+  Telephones                  Telephone[]
+  ObligationsCotisation       ObligationCotisation[]
+  Relances                    Relance[]
+  Candidacies                 Candidacy[]
+  Votes                       Vote[]
+  CotisationsMensuelles       CotisationMensuelle[] // Cotisations mensuelles
   RelancesCotisationMensuelle RelanceCotisationMensuelle[] // Relances cotisations mensuelles
-  InscriptionsEvenements     InscriptionEvenement[] // Inscriptions aux événements
-  idees                      Idee[] // Idées soumises par l'adhérent
-  commentairesIdee           CommentaireIdee[] // Commentaires sur les idées
+  InscriptionsEvenements      InscriptionEvenement[] // Inscriptions aux événements
+  idees                       Idee[] // Idées soumises par l'adhérent
+  commentairesIdee            CommentaireIdee[] // Commentaires sur les idées
   approbationsIdee            ApprobationIdee[] // Approbations des idées
-  Enfants                    Enfant[] // Enfants de l'adhérent
-  created_at                 DateTime?                    @db.Timestamp(0)
-  updated_at                 DateTime?                    @db.Timestamp(0)
-  userId                     String                       @unique
-  User                       User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Enfants                     Enfant[] // Enfants de l'adhérent
+  DettesInitiales             DetteInitiale[] // Dettes initiales
+  Paiements                   PaiementCotisation[] // Paiements effectués
+  Assistances                 Assistance[] // Assistances reçues
+  Avoirs                      Avoir[] // Avoirs (excédents de paiement)
+  created_at                  DateTime?                    @db.Timestamp(0)
+  updated_at                  DateTime?                    @db.Timestamp(0)
+  userId                      String                       @unique
+  User                        User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("adherent")
 }
@@ -326,13 +334,13 @@ model Telephone {
 
 // Modèle pour les enfants des adhérents
 model Enfant {
-  id                String    @id @default(cuid())
-  adherentId        String
-  prenom            String     @db.VarChar(255)
-  dateNaissance     DateTime?  // Date de naissance
-  age               Int?       // Âge (calculé ou saisi)
-  createdAt         DateTime   @default(now())
-  updatedAt         DateTime   @updatedAt
+  id            String    @id @default(cuid())
+  adherentId    String
+  prenom        String    @db.VarChar(255)
+  dateNaissance DateTime? // Date de naissance
+  age           Int? // Âge (calculé ou saisi)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
 
   Adherent Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
 
@@ -353,8 +361,10 @@ model ObligationCotisation {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  Adherent Adherent  @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  Relances Relance[]
+  Adherent  Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  Relances  Relance[]
+  Paiements PaiementCotisation[] // Paiements liés à cette obligation
+  UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette obligation
 
   @@map("obligations_cotisation")
 }
@@ -564,6 +574,8 @@ model CotisationMensuelle {
   Adherent       Adherent                     @relation(fields: [adherentId], references: [id], onDelete: Cascade)
   CreatedBy      User                         @relation(fields: [createdBy], references: [id], onDelete: Cascade)
   Relances       RelanceCotisationMensuelle[]
+  Paiements      PaiementCotisation[] // Paiements liés à cette cotisation mensuelle
+  UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette cotisation
 
   // Métadonnées
   createdAt DateTime @default(now())
@@ -596,6 +608,147 @@ model RelanceCotisationMensuelle {
   updatedAt DateTime @updatedAt
 
   @@map("relances_cotisation_mensuelle")
+}
+
+// Modèle pour les dettes initiales (2024, 2025, etc.)
+model DetteInitiale {
+  id             String   @id @default(cuid())
+  adherentId     String
+  annee          Int // Année de la dette (2024, 2025, etc.)
+  montant        Decimal  @db.Decimal(10, 2) // Montant total de la dette pour l'année
+  montantPaye    Decimal  @default(0) @db.Decimal(10, 2) // Montant déjà payé
+  montantRestant Decimal  @db.Decimal(10, 2) // Montant restant à payer
+  description    String?  @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  createdBy      String // ID de l'admin qui a créé la dette
+
+  // Relations
+  Adherent  Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  CreatedBy User                 @relation("DetteInitialeCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  Paiements PaiementCotisation[] // Paiements liés à cette dette
+  UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette dette
+
+  @@unique([adherentId, annee])
+  @@map("dettes_initiales")
+}
+
+// Modèle pour les paiements de cotisations (partiels ou complets)
+model PaiementCotisation {
+  id            String        @id @default(cuid())
+  adherentId    String
+  montant       Decimal       @db.Decimal(10, 2)
+  datePaiement  DateTime      @default(now())
+  moyenPaiement MoyenPaiement
+  reference     String?       @db.VarChar(100) // Référence du paiement (chèque, virement, etc.)
+  description   String?       @db.Text
+
+  // Liens vers les obligations/cotisations payées
+  obligationCotisationId String? // Si le paiement concerne une obligation
+  cotisationMensuelleId  String? // Si le paiement concerne une cotisation mensuelle
+  detteInitialeId        String? // Si le paiement concerne une dette initiale
+  assistanceId           String? // Si le paiement concerne une assistance
+
+  statut    String @default("Valide") // Valide, Annule, EnAttente
+  createdBy String // ID de l'admin qui a enregistré le paiement
+
+  // Relations
+  Adherent             Adherent              @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  ObligationCotisation ObligationCotisation? @relation(fields: [obligationCotisationId], references: [id], onDelete: SetNull)
+  CotisationMensuelle  CotisationMensuelle?  @relation(fields: [cotisationMensuelleId], references: [id], onDelete: SetNull)
+  DetteInitiale        DetteInitiale?        @relation(fields: [detteInitialeId], references: [id], onDelete: SetNull)
+  Assistance           Assistance?           @relation(fields: [assistanceId], references: [id], onDelete: SetNull)
+  CreatedBy            User                  @relation("PaiementCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  Avoir                Avoir?                @relation("AvoirFromPaiement") // Avoir créé par ce paiement (si excédent)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("paiements_cotisation")
+}
+
+// Modèle pour les avoirs (excédents de paiement)
+model Avoir {
+  id            String   @id @default(cuid())
+  adherentId   String
+  montant       Decimal  @db.Decimal(10, 2) // Montant de l'avoir
+  montantUtilise Decimal @default(0) @db.Decimal(10, 2) // Montant déjà utilisé
+  montantRestant Decimal @db.Decimal(10, 2) // Montant restant disponible
+  
+  // Origine de l'avoir
+  paiementId    String? @unique // ID du paiement qui a créé cet avoir (si applicable) - unique car un paiement ne peut créer qu'un seul avoir
+  description   String? @db.Text // Description de l'origine de l'avoir
+  
+  // Utilisation de l'avoir
+  statut        String   @default("Disponible") // Disponible, Utilise, Expire
+  
+  // Relations
+  Adherent      Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  Paiement      PaiementCotisation? @relation("AvoirFromPaiement", fields: [paiementId], references: [id], onDelete: SetNull)
+  Utilisations  UtilisationAvoir[] // Utilisations de cet avoir
+  
+  // Métadonnées
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+  dateExpiration DateTime? // Date d'expiration de l'avoir (optionnel)
+  
+  @@index([adherentId])
+  @@index([statut])
+  @@map("avoirs")
+}
+
+// Modèle pour les utilisations d'avoirs
+model UtilisationAvoir {
+  id            String   @id @default(cuid())
+  avoirId       String
+  montant       Decimal  @db.Decimal(10, 2) // Montant utilisé
+  
+  // Lien vers ce qui a été payé avec cet avoir
+  cotisationMensuelleId  String? // Si utilisé pour une cotisation mensuelle
+  obligationCotisationId String? // Si utilisé pour une obligation
+  detteInitialeId        String? // Si utilisé pour une dette initiale
+  assistanceId           String? // Si utilisé pour une assistance
+  
+  description   String?  @db.Text
+  dateUtilisation DateTime @default(now())
+  
+  // Relations
+  Avoir                 Avoir                 @relation(fields: [avoirId], references: [id], onDelete: Cascade)
+  CotisationMensuelle   CotisationMensuelle?  @relation(fields: [cotisationMensuelleId], references: [id], onDelete: SetNull)
+  ObligationCotisation  ObligationCotisation? @relation(fields: [obligationCotisationId], references: [id], onDelete: SetNull)
+  DetteInitiale         DetteInitiale?        @relation(fields: [detteInitialeId], references: [id], onDelete: SetNull)
+  Assistance            Assistance?           @relation(fields: [assistanceId], references: [id], onDelete: SetNull)
+  
+  // Métadonnées
+  createdAt     DateTime @default(now())
+  
+  @@index([avoirId])
+  @@map("utilisations_avoir")
+}
+
+// Modèle pour les assistances (50€ pour naissance, décès, anniversaire, mariage)
+model Assistance {
+  id             String                @id @default(cuid())
+  adherentId     String
+  type           TypeEvenementFamilial // Naissance, MariageEnfant, DecesFamille, AnniversaireSalle, Autre
+  montant        Decimal               @default(50.00) @db.Decimal(10, 2) // Montant fixe de 50€
+  dateEvenement  DateTime // Date de l'événement
+  montantPaye    Decimal               @default(0) @db.Decimal(10, 2)
+  montantRestant Decimal               @db.Decimal(10, 2)
+  statut         String                @default("EnAttente") // EnAttente, Paye, Annule
+  description    String?               @db.Text
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  createdBy      String // ID de l'admin qui a créé l'assistance
+
+  // Relations
+  Adherent  Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  CreatedBy User                 @relation("AssistanceCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  Paiements PaiementCotisation[] // Paiements liés à cette assistance
+  UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette assistance
+
+  @@map("assistances")
 }
 
 // Modèle pour la gestion des événements

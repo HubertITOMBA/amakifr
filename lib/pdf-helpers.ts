@@ -21,8 +21,10 @@ export function addPDFHeader(doc: any, title?: string): void {
   const pageWidth = doc.internal.pageSize.getWidth();
   
   // Fond bleu pour l'en-tête (#093DB5 = RGB(9, 61, 181))
+  // Augmenter la hauteur de l'en-tête si un titre est fourni pour avoir plus d'espace
+  const headerHeight = title ? 60 : 50;
   doc.setFillColor(9, 61, 181);
-  doc.rect(0, 0, pageWidth, 50, 'F');
+  doc.rect(0, 0, pageWidth, headerHeight, 'F');
   
   // Logo (si disponible)
   if (logoBase64) {
@@ -55,10 +57,13 @@ export function addPDFHeader(doc: any, title?: string): void {
   
   // Titre optionnel (si fourni)
   if (title) {
-    doc.setFontSize(14);
+    doc.setFontSize(16);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255); // Blanc pour être visible sur le fond bleu
-    doc.text(title, 20, 42);
+    // Positionner le titre en dessous du logo et du texte "AMAKI France" avec un padding
+    // Le logo se termine à y=40 (10 + 30), le texte "AMAKI France" est à y=25
+    // On met le titre à y=52 pour avoir un espacement confortable de 12px après le logo
+    doc.text(title, 20, 52);
   }
 }
 

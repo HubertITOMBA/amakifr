@@ -34,12 +34,17 @@ import {
   CreditCard,
   Mail,
   Phone,
-  Calendar
+  Calendar,
+  Info
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAdherentsWithCotisations, createManualCotisation, updateCotisation } from "@/actions/cotisations";
+import { createPaiementGeneral } from "@/actions/paiements";
 import { Modal } from "@/components/Modal";
 import { Label } from "@/components/ui/label";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 
 interface AdherentWithCotisations {
   id: string;
@@ -64,6 +69,10 @@ interface AdherentWithCotisations {
   enRetard: boolean;
   montantForfait: number;
   montantOccasionnel: number;
+  forfaitMoisCourant: number;
+  assistanceMoisCourant: number;
+  montantAPayerPourAnnulerDette: number;
+  totalAvoirs: number;
 }
 
 export default function AdminCotisationManagement() {
@@ -90,14 +99,23 @@ export default function AdminCotisationManagement() {
   });
   const [showManualForm, setShowManualForm] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
+  const [showPaiementDialog, setShowPaiementDialog] = useState(false);
   const [adherentDetails, setAdherentDetails] = useState<any>(null);
   const [loadingDetails, setLoadingDetails] = useState(false);
+  const [paiementAdherent, setPaiementAdherent] = useState<AdherentWithCotisations | null>(null);
   const [manualFormData, setManualFormData] = useState({
     type: "Forfait",
     montant: 15,
     moyenPaiement: "Especes",
     description: "",
     reference: "",
+  });
+  const [paiementFormData, setPaiementFormData] = useState({
+    montant: "",
+    datePaiement: new Date().toISOString().split('T')[0],
+    moyenPaiement: "Especes" as "Especes" | "Cheque" | "Virement" | "CarteBancaire",
+    reference: "",
+    description: "",
   });
 
   useEffect(() => {
@@ -128,14 +146,14 @@ export default function AdminCotisationManagement() {
         cell: ({ row }) => {
           const adherent = row.original;
           return (
-            <div className="flex items-center space-x-3">
-              <div className="h-10 w-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
-                <span className="text-sm font-medium text-blue-600 dark:text-blue-300">
+            <div className="flex items-center space-x-2">
+              <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+                <span className="text-xs font-medium text-blue-600 dark:text-blue-300">
                   {adherent.firstname[0]}{adherent.lastname[0]}
                 </span>
               </div>
               <div>
-                <p className="font-medium text-gray-900 dark:text-white">
+                <p className="text-sm font-medium text-gray-900 dark:text-white">
                   {adherent.civility} {adherent.firstname} {adherent.lastname}
                 </p>
               </div>
@@ -169,7 +187,7 @@ export default function AdminCotisationManagement() {
           const dette = row.getValue("totalDette") as number;
           return (
             <div className="text-right">
-              <span className={`font-bold ${dette > 0 ? 'text-red-600' : 'text-green-600'}`}>
+              <span className={`text-sm font-bold ${dette > 0 ? 'text-red-600' : 'text-green-600'}`}>
                 {dette.toFixed(2).replace('.', ',')} €
               </span>
             </div>
@@ -178,7 +196,7 @@ export default function AdminCotisationManagement() {
       },
       {
         accessorKey: "moisDeRetard",
-        header: "Mois de Retard",
+        header: "Retard",
         cell: ({ row }) => {
           const mois = row.getValue("moisDeRetard") as number;
           return (
@@ -197,13 +215,13 @@ export default function AdminCotisationManagement() {
         },
       },
       {
-        accessorKey: "montantForfait",
+        accessorKey: "forfaitMoisCourant",
         header: "Forfait",
         cell: ({ row }) => {
-          const montant = row.getValue("montantForfait") as number;
+          const montant = row.getValue("forfaitMoisCourant") as number;
           return (
             <div className="text-right">
-              <span className="font-medium text-gray-900 dark:text-white">
+              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
                 {montant.toFixed(2).replace('.', ',')} €
               </span>
             </div>
@@ -211,15 +229,61 @@ export default function AdminCotisationManagement() {
         },
       },
       {
-        accessorKey: "montantOccasionnel",
-        header: "Occasionnel",
+        accessorKey: "assistanceMoisCourant",
+        header: "Assistance",
         cell: ({ row }) => {
-          const montant = row.getValue("montantOccasionnel") as number;
+          const montant = row.getValue("assistanceMoisCourant") as number;
           return (
             <div className="text-right">
-              <span className="font-medium text-gray-900 dark:text-white">
+              <span className="text-sm font-medium text-purple-600 dark:text-purple-400">
                 {montant.toFixed(2).replace('.', ',')} €
               </span>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "montantAPayerPourAnnulerDette",
+        header: "A Payer",
+        cell: ({ row }) => {
+          const montant = row.getValue("montantAPayerPourAnnulerDette") as number;
+          return (
+            <div className="text-right">
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <div className="flex items-center justify-end gap-1 cursor-help">
+                    <span className={`text-sm font-bold ${montant > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                      {montant.toFixed(2).replace('.', ',')} €
+                    </span>
+                    {montant > 0 && (
+                      <Info className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                    )}
+                  </div>
+                </TooltipTrigger>
+                {montant > 0 && (
+                  <TooltipContent>
+                    <p>Pour annuler la dette</p>
+                  </TooltipContent>
+                )}
+              </Tooltip>
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "totalAvoirs",
+        header: "Avoirs",
+        cell: ({ row }) => {
+          const avoirs = row.getValue("totalAvoirs") as number;
+          return (
+            <div className="text-right">
+              {avoirs > 0 ? (
+                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                  {avoirs.toFixed(2).replace('.', ',')} €
+                </Badge>
+              ) : (
+                <span className="text-sm text-gray-400">0,00 €</span>
+              )}
             </div>
           );
         },
@@ -231,7 +295,7 @@ export default function AdminCotisationManagement() {
         cell: ({ row }) => {
           const adherent = row.original;
           return (
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-1">
               <Button
                 size="sm"
                 variant="outline"
@@ -239,7 +303,7 @@ export default function AdminCotisationManagement() {
                   setSelectedAdherent(adherent);
                   setShowManualForm(true);
                 }}
-                className="text-blue-600 hover:text-blue-700"
+                className="text-blue-600 hover:text-blue-700 h-7 px-2 text-xs"
               >
                 <Edit className="h-3 w-3 mr-1" />
                 Saisir
@@ -265,7 +329,7 @@ export default function AdminCotisationManagement() {
                     setLoadingDetails(false);
                   }
                 }}
-                className="text-green-600 hover:text-green-700"
+                className="text-green-600 hover:text-green-700 h-7 px-2 text-xs"
               >
                 <Eye className="h-3 w-3 mr-1" />
                 Voir
@@ -274,10 +338,31 @@ export default function AdminCotisationManagement() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="text-red-600 hover:text-red-700"
+                  className="text-red-600 hover:text-red-700 h-7 px-2 text-xs"
                 >
                   <Mail className="h-3 w-3 mr-1" />
                   Relancer
+                </Button>
+              )}
+              {adherent.montantAPayerPourAnnulerDette > 0 && (
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setPaiementAdherent(adherent);
+                    setPaiementFormData({
+                      montant: "", // Laisser libre pour que l'admin puisse saisir le montant qu'il souhaite
+                      datePaiement: new Date().toISOString().split('T')[0],
+                      moyenPaiement: "Especes",
+                      reference: "",
+                      description: "",
+                    });
+                    setShowPaiementDialog(true);
+                  }}
+                  className="text-purple-600 hover:text-purple-700 h-7 px-2 text-xs"
+                >
+                  <CreditCard className="h-3 w-3 mr-1" />
+                  Encaisser
                 </Button>
               )}
             </div>
@@ -364,86 +449,96 @@ export default function AdminCotisationManagement() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* En-tête */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Gestion des Cotisations
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">
-            Suivi des cotisations et gestion des adhérents
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="space-y-6 p-6">
+        {/* En-tête */}
+        <div className="flex justify-between items-center">
+          <div>
+            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
+              Gestion des Cotisations
+            </h1>
+            <p className="text-gray-700 dark:text-gray-300 mt-2 text-lg">
+              Suivi des cotisations et gestion des adhérents
+            </p>
+          </div>
+          <div className="flex items-center space-x-4">
+            <Button
+              onClick={() => window.location.href = '/admin/cotisations'}
+              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg"
+            >
+              <Calendar className="h-4 w-4 mr-2" />
+              Créer Cotisations
+            </Button>
+          </div>
         </div>
-        <div className="flex items-center space-x-4">
-          <Button
-            onClick={() => window.location.href = '/admin/cotisations'}
-            className="bg-blue-600 hover:bg-blue-700 text-white"
-          >
-            <Calendar className="h-4 w-4 mr-2" />
-            Créer Cotisations
-          </Button>
-        </div>
-      </div>
 
       {/* Statistiques */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        <Card>
-          <CardContent className="p-6">
+        <Card className="!py-0 border-blue-200 dark:border-blue-800 shadow-lg hover:shadow-xl transition-shadow">
+          <CardContent className="p-6 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                <p className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
                   Total Adhérents
                 </p>
-                <p className="text-2xl font-bold text-gray-900 dark:text-white">
+                <p className="text-3xl font-bold text-blue-900 dark:text-blue-100 mt-2">
                   {adherents.length}
                 </p>
               </div>
-              <Users className="h-8 w-8 text-blue-600" />
+              <div className="h-14 w-14 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                <Users className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="!py-0 border-red-200 dark:border-red-800 shadow-lg hover:shadow-xl transition-shadow">
+          <CardContent className="p-6 bg-gradient-to-br from-red-50 to-white dark:from-red-900/20 dark:to-gray-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                <p className="text-sm font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">
                   En Retard
                 </p>
-                <p className="text-2xl font-bold text-red-600">
+                <p className="text-3xl font-bold text-red-900 dark:text-red-100 mt-2">
                   {adherentsEnRetard}
                 </p>
               </div>
-              <AlertTriangle className="h-8 w-8 text-red-600" />
+              <div className="h-14 w-14 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+                <AlertTriangle className="h-7 w-7 text-red-600 dark:text-red-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-6">
+        <Card className="!py-0 border-orange-200 dark:border-orange-800 shadow-lg hover:shadow-xl transition-shadow">
+          <CardContent className="p-6 bg-gradient-to-br from-orange-50 to-white dark:from-orange-900/20 dark:to-gray-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
+                <p className="text-sm font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wide">
                   Total Dettes
                 </p>
-                <p className="text-2xl font-bold text-orange-600">
+                <p className="text-3xl font-bold text-orange-900 dark:text-orange-100 mt-2">
                   {totalDettes.toFixed(2).replace('.', ',')} €
                 </p>
               </div>
-              <Euro className="h-8 w-8 text-orange-600" />
+              <div className="h-14 w-14 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                <Euro className="h-7 w-7 text-orange-600 dark:text-orange-400" />
+              </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Tableau */}
-      <Card>
-        <CardHeader>
+      <Card className="!py-0 shadow-xl border-blue-200 dark:border-blue-800">
+        <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 text-white rounded-t-lg">
           <div className="flex justify-between items-center">
             <div>
-              <CardTitle>Liste des Adhérents</CardTitle>
-              <CardDescription>
+              <CardTitle className="text-2xl font-bold text-white flex items-center gap-3">
+                <Users className="h-6 w-6" />
+                Liste des Adhérents
+              </CardTitle>
+              <CardDescription className="text-blue-100 dark:text-blue-200 mt-2 text-base">
                 Gestion des cotisations et suivi des dettes
               </CardDescription>
             </div>
@@ -455,6 +550,7 @@ export default function AdminCotisationManagement() {
               <Button 
                 variant="outline" 
                 size="sm"
+                className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
                 onClick={async () => {
                   try {
                     toast.loading("Génération du PDF en cours...");
@@ -542,16 +638,16 @@ export default function AdminCotisationManagement() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
-          {/* Filtres */}
-          <div className="flex items-center space-x-4 mb-4">
-            <div className="flex items-center space-x-2">
-              <Search className="h-4 w-4 text-gray-400" />
+        <CardContent className="pt-6 pb-4 px-6">
+          {/* Filtres et recherche */}
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="relative flex-1">
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Rechercher un adhérent..."
-                value={globalFilter}
+                value={globalFilter as string}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="max-w-sm"
+                className="pl-10 border-gray-300 dark:border-gray-600"
               />
             </div>
             <Select
@@ -560,7 +656,7 @@ export default function AdminCotisationManagement() {
                 table.getColumn("status")?.setFilterValue(value === "all" ? "" : value)
               }
             >
-              <SelectTrigger className="w-40">
+              <SelectTrigger className="w-full sm:w-48 border-gray-300 dark:border-gray-600">
                 <SelectValue placeholder="Statut" />
               </SelectTrigger>
               <SelectContent>
@@ -572,15 +668,15 @@ export default function AdminCotisationManagement() {
           </div>
 
           {/* Table */}
-          <div className="rounded-md border">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
             <table className="w-full">
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id} className="border-b bg-gray-50 dark:bg-gray-800">
+                  <tr key={headerGroup.id} className="border-b bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700">
                     {headerGroup.headers.map((header) => (
                       <th
                         key={header.id}
-                        className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider"
+                        className="px-4 py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider"
                       >
                         {header.isPlaceholder
                           ? null
@@ -594,10 +690,22 @@ export default function AdminCotisationManagement() {
                 ))}
               </thead>
               <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                {table.getRowModel().rows.map((row) => (
-                  <tr key={row.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
+                {table.getRowModel().rows.map((row, index) => (
+                  <tr 
+                    key={row.id} 
+                    className={`
+                      ${index % 2 === 0 
+                        ? 'bg-white dark:bg-gray-900' 
+                        : 'bg-gray-50/50 dark:bg-gray-800/30'
+                      }
+                      hover:bg-blue-50 dark:hover:bg-blue-900/30 
+                      hover:border-l-4 hover:border-l-blue-500 dark:hover:border-l-blue-400
+                      transition-all duration-150
+                      cursor-pointer
+                    `}
+                  >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-4 py-4 whitespace-nowrap">
+                      <td key={cell.id} className="px-3 py-2 whitespace-nowrap text-gray-900 dark:text-gray-100">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
@@ -608,14 +716,15 @@ export default function AdminCotisationManagement() {
           </div>
 
           {/* Pagination */}
-          <div className="flex items-center justify-between mt-4">
-            <div className="text-sm text-gray-500">
+          <div className="bg-white dark:bg-gray-800 mt-5 flex items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-6">
+            <div className="flex-1 text-sm text-muted-foreground dark:text-gray-400">
               {table.getFilteredRowModel().rows.length} adhérent(s) au total
             </div>
             <div className="flex items-center space-x-2">
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 text-xs border-gray-300 dark:border-gray-600"
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
               >
@@ -624,6 +733,7 @@ export default function AdminCotisationManagement() {
               <Button
                 variant="outline"
                 size="sm"
+                className="h-8 text-xs border-gray-300 dark:border-gray-600"
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
               >
@@ -637,7 +747,7 @@ export default function AdminCotisationManagement() {
       {/* Modal de saisie manuelle */}
       {showManualForm && selectedAdherent && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-md">
+          <Card className="!py-0 w-full max-w-md">
             <CardHeader>
               <CardTitle>Saisir une Cotisation</CardTitle>
               <CardDescription>
@@ -851,6 +961,148 @@ export default function AdminCotisationManagement() {
           )}
         </Modal>
       )}
+
+      {/* Dialog d'encaissement */}
+      {showPaiementDialog && paiementAdherent && (
+        <Dialog open={showPaiementDialog} onOpenChange={setShowPaiementDialog}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Encaisser un Paiement</DialogTitle>
+              <DialogDescription>
+                Pour {paiementAdherent.civility} {paiementAdherent.firstname} {paiementAdherent.lastname}
+              </DialogDescription>
+            </DialogHeader>
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!paiementAdherent) return;
+
+                try {
+                  const result = await createPaiementGeneral({
+                    adherentId: paiementAdherent.id,
+                    montant: parseFloat(paiementFormData.montant),
+                    datePaiement: paiementFormData.datePaiement,
+                    moyenPaiement: paiementFormData.moyenPaiement,
+                    reference: paiementFormData.reference || undefined,
+                    description: paiementFormData.description || undefined,
+                  });
+
+                  if (result.success) {
+                    toast.success(result.message);
+                    setShowPaiementDialog(false);
+                    setPaiementAdherent(null);
+                    setPaiementFormData({
+                      montant: "",
+                      datePaiement: new Date().toISOString().split('T')[0],
+                      moyenPaiement: "Especes",
+                      reference: "",
+                      description: "",
+                    });
+                    loadAdherents();
+                  } else {
+                    toast.error(result.error || "Erreur lors de l'enregistrement");
+                  }
+                } catch (error) {
+                  console.error("Erreur:", error);
+                  toast.error("Erreur lors de l'enregistrement du paiement");
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <Label htmlFor="montant">Montant à encaisser (€) *</Label>
+                <Input
+                  id="montant"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  required
+                  value={paiementFormData.montant}
+                  onChange={(e) => setPaiementFormData({ ...paiementFormData, montant: e.target.value })}
+                  placeholder="0.00"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Montant suggéré pour annuler la dette: <strong>{paiementAdherent.montantAPayerPourAnnulerDette.toFixed(2)}€</strong>
+                  <br />
+                  <span className="text-blue-600 dark:text-blue-400">
+                    • Si le montant est <strong>inférieur</strong> : la dette sera réduite du montant saisi
+                    <br />
+                    • Si le montant est <strong>supérieur</strong> : la dette sera annulée et l'excédent créera un avoir
+                  </span>
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label htmlFor="datePaiement">Date de paiement *</Label>
+                  <Input
+                    id="datePaiement"
+                    type="date"
+                    required
+                    value={paiementFormData.datePaiement}
+                    onChange={(e) => setPaiementFormData({ ...paiementFormData, datePaiement: e.target.value })}
+                  />
+                </div>
+                <div>
+                  <Label htmlFor="moyenPaiement">Moyen de paiement *</Label>
+                  <Select
+                    value={paiementFormData.moyenPaiement}
+                    onValueChange={(value: any) => setPaiementFormData({ ...paiementFormData, moyenPaiement: value })}
+                  >
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Especes">Espèces</SelectItem>
+                      <SelectItem value="Cheque">Chèque</SelectItem>
+                      <SelectItem value="Virement">Virement</SelectItem>
+                      <SelectItem value="CarteBancaire">Carte bancaire</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="reference">Référence</Label>
+                <Input
+                  id="reference"
+                  value={paiementFormData.reference}
+                  onChange={(e) => setPaiementFormData({ ...paiementFormData, reference: e.target.value })}
+                  placeholder="N° de chèque, virement, etc."
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={paiementFormData.description}
+                  onChange={(e) => setPaiementFormData({ ...paiementFormData, description: e.target.value })}
+                  placeholder="Description optionnelle"
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowPaiementDialog(false);
+                    setPaiementAdherent(null);
+                  }}
+                >
+                  Annuler
+                </Button>
+                <Button type="submit">
+                  Encaisser
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
+      </div>
     </div>
   );
 }

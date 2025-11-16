@@ -166,11 +166,27 @@ export async function createManualCotisation(data: z.infer<typeof CreateCotisati
     });
 
     if (obligation) {
-      const nouveauMontantPaye = Number(obligation.montantPaye) + validatedData.montant;
-      const nouveauMontantRestant = Number(obligation.montantAttendu) - nouveauMontantPaye;
+      // Importer la fonction appliquerAvoirs depuis paiements
+      const { appliquerAvoirs } = await import("@/actions/paiements/index");
+      const Decimal = (await import("@prisma/client/runtime/library")).Decimal;
+      
+      // Appliquer d'abord les avoirs disponibles
+      const montantApresAvoirs = await appliquerAvoirs(
+        validatedData.adherentId,
+        new Decimal(obligation.montantRestant),
+        'obligationCotisation',
+        obligation.id
+      );
+
+      // Calculer le montant réellement payé
+      const montantPaiement = new Decimal(validatedData.montant);
+      const montantEffectivementPaye = Decimal.min(montantPaiement, montantApresAvoirs);
+      const nouveauMontantPaye = new Decimal(obligation.montantPaye).plus(montantEffectivementPaye);
+      const nouveauMontantRestant = montantApresAvoirs.minus(montantEffectivementPaye);
+      const excédent = montantPaiement.minus(montantEffectivementPaye);
       
       let nouveauStatut = "PartiellementPaye";
-      if (nouveauMontantRestant <= 0) {
+      if (nouveauMontantRestant.lte(0)) {
         nouveauStatut = "Paye";
       }
 
@@ -178,10 +194,24 @@ export async function createManualCotisation(data: z.infer<typeof CreateCotisati
         where: { id: obligation.id },
         data: {
           montantPaye: nouveauMontantPaye,
-          montantRestant: Math.max(0, nouveauMontantRestant),
+          montantRestant: nouveauMontantRestant.max(0),
           statut: nouveauStatut,
         }
       });
+
+      // Si il y a un excédent, créer un avoir
+      if (excédent.gt(0)) {
+        await prisma.avoir.create({
+          data: {
+            adherentId: validatedData.adherentId,
+            montant: excédent,
+            montantUtilise: new Decimal(0),
+            montantRestant: excédent,
+            description: `Avoir créé suite à un excédent de paiement de ${excédent.toFixed(2)}€ (cotisation manuelle)`,
+            statut: "Disponible",
+          },
+        });
+      }
     }
 
     return { success: true, data: cotisationConverted };
@@ -200,6 +230,45 @@ export async function getAdherentsWithCotisations() {
       return { success: false, error: "Non autorisé" };
     }
 
+    // Dates pour le mois en cours
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const periodeCourante = `${currentYear}-${String(currentMonth).padStart(2, '0')}`;
+    const startOfCurrentMonth = new Date(currentYear, currentMonth - 1, 1);
+    const endOfCurrentMonth = new Date(currentYear, currentMonth, 0, 23, 59, 59);
+
+    // Récupérer toutes les assistances du mois en cours
+    const toutesAssistancesMoisCourant = await prisma.assistance.findMany({
+      where: {
+        dateEvenement: {
+          gte: startOfCurrentMonth,
+          lte: endOfCurrentMonth
+        },
+        statut: { not: "Annule" }
+      },
+      include: {
+        Adherent: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true
+          }
+        }
+      }
+    });
+
+    // Trouver le type Forfait Mensuel
+    const typeForfait = await prisma.typeCotisationMensuelle.findFirst({
+      where: {
+        nom: { contains: "Forfait", mode: "insensitive" },
+        obligatoire: true,
+        actif: true
+      }
+    });
+
+    const montantForfait = typeForfait ? Number(typeForfait.montant) : 15;
+
     const adherents = await prisma.adherent.findMany({
       include: {
         User: {
@@ -216,6 +285,40 @@ export async function getAdherentsWithCotisations() {
           },
           orderBy: {
             dateEcheance: 'desc'
+          }
+        },
+        DettesInitiales: {
+          where: {
+            montantRestant: { gt: 0 }
+          },
+          orderBy: {
+            annee: 'desc'
+          }
+        },
+        Avoirs: {
+          where: {
+            statut: "Disponible",
+            montantRestant: { gt: 0 }
+          },
+          orderBy: {
+            createdAt: 'asc'
+          }
+        },
+        CotisationsMensuelles: {
+          where: {
+            periode: periodeCourante
+          },
+          include: {
+            TypeCotisation: true
+          }
+        },
+        Assistances: {
+          where: {
+            dateEvenement: {
+              gte: startOfCurrentMonth,
+              lte: endOfCurrentMonth
+            },
+            statut: { not: "Annule" }
           }
         },
         Cotisations: {
@@ -244,11 +347,67 @@ export async function getAdherentsWithCotisations() {
 
     // Calculer les dettes pour chaque adhérent
     const adherentsWithDebt = adherents.map(adherent => {
-      const totalDette = adherent.ObligationsCotisation.reduce((sum, obligation) => {
+      // Dette des obligations de cotisation
+      const detteObligations = adherent.ObligationsCotisation.reduce((sum, obligation) => {
         return sum + Number(obligation.montantRestant);
       }, 0);
 
-      const cotisationMensuelle = 15 + 50; // Forfait + Occasionnel
+      // Dette initiale (somme des montants restants de toutes les dettes initiales)
+      const detteInitiale = adherent.DettesInitiales.reduce((sum, dette) => {
+        return sum + Number(dette.montantRestant);
+      }, 0);
+
+      // Total des avoirs disponibles
+      const totalAvoirs = adherent.Avoirs.reduce((sum, avoir) => {
+        return sum + Number(avoir.montantRestant);
+      }, 0);
+
+      // Total de la dette brute = obligations + dettes initiales
+      const totalDetteBrute = detteObligations + detteInitiale;
+      
+      // Dette nette = dette brute - avoirs disponibles (minimum 0)
+      const totalDette = Math.max(0, totalDetteBrute - totalAvoirs);
+
+      // Calculer le forfait du mois en cours
+      // IMPORTANT: Ne calculer le forfait que si une cotisation mensuelle existe
+      // Si aucune cotisation n'a été créée, le forfait ne doit pas être inclus dans le calcul
+      const cotisationMensuelleCourante = adherent.CotisationsMensuelles.find(
+        cm => cm.periode === periodeCourante
+      );
+      let forfaitMoisCourant = 0;
+      let assistanceMoisCourant = 0;
+      
+      if (cotisationMensuelleCourante) {
+        // Si une cotisation mensuelle existe, extraire le forfait et les assistances
+        const description = cotisationMensuelleCourante.description || '';
+        // Le forfait est toujours présent dans une cotisation existante
+        forfaitMoisCourant = montantForfait;
+        
+        // Vérifier si l'adhérent est bénéficiaire
+        const isBeneficiaire = description.includes('Bénéficiaire de:');
+        
+        if (!isBeneficiaire && description.includes('+ Assistances:')) {
+          // Calculer le montant des assistances du mois
+          const assistancesMois = toutesAssistancesMoisCourant.filter(
+            ass => ass.adherentId !== adherent.id
+          );
+          assistanceMoisCourant = assistancesMois.reduce((sum, ass) => {
+            return sum + Number(ass.montantRestant > 0 ? ass.montantRestant : ass.montant);
+          }, 0);
+        }
+      } else {
+        // Pas de cotisation mensuelle créée : ne pas inclure le forfait dans le calcul
+        // Le forfait sera inclus uniquement quand la cotisation mensuelle sera créée
+        forfaitMoisCourant = 0;
+        assistanceMoisCourant = 0;
+      }
+
+      // Montant à payer pour annuler la dette = dette initiale + forfait mois en cours (si cotisation créée) + assistance mois en cours (si cotisation créée)
+      // IMPORTANT: Soustraire les avoirs disponibles car ils seront automatiquement appliqués
+      const montantBrutAPayer = detteInitiale + forfaitMoisCourant + assistanceMoisCourant;
+      const montantAPayerPourAnnulerDette = Math.max(0, montantBrutAPayer - totalAvoirs);
+
+      const cotisationMensuelle = montantForfait + 50; // Forfait + assistance moyenne
       const moisDeRetard = Math.floor(totalDette / cotisationMensuelle);
 
       return {
@@ -259,15 +418,47 @@ export async function getAdherentsWithCotisations() {
           montantPaye: Number(obligation.montantPaye),
           montantRestant: Number(obligation.montantRestant)
         })),
+        DettesInitiales: adherent.DettesInitiales.map((dette: any) => ({
+          ...dette,
+          montant: Number(dette.montant),
+          montantPaye: Number(dette.montantPaye),
+          montantRestant: Number(dette.montantRestant)
+        })),
         Cotisations: adherent.Cotisations.map((cotisation: any) => ({
           ...cotisation,
           montant: Number(cotisation.montant)
+        })),
+        CotisationsMensuelles: adherent.CotisationsMensuelles.map((cotisation: any) => ({
+          ...cotisation,
+          montantAttendu: Number(cotisation.montantAttendu),
+          montantPaye: Number(cotisation.montantPaye),
+          montantRestant: Number(cotisation.montantRestant),
+          TypeCotisation: cotisation.TypeCotisation ? {
+            ...cotisation.TypeCotisation,
+            montant: Number(cotisation.TypeCotisation.montant)
+          } : null
+        })),
+        Assistances: adherent.Assistances.map((assistance: any) => ({
+          ...assistance,
+          montant: Number(assistance.montant),
+          montantPaye: Number(assistance.montantPaye),
+          montantRestant: Number(assistance.montantRestant)
+        })),
+        Avoirs: adherent.Avoirs.map((avoir: any) => ({
+          ...avoir,
+          montant: Number(avoir.montant),
+          montantUtilise: Number(avoir.montantUtilise),
+          montantRestant: Number(avoir.montantRestant)
         })),
         totalDette: Number(totalDette.toFixed(2)),
         moisDeRetard,
         enRetard: moisDeRetard >= 3,
         montantForfait: Number(adherent.ObligationsCotisation.find(o => o.type === "Forfait")?.montantRestant || 0),
         montantOccasionnel: Number(adherent.ObligationsCotisation.find(o => o.type === "Assistance")?.montantRestant || 0),
+        forfaitMoisCourant: Number(forfaitMoisCourant.toFixed(2)),
+        assistanceMoisCourant: Number(assistanceMoisCourant.toFixed(2)),
+        montantAPayerPourAnnulerDette: Number(montantAPayerPourAnnulerDette.toFixed(2)),
+        totalAvoirs: Number(totalAvoirs.toFixed(2)),
       };
     });
 

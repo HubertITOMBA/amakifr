@@ -87,19 +87,26 @@ export default function AdminCotisationCreation() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (formData.typeCotisationIds.length === 0) {
-      toast.error("Veuillez sélectionner au moins un type de cotisation");
+    // Vérifier qu'au moins le forfait est sélectionné
+    const forfaitSelected = formData.typeCotisationIds.some(id => {
+      const type = typesCotisation.find(t => t.id === id);
+      return type && type.nom.toLowerCase().includes('forfait');
+    });
+    
+    if (!forfaitSelected) {
+      toast.error("Veuillez sélectionner au moins le type 'Forfait Mensuel'. Les assistances du mois seront automatiquement ajoutées.");
       return;
     }
     
     setLoading(true);
 
     try {
+      // La logique utilise automatiquement le forfait et ajoute les assistances du mois
       const result = await createCotisationsMensuelles({
         periode: `${formData.annee}-${formData.mois.toString().padStart(2, '0')}`,
         annee: formData.annee,
         mois: formData.mois,
-        typeCotisationIds: formData.typeCotisationIds,
+        typeCotisationIds: formData.typeCotisationIds, // Utilisé pour trouver le forfait
       });
 
       if (result.success) {
@@ -122,11 +129,14 @@ export default function AdminCotisationCreation() {
     }
   };
 
-  // Calculer le total basé sur les types sélectionnés
-  const totalCotisationMensuelle = formData.typeCotisationIds.reduce((total, typeId) => {
-    const type = typesCotisation.find(t => t.id === typeId);
-    return total + (type ? type.montant : 0);
-  }, 0);
+  // Trouver le forfait pour afficher le montant de base
+  const typeForfait = typesCotisation.find(t => 
+    t.id && formData.typeCotisationIds.includes(t.id) && 
+    t.nom.toLowerCase().includes('forfait')
+  );
+  const montantForfait = typeForfait ? typeForfait.montant : 0;
+  
+  // Note: Le total réel sera calculé côté serveur (forfait + assistances du mois par adhérent)
 
   return (
     <div className="space-y-6">
@@ -230,7 +240,9 @@ export default function AdminCotisationCreation() {
             <span>Nouvelles Cotisations Mensuelles</span>
           </CardTitle>
           <CardDescription>
-            Créer les obligations de cotisation pour tous les adhérents actifs
+            Créer les cotisations mensuelles pour tous les adhérents actifs. 
+            Chaque cotisation inclut automatiquement le forfait mensuel (15€ ou montant variable) 
+            + les assistances du mois s'il y en a.
           </CardDescription>
         </CardHeader>
         <CardContent>
@@ -327,14 +339,17 @@ export default function AdminCotisationCreation() {
             <Alert>
               <AlertDescription className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="font-medium">Total par adhérent :</span>
+                  <span className="font-medium">Forfait mensuel :</span>
                   <span className="font-bold text-lg">
-                    {totalCotisationMensuelle.toFixed(2).replace('.', ',')} €
+                    {montantForfait.toFixed(2).replace('.', ',')} €
                   </span>
                 </div>
-                <div className="text-sm text-gray-600 dark:text-gray-300">
+                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                  + assistances du mois (ajoutées automatiquement si présentes)
+                </div>
+                <div className="text-sm text-gray-600 dark:text-gray-300 mt-3">
                   <div className="mb-2">
-                    <strong>Types sélectionnés :</strong>
+                    <strong>Note :</strong> Chaque cotisation mensuelle inclut automatiquement le forfait + les assistances du mois pour chaque adhérent.
                   </div>
                   {formData.typeCotisationIds.length > 0 ? (
                     formData.typeCotisationIds.map(typeId => {

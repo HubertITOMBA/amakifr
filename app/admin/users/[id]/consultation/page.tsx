@@ -83,6 +83,8 @@ const formatDate = (date: string | Date | null | undefined) => {
 
 const getEvenementFamilialLabel = (type: string) => {
   switch (type) {
+    case "Naissance":
+      return "Naissance";
     case "MariageEnfant":
       return "Mariage d'un enfant";
     case "DecesFamille":
