@@ -3,7 +3,7 @@ import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Calendar, MapPin, Clock, Users, Vote, Award, CheckCircle, Cake, Gift, Trophy } from "lucide-react";
+import { Calendar, MapPin, Clock, Users, Vote, Award, CheckCircle, Trophy } from "lucide-react";
 import Link from "next/link";
 
 export default function EvenementsPage() {
@@ -295,38 +295,6 @@ export default function EvenementsPage() {
                 </CardContent>
               </Card> */}
 
-              {/* Événement d'anniversaire - En second plan */}
-              <Card className="border border-pink-200 dark:border-pink-800 shadow-lg bg-gradient-to-br from-pink-50/50 to-rose-50/50 dark:from-pink-900/10 dark:to-rose-900/10">
-                <CardHeader className="bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20">
-                  <div className="flex items-center gap-3">
-                    <Cake className="h-6 w-6 text-pink-500" />
-                    <CardTitle className="text-xl text-pink-800 dark:text-pink-200">
-                      🎂 Anniversaire d'un Membre
-                    </CardTitle>
-                  </div>
-                  <CardDescription className="text-pink-600 dark:text-pink-400">
-                    Jeudi 21 Novembre - 19h00
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-4">
-                    <p className="text-sm text-pink-700 dark:text-pink-300">
-                      Célébration conviviale avec cocktail, gâteau et remise de cadeaux. 
-                      Tous les membres sont invités à partager ce moment de joie.
-                    </p>
-                    <div className="flex gap-3">
-                      <Button size="sm" className="bg-pink-500 hover:bg-pink-600 text-white">
-                        <Cake className="h-4 w-4 mr-2" />
-                        Participer
-                      </Button>
-                      <Button size="sm" variant="outline" className="border-pink-500 text-pink-500 hover:bg-pink-50">
-                        <Gift className="h-4 w-4 mr-2" />
-                        Cadeau
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
             </div>
 
             {/* Sidebar */}

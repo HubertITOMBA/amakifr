@@ -239,10 +239,10 @@ export default function AdminCandidaturesPage() {
             </Link>
             {c.status === CandidacyStatus.EnAttente && (
               <>
-                <Button size="sm" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50" onClick={() => handleCandidacyStatusChange(c.id, CandidacyStatus.Validee)} title="Valider">
+                <Button size="sm" variant="outline" className="text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => handleCandidacyStatusChange(c.id, CandidacyStatus.Validee)} title="Valider">
                   <CheckCircle className="h-4 w-4" />
                 </Button>
-                <Button size="sm" variant="outline" className="text-red-600 border-red-600 hover:bg-red-50" onClick={() => handleCandidacyStatusChange(c.id, CandidacyStatus.Rejetee)} title="Rejeter">
+                <Button size="sm" variant="outline" className="text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20" onClick={() => handleCandidacyStatusChange(c.id, CandidacyStatus.Rejetee)} title="Rejeter">
                   <XCircle className="h-4 w-4" />
                 </Button>
               </>
@@ -275,29 +275,31 @@ export default function AdminCandidaturesPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="flex items-center justify-between">
-          <CardTitle className="flex items-center">
-            <Users className="h-5 w-5 mr-2" />
-            Candidatures
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <ColumnVisibilityToggle 
-              table={table} 
-              storageKey="admin-candidatures-column-visibility"
-            />
-            <Link href="/admin/candidatures/gestion">
-              <Button>
-                <Plus className="h-4 w-4 mr-2" />
-                Nouvelle candidature
-              </Button>
-            </Link>
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+      <Card className="!py-0 border-2 border-indigo-200 dark:border-indigo-800/50 bg-white dark:bg-gray-900">
+        <CardHeader className="pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 bg-gradient-to-r from-indigo-100 to-indigo-50 dark:from-indigo-900/30 dark:to-indigo-800/20 rounded-t-lg">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <CardTitle className="flex items-center text-lg sm:text-xl text-gray-700 dark:text-gray-200">
+              <Users className="h-5 w-5 mr-2 text-indigo-500 dark:text-indigo-400" />
+              Candidatures
+            </CardTitle>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <ColumnVisibilityToggle 
+                table={table} 
+                storageKey="admin-candidatures-column-visibility"
+              />
+              <Link href="/admin/candidatures/gestion" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nouvelle candidature
+                </Button>
+              </Link>
+            </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
           {/* Filtres */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input

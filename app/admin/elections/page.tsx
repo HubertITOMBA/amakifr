@@ -223,10 +223,10 @@ export default function AdminElectionsPage() {
       cell: ({ row }) => {
         const status = row.original.status;
         const statusConfig = {
-          [ElectionStatus.Preparation]: { label: "En préparation", color: "bg-gray-100 text-gray-800 dark:bg-gray-800 dark:text-gray-200" },
-          [ElectionStatus.Ouverte]: { label: "Ouverte", color: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" },
-          [ElectionStatus.Cloturee]: { label: "Clôturée", color: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" },
-          [ElectionStatus.Annulee]: { label: "Annulée", color: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200" },
+          [ElectionStatus.Preparation]: { label: "En préparation", color: "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300 border border-slate-200 dark:border-slate-700" },
+          [ElectionStatus.Ouverte]: { label: "Ouverte", color: "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800" },
+          [ElectionStatus.Cloturee]: { label: "Clôturée", color: "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300 border border-sky-200 dark:border-sky-800" },
+          [ElectionStatus.Annulee]: { label: "Annulée", color: "bg-rose-100 text-rose-700 dark:bg-rose-900/30 dark:text-rose-300 border border-rose-200 dark:border-rose-800" },
         };
         const config = statusConfig[status as keyof typeof statusConfig] || statusConfig[ElectionStatus.Preparation];
         return <Badge className={config.color}>{config.label}</Badge>;
@@ -350,20 +350,20 @@ export default function AdminElectionsPage() {
     <div className="flex gap-6 relative">
       {/* Contenu principal */}
       <div className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'lg:mr-80' : ''}`}>
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-2">
-                <Calendar className="h-5 w-5" />
+        <Card className="!py-0 border-2 border-teal-200 dark:border-teal-800/50 bg-white dark:bg-gray-900">
+          <CardHeader className="pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 bg-gradient-to-r from-teal-100 to-teal-50 dark:from-teal-900/30 dark:to-teal-800/20 rounded-t-lg">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl text-gray-700 dark:text-gray-200">
+                <Calendar className="h-5 w-5 text-teal-500 dark:text-teal-400" />
                 Gestion des Élections
               </CardTitle>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
                 <ColumnVisibilityToggle 
                   table={table} 
                   storageKey="admin-elections-column-visibility"
                 />
-                <Link href="/admin/elections/gestion">
-                  <Button>
+                <Link href="/admin/elections/gestion" className="w-full sm:w-auto">
+                  <Button className="w-full sm:w-auto">
                     <Calendar className="h-4 w-4 mr-2" />
                     Créer une élection
                   </Button>
@@ -371,9 +371,9 @@ export default function AdminElectionsPage() {
               </div>
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
             {/* Filtres */}
-            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
               <div className="relative flex-1">
                 <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                 <Input

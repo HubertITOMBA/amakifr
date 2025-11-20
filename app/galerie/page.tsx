@@ -207,27 +207,27 @@ export default function GaleriePage() {
       <Navbar />
       
       {/* Hero Section */}
-      <section className="relative py-20 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
+      <section className="relative py-8 sm:py-12 md:py-16 lg:py-20 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
         <div className="absolute inset-0 bg-black/20" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-          <div className="flex justify-center mb-8">
-            <div className="bg-white/20 backdrop-blur-sm rounded-full p-6 shadow-2xl">
-              <Camera className="h-16 w-16 text-white" />
+          <div className="flex justify-center mb-4 sm:mb-6 md:mb-8">
+            <div className="bg-white/20 backdrop-blur-sm rounded-full p-4 sm:p-5 md:p-6 shadow-2xl">
+              <Camera className="h-10 w-10 sm:h-12 sm:w-12 md:h-16 md:w-16 text-white" />
             </div>
           </div>
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 text-white drop-shadow-lg">
+          <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-3 sm:mb-4 md:mb-6 text-white drop-shadow-lg">
             Galerie Photos & Vidéos
           </h1>
-          <p className="text-xl md:text-2xl mb-8 text-purple-100">
+          <p className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl mb-4 sm:mb-6 md:mb-8 text-purple-100 px-4">
             Découvrez nos moments forts à travers les souvenirs de nos événements
           </p>
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-lg px-6 py-3">
-              <Camera className="h-5 w-5 mr-2" />
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4 justify-center px-4">
+            <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs sm:text-sm md:text-base lg:text-lg px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3">
+              <Camera className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1.5 sm:mr-2" />
               Photos & Vidéos
             </Badge>
-            <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-lg px-6 py-3">
-              <Users className="h-5 w-5 mr-2" />
+            <Badge variant="secondary" className="bg-white/20 text-white border-white/30 text-xs sm:text-sm md:text-base lg:text-lg px-3 sm:px-4 md:px-6 py-2 sm:py-2.5 md:py-3">
+              <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 md:h-5 md:w-5 mr-1.5 sm:mr-2" />
               Moments partagés
             </Badge>
           </div>
@@ -235,22 +235,23 @@ export default function GaleriePage() {
       </section>
 
       {/* Filtres par catégorie */}
-      <section className="py-8 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-gray-700">
+      <section className="py-4 sm:py-6 md:py-8 bg-white dark:bg-slate-900 border-b border-gray-200 dark:border-gray-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-wrap justify-center gap-4">
+          <div className="flex flex-wrap justify-center gap-2 sm:gap-3 md:gap-4">
             <Button
               variant={selectedCategory === null ? "default" : "outline"}
               onClick={() => setSelectedCategory(null)}
-              className="px-6 py-3"
+              className="px-3 sm:px-4 md:px-6 py-2 text-xs sm:text-sm"
             >
-              Tous les événements
+              <span className="hidden sm:inline">Tous les événements</span>
+              <span className="sm:hidden">Tous</span>
             </Button>
             {categories.map((category) => (
               <Button
                 key={category}
                 variant={selectedCategory === category ? "default" : "outline"}
                 onClick={() => setSelectedCategory(category)}
-                className="px-6 py-3"
+                className="px-3 sm:px-4 md:px-6 py-2 text-xs sm:text-sm"
               >
                 {category}
               </Button>
@@ -260,28 +261,28 @@ export default function GaleriePage() {
       </section>
 
       {/* Contenu de la galerie */}
-      <section className="py-16">
+      <section className="py-8 sm:py-12 md:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {selectedCategory ? (
             // Affichage d'une catégorie spécifique
-            <div className="space-y-8">
-              <div className="text-center mb-12">
-                <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+            <div className="space-y-4 sm:space-y-6 md:space-y-8">
+              <div className="text-center mb-6 sm:mb-8 md:mb-12">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3 md:mb-4">
                   {selectedCategory}
                 </h2>
-                <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+                <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto px-4">
                   {galleryData[selectedCategory as keyof typeof galleryData].description}
                 </p>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
                 {galleryData[selectedCategory as keyof typeof galleryData].items.map((item) => (
                   <Card 
                     key={item.id} 
                     className="overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group"
                     onClick={() => setSelectedItem(item)}
                   >
-                    <div className="relative h-64 overflow-hidden">
+                    <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden">
                       <Image
                         src={item.src}
                         alt={item.alt}
@@ -289,42 +290,42 @@ export default function GaleriePage() {
                         className="object-cover group-hover:scale-105 transition-transform duration-300"
                       />
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
-                      <div className="absolute top-4 right-4">
+                      <div className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4">
                         {item.type === "video" ? (
-                          <Badge className="bg-red-500 text-white">
-                            <Video className="h-3 w-3 mr-1" />
-                            Vidéo
+                          <Badge className="bg-red-500 text-white text-xs">
+                            <Video className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1" />
+                            <span className="hidden sm:inline">Vidéo</span>
                           </Badge>
                         ) : (
-                          <Badge className="bg-blue-500 text-white">
-                            <Camera className="h-3 w-3 mr-1" />
-                            Photo
+                          <Badge className="bg-blue-500 text-white text-xs">
+                            <Camera className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1" />
+                            <span className="hidden sm:inline">Photo</span>
                           </Badge>
                         )}
                       </div>
                       {item.type === "video" && (
                         <div className="absolute inset-0 flex items-center justify-center">
-                          <div className="bg-white/90 rounded-full p-4 group-hover:bg-white transition-colors">
-                            <Play className="h-8 w-8 text-gray-800" />
+                          <div className="bg-white/90 rounded-full p-3 sm:p-4 group-hover:bg-white transition-colors">
+                            <Play className="h-6 w-6 sm:h-7 sm:w-7 md:h-8 md:w-8 text-gray-800" />
                           </div>
                         </div>
                       )}
                     </div>
-                    <CardContent className="p-6">
-                      <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                    <CardContent className="p-4 sm:p-5 md:p-6">
+                      <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-2">
                         {item.title}
                       </h3>
-                      <p className="text-gray-600 dark:text-gray-300 text-sm mb-4">
+                      <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mb-3 sm:mb-4">
                         {item.description}
                       </p>
-                      <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                         <div className="flex items-center gap-1">
-                          <Calendar className="h-4 w-4" />
-                          {item.date}
+                          <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">{item.date}</span>
                         </div>
                         <div className="flex items-center gap-1">
-                          <MapPin className="h-4 w-4" />
-                          {item.location}
+                          <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                          <span className="truncate">{item.location}</span>
                         </div>
                       </div>
                     </CardContent>
@@ -334,30 +335,30 @@ export default function GaleriePage() {
             </div>
           ) : (
             // Affichage de toutes les catégories
-            <div className="space-y-16">
+            <div className="space-y-8 sm:space-y-12 md:space-y-16">
               {categories.map((category) => {
                 const categoryData = galleryData[category as keyof typeof galleryData];
                 const colorClass = colorClasses[categoryData.color as keyof typeof colorClasses];
                 
                 return (
-                  <div key={category} className="space-y-8">
+                  <div key={category} className="space-y-4 sm:space-y-6 md:space-y-8">
                     <div className="text-center">
-                      <h2 className="text-3xl font-bold text-gray-900 dark:text-white mb-4">
+                      <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3 md:mb-4">
                         {category}
                       </h2>
-                      <p className="text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto">
+                      <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto px-4">
                         {categoryData.description}
                       </p>
                     </div>
                     
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
                       {categoryData.items.slice(0, 3).map((item) => (
                         <Card 
                           key={item.id} 
                           className={`overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br ${colorClass.bg} border ${colorClass.border}`}
                           onClick={() => setSelectedItem(item)}
                         >
-                          <div className="relative h-48 overflow-hidden">
+                          <div className="relative h-40 sm:h-44 md:h-48 overflow-hidden">
                             <Image
                               src={item.src}
                               alt={item.alt}
@@ -365,39 +366,39 @@ export default function GaleriePage() {
                               className="object-cover group-hover:scale-105 transition-transform duration-300"
                             />
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
-                            <div className="absolute top-3 right-3">
+                            <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
                               {item.type === "video" ? (
-                                <Badge className="bg-red-500 text-white">
-                                  <Video className="h-3 w-3 mr-1" />
-                                  Vidéo
+                                <Badge className="bg-red-500 text-white text-xs">
+                                  <Video className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1" />
+                                  <span className="hidden sm:inline">Vidéo</span>
                                 </Badge>
                               ) : (
-                                <Badge className="bg-blue-500 text-white">
-                                  <Camera className="h-3 w-3 mr-1" />
-                                  Photo
+                                <Badge className="bg-blue-500 text-white text-xs">
+                                  <Camera className="h-2.5 w-2.5 sm:h-3 sm:w-3 mr-1" />
+                                  <span className="hidden sm:inline">Photo</span>
                                 </Badge>
                               )}
                             </div>
                             {item.type === "video" && (
                               <div className="absolute inset-0 flex items-center justify-center">
-                                <div className="bg-white/90 rounded-full p-3 group-hover:bg-white transition-colors">
-                                  <Play className="h-6 w-6 text-gray-800" />
+                                <div className="bg-white/90 rounded-full p-2.5 sm:p-3 group-hover:bg-white transition-colors">
+                                  <Play className="h-5 w-5 sm:h-6 sm:w-6 text-gray-800" />
                                 </div>
                               </div>
                             )}
                           </div>
-                          <CardContent className="p-4">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+                          <CardContent className="p-3 sm:p-4">
+                            <h3 className="text-sm sm:text-base md:text-lg font-semibold text-gray-900 dark:text-white mb-2">
                               {item.title}
                             </h3>
-                            <div className="flex items-center gap-3 text-sm text-gray-500 dark:text-gray-400">
+                            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 sm:gap-3 text-xs sm:text-sm text-gray-500 dark:text-gray-400">
                               <div className="flex items-center gap-1">
-                                <Calendar className="h-3 w-3" />
-                                {item.date}
+                                <Calendar className="h-3.5 w-3.5 sm:h-3 sm:w-3 flex-shrink-0" />
+                                <span className="truncate">{item.date}</span>
                               </div>
                               <div className="flex items-center gap-1">
-                                <MapPin className="h-3 w-3" />
-                                {item.location}
+                                <MapPin className="h-3.5 w-3.5 sm:h-3 sm:w-3 flex-shrink-0" />
+                                <span className="truncate">{item.location}</span>
                               </div>
                             </div>
                           </CardContent>
@@ -409,9 +410,10 @@ export default function GaleriePage() {
                       <Button 
                         variant="outline"
                         onClick={() => setSelectedCategory(category)}
-                        className="px-8 py-3"
+                        className="px-4 sm:px-6 md:px-8 py-2 text-xs sm:text-sm"
                       >
-                        Voir tous les {category.toLowerCase()}
+                        <span className="hidden sm:inline">Voir tous les {category.toLowerCase()}</span>
+                        <span className="sm:hidden">Voir tout</span>
                       </Button>
                     </div>
                   </div>
@@ -425,8 +427,8 @@ export default function GaleriePage() {
       {/* Modal pour afficher les détails */}
       {selectedItem && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white dark:bg-slate-900 rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-            <div className="relative h-96">
+          <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
+            <div className="relative h-48 sm:h-64 md:h-80 lg:h-96 flex-shrink-0">
               <Image
                 src={selectedItem.src}
                 alt={selectedItem.alt}
@@ -435,55 +437,56 @@ export default function GaleriePage() {
               />
               <button
                 onClick={() => setSelectedItem(null)}
-                className="absolute top-4 right-4 bg-white/90 hover:bg-white rounded-full p-2 transition-colors"
+                className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 bg-white/90 hover:bg-white rounded-full p-2 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
               >
-                <X className="h-6 w-6 text-gray-800" />
+                <X className="h-5 w-5 sm:h-6 sm:w-6 text-gray-800" />
               </button>
               {selectedItem.type === "video" && (
                 <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-white/90 rounded-full p-6">
-                    <Play className="h-12 w-12 text-gray-800" />
+                  <div className="bg-white/90 rounded-full p-4 sm:p-5 md:p-6">
+                    <Play className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-gray-800" />
                   </div>
                 </div>
               )}
             </div>
-            <div className="p-8">
-              <div className="flex items-center gap-4 mb-4">
+            <div className="p-4 sm:p-6 md:p-8 flex-1 overflow-y-auto">
+              <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
                 {selectedItem.type === "video" ? (
-                  <Badge className="bg-red-500 text-white">
-                    <Video className="h-4 w-4 mr-1" />
+                  <Badge className="bg-red-500 text-white text-xs sm:text-sm">
+                    <Video className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
                     Vidéo
                   </Badge>
                 ) : (
-                  <Badge className="bg-blue-500 text-white">
-                    <Camera className="h-4 w-4 mr-1" />
+                  <Badge className="bg-blue-500 text-white text-xs sm:text-sm">
+                    <Camera className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
                     Photo
                   </Badge>
                 )}
               </div>
-              <h3 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+              <h3 className="text-lg sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white mb-3 sm:mb-4">
                 {selectedItem.title}
               </h3>
-              <p className="text-gray-600 dark:text-gray-300 mb-6">
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4 sm:mb-6">
                 {selectedItem.description}
               </p>
-              <div className="flex items-center gap-6 text-sm text-gray-500 dark:text-gray-400 mb-6">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-3 sm:gap-6 text-xs sm:text-sm text-gray-500 dark:text-gray-400 mb-4 sm:mb-6">
                 <div className="flex items-center gap-2">
-                  <Calendar className="h-4 w-4" />
-                  {selectedItem.date}
+                  <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">{selectedItem.date}</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  {selectedItem.location}
+                  <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                  <span className="truncate">{selectedItem.location}</span>
                 </div>
               </div>
-              <div className="flex gap-4">
-                <Button className="flex items-center gap-2">
-                  <Eye className="h-4 w-4" />
-                  Voir en plein écran
+              <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 md:gap-4">
+                <Button className="flex items-center justify-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
+                  <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                  <span className="hidden sm:inline">Voir en plein écran</span>
+                  <span className="sm:hidden">Plein écran</span>
                 </Button>
-                <Button variant="outline" className="flex items-center gap-2">
-                  <Download className="h-4 w-4" />
+                <Button variant="outline" className="flex items-center justify-center gap-2 w-full sm:w-auto text-xs sm:text-sm">
+                  <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
                   Télécharger
                 </Button>
               </div>

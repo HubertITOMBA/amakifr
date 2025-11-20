@@ -44,7 +44,6 @@ import {
   Grid3X3,
   List,
   X,
-  DollarSign,
   AlertCircle,
   CheckCircle2,
   Lightbulb,
@@ -52,22 +51,43 @@ import {
   ThumbsUp,
   Trash2,
   Pencil,
-  Info
+  Info,
+  Heart,
+  Download,
+  Image,
+  Table as TableIcon,
+  Upload,
+  Video,
+  File,
+  BarChart3,
+  Activity,
+  Baby,
+  Edit2,
+  Calendar as CalendarIcon,
+  BookOpen,
+  Scale,
+  Bell
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { PhotoUpload } from "@/components/ui/photo-upload";
 import { updateUserData, getUserCandidatures, getUserVotes, getAllCandidatesForProfile } from "@/actions/user";
+import { downloadPasseportPDF } from "@/actions/passeport";
+import { differenceInYears, differenceInMonths } from "date-fns";
 import { toast } from "sonner";
 import { FinancialTables } from "@/components/financial/financial-tables";
-import { getIdeesByUser, createIdee, updateIdee, deleteIdee } from "@/actions/idees";
-import { StatutIdee } from "@prisma/client";
+import { NotificationPreferences } from "@/components/user/NotificationPreferences";
+import { getIdeesByUser, getAllIdees, createIdee, updateIdee, deleteIdee, createCommentaire, toggleApprobation } from "@/actions/idees";
+import { getDocuments, deleteDocument } from "@/actions/documents";
+import { getUserBadges } from "@/actions/badges";
+import { StatutIdee, TypeDocument } from "@prisma/client";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Table,
   TableBody,
@@ -89,7 +109,7 @@ import {
 } from "@tanstack/react-table";
 
 // Types pour les sections du menu
-type MenuSection = 'profile' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'idees' | 'settings';
+type MenuSection = 'profile' | 'statistiques' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'idees' | 'documents' | 'badges' | 'enfants' | 'passeport' | 'notifications' | 'settings';
 
 // Type pour les dettes initiales
 interface DetteInitiale {
@@ -114,7 +134,7 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-8 px-2 lg:px-3 font-semibold text-red-900 dark:text-red-300"
+            className="h-7 px-2 font-semibold text-xs text-red-900 dark:text-red-300"
           >
             Année
             {column.getIsSorted() === 'asc' ? (
@@ -136,7 +156,7 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-8 px-2 lg:px-3 font-semibold text-gray-900 dark:text-gray-300"
+            className="h-7 px-2 font-semibold text-xs text-gray-900 dark:text-gray-300"
           >
             Montant total
             {column.getIsSorted() === 'asc' ? (
@@ -157,7 +177,7 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-8 px-2 lg:px-3 font-semibold text-green-900 dark:text-green-300"
+            className="h-7 px-2 font-semibold text-xs text-green-900 dark:text-green-300"
           >
             Montant payé
             {column.getIsSorted() === 'asc' ? (
@@ -178,7 +198,7 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-8 px-2 lg:px-3 font-semibold text-red-900 dark:text-red-300"
+            className="h-7 px-2 font-semibold text-xs text-red-900 dark:text-red-300"
           >
             Montant restant
             {column.getIsSorted() === 'asc' ? (
@@ -204,7 +224,7 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
       columnHelper.accessor('description', {
         header: 'Description',
         cell: ({ row }) => (
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-xs text-gray-600 dark:text-gray-400">
             {row.getValue('description') || '-'}
           </span>
         ),
@@ -242,47 +262,49 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
   });
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="bg-red-50 dark:bg-red-900/20">
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id} className="font-semibold text-center">
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className="hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="text-center">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
+    <div className="overflow-x-auto -mx-4 sm:mx-0">
+      <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+        <Table className="min-w-[640px]">
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="bg-red-50 dark:bg-red-900/20">
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id} className="font-semibold text-center text-xs px-2 py-1.5">
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
                 ))}
               </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center">
-                <div className="flex flex-col items-center gap-2">
-                  <AlertCircle className="h-8 w-8 text-gray-400" />
-                  <p className="text-gray-500">Aucune dette initiale trouvée.</p>
-                </div>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="text-center text-xs px-2 py-1.5">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <AlertCircle className="h-8 w-8 text-gray-400" />
+                    <p className="text-gray-500 text-sm">Aucune dette initiale trouvée.</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
@@ -327,7 +349,7 @@ function HistoriqueCotisationsTable({ cotisations }: { cotisations: HistoriqueCo
           const date = new Date(annee, mois - 1, 1);
           const nomMois = date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
           return (
-            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
               {nomMois.charAt(0).toUpperCase() + nomMois.slice(1)}
             </span>
           );
@@ -338,7 +360,7 @@ function HistoriqueCotisationsTable({ cotisations }: { cotisations: HistoriqueCo
         cell: ({ row }) => {
           const montant = row.getValue('montantAttendu') as number;
           return (
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">
+            <span className="text-xs font-medium text-gray-700 dark:text-gray-300">
               {montant.toFixed(2).replace('.', ',')} €
             </span>
           );
@@ -349,7 +371,7 @@ function HistoriqueCotisationsTable({ cotisations }: { cotisations: HistoriqueCo
         cell: ({ row }) => {
           const restant = row.getValue('montantRestant') as number;
           return (
-            <span className={`text-sm font-medium ${restant > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+            <span className={`text-xs font-medium ${restant > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
               {restant.toFixed(2).replace('.', ',')} €
             </span>
           );
@@ -370,7 +392,7 @@ function HistoriqueCotisationsTable({ cotisations }: { cotisations: HistoriqueCo
           
           return (
             <div className="text-center">
-              <span className="text-sm font-bold text-green-600 dark:text-green-400">
+              <span className="text-xs font-bold text-green-600 dark:text-green-400">
                 {totalPaye.toFixed(2).replace('.', ',')} €
               </span>
               {paiements.length > 1 && (
@@ -420,47 +442,49 @@ function HistoriqueCotisationsTable({ cotisations }: { cotisations: HistoriqueCo
   });
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="bg-indigo-50 dark:bg-indigo-900/20">
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id} className="font-semibold text-center">
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
-              ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows?.length ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="text-center">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </TableCell>
+    <div className="overflow-x-auto -mx-4 sm:mx-0">
+      <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+        <Table className="min-w-[640px]">
+          <TableHeader>
+            {table.getHeaderGroups().map((headerGroup) => (
+              <TableRow key={headerGroup.id} className="bg-indigo-50 dark:bg-indigo-900/20">
+                {headerGroup.headers.map((header) => (
+                  <TableHead key={header.id} className="font-semibold text-center text-xs px-2 py-1.5">
+                    {header.isPlaceholder
+                      ? null
+                      : flexRender(header.column.columnDef.header, header.getContext())}
+                  </TableHead>
                 ))}
               </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center">
-                <div className="flex flex-col items-center gap-2">
-                  <History className="h-8 w-8 text-gray-400" />
-                  <p className="text-gray-500">Aucun historique de cotisation disponible.</p>
-                </div>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+            ))}
+          </TableHeader>
+          <TableBody>
+            {table.getRowModel().rows?.length ? (
+              table.getRowModel().rows.map((row) => (
+                <TableRow
+                  key={row.id}
+                  className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <TableCell key={cell.id} className="text-center text-xs px-2 py-1.5">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </TableCell>
+                  ))}
+                </TableRow>
+              ))
+            ) : (
+              <TableRow>
+                <TableCell colSpan={columns.length} className="h-24 text-center">
+                  <div className="flex flex-col items-center gap-2">
+                    <History className="h-8 w-8 text-gray-400" />
+                    <p className="text-gray-500 text-sm">Aucun historique de cotisation disponible.</p>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </div>
     </div>
   );
 }
@@ -485,192 +509,48 @@ interface CotisationMois {
 }
 
 function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }) {
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'dateCotisation', desc: true }]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'type', desc: false }]);
 
   const columnHelper = createColumnHelper<CotisationMois>();
+
+  // Calculer le total du mois
+  const totalMois = useMemo(() => {
+    return cotisations.reduce((sum, cot) => sum + cot.montant, 0);
+  }, [cotisations]);
 
   const columns = useMemo<ColumnDef<CotisationMois>[]>(
     () => [
       columnHelper.accessor('type', {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-8 px-2 lg:px-3 font-semibold text-blue-900 dark:text-blue-300"
-          >
-            Type
-            {column.getIsSorted() === 'asc' ? (
-              <ChevronUp className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === 'desc' ? (
-              <ChevronDown className="ml-2 h-4 w-4" />
-            ) : null}
-          </Button>
-        ),
+        header: 'Type',
         cell: ({ row }) => (
-          <div className="flex items-center gap-2 justify-center">
-            <Receipt className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-            <span className="font-medium">{row.getValue('type')}</span>
+          <div className="flex items-center gap-2">
+            {row.original.isCotisationMensuelle ? (
+              <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+            ) : (
+              <Heart className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+            )}
+            <span className="font-medium text-xs sm:text-sm text-gray-900 dark:text-white">{row.getValue('type')}</span>
           </div>
         ),
       }),
-      columnHelper.accessor('montant', {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-8 px-2 lg:px-3 font-semibold text-gray-900 dark:text-gray-300"
-          >
-            Montant
-            {column.getIsSorted() === 'asc' ? (
-              <ChevronUp className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === 'desc' ? (
-              <ChevronDown className="ml-2 h-4 w-4" />
-            ) : null}
-          </Button>
-        ),
-        cell: ({ row }) => (
-          <span className="font-bold text-gray-900 dark:text-white">
-            {parseFloat(row.getValue('montant')).toFixed(2).replace('.', ',')} €
-          </span>
-        ),
-      }),
       columnHelper.accessor('description', {
-        header: 'Détails',
+        header: 'Description',
         cell: ({ row }) => {
           const description = row.getValue('description') as string | undefined;
-          if (!description) return <span className="text-sm text-gray-500">-</span>;
-          
-          // Parser la description pour afficher de manière plus lisible
-          // Format attendu: "Cotisation 2024-11 : Forfait 15,00€ + Assistances: AnniversaireSalle pour Nom Prénom (50,00€) = Total: 65,00€"
-          // ou "Cotisation 2024-11 : Forfait 15,00€ - Bénéficiaire de: AnniversaireSalle (bénéficiaire) (ne paie pas l'assistance)"
-          
-          // Extraire les informations
-          const parts = description.split(' : ');
-          if (parts.length < 2) {
-            return <div className="text-xs text-gray-600 dark:text-gray-400">{description}</div>;
-          }
-          
-          const periode = parts[0];
-          const details = parts[1];
-          
-          // Vérifier si c'est un bénéficiaire ou un contributeur
-          const isBeneficiaire = details.includes('Bénéficiaire de:');
-          const hasAssistances = details.includes('+ Assistances:');
-          
           return (
-            <div className="text-xs text-left max-w-lg space-y-1.5">
-              <div className="font-semibold text-blue-700 dark:text-blue-300">
-                {periode}
-              </div>
-              
-              {isBeneficiaire ? (
-                // Cas bénéficiaire : ne paie que le forfait
-                <div className="space-y-1 pl-2 border-l-2 border-green-300 dark:border-green-700">
-                  <div className="flex items-center gap-1">
-                    <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">
-                      Forfait mensuel: 15,00€
-                    </span>
-                  </div>
-                  <div className="text-gray-600 dark:text-gray-400 italic pl-4">
-                    {details.split('Bénéficiaire de:')[1]?.split('(ne paie pas')[0]?.trim() || ''}
-                  </div>
-                  <div className="text-green-600 dark:text-green-400 font-semibold text-[10px]">
-                    ✓ Vous êtes bénéficiaire, vous ne payez pas l'assistance
-                  </div>
-                </div>
-              ) : hasAssistances ? (
-                // Cas contributeur : paie forfait + assistances
-                <div className="space-y-1.5 pl-2 border-l-2 border-blue-300 dark:border-blue-700">
-                  <div className="flex items-center gap-1">
-                    <Euro className="h-3 w-3 text-gray-600 dark:text-gray-400" />
-                    <span className="text-gray-700 dark:text-gray-300 font-medium">
-                      Forfait mensuel: 15,00€
-                    </span>
-                  </div>
-                  
-                  {details.includes('+ Assistances:') && (
-                    <div className="space-y-1 pl-4">
-                      <div className="text-gray-600 dark:text-gray-400 font-medium">
-                        Assistances du mois:
-                      </div>
-                      {details.split('+ Assistances:')[1]?.split(' = ')[0]?.split(',').map((ass: string, idx: number) => (
-                        <div key={idx} className="text-gray-600 dark:text-gray-400 pl-2 text-[10px]">
-                          • {ass.trim()}
-                        </div>
-                      )) || (
-                        <div className="text-gray-600 dark:text-gray-400 pl-2 text-[10px]">
-                          • {details.split('+ Assistances:')[1]?.split(' = ')[0]?.trim()}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                  
-                  {details.includes(' = Total:') && (
-                    <div className="pt-1 border-t border-gray-200 dark:border-gray-700">
-                      <div className="font-bold text-blue-600 dark:text-blue-400">
-                        {details.split(' = ')[1]}
-                      </div>
-                    </div>
-                  )}
-                </div>
-              ) : (
-                // Format simple
-                <div className="text-gray-600 dark:text-gray-400 pl-2">
-                  {details}
-                </div>
-              )}
+            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-left">
+              {description || '-'}
             </div>
           );
         },
       }),
-      columnHelper.accessor('montantRestant', {
-        header: ({ column }) => (
-          <Button
-            variant="ghost"
-            onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-8 px-2 lg:px-3 font-semibold text-red-900 dark:text-red-300"
-          >
-            Restant
-            {column.getIsSorted() === 'asc' ? (
-              <ChevronUp className="ml-2 h-4 w-4" />
-            ) : column.getIsSorted() === 'desc' ? (
-              <ChevronDown className="ml-2 h-4 w-4" />
-            ) : null}
-          </Button>
+      columnHelper.accessor('montant', {
+        header: 'Montant',
+        cell: ({ row }) => (
+          <span className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
+            {parseFloat(row.getValue('montant')).toFixed(2).replace('.', ',')} €
+          </span>
         ),
-        cell: ({ row }) => {
-          const montant = parseFloat(row.getValue('montantRestant'));
-          return (
-            <span className={`font-bold ${
-              montant > 0 
-                ? 'text-red-600 dark:text-red-400' 
-                : 'text-green-600 dark:text-green-400'
-            }`}>
-              {montant.toFixed(2).replace('.', ',')} €
-            </span>
-          );
-        },
-      }),
-      columnHelper.accessor('statut', {
-        header: 'Statut',
-        cell: ({ row }) => {
-          const statut = row.getValue('statut');
-          const montantRestant = parseFloat(row.original.montantRestant.toString());
-          const isPaye = montantRestant === 0 || statut === 'Paye' || statut === 'Valide';
-          
-          return (
-            <Badge className={
-              isPaye
-                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                : statut === 'EnRetard'
-                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-            }>
-              {isPaye ? 'Payée' : statut === 'EnRetard' ? 'En retard' : 'En attente'}
-            </Badge>
-          );
-        },
       }),
       columnHelper.display({
         id: 'actions',
@@ -682,16 +562,26 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
           
           if (isPaye) {
             return (
-              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+              <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
                 <CheckCircle2 className="h-3 w-3 mr-1" />
                 Payée
               </Badge>
             );
           }
           
+          // Si c'est une cotisation dynamique (non créée par l'admin), afficher un message
+          if (row.original.isCotisationMensuelle === false && !row.original.cotisationMensuelleId) {
+            return (
+              <Badge variant="outline" className="text-xs text-gray-500 dark:text-gray-400">
+                <Info className="h-3 w-3 mr-1" />
+                En attente de création
+              </Badge>
+            );
+          }
+          
           // Déterminer le type de paiement
           let paymentUrl = '/paiement?';
-          if (row.original.isCotisationMensuelle) {
+          if (row.original.isCotisationMensuelle && row.original.cotisationMensuelleId) {
             paymentUrl += `type=cotisation-mensuelle&id=${row.original.cotisationMensuelleId}`;
           } else if (row.original.isAssistance) {
             paymentUrl += `type=assistance&id=${row.original.assistanceId}`;
@@ -701,9 +591,10 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
           
           return (
             <a href={paymentUrl}>
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white">
-                <CreditCard className="h-4 w-4 mr-2" />
-                Payer
+              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-7 sm:h-8 text-xs px-2 sm:px-3">
+                <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Payer</span>
+                <span className="sm:hidden">€</span>
               </Button>
             </a>
           );
@@ -726,47 +617,61 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
   });
 
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          {table.getHeaderGroups().map((headerGroup) => (
-            <TableRow key={headerGroup.id} className="bg-blue-50 dark:bg-blue-900/20">
-              {headerGroup.headers.map((header) => (
-                <TableHead key={header.id} className="font-semibold text-center">
-                  {header.isPlaceholder
-                    ? null
-                    : flexRender(header.column.columnDef.header, header.getContext())}
-                </TableHead>
+    <div className="space-y-3">
+      <div className="overflow-x-auto -mx-4 sm:mx-0">
+        <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+          <Table className="min-w-full">
+            <TableHeader>
+              {table.getHeaderGroups().map((headerGroup) => (
+                <TableRow key={headerGroup.id} className="bg-blue-50 dark:bg-blue-900/20">
+                  {headerGroup.headers.map((header) => (
+                    <TableHead key={header.id} className="font-semibold text-center text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2">
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
+                  ))}
+                </TableRow>
               ))}
-            </TableRow>
-          ))}
-        </TableHeader>
-        <TableBody>
-          {table.getRowModel().rows.length > 0 ? (
-            table.getRowModel().rows.map((row) => (
-              <TableRow
-                key={row.id}
-                className="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <TableCell key={cell.id} className="text-center">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
+            </TableHeader>
+            <TableBody>
+              {table.getRowModel().rows.length > 0 ? (
+                table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="text-center text-xs sm:text-sm px-2 sm:px-3 py-1.5 sm:py-2 align-middle">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))
+              ) : (
+                <TableRow>
+                  <TableCell colSpan={columns.length} className="h-24 text-center">
+                    <div className="flex flex-col items-center gap-2">
+                      <Receipt className="h-8 w-8 text-gray-400" />
+                      <p className="text-gray-500 text-sm">Aucune cotisation du mois en cours.</p>
+                    </div>
                   </TableCell>
-                ))}
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={columns.length} className="h-24 text-center">
-                <div className="flex flex-col items-center gap-2">
-                  <Receipt className="h-8 w-8 text-gray-400" />
-                  <p className="text-gray-500">Aucune cotisation du mois en cours.</p>
-                </div>
-              </TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
+                </TableRow>
+              )}
+            </TableBody>
+          </Table>
+        </div>
+      </div>
+      
+      {/* Ligne de total */}
+      {cotisations.length > 0 && totalMois > 0 && (
+        <div className="flex justify-end items-center gap-3 px-4 sm:px-0 pt-2 border-t border-gray-200 dark:border-gray-700">
+          <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">Total du mois :</span>
+          <span className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">
+            {totalMois.toFixed(2).replace('.', ',')} €
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -784,8 +689,10 @@ export default function UserProfilePage() {
   const [dettesInitiales, setDettesInitiales] = useState<any[]>([]);
   const [cotisationsMois, setCotisationsMois] = useState<any[]>([]);
   const [cotisationMoisProchain, setCotisationMoisProchain] = useState<any>(null);
+  const [showCotisationMoisProchain, setShowCotisationMoisProchain] = useState(false);
   const [avoirs, setAvoirs] = useState<any[]>([]);
   const [historiqueCotisations, setHistoriqueCotisations] = useState<any[]>([]);
+  const [showHistoriqueCotisations, setShowHistoriqueCotisations] = useState(false);
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedElection, setSelectedElection] = useState<string>('all');
@@ -799,11 +706,26 @@ export default function UserProfilePage() {
   const [votesGroupByElection, setVotesGroupByElection] = useState(true);
   // États pour la section Mes Idées
   const [idees, setIdees] = useState<any[]>([]);
+  const [allIdees, setAllIdees] = useState<any[]>([]);
   const [ideesLoading, setIdeesLoading] = useState(false);
+  const [allIdeesLoading, setAllIdeesLoading] = useState(false);
   const [showCreateIdeeDialog, setShowCreateIdeeDialog] = useState(false);
   const [showEditIdeeDialog, setShowEditIdeeDialog] = useState(false);
   const [editingIdee, setEditingIdee] = useState<any>(null);
   const [ideeFormData, setIdeeFormData] = useState({ titre: '', description: '' });
+  const [selectedIdeeTab, setSelectedIdeeTab] = useState<'mes-idees' | 'toutes-idees'>('mes-idees');
+  const [showCommentForm, setShowCommentForm] = useState<string | null>(null);
+  const [commentContent, setCommentContent] = useState("");
+  const [commentLoading, setCommentLoading] = useState(false);
+  const [expandedIdees, setExpandedIdees] = useState<Set<string>>(new Set());
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [documentsLoading, setDocumentsLoading] = useState(false);
+  const [badges, setBadges] = useState<any[]>([]);
+  const [badgesLoading, setBadgesLoading] = useState(false);
+  const [enfants, setEnfants] = useState<any[]>([]);
+  const [showEditEnfantDialog, setShowEditEnfantDialog] = useState(false);
+  const [editingEnfant, setEditingEnfant] = useState<any>(null);
+  const [enfantFormData, setEnfantFormData] = useState({ prenom: '', dateNaissance: '', age: undefined as number | undefined });
 
   // Synchroniser l'image avec les données utilisateur
   useEffect(() => {
@@ -824,46 +746,117 @@ export default function UserProfilePage() {
         switch (activeSection) {
           case 'cotisations':
             // Charger les cotisations, obligations, dettes initiales et cotisations du mois depuis le profil utilisateur
-            if (userProfile?.adherent) {
+            // SAUF si l'utilisateur est admin (l'admin ne cotise ni ne bénéficie d'assistances)
+            const isAdmin = user?.role === 'Admin';
+            
+            if (userProfile?.adherent && !isAdmin) {
               setCotisations((userProfile.adherent as any).Cotisations || []);
               setObligationsCotisation((userProfile.adherent as any).ObligationsCotisation || []);
               setDettesInitiales((userProfile.adherent as any).DettesInitiales || []);
               setAvoirs((userProfile.adherent as any).Avoirs || []);
               
-              // Construire la liste des cotisations du mois : cotisations mensuelles + assistances du mois
-              const cotisationsMensuelles = ((userProfile.adherent as any).CotisationsMensuelles || []).map((cm: any) => ({
-                id: cm.id,
-                type: cm.TypeCotisation?.nom || 'Cotisation',
-                montant: Number(cm.montantAttendu),
-                montantPaye: Number(cm.montantPaye),
-                montantRestant: Number(cm.montantRestant),
-                dateCotisation: cm.dateEcheance,
-                periode: cm.periode,
-                statut: cm.statut,
-                description: cm.description,
-                moyenPaiement: 'Non payé',
-                reference: cm.id,
-                isCotisationMensuelle: true,
-                cotisationMensuelleId: cm.id
-              }));
+              // Construire la liste des cotisations du mois : forfait mensuel + assistances du mois (séparés)
+              const cotisationsMensuelles = ((userProfile.adherent as any).CotisationsMensuelles || []);
+              const assistances = ((userProfile.adherent as any).Assistances || []);
               
-              const assistances = ((userProfile.adherent as any).Assistances || []).map((ass: any) => ({
-                id: ass.id,
-                type: `Assistance ${ass.type}`,
-                montant: Number(ass.montant),
-                montantPaye: Number(ass.montantPaye),
-                montantRestant: Number(ass.montantRestant),
-                dateCotisation: ass.dateEvenement,
-                periode: `${new Date(ass.dateEvenement).getFullYear()}-${String(new Date(ass.dateEvenement).getMonth() + 1).padStart(2, '0')}`,
-                statut: ass.statut === 'EnAttente' ? 'EnAttente' : ass.statut === 'Paye' ? 'Valide' : 'EnAttente',
-                description: `Assistance pour ${ass.type}`,
-                moyenPaiement: 'Non payé',
-                reference: ass.id,
-                isAssistance: true,
-                assistanceId: ass.id
-              }));
+              // Filtrer les cotisations mensuelles du mois en cours
+              const moisCourant = new Date().getMonth() + 1;
+              const anneeCourante = new Date().getFullYear();
+              const cotisationMensuelleCourante = cotisationsMensuelles.find((cm: any) => 
+                cm.mois === moisCourant && cm.annee === anneeCourante
+              );
               
-              setCotisationsMois([...cotisationsMensuelles, ...assistances]);
+              const items: any[] = [];
+              
+              // Si une cotisation mensuelle existe pour le mois en cours, utiliser ses données
+              if (cotisationMensuelleCourante) {
+                // Récupérer le montant du forfait depuis le TypeCotisation ou utiliser 15€ par défaut
+                const montantForfait = cotisationMensuelleCourante.TypeCotisation?.montant 
+                  ? Number(cotisationMensuelleCourante.TypeCotisation.montant)
+                  : 15.00;
+                
+                // Calculer le montant payé et restant pour le forfait uniquement
+                // On doit estimer la part du forfait dans les paiements totaux
+                const montantTotalCotisation = Number(cotisationMensuelleCourante.montantAttendu);
+                const montantPayeTotal = Number(cotisationMensuelleCourante.montantPaye);
+                const montantRestantTotal = Number(cotisationMensuelleCourante.montantRestant);
+                
+                // Calculer la proportion du forfait dans le total
+                const proportionForfait = montantTotalCotisation > 0 ? montantForfait / montantTotalCotisation : 1;
+                const montantPayeForfait = montantPayeTotal * proportionForfait;
+                const montantRestantForfait = montantForfait - montantPayeForfait;
+                
+                items.push({
+                  id: `forfait-${cotisationMensuelleCourante.id}`,
+                  type: 'Forfait mensuel',
+                  montant: montantForfait,
+                  montantPaye: montantPayeForfait,
+                  montantRestant: Math.max(0, montantRestantForfait),
+                  dateCotisation: cotisationMensuelleCourante.dateEcheance,
+                  periode: cotisationMensuelleCourante.periode,
+                  statut: montantRestantForfait <= 0 ? 'Paye' : cotisationMensuelleCourante.statut,
+                  description: 'Cotisation mensuelle forfaitaire',
+                  moyenPaiement: 'Non payé',
+                  reference: cotisationMensuelleCourante.id,
+                  isCotisationMensuelle: true,
+                  cotisationMensuelleId: cotisationMensuelleCourante.id
+                });
+              } else {
+                // Si aucune cotisation mensuelle n'existe pour le mois en cours, calculer dynamiquement
+                // (comme pour la cotisation prévisionnelle du mois prochain)
+                // Utiliser le typeForfait récupéré depuis getUserData
+                const typeForfait = (userProfile as any)?.typeForfait;
+                const montantForfait = typeForfait?.montant || 15.00; // 15€ par défaut si pas de type
+                const periode = `${anneeCourante}-${String(moisCourant).padStart(2, '0')}`;
+                
+                items.push({
+                  id: `forfait-dynamique-${moisCourant}-${anneeCourante}`,
+                  type: 'Forfait mensuel',
+                  montant: montantForfait,
+                  montantPaye: 0,
+                  montantRestant: montantForfait,
+                  dateCotisation: new Date(anneeCourante, moisCourant - 1, 15),
+                  periode: periode,
+                  statut: 'EnAttente',
+                  description: 'Cotisation mensuelle forfaitaire (non créée par l\'admin)',
+                  moyenPaiement: 'Non payé',
+                  reference: 'dynamique',
+                  isCotisationMensuelle: false, // Pas de cotisation mensuelle réelle
+                  cotisationMensuelleId: null
+                });
+              }
+              
+              // Créer une ligne pour chaque assistance du mois en cours
+              // IMPORTANT: On affiche seulement les assistances que l'adhérent doit payer (pas celles dont il est bénéficiaire)
+              const adherentId = (userProfile.adherent as any)?.id;
+              const assistanceItems = assistances
+                .filter((ass: any) => {
+                  // Filtrer par mois en cours
+                  const dateAss = new Date(ass.dateEvenement);
+                  const isMoisCourant = dateAss.getMonth() + 1 === moisCourant && dateAss.getFullYear() === anneeCourante;
+                  
+                  // Exclure les assistances dont l'utilisateur est bénéficiaire (il ne les paie pas)
+                  const isBeneficiaire = ass.adherentId === adherentId;
+                  
+                  return isMoisCourant && !isBeneficiaire;
+                })
+                .map((ass: any) => ({
+                  id: `assistance-${ass.id}`,
+                  type: `Assistance ${ass.type}`,
+                  montant: Number(ass.montant),
+                  montantPaye: Number(ass.montantPaye || 0),
+                  montantRestant: Number(ass.montantRestant || ass.montant),
+                  dateCotisation: ass.dateEvenement,
+                  periode: `${new Date(ass.dateEvenement).getFullYear()}-${String(new Date(ass.dateEvenement).getMonth() + 1).padStart(2, '0')}`,
+                  statut: ass.statut === 'Paye' || (ass.montantRestant !== undefined && Number(ass.montantRestant) <= 0) ? 'Valide' : 'EnAttente',
+                  description: `Assistance pour ${ass.type}${ass.Adherent ? ` (${ass.Adherent.firstname} ${ass.Adherent.lastname})` : ''}`,
+                  moyenPaiement: 'Non payé',
+                  reference: ass.id,
+                  isAssistance: true,
+                  assistanceId: ass.id
+                }));
+              
+              setCotisationsMois([...items, ...assistanceItems]);
               
               // Construire l'historique des cotisations mensuelles avec leurs paiements
               const toutesCotisationsMensuelles = ((userProfile.adherent as any).CotisationsMensuelles || []);
@@ -873,6 +866,15 @@ export default function UserProfilePage() {
               if ((userProfile as any).cotisationMoisProchain) {
                 setCotisationMoisProchain((userProfile as any).cotisationMoisProchain);
               }
+            } else if (isAdmin) {
+              // Si l'utilisateur est admin, ne pas afficher de cotisations
+              setCotisations([]);
+              setObligationsCotisation([]);
+              setDettesInitiales([]);
+              setAvoirs([]);
+              setCotisationsMois([]);
+              setHistoriqueCotisations([]);
+              setCotisationMoisProchain(null);
             }
             break;
           case 'candidatures':
@@ -893,6 +895,38 @@ export default function UserProfilePage() {
               setCandidates(candidatesResult.candidates || []);
             }
             break;
+          case 'documents':
+            setDocumentsLoading(true);
+            const documentsResult = await getDocuments();
+            if (documentsResult.success && documentsResult.documents) {
+              setDocuments(documentsResult.documents || []);
+            } else {
+              setDocuments([]);
+            }
+            setDocumentsLoading(false);
+            break;
+          case 'badges':
+            setBadgesLoading(true);
+            if (user.id) {
+              const badgesResult = await getUserBadges(user.id);
+              if (badgesResult.success && badgesResult.data) {
+                setBadges(badgesResult.data || []);
+              } else {
+                setBadges([]);
+              }
+            }
+            setBadgesLoading(false);
+            break;
+          case 'enfants':
+            if (userProfile?.adherent) {
+              setEnfants((userProfile.adherent as any).Enfants || []);
+            } else {
+              setEnfants([]);
+            }
+            break;
+          case 'statistiques':
+            // Les statistiques sont calculées à partir des données existantes
+            break;
           case 'idees':
             setIdeesLoading(true);
             const ideesResult = await getIdeesByUser(user.id);
@@ -902,6 +936,13 @@ export default function UserProfilePage() {
               toast.error(ideesResult.error || "Erreur lors du chargement des idées");
             }
             setIdeesLoading(false);
+            // Charger aussi toutes les idées validées
+            setAllIdeesLoading(true);
+            const allIdeesResult = await getAllIdees();
+            if (allIdeesResult.success && allIdeesResult.data) {
+              setAllIdees(allIdeesResult.data || []);
+            }
+            setAllIdeesLoading(false);
             break;
         }
       } catch (error) {
@@ -914,6 +955,34 @@ export default function UserProfilePage() {
 
     loadSectionData();
   }, [activeSection, user]);
+
+  const handleDownloadPasseport = async () => {
+    try {
+      toast.loading("Génération du passeport en cours...");
+      const result = await downloadPasseportPDF();
+      
+      if (result.success && result.pdfBuffer && result.numeroPasseport) {
+        // Le pdfBuffer est un Array (sérialisé depuis le serveur), on doit le convertir en Uint8Array pour le Blob
+        const uint8Array = new Uint8Array(result.pdfBuffer);
+        const blob = new Blob([uint8Array], { type: 'application/pdf' });
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = `Passeport-AMAKI-${result.numeroPasseport}.pdf`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+        
+        toast.success(`Passeport téléchargé avec succès ! (${result.numeroPasseport})`);
+      } else {
+        toast.error(result.error || "Erreur lors du téléchargement du passeport");
+      }
+    } catch (error) {
+      console.error("Erreur lors du téléchargement du passeport:", error);
+      toast.error("Erreur lors du téléchargement du passeport");
+    }
+  };
 
   const handleImageChange = async (imageUrl: string) => {
     setCurrentImage(imageUrl);
@@ -1212,13 +1281,49 @@ export default function UserProfilePage() {
     {
       id: 'cotisations' as MenuSection,
       label: 'Mes Cotisations',
-      icon: DollarSign,
+      icon: Euro,
       description: 'Cotisations et obligations'
+    },
+    {
+      id: 'documents' as MenuSection,
+      label: 'Mes Documents',
+      icon: FileText,
+      description: 'Gérer mes documents'
+    },
+    {
+      id: 'badges' as MenuSection,
+      label: 'Mes Badges',
+      icon: Award,
+      description: 'Mes récompenses et badges'
+    },
+    {
+      id: 'passeport' as MenuSection,
+      label: 'Mon Passeport',
+      icon: Shield,
+      description: 'Droits et obligations'
+    },
+    {
+      id: 'statistiques' as MenuSection,
+      label: 'Statistiques',
+      icon: BarChart3,
+      description: 'Mes statistiques personnelles'
+    },
+    {
+      id: 'enfants' as MenuSection,
+      label: 'Mes Enfants',
+      icon: Baby,
+      description: 'Gérer mes enfants'
+    },
+    {
+      id: 'idees' as MenuSection,
+      label: 'Mes Idées',
+      icon: Lightbulb,
+      description: 'Gérer mes idées'
     },
     {
       id: 'candidatures' as MenuSection,
       label: 'Mes Candidatures',
-      icon: FileText,
+      icon: Vote,
       description: 'Candidatures soumises'
     },
     {
@@ -1234,10 +1339,10 @@ export default function UserProfilePage() {
       description: 'Voir tous les candidats'
     },
     {
-      id: 'idees' as MenuSection,
-      label: 'Mes Idées',
-      icon: Lightbulb,
-      description: 'Gérer mes idées'
+      id: 'notifications' as MenuSection,
+      label: 'Notifications',
+      icon: Bell,
+      description: 'Préférences de notifications'
     },
     {
       id: 'settings' as MenuSection,
@@ -1254,13 +1359,13 @@ export default function UserProfilePage() {
         return (
           <div className="space-y-6">
             {/* En-tête de section avec bouton principal */}
-            <div className="flex justify-between items-center mb-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mon Profil</h2>
-                <p className="text-gray-600 dark:text-gray-300">Gérez vos informations personnelles</p>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Mon Profil</h2>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Gérez vos informations personnelles</p>
               </div>
-              <Link href="/user/update">
-                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+              <Link href="/user/update" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white">
                   <Edit className="h-4 w-4 mr-2" />
                   Modifier le profil
                 </Button>
@@ -1312,14 +1417,7 @@ export default function UserProfilePage() {
                       <p className="text-sm text-gray-500">Dernière connexion</p>
                       <p className="font-medium">
                         {userLastLogin ? 
-                          new Date(userLastLogin).toLocaleString('fr-FR', {
-                            weekday: 'long',
-                            year: 'numeric',
-                            month: 'long',
-                            day: 'numeric',
-                            hour: '2-digit',
-                            minute: '2-digit'
-                          }) :
+                          format(new Date(userLastLogin), "d MMMM yyyy à HH:mm", { locale: fr }) :
                           "Jamais"
                         }
                       </p>
@@ -1794,7 +1892,7 @@ export default function UserProfilePage() {
             })()}
 
             {/* Afficher la cotisation prévisionnelle du mois prochain */}
-            {cotisationMoisProchain && (
+            {cotisationMoisProchain && showCotisationMoisProchain && (
               <Card className="border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-900 !py-0">
                 <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 text-white pb-3 pt-3 px-6 gap-0">
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -1903,8 +2001,35 @@ export default function UserProfilePage() {
               </Card>
             )}
 
-            {/* Historique des cotisations par mois */}
-            {historiqueCotisations.length > 0 && (
+            {/* Bouton pour afficher/masquer la cotisation prévisionnelle */}
+            {cotisationMoisProchain && (
+              <div className="flex justify-center pt-2 pb-2 border-t border-gray-200 dark:border-gray-700 mt-4">
+                {!showCotisationMoisProchain ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCotisationMoisProchain(true)}
+                    className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 h-8"
+                  >
+                    <Clock className="h-3 w-3 mr-1.5" />
+                    Voir la cotisation prévisionnelle du mois prochain
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowCotisationMoisProchain(false)}
+                    className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 h-8"
+                  >
+                    <X className="h-3 w-3 mr-1.5" />
+                    Masquer
+                  </Button>
+                )}
+              </div>
+            )}
+
+            {/* Afficher l'historique des cotisations par mois */}
+            {historiqueCotisations.length > 0 && showHistoriqueCotisations && (
               <Card className="border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-900 !py-0">
                 <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white pb-3 pt-3 px-6 gap-0">
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -1919,6 +2044,33 @@ export default function UserProfilePage() {
                   <HistoriqueCotisationsTable cotisations={historiqueCotisations} />
                 </CardContent>
               </Card>
+            )}
+
+            {/* Bouton pour afficher/masquer l'historique des cotisations */}
+            {historiqueCotisations.length > 0 && (
+              <div className="flex justify-center pt-2 pb-2 border-t border-gray-200 dark:border-gray-700 mt-4">
+                {!showHistoriqueCotisations ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowHistoriqueCotisations(true)}
+                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 h-8"
+                  >
+                    <History className="h-3 w-3 mr-1.5" />
+                    Voir l'historique des cotisations par mois
+                  </Button>
+                ) : (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowHistoriqueCotisations(false)}
+                    className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 h-8"
+                  >
+                    <X className="h-3 w-3 mr-1.5" />
+                    Masquer
+                  </Button>
+                )}
+              </div>
             )}
 
             <FinancialTables 
@@ -2462,6 +2614,1048 @@ export default function UserProfilePage() {
           </div>
         );
 
+      case 'documents':
+        const getDocumentIcon = (type: TypeDocument) => {
+          switch (type) {
+            case TypeDocument.PDF:
+              return FileText;
+            case TypeDocument.Image:
+              return Image;
+            case TypeDocument.Video:
+              return Video;
+            case TypeDocument.Excel:
+              return TableIcon;
+            case TypeDocument.Word:
+              return FileText;
+            default:
+              return File;
+          }
+        };
+
+        const getDocumentColor = (type: TypeDocument) => {
+          switch (type) {
+            case TypeDocument.PDF:
+              return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+            case TypeDocument.Image:
+              return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+            case TypeDocument.Video:
+              return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
+            case TypeDocument.Excel:
+              return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+            case TypeDocument.Word:
+              return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200";
+            default:
+              return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+          }
+        };
+
+        const formatFileSize = (bytes: number) => {
+          if (bytes === 0) return "0 Bytes";
+          const k = 1024;
+          const sizes = ["Bytes", "KB", "MB", "GB"];
+          const i = Math.floor(Math.log(bytes) / Math.log(k));
+          return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+        };
+
+        const handleDeleteDocument = async (documentId: string) => {
+          if (!confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) {
+            return;
+          }
+
+          const result = await deleteDocument(documentId);
+          if (result.success) {
+            setDocuments((prev) => prev.filter((d) => d.id !== documentId));
+            toast.success("Document supprimé avec succès");
+          } else {
+            toast.error(result.error || "Erreur lors de la suppression");
+          }
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <FileText className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  Mes Documents
+                </h2>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mt-1">
+                  Gérez tous vos documents en un seul endroit
+                </p>
+              </div>
+              <Link href="/user/documents" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-sm h-9 sm:h-10">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Gérer mes documents
+                </Button>
+              </Link>
+            </div>
+
+            {documentsLoading ? (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : documents.length === 0 ? (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <FileText className="h-16 w-16 text-gray-400 mb-4" />
+                    <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 mb-4">
+                      Aucun document uploadé
+                    </p>
+                    <Link href="/user/documents">
+                      <Button className="bg-blue-600 hover:bg-blue-700 text-white text-sm h-9 sm:h-10">
+                        <Upload className="h-4 w-4 mr-2" />
+                        Uploader votre premier document
+                      </Button>
+                    </Link>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base sm:text-lg">
+                    Mes Documents ({documents.length})
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    {documents.slice(0, 5).map((document) => {
+                      const IconComponent = getDocumentIcon(document.type);
+                      return (
+                        <div
+                          key={document.id}
+                          className="flex items-center gap-3 sm:gap-4 p-3 sm:p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
+                        >
+                          <div className={`p-2 sm:p-3 rounded-lg flex-shrink-0 ${getDocumentColor(document.type)}`}>
+                            <IconComponent className="h-4 w-4 sm:h-5 sm:w-5" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h3 className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white truncate">
+                              {document.nomOriginal}
+                            </h3>
+                            <div className="flex items-center gap-2 mt-1 flex-wrap">
+                              <Badge
+                                variant="outline"
+                                className={`text-xs ${getDocumentColor(document.type)}`}
+                              >
+                                {document.type}
+                              </Badge>
+                              {document.categorie && (
+                                <Badge variant="outline" className="text-xs">
+                                  {document.categorie}
+                                </Badge>
+                              )}
+                              <span className="text-xs text-gray-500 dark:text-gray-400">
+                                {formatFileSize(document.taille)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                            <a
+                              href={document.chemin}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                              title="Voir"
+                            >
+                              <Eye className="h-4 w-4" />
+                            </a>
+                            <a
+                              href={document.chemin}
+                              download
+                              className="h-8 w-8 sm:h-9 sm:w-9 flex items-center justify-center rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                              title="Télécharger"
+                            >
+                              <Download className="h-4 w-4" />
+                            </a>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteDocument(document.id)}
+                              className="h-8 w-8 sm:h-9 sm:w-9 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              title="Supprimer"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                  {documents.length > 5 && (
+                    <div className="mt-4 pt-4 border-t border-gray-200 dark:border-gray-700">
+                      <Link href="/user/documents">
+                        <Button variant="outline" className="w-full text-sm h-9 sm:h-10">
+                          Voir tous les documents ({documents.length})
+                        </Button>
+                      </Link>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )}
+          </div>
+        );
+
+      case 'badges':
+        const getBadgeIcon = (iconName: string) => {
+          const IconComponent = (LucideIcons as any)[iconName] || Award;
+          return IconComponent;
+        };
+
+        const getBadgeColorClass = (couleur: string) => {
+          const colorMap: Record<string, string> = {
+            blue: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-300 dark:border-blue-700",
+            green: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-300 dark:border-green-700",
+            purple: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 border-purple-300 dark:border-purple-700",
+            orange: "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 border-orange-300 dark:border-orange-700",
+            yellow: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 border-yellow-300 dark:border-yellow-700",
+            red: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-red-300 dark:border-red-700",
+            indigo: "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 border-indigo-300 dark:border-indigo-700",
+            pink: "bg-pink-100 text-pink-800 dark:bg-pink-900 dark:text-pink-200 border-pink-300 dark:border-pink-700",
+            slate: "bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200 border-slate-300 dark:border-slate-700",
+            gold: "bg-yellow-200 text-yellow-900 dark:bg-yellow-800 dark:text-yellow-100 border-yellow-400 dark:border-yellow-600",
+          };
+          return colorMap[couleur] || colorMap.blue;
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Award className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  Mes Badges
+                </h2>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mt-1">
+                  Vos récompenses et accomplissements dans l'association
+                </p>
+              </div>
+            </div>
+
+            {badgesLoading ? (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : badges.length === 0 ? (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <Award className="h-16 w-16 text-gray-400 mb-4" />
+                    <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 mb-2">
+                      Vous n'avez pas encore de badges
+                    </p>
+                    <p className="text-xs sm:text-sm text-gray-400 dark:text-gray-500">
+                      Participez aux activités de l'association pour débloquer vos premiers badges !
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {badges.map((attribution) => {
+                  const badge = attribution.Badge;
+                  const IconComponent = getBadgeIcon(badge.icone);
+                  return (
+                    <Card key={attribution.id} className="hover:shadow-lg transition-shadow">
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="flex flex-col items-center text-center space-y-3">
+                          <div className={`p-4 sm:p-6 rounded-full ${getBadgeColorClass(badge.couleur)}`}>
+                            <IconComponent className="h-8 w-8 sm:h-10 sm:w-10" />
+                          </div>
+                          <div className="space-y-1">
+                            <h3 className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">
+                              {badge.nom}
+                            </h3>
+                            <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 line-clamp-2">
+                              {badge.description}
+                            </p>
+                          </div>
+                          {attribution.raison && (
+                            <div className="w-full pt-2 border-t border-gray-200 dark:border-gray-700">
+                              <p className="text-xs text-gray-500 dark:text-gray-400 italic">
+                                "{attribution.raison}"
+                              </p>
+                            </div>
+                          )}
+                          <div className="w-full pt-2 border-t border-gray-200 dark:border-gray-700">
+                            <p className="text-xs text-gray-500 dark:text-gray-400">
+                              Obtenu le {format(new Date(attribution.createdAt), "dd MMMM yyyy", { locale: fr })}
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        );
+
+      case 'statistiques':
+        // Calculer les statistiques
+        const totalCotisations = cotisations.length;
+        const totalCotisationsPayees = cotisations.filter((c: any) => {
+          const restant = Number(c.montantRestant || 0);
+          return restant === 0;
+        }).length;
+        const totalIdees = idees.length;
+        const totalIdeesValidees = idees.filter((i: any) => i.statut === 'Validee').length;
+        const totalDocuments = documents.length;
+        const totalVotes = votes.length;
+        const totalCandidatures = candidatures.length;
+        const totalDette = dettesInitiales.reduce((sum: number, d: any) => sum + Number(d.montantRestant || 0), 0);
+        const totalAvoir = avoirs.reduce((sum: number, a: any) => sum + Number(a.montantRestant || 0), 0);
+        const totalEnfants = enfants.length;
+
+        // Calculer l'ancienneté
+        const dateAdhesion = userProfile?.adherent?.datePremiereAdhesion 
+          ? new Date(userProfile.adherent.datePremiereAdhesion)
+          : userCreatedAt ? new Date(userCreatedAt) : new Date();
+        const ancienneteAnnees = differenceInYears(new Date(), dateAdhesion);
+        const ancienneteMois = differenceInMonths(new Date(), dateAdhesion) % 12;
+
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <BarChart3 className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                Mes Statistiques Personnelles
+              </h2>
+              <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mt-1">
+                Vue d'ensemble de votre activité dans l'association
+              </p>
+            </div>
+
+            {/* Cartes de statistiques principales */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+              <Card className="!py-0 border-2 border-blue-200 dark:border-blue-800/50">
+                <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-3 sm:py-4">
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <Euro className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Cotisations
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                    {totalCotisationsPayees}/{totalCotisations}
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Payées / Total
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="!py-0 border-2 border-purple-200 dark:border-purple-800/50">
+                <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 text-white py-3 sm:py-4">
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <Lightbulb className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Idées
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                    {totalIdeesValidees}/{totalIdees}
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Validées / Total
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="!py-0 border-2 border-green-200 dark:border-green-800/50">
+                <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white py-3 sm:py-4">
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <FileText className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Documents
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                    {totalDocuments}
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Documents uploadés
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="!py-0 border-2 border-orange-200 dark:border-orange-800/50">
+                <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white py-3 sm:py-4">
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <Vote className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Votes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                    {totalVotes}
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Votes exprimés
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Statistiques financières */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              <Card className="!py-0 border-2 border-red-200 dark:border-red-800/50">
+                <CardHeader className="bg-gradient-to-r from-red-500 to-red-600 text-white py-3 sm:py-4">
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Dette Totale
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                    {totalDette.toFixed(2).replace('.', ',')} €
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Montant restant à payer
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="!py-0 border-2 border-emerald-200 dark:border-emerald-800/50">
+                <CardHeader className="bg-gradient-to-r from-emerald-500 to-emerald-600 text-white py-3 sm:py-4">
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Avoir
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                    {totalAvoir.toFixed(2).replace('.', ',')} €
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    Crédit disponible
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="!py-0 border-2 border-indigo-200 dark:border-indigo-800/50">
+                <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 text-white py-3 sm:py-4">
+                  <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                    <CalendarIcon className="h-4 w-4 sm:h-5 sm:w-5" />
+                    Ancienneté
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  <div className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+                    {ancienneteAnnees} an{ancienneteAnnees > 1 ? 's' : ''}
+                  </div>
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
+                    {ancienneteMois > 0 && `${ancienneteMois} mois`}
+                    {ancienneteMois === 0 && 'Membre depuis'}
+                  </p>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Statistiques détaillées */}
+            <Card className="!py-0">
+              <CardHeader className="bg-gradient-to-r from-slate-500 to-slate-600 text-white py-3 sm:py-4">
+                <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                  <Activity className="h-4 w-4 sm:h-5 sm:w-5" />
+                  Détails de l'Activité
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+                  <div className="space-y-1">
+                    <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Candidatures</div>
+                    <div className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{totalCandidatures}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Enfants</div>
+                    <div className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{totalEnfants}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Dettes initiales</div>
+                    <div className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{dettesInitiales.length}</div>
+                  </div>
+                  <div className="space-y-1">
+                    <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Obligations</div>
+                    <div className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">{obligationsCotisation.length}</div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case 'enfants':
+        const calculateAge = (dateNaissance: Date | string | null | undefined): number | null => {
+          if (!dateNaissance) return null;
+          try {
+            const birthDate = typeof dateNaissance === 'string' ? new Date(dateNaissance) : dateNaissance;
+            if (isNaN(birthDate.getTime())) return null;
+            return differenceInYears(new Date(), birthDate);
+          } catch {
+            return null;
+          }
+        };
+
+        const handleEditEnfant = (enfant: any) => {
+          setEditingEnfant(enfant);
+          setEnfantFormData({
+            prenom: enfant.prenom || '',
+            dateNaissance: enfant.dateNaissance ? format(new Date(enfant.dateNaissance), 'yyyy-MM-dd') : '',
+            age: enfant.age || calculateAge(enfant.dateNaissance) || undefined
+          });
+          setShowEditEnfantDialog(true);
+        };
+
+        const handleSaveEnfant = async () => {
+          if (!enfantFormData.prenom.trim()) {
+            toast.error("Le prénom est requis");
+            return;
+          }
+
+          try {
+            const enfantsData = [...enfants];
+            if (editingEnfant) {
+              // Mettre à jour l'enfant existant
+              const index = enfantsData.findIndex((e: any) => e.id === editingEnfant.id);
+              if (index !== -1) {
+                const dateNaissance = enfantFormData.dateNaissance ? new Date(enfantFormData.dateNaissance) : null;
+                const age = enfantFormData.age || (dateNaissance ? calculateAge(dateNaissance) : null);
+                enfantsData[index] = {
+                  ...enfantsData[index],
+                  prenom: enfantFormData.prenom,
+                  dateNaissance: dateNaissance,
+                  age: age
+                };
+              }
+            } else {
+              // Ajouter un nouvel enfant
+              const dateNaissance = enfantFormData.dateNaissance ? new Date(enfantFormData.dateNaissance) : null;
+              const age = enfantFormData.age || (dateNaissance ? calculateAge(dateNaissance) : null);
+              enfantsData.push({
+                id: `temp-${Date.now()}`,
+                prenom: enfantFormData.prenom,
+                dateNaissance: dateNaissance,
+                age: age
+              });
+            }
+
+            // Sauvegarder via updateUserData
+            const result = await updateUserData(
+              user || {},
+              userProfile?.adherent || {},
+              {},
+              [],
+              enfantsData
+            );
+
+            if (result.success) {
+              toast.success(editingEnfant ? "Enfant mis à jour avec succès" : "Enfant ajouté avec succès");
+              setEnfants(enfantsData);
+              setShowEditEnfantDialog(false);
+              setEditingEnfant(null);
+              setEnfantFormData({ prenom: '', dateNaissance: '', age: undefined });
+              // Recharger les données
+              window.location.reload();
+            } else {
+              toast.error(result.message || "Erreur lors de la sauvegarde");
+            }
+          } catch (error) {
+            console.error("Erreur:", error);
+            toast.error("Erreur lors de la sauvegarde");
+          }
+        };
+
+        const handleDeleteEnfant = async (enfantId: string) => {
+          if (!confirm("Êtes-vous sûr de vouloir supprimer cet enfant ?")) {
+            return;
+          }
+
+          try {
+            const enfantsData = enfants.filter((e: any) => e.id !== enfantId);
+            const result = await updateUserData(
+              user || {},
+              userProfile?.adherent || {},
+              {},
+              [],
+              enfantsData
+            );
+
+            if (result.success) {
+              toast.success("Enfant supprimé avec succès");
+              setEnfants(enfantsData);
+              // Recharger les données
+              window.location.reload();
+            } else {
+              toast.error(result.message || "Erreur lors de la suppression");
+            }
+          } catch (error) {
+            console.error("Erreur:", error);
+            toast.error("Erreur lors de la suppression");
+          }
+        };
+
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Baby className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                  Mes Enfants
+                </h2>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mt-1">
+                  Gérez les informations de vos enfants
+                </p>
+              </div>
+              <Button
+                onClick={() => {
+                  setEditingEnfant(null);
+                  setEnfantFormData({ prenom: '', dateNaissance: '', age: undefined });
+                  setShowEditEnfantDialog(true);
+                }}
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-sm h-9 sm:h-10"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Ajouter un enfant
+              </Button>
+            </div>
+
+            {enfants.length === 0 ? (
+              <Card>
+                <CardContent className="py-12">
+                  <div className="flex flex-col items-center justify-center text-center">
+                    <Baby className="h-16 w-16 text-gray-400 mb-4" />
+                    <p className="text-sm sm:text-base text-gray-500 dark:text-gray-400 mb-4">
+                      Aucun enfant enregistré
+                    </p>
+                    <Button
+                      onClick={() => {
+                        setEditingEnfant(null);
+                        setEnfantFormData({ prenom: '', dateNaissance: '', age: undefined });
+                        setShowEditEnfantDialog(true);
+                      }}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-sm h-9 sm:h-10"
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Ajouter votre premier enfant
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+                {enfants.map((enfant: any) => {
+                  const age = enfant.age || (enfant.dateNaissance ? calculateAge(enfant.dateNaissance) : null);
+                  return (
+                    <Card key={enfant.id} className="!py-0 border-2 border-pink-200 dark:border-pink-800/50 hover:shadow-lg transition-shadow">
+                      <CardHeader className="bg-gradient-to-r from-pink-500 to-pink-600 text-white py-3 sm:py-4">
+                        <CardTitle className="text-sm sm:text-base flex items-center gap-2">
+                          <Baby className="h-4 w-4 sm:h-5 sm:w-5" />
+                          {enfant.prenom}
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="p-4 sm:p-6">
+                        <div className="space-y-3">
+                          {enfant.dateNaissance && (
+                            <div>
+                              <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Date de naissance</div>
+                              <div className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">
+                                {format(new Date(enfant.dateNaissance), "dd MMMM yyyy", { locale: fr })}
+                              </div>
+                            </div>
+                          )}
+                          {age !== null && (
+                            <div>
+                              <div className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">Âge</div>
+                              <div className="text-sm sm:text-base font-medium text-gray-900 dark:text-white">
+                                {age} an{age > 1 ? 's' : ''}
+                              </div>
+                            </div>
+                          )}
+                          <div className="flex gap-2 pt-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleEditEnfant(enfant)}
+                              className="flex-1 text-xs sm:text-sm h-8 sm:h-9"
+                            >
+                              <Edit2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                              Modifier
+                            </Button>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleDeleteEnfant(enfant.id)}
+                              className="flex-1 text-xs sm:text-sm h-8 sm:h-9 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                            >
+                              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                              Supprimer
+                            </Button>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+
+            {/* Dialog pour ajouter/modifier un enfant */}
+            <Dialog open={showEditEnfantDialog} onOpenChange={setShowEditEnfantDialog}>
+              <DialogContent className="w-[95vw] sm:w-full max-w-md">
+                <DialogHeader>
+                  <DialogTitle className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                      <Baby className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    </div>
+                    {editingEnfant ? 'Modifier un enfant' : 'Ajouter un enfant'}
+                  </DialogTitle>
+                  <DialogDescription className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+                    {editingEnfant ? 'Modifiez les informations de l\'enfant' : 'Renseignez les informations de l\'enfant'}
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 mt-4">
+                  <div>
+                    <Label htmlFor="enfant-prenom" className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Prénom *
+                    </Label>
+                    <Input
+                      id="enfant-prenom"
+                      value={enfantFormData.prenom}
+                      onChange={(e) => setEnfantFormData({ ...enfantFormData, prenom: e.target.value })}
+                      placeholder="Prénom de l'enfant"
+                      className="mt-1.5 text-sm h-9 sm:h-10"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="enfant-date" className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Date de naissance
+                    </Label>
+                    <Input
+                      id="enfant-date"
+                      type="date"
+                      value={enfantFormData.dateNaissance}
+                      onChange={(e) => {
+                        const date = e.target.value;
+                        const age = date ? calculateAge(new Date(date)) : undefined;
+                        setEnfantFormData({ ...enfantFormData, dateNaissance: date, age });
+                      }}
+                      className="mt-1.5 text-sm h-9 sm:h-10"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="enfant-age" className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
+                      Âge (calculé automatiquement si date fournie)
+                    </Label>
+                    <Input
+                      id="enfant-age"
+                      type="number"
+                      min="0"
+                      value={enfantFormData.age || ""}
+                      onChange={(e) => setEnfantFormData({ ...enfantFormData, age: parseInt(e.target.value) || undefined })}
+                      placeholder="Âge"
+                      className="mt-1.5 text-sm h-9 sm:h-10"
+                    />
+                  </div>
+                  <div className="flex gap-2 justify-end pt-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setShowEditEnfantDialog(false);
+                        setEditingEnfant(null);
+                        setEnfantFormData({ prenom: '', dateNaissance: '', age: undefined });
+                      }}
+                      className="text-sm h-9 sm:h-10"
+                    >
+                      Annuler
+                    </Button>
+                    <Button
+                      onClick={handleSaveEnfant}
+                      className="bg-blue-600 hover:bg-blue-700 text-white text-sm h-9 sm:h-10"
+                    >
+                      {editingEnfant ? 'Enregistrer' : 'Ajouter'}
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        );
+
+      case 'passeport':
+        return (
+          <div className="space-y-3">
+            {/* En-tête de section */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 mb-2">
+              <div>
+                <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                  <Shield className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400" />
+                  Mon Passeport Adhérent
+                </h2>
+                <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Droits et obligations de l'adhérent</p>
+              </div>
+              <Button 
+                onClick={async () => {
+                  try {
+                    const result = await downloadPasseportPDF();
+                    if (result.success && result.pdfBuffer) {
+                      const blob = new Blob([result.pdfBuffer], { type: 'application/pdf' });
+                      const url = window.URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `passeport-amaki-${result.numeroPasseport || 'adhérent'}.pdf`;
+                      document.body.appendChild(a);
+                      a.click();
+                      window.URL.revokeObjectURL(url);
+                      document.body.removeChild(a);
+                      toast.success("Passeport téléchargé avec succès");
+                    } else {
+                      toast.error(result.error || "Erreur lors du téléchargement");
+                    }
+                  } catch (error) {
+                    console.error("Erreur:", error);
+                    toast.error("Erreur lors du téléchargement du passeport");
+                  }
+                }}
+                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Télécharger le passeport PDF
+              </Button>
+            </div>
+
+            {/* Droits de l'adhérent */}
+            <Card className="!py-0 border-2 border-green-200 dark:border-green-800 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30">
+              <CardHeader className="py-3 sm:py-4 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/50 dark:to-emerald-900/50 border-b-2 border-green-200 dark:border-green-800">
+                <CardTitle className="text-base sm:text-lg text-green-900 dark:text-green-100 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
+                  Droits de l'Adhérent
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 space-y-2">
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-green-200 dark:border-green-800">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-0.5">Droit de vote</h4>
+                      <p className="text-xs text-green-800 dark:text-green-200">
+                        Participer aux élections et votes de l'association lors des assemblées générales et consultations.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-green-200 dark:border-green-800">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-0.5">Droit de candidature</h4>
+                      <p className="text-xs text-green-800 dark:text-green-200">
+                        Se porter candidat aux différents postes électifs de l'association selon les conditions établies.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-green-200 dark:border-green-800">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-0.5">Droit de participation</h4>
+                      <p className="text-xs text-green-800 dark:text-green-200">
+                        Participer à toutes les activités, événements et réunions organisés par l'association.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-green-200 dark:border-green-800">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-0.5">Droit d'expression</h4>
+                      <p className="text-xs text-green-800 dark:text-green-200">
+                        Proposer des idées, faire des suggestions et exprimer son opinion lors des assemblées et consultations.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-green-200 dark:border-green-800">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-0.5">Droit à l'information</h4>
+                      <p className="text-xs text-green-800 dark:text-green-200">
+                        Recevoir toutes les informations concernant les activités, décisions et projets de l'association.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-green-200 dark:border-green-800">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-0.5">Droit aux assistances</h4>
+                      <p className="text-xs text-green-800 dark:text-green-200">
+                        Bénéficier des assistances prévues par l'association (naissance, mariage, décès, anniversaire de salle, etc.).
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-green-200 dark:border-green-800">
+                    <CheckCircle className="h-4 w-4 text-green-600 dark:text-green-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-green-900 dark:text-green-100 mb-0.5">Droit de consultation</h4>
+                      <p className="text-xs text-green-800 dark:text-green-200">
+                        Consulter les documents et comptes de l'association selon les modalités prévues par les statuts.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Obligations de l'adhérent */}
+            <Card className="!py-0 border-2 border-orange-200 dark:border-orange-800 shadow-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/30 dark:to-amber-900/30">
+              <CardHeader className="py-3 sm:py-4 bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/50 dark:to-amber-900/50 border-b-2 border-orange-200 dark:border-orange-800">
+                <CardTitle className="text-base sm:text-lg text-orange-900 dark:text-orange-100 flex items-center gap-2">
+                  <Scale className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
+                  Obligations de l'Adhérent
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 space-y-2">
+                <div className="space-y-2">
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-orange-200 dark:border-orange-800">
+                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-0.5">Paiement des cotisations</h4>
+                      <p className="text-xs text-orange-800 dark:text-orange-200">
+                        Payer régulièrement les cotisations mensuelles et les frais d'adhésion selon les modalités établies.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-orange-200 dark:border-orange-800">
+                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-0.5">Respect des statuts</h4>
+                      <p className="text-xs text-orange-800 dark:text-orange-200">
+                        Respecter les statuts, le règlement intérieur et les décisions prises par les instances de l'association.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-orange-200 dark:border-orange-800">
+                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-0.5">Participation active</h4>
+                      <p className="text-xs text-orange-800 dark:text-orange-200">
+                        Participer activement à la vie de l'association et contribuer à son développement.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-orange-200 dark:border-orange-800">
+                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-0.5">Respect des valeurs</h4>
+                      <p className="text-xs text-orange-800 dark:text-orange-200">
+                        Respecter les valeurs de l'association : Intégration, Respect et Solidarité.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-orange-200 dark:border-orange-800">
+                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-0.5">Mise à jour des informations</h4>
+                      <p className="text-xs text-orange-800 dark:text-orange-200">
+                        Maintenir à jour ses informations personnelles et notifier tout changement à l'association.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-orange-200 dark:border-orange-800">
+                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-0.5">Confidentialité</h4>
+                      <p className="text-xs text-orange-800 dark:text-orange-200">
+                        Respecter la confidentialité des informations et discussions internes à l'association.
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="flex items-start gap-2 p-2 bg-white/50 dark:bg-white/10 rounded-md border border-orange-200 dark:border-orange-800">
+                    <AlertCircle className="h-4 w-4 text-orange-600 dark:text-orange-400 mt-0.5 flex-shrink-0" />
+                    <div>
+                      <h4 className="text-sm font-semibold text-orange-900 dark:text-orange-100 mb-0.5">Assiduité</h4>
+                      <p className="text-xs text-orange-800 dark:text-orange-200">
+                        Assister aux assemblées générales et réunions importantes de l'association dans la mesure du possible.
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Informations complémentaires */}
+            <Card className="!py-0 border-2 border-blue-200 dark:border-blue-800 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30">
+              <CardHeader className="py-3 sm:py-4 bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/50 dark:to-indigo-900/50 border-b-2 border-blue-200 dark:border-blue-800">
+                <CardTitle className="text-base sm:text-lg text-blue-900 dark:text-blue-100 flex items-center gap-2">
+                  <Info className="h-4 w-4 sm:h-5 sm:w-5 text-blue-600 dark:text-blue-400" />
+                  Informations Complémentaires
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 space-y-2">
+                <div className="space-y-2">
+                  <div className="p-2 bg-white/50 dark:bg-white/10 rounded-md border border-blue-200 dark:border-blue-800">
+                    <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Valeurs de l'Association</h4>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mb-1">
+                      <strong>Intégration</strong> - Favoriser l'intégration des membres dans la société française tout en préservant leurs racines culturelles.
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200 mb-1">
+                      <strong>Respect</strong> - Promouvoir le respect mutuel, la tolérance et la diversité culturelle.
+                    </p>
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      <strong>Solidarité</strong> - Développer l'entraide et la solidarité entre les membres de l'association.
+                    </p>
+                  </div>
+
+                  <div className="p-2 bg-white/50 dark:bg-white/10 rounded-md border border-blue-200 dark:border-blue-800">
+                    <h4 className="text-sm font-semibold text-blue-900 dark:text-blue-100 mb-1">Contact</h4>
+                    <p className="text-xs text-blue-800 dark:text-blue-200">
+                      Pour toute question concernant vos droits et obligations, n'hésitez pas à contacter le secrétariat de l'association.
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case 'notifications':
+        return (
+          <div className="space-y-6">
+            <div>
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <Bell className="h-6 w-6 text-blue-600 dark:text-blue-400" />
+                Préférences de Notifications
+              </h2>
+              <p className="text-gray-600 dark:text-gray-300">Configurez comment et quand vous recevez les notifications</p>
+            </div>
+            <NotificationPreferences
+              onSave={async (preferences) => {
+                // Pour l'instant, on sauvegarde juste en mémoire
+                // Plus tard, on pourra sauvegarder en base de données
+                toast.success("Préférences sauvegardées (en mémoire)");
+              }}
+            />
+          </div>
+        );
+
       case 'settings':
         return (
           <div className="space-y-6">
@@ -2561,6 +3755,11 @@ export default function UserProfilePage() {
                 if (ideesResult.success && ideesResult.data) {
                   setIdees(ideesResult.data || []);
                 }
+                // Recharger aussi toutes les idées validées
+                const allIdeesResult = await getAllIdees();
+                if (allIdeesResult.success && allIdeesResult.data) {
+                  setAllIdees(allIdeesResult.data || []);
+                }
               }
             } else {
               toast.error(result.error || "Erreur lors de la création de l'idée");
@@ -2600,6 +3799,11 @@ export default function UserProfilePage() {
                 if (ideesResult.success && ideesResult.data) {
                   setIdees(ideesResult.data || []);
                 }
+                // Recharger aussi toutes les idées validées
+                const allIdeesResult = await getAllIdees();
+                if (allIdeesResult.success && allIdeesResult.data) {
+                  setAllIdees(allIdeesResult.data || []);
+                }
               }
             } else {
               toast.error(result.error || "Erreur lors de la mise à jour de l'idée");
@@ -2628,6 +3832,11 @@ export default function UserProfilePage() {
                 if (ideesResult.success && ideesResult.data) {
                   setIdees(ideesResult.data || []);
                 }
+                // Recharger aussi toutes les idées validées
+                const allIdeesResult = await getAllIdees();
+                if (allIdeesResult.success && allIdeesResult.data) {
+                  setAllIdees(allIdeesResult.data || []);
+                }
               }
             } else {
               toast.error(result.error || "Erreur lors de la suppression de l'idée");
@@ -2655,12 +3864,78 @@ export default function UserProfilePage() {
           }
         };
 
+        const handleCommentSubmit = async (ideeId: string) => {
+          if (!commentContent.trim()) {
+            toast.error("Veuillez saisir un commentaire");
+            return;
+          }
+
+          try {
+            setCommentLoading(true);
+            const formData = new FormData();
+            formData.append("ideeId", ideeId);
+            formData.append("contenu", commentContent);
+
+            const result = await createCommentaire(formData);
+            if (result.success) {
+              toast.success("Commentaire ajouté avec succès");
+              setCommentContent("");
+              setShowCommentForm(null);
+              // Recharger toutes les idées
+              const allIdeesResult = await getAllIdees();
+              if (allIdeesResult.success && allIdeesResult.data) {
+                setAllIdees(allIdeesResult.data || []);
+              }
+            } else {
+              toast.error(result.error || "Erreur lors de l'ajout du commentaire");
+            }
+          } catch (error) {
+            console.error("Erreur lors de l'ajout du commentaire:", error);
+            toast.error("Erreur lors de l'ajout du commentaire");
+          } finally {
+            setCommentLoading(false);
+          }
+        };
+
+        const handleToggleApprobation = async (ideeId: string) => {
+          try {
+            const result = await toggleApprobation(ideeId);
+            if (result.success) {
+              // Recharger toutes les idées
+              const allIdeesResult = await getAllIdees();
+              if (allIdeesResult.success && allIdeesResult.data) {
+                setAllIdees(allIdeesResult.data || []);
+              }
+            } else {
+              toast.error(result.error || "Erreur lors de l'approbation");
+            }
+          } catch (error) {
+            console.error("Erreur lors de l'approbation:", error);
+            toast.error("Erreur lors de l'approbation");
+          }
+        };
+
+        const toggleExpandIdee = (ideeId: string) => {
+          const newExpanded = new Set(expandedIdees);
+          if (newExpanded.has(ideeId)) {
+            newExpanded.delete(ideeId);
+          } else {
+            newExpanded.add(ideeId);
+          }
+          setExpandedIdees(newExpanded);
+        };
+
+        const hasUserApprobation = (idee: any) => {
+          if (!user?.id) return false;
+          return idee.Approbations?.some((app: any) => app.Adherent?.User?.id === user.id) || false;
+        };
+
         return (
           <div className="space-y-6">
             <div className="flex justify-between items-center mb-6">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mes Idées</h2>
-                <p className="text-gray-600 dark:text-gray-300">Gérez vos idées soumises à la boîte à idées</p>
+                <h2 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-2 bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-400 dark:to-indigo-400 bg-clip-text text-transparent">Idées</h2>
+                <p className="text-gray-600 dark:text-gray-300">Gérez vos idées et découvrez celles des autres adhérents</p>
               </div>
               <Dialog open={showCreateIdeeDialog} onOpenChange={setShowCreateIdeeDialog}>
                 <DialogTrigger asChild>
@@ -2713,107 +3988,321 @@ export default function UserProfilePage() {
               </Dialog>
             </div>
 
-            {ideesLoading ? (
-              <div className="flex items-center justify-center py-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-              </div>
-            ) : idees.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center">
-                  <Lightbulb className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-                  <p className="text-gray-600 dark:text-gray-300 text-lg mb-4">
-                    Vous n'avez pas encore soumis d'idée
-                  </p>
-                  <Button onClick={() => setShowCreateIdeeDialog(true)} className="bg-blue-600 hover:bg-blue-700">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Proposer une idée
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <div className="space-y-4">
-                {idees.map((idee) => (
-                  <Card key={idee.id} className="shadow-md">
-                    <CardHeader>
-                      <div className="flex items-start justify-between">
-                        <div className="flex-1">
-                          <CardTitle className="text-lg mb-2">{idee.titre}</CardTitle>
-                          <div className="flex items-center gap-3 text-sm text-gray-500">
-                            <div className="flex items-center gap-1">
-                              <Calendar className="h-4 w-4" />
-                              <span>
-                                {format(new Date(idee.dateCreation), "d MMMM yyyy", { locale: fr })}
-                              </span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <MessageSquare className="h-4 w-4" />
-                              <span>{idee.nombreCommentaires} commentaire{idee.nombreCommentaires !== 1 ? "s" : ""}</span>
-                            </div>
-                            <div className="flex items-center gap-1">
-                              <ThumbsUp className="h-4 w-4" />
-                              <span>{idee.nombreApprobations} approbation{idee.nombreApprobations !== 1 ? "s" : ""}</span>
-                            </div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-2">
-                          {getStatutBadge(idee.statut)}
-                        </div>
-                      </div>
-                    </CardHeader>
-                    <CardContent>
-                      <p className="text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-wrap">
-                        {idee.description}
+            <Tabs value={selectedIdeeTab} onValueChange={(value) => setSelectedIdeeTab(value as 'mes-idees' | 'toutes-idees')} className="w-full">
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="mes-idees" className="flex items-center gap-2">
+                  <Lightbulb className="h-4 w-4" />
+                  Mes Idées ({idees.length})
+                </TabsTrigger>
+                <TabsTrigger value="toutes-idees" className="flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Toutes les Idées ({allIdees.length})
+                </TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="mes-idees" className="space-y-4">
+                {ideesLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : idees.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <Lightbulb className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 dark:text-gray-300 text-lg mb-4">
+                        Vous n'avez pas encore soumis d'idée
                       </p>
-                      {idee.raisonRejet && (
-                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4">
-                          <p className="text-sm text-red-700 dark:text-red-300">
-                            <strong>Raison du rejet/blocage :</strong> {idee.raisonRejet}
-                          </p>
-                        </div>
-                      )}
-                      <div className="flex gap-2">
-                        {idee.statut === StatutIdee.EnAttente && !idee.estLue && (
-                          <>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => {
-                                setEditingIdee(idee);
-                                setIdeeFormData({ titre: idee.titre, description: idee.description });
-                                setShowEditIdeeDialog(true);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4 mr-2" />
-                              Modifier
-                            </Button>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => handleDeleteIdee(idee.id)}
-                              className="text-red-600 hover:text-red-700 hover:bg-red-50"
-                            >
-                              <Trash2 className="h-4 w-4 mr-2" />
-                              Supprimer
-                            </Button>
-                          </>
-                        )}
-                        {idee.estLue && (
-                          <p className="text-sm text-gray-500 italic">
-                            Cette idée ne peut plus être modifiée ou supprimée car elle a déjà été lue. Contactez l'administration si nécessaire.
-                          </p>
-                        )}
-                        <Link href="/idees" className="ml-auto">
-                          <Button variant="outline" size="sm">
-                            <Eye className="h-4 w-4 mr-2" />
-                            Voir sur le site
-                          </Button>
-                        </Link>
-                      </div>
+                      <Button onClick={() => setShowCreateIdeeDialog(true)} className="bg-blue-600 hover:bg-blue-700">
+                        <Plus className="h-4 w-4 mr-2" />
+                        Proposer une idée
+                      </Button>
                     </CardContent>
                   </Card>
-                ))}
-              </div>
-            )}
+                ) : (
+                  <div className="space-y-4">
+                    {idees.map((idee) => (
+                      <Card key={idee.id} className="shadow-md">
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1">
+                              <CardTitle className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-2">{idee.titre}</CardTitle>
+                              <div className="flex items-center gap-3 text-sm text-gray-500">
+                                <div className="flex items-center gap-1">
+                                  <Calendar className="h-4 w-4" />
+                                  <span>
+                                    {format(new Date(idee.dateCreation), "d MMMM yyyy à HH:mm", { locale: fr })}
+                                  </span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <MessageSquare className="h-4 w-4" />
+                                  <span>{idee.nombreCommentaires} commentaire{idee.nombreCommentaires !== 1 ? "s" : ""}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                  <ThumbsUp className="h-4 w-4" />
+                                  <span>{idee.nombreApprobations} approbation{idee.nombreApprobations !== 1 ? "s" : ""}</span>
+                                </div>
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {getStatutBadge(idee.statut)}
+                            </div>
+                          </div>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-wrap">
+                            {idee.description}
+                          </p>
+                          {idee.raisonRejet && (
+                            <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 mb-4">
+                              <p className="text-sm text-red-700 dark:text-red-300">
+                                <strong>Raison du rejet/blocage :</strong> {idee.raisonRejet}
+                              </p>
+                            </div>
+                          )}
+                          <div className="flex gap-2">
+                            {idee.statut === StatutIdee.EnAttente && !idee.estLue && (
+                              <>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => {
+                                    setEditingIdee(idee);
+                                    setIdeeFormData({ titre: idee.titre, description: idee.description });
+                                    setShowEditIdeeDialog(true);
+                                  }}
+                                >
+                                  <Pencil className="h-4 w-4 mr-2" />
+                                  Modifier
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => handleDeleteIdee(idee.id)}
+                                  className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                                >
+                                  <Trash2 className="h-4 w-4 mr-2" />
+                                  Supprimer
+                                </Button>
+                              </>
+                            )}
+                            {idee.estLue && (
+                              <p className="text-sm text-gray-500 italic">
+                                Cette idée ne peut plus être modifiée ou supprimée car elle a déjà été lue. Contactez l'administration si nécessaire.
+                              </p>
+                            )}
+                            <Link href="/idees" className="ml-auto">
+                              <Button variant="outline" size="sm">
+                                <Eye className="h-4 w-4 mr-2" />
+                                Voir sur le site
+                              </Button>
+                            </Link>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
+              </TabsContent>
+
+              <TabsContent value="toutes-idees" className="space-y-4">
+                {allIdeesLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                  </div>
+                ) : allIdees.length === 0 ? (
+                  <Card>
+                    <CardContent className="py-12 text-center">
+                      <Lightbulb className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 dark:text-gray-300 text-lg">
+                        Aucune idée validée pour le moment
+                      </p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  <div className="space-y-4">
+                    {allIdees.map((idee) => {
+                      const isExpanded = expandedIdees.has(idee.id);
+                      const hasApprobation = hasUserApprobation(idee);
+                      const auteurName = `${idee.Adherent?.firstname || ''} ${idee.Adherent?.lastname || ''}`.trim() || 'Auteur inconnu';
+                      
+                      return (
+                        <Card key={idee.id} className="shadow-md hover:shadow-lg transition-shadow">
+                          <CardHeader>
+                            <div className="flex items-start justify-between gap-4">
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start gap-3 mb-3">
+                                  <Avatar className="h-10 w-10 flex-shrink-0">
+                                    <AvatarImage src={idee.Adherent?.User?.image || undefined} alt={auteurName} />
+                                    <AvatarFallback className="bg-blue-100 text-blue-600">
+                                      {auteurName.charAt(0).toUpperCase()}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <CardTitle className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mb-1">{idee.titre}</CardTitle>
+                                    <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">
+                                      Par {auteurName}
+                                    </p>
+                                    <div className="flex items-center gap-3 text-xs sm:text-sm text-gray-500 flex-wrap">
+                                      <div className="flex items-center gap-1">
+                                        <Calendar className="h-3.5 w-3.5" />
+                                        <span>
+                                          {format(new Date(idee.dateCreation), "d MMMM yyyy à HH:mm", { locale: fr })}
+                                        </span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <MessageSquare className="h-3.5 w-3.5" />
+                                        <span>{idee.Commentaires?.length || 0} commentaire{(idee.Commentaires?.length || 0) !== 1 ? "s" : ""}</span>
+                                      </div>
+                                      <div className="flex items-center gap-1">
+                                        <ThumbsUp className="h-3.5 w-3.5" />
+                                        <span>{idee.Approbations?.length || 0} approbation{(idee.Approbations?.length || 0) !== 1 ? "s" : ""}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </CardHeader>
+                          <CardContent>
+                            <p className={`text-gray-700 dark:text-gray-300 mb-4 whitespace-pre-wrap ${!isExpanded ? 'line-clamp-3' : ''}`}>
+                              {idee.description}
+                            </p>
+                            
+                            {!isExpanded && idee.description.length > 150 && (
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => toggleExpandIdee(idee.id)}
+                                className="text-blue-600 hover:text-blue-700 mb-4"
+                              >
+                                Voir plus
+                              </Button>
+                            )}
+
+                            {isExpanded && (
+                              <>
+                                {/* Commentaires */}
+                                {idee.Commentaires && idee.Commentaires.length > 0 && (
+                                  <div className="mt-4 space-y-3 border-t pt-4">
+                                    <h4 className="font-semibold text-sm text-gray-700 dark:text-gray-300 mb-2">
+                                      Commentaires ({idee.Commentaires.length})
+                                    </h4>
+                                    {idee.Commentaires.map((comment: any) => (
+                                      <div key={comment.id} className="flex gap-3">
+                                        <Avatar className="h-8 w-8 flex-shrink-0">
+                                          <AvatarImage src={comment.Adherent?.User?.image || undefined} alt={`${comment.Adherent?.firstname || ''} ${comment.Adherent?.lastname || ''}`} />
+                                          <AvatarFallback className="bg-gray-100 text-gray-600 text-xs">
+                                            {`${comment.Adherent?.firstname || ''} ${comment.Adherent?.lastname || ''}`.charAt(0).toUpperCase()}
+                                          </AvatarFallback>
+                                        </Avatar>
+                                        <div className="flex-1 min-w-0">
+                                          <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
+                                            <p className="text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                              {`${comment.Adherent?.firstname || ''} ${comment.Adherent?.lastname || ''}`.trim() || 'Anonyme'}
+                                            </p>
+                                            <p className="text-sm text-gray-600 dark:text-gray-400 whitespace-pre-wrap">
+                                              {comment.contenu}
+                                            </p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-500 mt-2">
+                                              {format(new Date(comment.createdAt), "d MMM yyyy à HH:mm", { locale: fr })}
+                                            </p>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+
+                                {/* Formulaire de commentaire */}
+                                {showCommentForm === idee.id ? (
+                                  <div className="mt-4 space-y-2 border-t pt-4">
+                                    <Label htmlFor={`comment-${idee.id}`} className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                                      Ajouter un commentaire
+                                    </Label>
+                                    <Textarea
+                                      id={`comment-${idee.id}`}
+                                      value={commentContent}
+                                      onChange={(e) => setCommentContent(e.target.value)}
+                                      placeholder="Votre commentaire..."
+                                      rows={3}
+                                      className="resize-none"
+                                    />
+                                    <div className="flex gap-2 justify-end">
+                                      <Button
+                                        variant="outline"
+                                        size="sm"
+                                        onClick={() => {
+                                          setShowCommentForm(null);
+                                          setCommentContent("");
+                                        }}
+                                      >
+                                        Annuler
+                                      </Button>
+                                      <Button
+                                        size="sm"
+                                        onClick={() => handleCommentSubmit(idee.id)}
+                                        disabled={commentLoading}
+                                        className="bg-blue-600 hover:bg-blue-700"
+                                      >
+                                        {commentLoading ? "Envoi..." : "Commenter"}
+                                      </Button>
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => setShowCommentForm(idee.id)}
+                                    className="mt-4"
+                                  >
+                                    <MessageSquare className="h-4 w-4 mr-2" />
+                                    Commenter
+                                  </Button>
+                                )}
+
+                                {isExpanded && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => toggleExpandIdee(idee.id)}
+                                    className="text-blue-600 hover:text-blue-700 mt-2"
+                                  >
+                                    Voir moins
+                                  </Button>
+                                )}
+                              </>
+                            )}
+
+                            {/* Actions */}
+                            <div className="flex items-center gap-2 mt-4 pt-4 border-t">
+                              <Button
+                                variant={hasApprobation ? "default" : "outline"}
+                                size="sm"
+                                onClick={() => handleToggleApprobation(idee.id)}
+                                className={hasApprobation ? "bg-blue-600 hover:bg-blue-700" : ""}
+                              >
+                                <ThumbsUp className={`h-4 w-4 mr-2 ${hasApprobation ? "fill-current" : ""}`} />
+                                {hasApprobation ? "Approuvé" : "Approuver"}
+                              </Button>
+                              {!isExpanded && (
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => toggleExpandIdee(idee.id)}
+                                >
+                                  <Eye className="h-4 w-4 mr-2" />
+                                  Voir les détails
+                                </Button>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
+                  </div>
+                )}
+              </TabsContent>
+            </Tabs>
 
             {/* Dialog d'édition */}
             <Dialog open={showEditIdeeDialog} onOpenChange={setShowEditIdeeDialog}>
@@ -2873,46 +4362,56 @@ export default function UserProfilePage() {
       <Navbar />
       
       {/* Hero Section */}
-      <section className="relative py-16 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white">
+      <section className="relative py-3 sm:py-4 md:py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white">
         <div className="absolute inset-0 bg-black/20" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex flex-col md:flex-row items-center gap-8">
-            <div className="relative">
+          <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 md:gap-4">
+            <div className="relative flex-shrink-0">
               <PhotoUpload
                 currentImage={currentImage}
                 userName={user.name || ""}
                 onImageChange={handleImageChange}
-                size="lg"
+                size="sm"
               />
             </div>
             
-            <div className="flex-1 text-center md:text-left">
-              <h1 className="text-3xl md:text-4xl font-bold mb-2">
+            <div className="flex-1 text-center sm:text-left min-w-0">
+              <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-0.5 sm:mb-1">
                 {user.name || "Utilisateur"}
               </h1>
-              <p className="text-xl text-blue-100 mb-4">{user.email}</p>
-              <div className="flex flex-wrap justify-center md:justify-start gap-3">
-                <Badge className={getStatusColor(userStatus)}>
-                  <CheckCircle className="h-4 w-4 mr-1" />
+              <p className="text-xs sm:text-sm md:text-base text-blue-100 mb-1 sm:mb-2 truncate">{user.email}</p>
+              <div className="flex flex-wrap justify-center sm:justify-start gap-1.5 sm:gap-2">
+                <Badge className={`${getStatusColor(userStatus)} text-xs`}>
+                  <CheckCircle className="h-3 w-3 mr-0.5" />
                   {userStatus}
                 </Badge>
-                <Badge className={getRoleColor(userRole)}>
-                  <Shield className="h-4 w-4 mr-1" />
+                <Badge className={`${getRoleColor(userRole)} text-xs`}>
+                  <Shield className="h-3 w-3 mr-0.5" />
                   {userRole}
                 </Badge>
               </div>
             </div>
             
-            <div className="flex gap-3">
+            <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
+              {userProfile?.adherent?.numeroPasseport && user?.status === 'Actif' && (
+                <Button 
+                  onClick={handleDownloadPasseport}
+                  className="bg-white text-blue-600 hover:bg-blue-50 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 font-medium shadow-sm"
+                  title={`Télécharger le passeport ${userProfile.adherent.numeroPasseport}`}
+                >
+                  <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+                  <span className="hidden sm:inline">Passeport</span>
+                </Button>
+              )}
               <Link href="/user/update">
-                <Button variant="outline" className="border-white text-white hover:bg-white/10">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Modifier
+                <Button className="bg-white text-blue-600 hover:bg-blue-50 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 font-medium shadow-sm">
+                  <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+                  <span className="hidden sm:inline">Modifier</span>
                 </Button>
               </Link>
-              <Button variant="outline" className="border-white text-white hover:bg-white/10">
-                <Settings className="h-4 w-4 mr-2" />
-                Paramètres
+              <Button className="bg-white/90 text-blue-600 hover:bg-white dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 font-medium shadow-sm">
+                <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                <span className="hidden sm:inline ml-1">Paramètres</span>
               </Button>
             </div>
           </div>
@@ -2920,12 +4419,12 @@ export default function UserProfilePage() {
       </section>
 
       {/* Contenu principal avec menu latéral */}
-      <section className="py-16">
+      <section className="py-8 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-8">
             
-            {/* Menu latéral */}
-            <div className="lg:col-span-1">
+            {/* Menu latéral - Desktop */}
+            <div className="hidden lg:block lg:col-span-1">
               <Card className="sticky top-8">
                 <CardHeader>
                   <CardTitle className="text-lg">Mon Compte</CardTitle>
@@ -2967,6 +4466,33 @@ export default function UserProfilePage() {
                   </nav>
                 </CardContent>
               </Card>
+            </div>
+
+            {/* Menu horizontal scrollable - Mobile */}
+            <div className="lg:hidden -mx-4 sm:mx-0">
+              <div className="overflow-x-auto px-4 sm:px-0 pb-2">
+                <div className="flex gap-2 min-w-max">
+                  {menuItems.map((item) => {
+                    const Icon = item.icon;
+                    const isActive = activeSection === item.id;
+                    
+                    return (
+                      <button
+                        key={item.id}
+                        onClick={() => setActiveSection(item.id)}
+                        className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium whitespace-nowrap transition-colors min-h-[44px] ${
+                          isActive
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
+                        }`}
+                      >
+                        <Icon className="h-4 w-4" />
+                        <span>{item.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
 
             {/* Contenu principal */}

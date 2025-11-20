@@ -7,6 +7,7 @@ import HeroImage from "@/public/hero.png";
 import { buttonVariants } from "@/components/ui/button";
 import { UserButton } from "../auth/user-button";
 import { ThemeToggle } from "../ThemeToggle";
+import { NotificationCenter } from "../notifications/NotificationCenter";
 import { useState } from "react";
 import { Menu, X, Shield } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
@@ -45,8 +46,8 @@ export function Navbar() {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-2">
             <Image src={Logo} alt="Logo" className="size-10" />
-            <h3 className="text-3xl font-semibold">
-              ama<span className="text-red-500 font-semibold">K</span>i
+            <h3 className="text-2xl font-semibold">
+              Ama<span className="text-3xl text-red-500 font-semibold">K</span>i
             </h3>
           </Link>
 
@@ -74,18 +75,20 @@ export function Navbar() {
           </div>
 
           {/* Actions Desktop */}
-          <div className="hidden lg:flex lg:items-center lg:gap-4">
+          <div className="hidden lg:flex lg:items-center lg:gap-2">
+            <NotificationCenter />
             <ThemeToggle />
             <UserButton />
           </div>
 
           {/* Menu Mobile Button */}
-          <div className="lg:hidden flex items-center gap-2">
+          <div className="lg:hidden flex items-center gap-1 sm:gap-2">
+            <NotificationCenter />
             <ThemeToggle />
             <UserButton />
             <button
               onClick={toggleMenu}
-              className="p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors"
+              className="p-2.5 sm:p-2 rounded-md text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors min-h-[44px] min-w-[44px] sm:min-h-0 sm:min-w-0 flex items-center justify-center"
               aria-label="Menu"
             >
               {isMenuOpen ? (
@@ -105,8 +108,10 @@ export function Navbar() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="block px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
+                  className="block px-4 py-3 sm:px-3 sm:py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors min-h-[44px] sm:min-h-0 flex items-center touch-manipulation"
+                  onClick={() => {
+                    setIsMenuOpen(false);
+                  }}
                 >
                   {item.name}
                 </Link>
@@ -115,10 +120,10 @@ export function Navbar() {
               {user?.role === "Admin" && (
                 <Link
                   href="/admin"
-                  className="flex items-center gap-2 px-3 py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors"
+                  className="flex items-center gap-2 px-4 py-3 sm:px-3 sm:py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors min-h-[44px] sm:min-h-0 touch-manipulation"
                   onClick={() => setIsMenuOpen(false)}
                 >
-                  <Shield className="h-4 w-4" />
+                  <Shield className="h-5 w-5 sm:h-4 sm:w-4" />
                   Admin
                 </Link>
               )}

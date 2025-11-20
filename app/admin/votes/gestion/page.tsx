@@ -160,12 +160,12 @@ export default function GestionVotesPage() {
           <div className="space-y-2">
             <Label>Candidat (facultatif pour vote blanc)</Label>
             <Input placeholder="Rechercher un candidat..." className="mb-2" value={candidacySearch} onChange={(e) => setCandidacySearch(e.target.value)} disabled={!form.positionId} />
-            <Select value={form.candidacyId || ""} onValueChange={(v) => setForm({ ...form, candidacyId: v || null })} disabled={!form.positionId}>
+            <Select value={form.candidacyId || "none"} onValueChange={(v) => setForm({ ...form, candidacyId: v === "none" ? null : v })} disabled={!form.positionId}>
               <SelectTrigger>
                 <SelectValue placeholder={form.positionId ? "Choisir un candidat (ou laisser vide pour blanc)" : "Choisir d'abord un poste"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Vote blanc</SelectItem>
+                <SelectItem value="none">Vote blanc</SelectItem>
                 {filteredCandidacies.map(opt => (
                   <SelectItem key={opt.id} value={opt.id}>{opt.label}</SelectItem>
                 ))}

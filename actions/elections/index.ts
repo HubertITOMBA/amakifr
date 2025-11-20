@@ -1288,6 +1288,105 @@ export async function getElectionById(electionId: string): Promise<{ success: bo
   }
 }
 
+/**
+ * Récupère les candidats d'une élection organisés par poste
+ * 
+ * @param electionId - L'ID de l'élection
+ * @returns Un objet avec success (boolean), candidatesByPosition (array) en cas de succès, 
+ *          ou error (string) en cas d'échec
+ */
+export async function getCandidatesByPositionForElection(electionId: string): Promise<{ success: boolean; candidatesByPosition?: any[]; election?: any; error?: string }> {
+  try {
+    const election = await prisma.election.findUnique({
+      where: { id: electionId },
+      include: {
+        positions: {
+          include: {
+            PosteTemplate: {
+              select: {
+                ordre: true
+              }
+            },
+            candidacies: {
+              where: {
+                status: { in: ["Validee", "EnAttente"] } // Seulement les candidatures valides ou en attente
+              },
+              include: {
+                adherent: {
+                  include: {
+                    User: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        image: true
+                      }
+                    }
+                  }
+                }
+              },
+              orderBy: {
+                createdAt: 'asc'
+              }
+            }
+          },
+          orderBy: {
+            titre: 'asc'
+          }
+        }
+      }
+    });
+
+    if (!election) {
+      return { success: false, error: "Élection non trouvée" };
+    }
+
+    // Organiser les candidats par poste et trier par ordre du template
+    const sortedPositions = [...election.positions].sort((a, b) => {
+      const ordreA = a.PosteTemplate?.ordre ?? 999;
+      const ordreB = b.PosteTemplate?.ordre ?? 999;
+      if (ordreA !== ordreB) return ordreA - ordreB;
+      return (a.titre || "").localeCompare(b.titre || "");
+    });
+
+    const candidatesByPosition = sortedPositions.map(position => ({
+      position: {
+        id: position.id,
+        titre: position.titre,
+        type: position.type
+      },
+      candidates: position.candidacies.map(candidacy => ({
+        id: candidacy.id,
+        adherent: {
+          id: candidacy.adherent.id,
+          firstname: candidacy.adherent.firstname,
+          lastname: candidacy.adherent.lastname,
+          civility: candidacy.adherent.civility,
+          User: candidacy.adherent.User
+        },
+        status: candidacy.status,
+        createdAt: candidacy.createdAt
+      }))
+    }));
+
+    return {
+      success: true,
+      candidatesByPosition,
+      election: {
+        id: election.id,
+        titre: election.titre,
+        dateScrutin: election.dateScrutin,
+        dateOuverture: election.dateOuverture,
+        dateCloture: election.dateCloture,
+        dateClotureCandidatures: election.dateClotureCandidatures
+      }
+    };
+  } catch (error) {
+    console.error("Erreur lors de la récupération des candidats par poste:", error);
+    return { success: false, error: "Erreur lors de la récupération des candidats" };
+  }
+}
+
 // Server Action pour voter
 export async function vote(
   electionId: string,

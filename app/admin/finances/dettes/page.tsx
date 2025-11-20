@@ -311,14 +311,15 @@ export default function AdminDettesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
-      <Card className="mx-auto max-w-7xl shadow-lg border-blue-200 dark:border-blue-700/50 bg-white dark:bg-gray-900 !py-0">
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white pb-4 pt-4 px-6 gap-0">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Dettes Initiales ({filteredData.length})
-            </CardTitle>
-            <div className="flex items-center gap-2">
+      <div className="p-4 sm:p-6">
+        <Card className="mx-auto max-w-7xl shadow-lg border-2 border-blue-200 dark:border-blue-800/50 bg-white dark:bg-gray-900 !py-0">
+          <CardHeader className="bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl text-gray-700 dark:text-gray-200">
+                <FileText className="h-5 w-5 text-blue-500 dark:text-blue-400" />
+                Dettes Initiales ({filteredData.length})
+              </CardTitle>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
               <ColumnVisibilityToggle 
                 table={table} 
                 storageKey="admin-dettes-column-visibility"
@@ -427,9 +428,9 @@ export default function AdminDettesPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-0 px-6 pb-6">
+        <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
           {/* Filtres et recherche */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -466,12 +467,12 @@ export default function AdminDettesPage() {
               <DataTable table={table} emptyMessage="Aucune dette initiale trouvée" compact={true} />
               
               {/* Pagination */}
-              <div className="bg-white dark:bg-gray-800 mt-5 flex items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
-                <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+              <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
+                <div className="flex-1 text-xs sm:text-sm text-muted-foreground dark:text-gray-400 text-center sm:text-left">
                   {table.getFilteredRowModel().rows.length} ligne(s) au total
                 </div>
 
-                <div className="flex items-center space-x-6 lg:space-x-8">
+                <div className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8 w-full sm:w-auto justify-center sm:justify-end">
                   <div className="flex items-center space-x-2">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
                     <Select
@@ -541,6 +542,7 @@ export default function AdminDettesPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

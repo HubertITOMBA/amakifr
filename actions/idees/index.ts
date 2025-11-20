@@ -1184,3 +1184,22 @@ export async function getIdeeById(id: string) {
   }
 }
 
+// Exports avec des noms alternatifs pour compatibilité avec les composants existants
+/**
+ * Alias pour createCommentaire (compatibilité)
+ * @deprecated Utilisez createCommentaire à la place
+ */
+export const commentIdee = createCommentaire;
+
+/**
+ * Alias pour toggleApprobation (compatibilité)
+ * @deprecated Utilisez toggleApprobation à la place
+ */
+export const voteIdee = toggleApprobation;
+
+/**
+ * Alias pour supprimerCommentaire (compatibilité)
+ * @deprecated Utilisez supprimerCommentaire à la place
+ */
+export const adminDeleteCommentaire = supprimerCommentaire;
+

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, Euro, Users, AlertTriangle, CheckCircle2, Clock, DollarSign } from "lucide-react";
+import { Calendar, Euro, Users, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
 import { toast } from "sonner";
 import { createCotisationsMensuelles, getCotisationsMensuellesStats } from "@/actions/cotisations-mensuelles";
 import { getAllTypesCotisationMensuelle } from "@/actions/cotisations-mensuelles";
@@ -209,7 +209,7 @@ export default function AdminCotisationCreation() {
                     {stats.totalDettes.toFixed(2).replace('.', ',')} €
                   </p>
                 </div>
-                <DollarSign className="h-8 w-8 text-orange-600" />
+                <Euro className="h-8 w-8 text-orange-600" />
               </div>
             </CardContent>
           </Card>

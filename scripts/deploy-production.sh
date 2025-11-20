@@ -3,148 +3,162 @@
 # Script de déploiement en production pour AMAKI France
 # Usage: ./scripts/deploy-production.sh
 
-set -e  # Arrête le script en cas d'erreur
+set -e
 
-# Couleurs pour les messages
+echo "🚀 Déploiement AMAKI France en Production"
+echo "=========================================="
+
+# Couleurs
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Fonction pour afficher les messages
-info() {
-    echo -e "${BLUE}ℹ️  $1${NC}"
-}
+# Vérifications préalables
+echo -e "${BLUE}📋 Vérifications préalables...${NC}"
 
-success() {
-    echo -e "${GREEN}✅ $1${NC}"
-}
-
-warning() {
-    echo -e "${YELLOW}⚠️  $1${NC}"
-}
-
-error() {
-    echo -e "${RED}❌ $1${NC}"
-}
-
-# Vérification que nous sommes dans le bon répertoire
-if [ ! -f "package.json" ]; then
-    error "Ce script doit être exécuté depuis la racine du projet"
+# Vérifier Node.js
+if ! command -v node &> /dev/null; then
+    echo -e "${RED}❌ Node.js n'est pas installé${NC}"
     exit 1
 fi
+NODE_VERSION=$(node -v)
+echo -e "${GREEN}✅ Node.js: $NODE_VERSION${NC}"
 
-info "🚀 Début du déploiement en production..."
-
-# 1. Vérification de l'environnement
-info "🔍 Vérification de l'environnement..."
-if [ -z "$DATABASE_URL" ]; then
-    error "La variable DATABASE_URL n'est pas définie"
+# Vérifier npm
+if ! command -v npm &> /dev/null; then
+    echo -e "${RED}❌ npm n'est pas installé${NC}"
     exit 1
 fi
+echo -e "${GREEN}✅ npm installé${NC}"
 
-# 2. Sauvegarde de la base de données
-info "📦 Création de la sauvegarde de la base de données..."
-BACKUP_DIR="./backups"
-mkdir -p "$BACKUP_DIR"
-BACKUP_FILE="$BACKUP_DIR/backup_$(date +%Y%m%d_%H%M%S).sql"
+# Vérifier PM2
+if ! command -v pm2 &> /dev/null; then
+    echo -e "${YELLOW}⚠️  PM2 n'est pas installé, installation...${NC}"
+    npm install -g pm2
+fi
+echo -e "${GREEN}✅ PM2 installé${NC}"
 
-# Extraction des informations de connexion depuis DATABASE_URL
-# Format: postgresql://user:password@host:port/database
-DB_URL=$DATABASE_URL
-
-# Création de la sauvegarde
-if command -v pg_dump &> /dev/null; then
-    pg_dump "$DB_URL" > "$BACKUP_FILE" 2>/dev/null || {
-        warning "Impossible de créer la sauvegarde avec pg_dump"
-        warning "Assurez-vous que pg_dump est installé et que DATABASE_URL est correct"
-        read -p "Continuer sans sauvegarde? (non recommandé) [y/N]: " -n 1 -r
-        echo
-        if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-            error "Déploiement annulé"
-            exit 1
-        fi
-    }
-    success "Sauvegarde créée: $BACKUP_FILE"
-else
-    warning "pg_dump n'est pas installé. Impossible de créer une sauvegarde automatique."
-    warning "Veuillez créer une sauvegarde manuellement avant de continuer."
-    read -p "Avez-vous créé une sauvegarde manuelle? [y/N]: " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        error "Déploiement annulé. Créez d'abord une sauvegarde."
+# Vérifier le fichier .env
+if [ ! -f .env ]; then
+    echo -e "${RED}❌ Le fichier .env n'existe pas${NC}"
+    if [ -f env.example ]; then
+        echo -e "${YELLOW}📝 Création du fichier .env à partir de env.example...${NC}"
+        cp env.example .env
+        echo -e "${YELLOW}⚠️  Veuillez éditer le fichier .env avec vos valeurs de production${NC}"
+        exit 1
+    else
+        echo -e "${RED}❌ Le fichier env.example n'existe pas${NC}"
         exit 1
     fi
 fi
+echo -e "${GREEN}✅ Fichier .env trouvé${NC}"
 
-# 3. Vérification de l'état des migrations
-info "🔍 Vérification de l'état des migrations..."
-npx prisma migrate status || {
-    error "Erreur lors de la vérification des migrations"
+# Vérifier les variables d'environnement critiques
+echo -e "${BLUE}🔍 Vérification des variables d'environnement...${NC}"
+source .env
+
+if [ -z "$DATABASE_URL" ]; then
+    echo -e "${RED}❌ DATABASE_URL n'est pas défini${NC}"
     exit 1
-}
+fi
+echo -e "${GREEN}✅ DATABASE_URL défini${NC}"
 
-# 4. Installation des dépendances
-info "📦 Installation des dépendances..."
-npm install || {
-    error "Erreur lors de l'installation des dépendances"
+if [ -z "$AUTH_SECRET" ]; then
+    echo -e "${RED}❌ AUTH_SECRET n'est pas défini${NC}"
     exit 1
-}
-success "Dépendances installées"
+fi
+echo -e "${GREEN}✅ AUTH_SECRET défini${NC}"
 
-# 5. Application des migrations Prisma
-info "🔄 Application des migrations Prisma..."
-warning "Cette étape va modifier la structure de la base de données"
-read -p "Continuer? [y/N]: " -n 1 -r
-echo
-if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-    error "Déploiement annulé"
+if [ -z "$NEXT_PUBLIC_APP_URL" ]; then
+    echo -e "${YELLOW}⚠️  NEXT_PUBLIC_APP_URL n'est pas défini${NC}"
+fi
+
+# Récupération des dernières modifications via Git
+echo -e "${BLUE}📥 Récupération des dernières modifications via Git...${NC}"
+if [ -d ".git" ]; then
+    git pull origin main || {
+        echo -e "${YELLOW}⚠️  Erreur lors du git pull, vérification du statut...${NC}"
+        git status
+        read -p "Continuer quand même? (o/N) " -n 1 -r
+        echo
+        if [[ ! $REPLY =~ ^[Oo]$ ]]; then
+            exit 1
+        fi
+    }
+    echo -e "${GREEN}✅ Dernière version récupérée${NC}"
+else
+    echo -e "${RED}❌ Ce n'est pas un dépôt Git${NC}"
     exit 1
 fi
 
+# Installation des dépendances
+echo -e "${BLUE}📦 Installation des dépendances...${NC}"
+npm ci
+
+# Génération Prisma
+echo -e "${BLUE}🔧 Génération du client Prisma...${NC}"
+npx prisma generate
+
+# Exécution des migrations
+echo -e "${BLUE}🗄️  Exécution des migrations de base de données...${NC}"
 npx prisma migrate deploy || {
-    error "Erreur lors de l'application des migrations"
-    error "La base de données peut être dans un état incohérent"
-    error "Restaurez la sauvegarde: psql \$DATABASE_URL < $BACKUP_FILE"
-    exit 1
-}
-success "Migrations appliquées"
-
-# 6. Génération du Prisma Client
-info "⚙️ Génération du Prisma Client..."
-npx prisma generate || {
-    error "Erreur lors de la génération du Prisma Client"
-    exit 1
-}
-success "Prisma Client généré"
-
-# 7. Build de l'application
-info "🏗️ Build de l'application Next.js..."
-npm run build || {
-    error "Erreur lors du build de l'application"
-    exit 1
-}
-success "Application buildée"
-
-# 8. Vérification finale
-info "🔍 Vérification finale..."
-npx prisma migrate status || {
-    warning "Vérification des migrations échouée, mais le déploiement est terminé"
+    echo -e "${YELLOW}⚠️  Erreur lors des migrations, vérification du statut...${NC}"
+    npx prisma migrate status
 }
 
-# 9. Instructions pour le redémarrage
-success "✅ Déploiement terminé avec succès!"
-echo ""
-info "📝 Prochaines étapes:"
-echo "   1. Redémarrez votre application:"
-echo "      - PM2: pm2 restart amakifr"
-echo "      - systemd: systemctl restart amakifr"
-echo "      - Docker: docker-compose restart"
-echo ""
-echo "   2. Vérifiez que l'application fonctionne correctement"
-echo ""
-echo "   3. En cas de problème, restaurez la sauvegarde:"
-echo "      psql \$DATABASE_URL < $BACKUP_FILE"
-echo ""
+# Build de production
+echo -e "${BLUE}🔨 Build de production...${NC}"
+npm run build
 
+# Vérification des fichiers PWA
+echo -e "${BLUE}📱 Vérification des fichiers PWA...${NC}"
+if [ ! -f "public/sw.js" ]; then
+    echo -e "${YELLOW}⚠️  Le service worker n'a pas été généré${NC}"
+else
+    echo -e "${GREEN}✅ Service worker généré${NC}"
+fi
+
+if [ ! -f "app/web-app-manifest-192x192.png" ] && [ ! -f "public/web-app-manifest-192x192.png" ]; then
+    echo -e "${YELLOW}⚠️  Les icônes PWA ne sont pas trouvées${NC}"
+else
+    echo -e "${GREEN}✅ Icônes PWA trouvées${NC}"
+fi
+
+# Création du répertoire de logs si nécessaire
+if [ ! -d "logs" ]; then
+    mkdir -p logs
+    echo -e "${GREEN}✅ Répertoire logs créé${NC}"
+fi
+
+# Redémarrage avec PM2
+echo -e "${BLUE}🔄 Redémarrage de l'application avec PM2...${NC}"
+
+# Vérifier si l'application est déjà en cours d'exécution
+if pm2 list | grep -q "amakifr"; then
+    echo -e "${YELLOW}⚠️  L'application est déjà en cours d'exécution${NC}"
+    pm2 restart amakifr
+else
+    echo -e "${BLUE}🚀 Démarrage de l'application...${NC}"
+    pm2 start ecosystem.config.js --only amakifr
+fi
+
+# Sauvegarder la configuration PM2
+pm2 save
+
+# Afficher le statut
+echo -e "\n${GREEN}📊 Statut de l'application:${NC}"
+pm2 status
+
+# Afficher les logs récents
+echo -e "\n${BLUE}📋 Logs récents (Ctrl+C pour quitter):${NC}"
+pm2 logs amakifr --lines 20
+
+echo -e "\n${GREEN}✅ Déploiement terminé avec succès!${NC}"
+echo -e "${GREEN}🌐 L'application devrait être accessible sur: ${NEXT_PUBLIC_APP_URL:-https://amaki.fr}${NC}"
+echo -e "\n${BLUE}💡 Commandes utiles:${NC}"
+echo -e "  - Voir les logs: ${YELLOW}pm2 logs amakifr${NC}"
+echo -e "  - Voir le statut: ${YELLOW}pm2 status${NC}"
+echo -e "  - Redémarrer: ${YELLOW}pm2 restart amakifr${NC}"
+echo -e "  - Arrêter: ${YELLOW}pm2 stop amakifr${NC}"

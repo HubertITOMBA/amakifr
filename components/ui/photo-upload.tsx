@@ -75,15 +75,24 @@ export function PhotoUpload({
       if (result.success && result.url) {
         onImageChange(result.url);
         toast.success("Photo mise à jour avec succès !");
+        setPreview(null); // Réinitialiser le preview après upload réussi
       } else {
-        throw new Error(result.message || 'Erreur lors de l\'upload');
+        const errorMessage = result.message || result.error || 'Erreur lors de l\'upload';
+        console.error('Erreur upload:', errorMessage, result);
+        toast.error(errorMessage || "Erreur lors de l'ajout de la photo");
+        setPreview(null);
       }
     } catch (error) {
       console.error('Erreur upload:', error);
-      toast.error("Erreur lors de l'upload de l'image");
+      const errorMessage = error instanceof Error ? error.message : 'Erreur lors de l\'upload de l\'image';
+      toast.error(errorMessage);
       setPreview(null);
     } finally {
       setUploading(false);
+      // Réinitialiser l'input pour permettre de sélectionner le même fichier
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
     }
   };
 
@@ -112,7 +121,9 @@ export function PhotoUpload({
           <button
             onClick={() => fileInputRef.current?.click()}
             disabled={uploading}
-            className="absolute bottom-2 right-2 bg-white text-gray-800 rounded-full p-2 hover:bg-gray-100 transition-colors disabled:opacity-50"
+            className="absolute bottom-2 right-2 bg-white text-gray-800 rounded-full p-2 hover:bg-gray-100 transition-colors disabled:opacity-50 shadow-lg"
+            title="Changer la photo (caméra ou galerie)"
+            type="button"
           >
             {uploading ? (
               <Loader2 className={`${iconSizes[size]} animate-spin`} />
@@ -125,7 +136,9 @@ export function PhotoUpload({
             <button
               onClick={handleRemoveImage}
               disabled={uploading}
-              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50"
+              className="absolute top-2 right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600 transition-colors disabled:opacity-50 shadow-lg"
+              title="Supprimer la photo"
+              type="button"
             >
               <X className="h-3 w-3" />
             </button>
@@ -137,10 +150,11 @@ export function PhotoUpload({
         ref={fileInputRef}
         type="file"
         accept="image/*"
+        capture="environment"
         onChange={handleFileSelect}
         className="hidden"
         disabled={uploading}
-        title={`Format: JPG, PNG, GIF, WEBP • Taille max: ${maxSize}MB`}
+        title={`Format: JPG, PNG, GIF, WEBP • Taille max: ${maxSize}MB • Sur mobile: permet d'utiliser la caméra`}
       />
     </div>
   );

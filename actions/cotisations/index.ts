@@ -190,11 +190,14 @@ export async function createManualCotisation(data: z.infer<typeof CreateCotisati
         nouveauStatut = "Paye";
       }
 
+      // S'assurer que montantRestant n'est pas négatif
+      const montantRestantFinal = nouveauMontantRestant.gte(0) ? nouveauMontantRestant : new Decimal(0);
+
       await prisma.obligationCotisation.update({
         where: { id: obligation.id },
         data: {
           montantPaye: nouveauMontantPaye,
-          montantRestant: nouveauMontantRestant.max(0),
+          montantRestant: montantRestantFinal,
           statut: nouveauStatut,
         }
       });

@@ -372,14 +372,15 @@ export default function AdminPaiementsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50">
-      <Card className="mx-auto max-w-7xl shadow-lg border-green-200 dark:border-green-700/50 bg-white dark:bg-gray-900 !py-0">
-        <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 text-white pb-4 pt-4 px-6 gap-0">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Receipt className="h-5 w-5" />
-              Paiements ({filteredData.length})
-            </CardTitle>
-            <div className="flex items-center gap-2">
+      <div className="p-4 sm:p-6">
+        <Card className="mx-auto max-w-7xl shadow-lg border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900 !py-0">
+          <CardHeader className="bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl text-gray-700 dark:text-gray-200">
+                <Receipt className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
+                Paiements ({filteredData.length})
+              </CardTitle>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
               <ColumnVisibilityToggle 
                 table={table} 
                 storageKey="admin-paiements-column-visibility"
@@ -454,12 +455,12 @@ export default function AdminPaiementsPage() {
                             {financialItems.dettes.length > 0 && (
                               <div>
                                 <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Dettes initiales</Label>
-                                <Select value={formData.detteInitialeId} onValueChange={(value) => setFormData({ ...formData, detteInitialeId: value, cotisationMensuelleId: "", assistanceId: "" })}>
+                                <Select value={formData.detteInitialeId || "none"} onValueChange={(value) => setFormData({ ...formData, detteInitialeId: value === "none" ? "" : value, cotisationMensuelleId: "", assistanceId: "" })}>
                                   <SelectTrigger className="h-9 text-sm">
                                     <SelectValue placeholder="Sélectionner une dette" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">Aucune</SelectItem>
+                                    <SelectItem value="none">Aucune</SelectItem>
                                     {financialItems.dettes.map((d) => (
                                       <SelectItem key={d.id} value={d.id}>
                                         {d.label}
@@ -472,12 +473,12 @@ export default function AdminPaiementsPage() {
                             {financialItems.cotisations.length > 0 && (
                               <div>
                                 <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Cotisations mensuelles</Label>
-                                <Select value={formData.cotisationMensuelleId} onValueChange={(value) => setFormData({ ...formData, cotisationMensuelleId: value, detteInitialeId: "", assistanceId: "" })}>
+                                <Select value={formData.cotisationMensuelleId || "none"} onValueChange={(value) => setFormData({ ...formData, cotisationMensuelleId: value === "none" ? "" : value, detteInitialeId: "", assistanceId: "" })}>
                                   <SelectTrigger className="h-9 text-sm">
                                     <SelectValue placeholder="Sélectionner une cotisation" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">Aucune</SelectItem>
+                                    <SelectItem value="none">Aucune</SelectItem>
                                     {financialItems.cotisations.map((c) => (
                                       <SelectItem key={c.id} value={c.id}>
                                         {c.label}
@@ -490,12 +491,12 @@ export default function AdminPaiementsPage() {
                             {financialItems.assistances.length > 0 && (
                               <div>
                                 <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Assistances</Label>
-                                <Select value={formData.assistanceId} onValueChange={(value) => setFormData({ ...formData, assistanceId: value, detteInitialeId: "", cotisationMensuelleId: "" })}>
+                                <Select value={formData.assistanceId || "none"} onValueChange={(value) => setFormData({ ...formData, assistanceId: value === "none" ? "" : value, detteInitialeId: "", cotisationMensuelleId: "" })}>
                                   <SelectTrigger className="h-9 text-sm">
                                     <SelectValue placeholder="Sélectionner une assistance" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="">Aucune</SelectItem>
+                                    <SelectItem value="none">Aucune</SelectItem>
                                     {financialItems.assistances.map((a) => (
                                       <SelectItem key={a.id} value={a.id}>
                                         {a.label}
@@ -583,9 +584,9 @@ export default function AdminPaiementsPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-0 px-6 pb-6">
+        <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
           {/* Filtres et recherche */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -621,12 +622,12 @@ export default function AdminPaiementsPage() {
               <DataTable table={table} emptyMessage="Aucun paiement trouvé" compact={true} />
               
               {/* Pagination */}
-              <div className="bg-white dark:bg-gray-800 mt-5 flex items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
-                <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+              <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
+                <div className="flex-1 text-xs sm:text-sm text-muted-foreground dark:text-gray-400 text-center sm:text-left">
                   {table.getFilteredRowModel().rows.length} ligne(s) au total
                 </div>
 
-                <div className="flex items-center space-x-6 lg:space-x-8">
+                <div className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8 w-full sm:w-auto justify-center sm:justify-end">
                   <div className="flex items-center space-x-2">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
                     <Select
@@ -696,6 +697,7 @@ export default function AdminPaiementsPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

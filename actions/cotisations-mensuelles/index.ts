@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { UserRole } from "@prisma/client";
+import { revalidatePath } from "next/cache";
 
 // Schémas de validation
 const CreateTypeCotisationSchema = z.object({
@@ -200,11 +201,13 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
     const validatedData = CreateCotisationMensuelleSchema.parse(data);
     const periode = `${validatedData.annee}-${validatedData.mois.toString().padStart(2, '0')}`;
 
-    // Récupérer tous les adhérents actifs
+    // Récupérer tous les adhérents actifs SAUF l'administrateur
+    // L'administrateur ne cotise ni le frais d'adhésion, ni la cotisation forfaitaire, ni les assistances
     const adherents = await prisma.adherent.findMany({
       where: {
         User: {
-          status: "Actif"
+          status: "Actif",
+          role: { not: UserRole.Admin } // Exclure l'administrateur
         }
       },
       include: {
@@ -213,7 +216,7 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
     });
 
     if (adherents.length === 0) {
-      return { success: false, error: "Aucun adhérent actif trouvé" };
+      return { success: false, error: "Aucun adhérent actif trouvé (hors administrateur)" };
     }
 
     // Trouver le type "Forfait Mensuel" (obligatoire)
@@ -354,11 +357,14 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
         const nouveauMontantPaye = new Decimal(cotisation.montantPaye).plus(montantAvoirsAppliques);
         const nouveauStatut = montantApresAvoirs.lte(0) ? "Paye" : nouveauMontantPaye.gt(0) ? "PartiellementPaye" : "EnAttente";
 
+        // Utiliser Decimal.max() (méthode statique) ou Math.max() avec conversion
+        const montantRestantFinal = montantApresAvoirs.gte(0) ? montantApresAvoirs : new Decimal(0);
+
         await prisma.cotisationMensuelle.update({
           where: { id: cotisation.id },
           data: {
             montantPaye: nouveauMontantPaye,
-            montantRestant: montantApresAvoirs.max(0),
+            montantRestant: montantRestantFinal,
             statut: nouveauStatut,
           },
         });
@@ -367,10 +373,16 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
       }
     }
 
-    let message = `${createdCount} cotisation(s) mensuelle(s) créées pour ${adherents.length} adhérent(s). Chaque cotisation inclut le forfait mensuel + les assistances du mois.`;
+    let message = `${createdCount} cotisation(s) mensuelle(s) créées pour ${adherents.length} adhérent(s) (l'administrateur est exclu). Chaque cotisation inclut le forfait mensuel + les assistances du mois.`;
     if (avoirsAppliques > 0) {
       message += ` ${avoirsAppliques} cotisation(s) ont été partiellement ou totalement payées avec des avoirs disponibles.`;
     }
+
+    // Revalider les pages des adhérents et de gestion
+    // Note: L'administrateur n'a pas de cotisations, donc son profil ne sera pas mis à jour
+    revalidatePath("/user/profile");
+    revalidatePath("/admin/cotisations");
+    revalidatePath("/admin/cotisations/gestion");
 
     return { 
       success: true, 
@@ -386,6 +398,11 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
   } catch (error) {
     console.error("Erreur lors de la création des cotisations mensuelles:", error);
     return { success: false, error: "Erreur interne du serveur" };
+  } finally {
+    // Revalider même en cas d'erreur partielle
+    revalidatePath("/user/profile");
+    revalidatePath("/admin/cotisations");
+    revalidatePath("/admin/cotisations/gestion");
   }
 }
 

@@ -5,13 +5,15 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { UserRole } from "@prisma/client";
+import { revalidatePath } from "next/cache";
 
 // Schémas de validation
 const CreateDepenseSchema = z.object({
   libelle: z.string().min(1, "Le libellé est requis"),
   montant: z.number().min(0, "Le montant doit être positif"),
   dateDepense: z.string().min(1, "La date est requise"),
-  categorie: z.string().min(1, "La catégorie est requise"),
+  typeDepenseId: z.string().optional(), // ID du type de dépense
+  categorie: z.string().optional(), // Conservé pour compatibilité
   description: z.string().optional(),
   justificatif: z.string().optional(), // URL du fichier uploadé
   statut: z.enum(["EnAttente", "Valide", "Rejete"]).default("EnAttente"),
@@ -22,6 +24,7 @@ const UpdateDepenseSchema = z.object({
   libelle: z.string().optional(),
   montant: z.number().min(0).optional(),
   dateDepense: z.string().optional(),
+  typeDepenseId: z.string().optional().nullable(),
   categorie: z.string().optional(),
   description: z.string().optional(),
   justificatif: z.string().optional(),
@@ -43,7 +46,8 @@ export async function createDepense(data: z.infer<typeof CreateDepenseSchema>) {
         libelle: validatedData.libelle,
         montant: validatedData.montant,
         dateDepense: new Date(validatedData.dateDepense),
-        categorie: validatedData.categorie,
+        typeDepenseId: validatedData.typeDepenseId || null,
+        categorie: validatedData.categorie || null,
         description: validatedData.description,
         justificatif: validatedData.justificatif,
         statut: validatedData.statut,
@@ -55,6 +59,13 @@ export async function createDepense(data: z.infer<typeof CreateDepenseSchema>) {
             id: true,
             email: true,
           }
+        },
+        TypeDepense: {
+          select: {
+            id: true,
+            titre: true,
+            description: true,
+          }
         }
       }
     });
@@ -64,6 +75,9 @@ export async function createDepense(data: z.infer<typeof CreateDepenseSchema>) {
       ...depense,
       montant: Number(depense.montant)
     };
+
+    revalidatePath("/admin/depenses");
+    revalidatePath("/admin/depenses/gestion");
 
     return { success: true, data: depenseConverted };
 
@@ -87,6 +101,13 @@ export async function getAllDepenses() {
           select: {
             id: true,
             email: true,
+          }
+        },
+        TypeDepense: {
+          select: {
+            id: true,
+            titre: true,
+            description: true,
           }
         }
       },
@@ -117,6 +138,20 @@ export async function updateDepense(data: z.infer<typeof UpdateDepenseSchema>) {
       return { success: false, error: "Non autorisé" };
     }
 
+    // Vérifier que la dépense existe et n'est pas validée ou rejetée
+    const existingDepense = await prisma.depense.findUnique({
+      where: { id: data.id },
+      select: { statut: true }
+    });
+
+    if (!existingDepense) {
+      return { success: false, error: "Dépense non trouvée" };
+    }
+
+    if (existingDepense.statut === "Valide" || existingDepense.statut === "Rejete") {
+      return { success: false, error: "Une dépense validée ou rejetée ne peut plus être modifiée" };
+    }
+
     const validatedData = UpdateDepenseSchema.parse(data);
 
     const depense = await prisma.depense.update({
@@ -125,6 +160,7 @@ export async function updateDepense(data: z.infer<typeof UpdateDepenseSchema>) {
         libelle: validatedData.libelle,
         montant: validatedData.montant,
         dateDepense: validatedData.dateDepense ? new Date(validatedData.dateDepense) : undefined,
+        typeDepenseId: validatedData.typeDepenseId !== undefined ? validatedData.typeDepenseId : undefined,
         categorie: validatedData.categorie,
         description: validatedData.description,
         justificatif: validatedData.justificatif,
@@ -136,6 +172,13 @@ export async function updateDepense(data: z.infer<typeof UpdateDepenseSchema>) {
             id: true,
             email: true,
           }
+        },
+        TypeDepense: {
+          select: {
+            id: true,
+            titre: true,
+            description: true,
+          }
         }
       }
     });
@@ -145,6 +188,8 @@ export async function updateDepense(data: z.infer<typeof UpdateDepenseSchema>) {
       ...depense,
       montant: Number(depense.montant)
     };
+
+    revalidatePath("/admin/depenses");
 
     return { success: true, data: depenseConverted };
 
@@ -162,14 +207,120 @@ export async function deleteDepense(id: string) {
       return { success: false, error: "Non autorisé" };
     }
 
+    // Vérifier que la dépense existe et n'est pas validée ou rejetée
+    const existingDepense = await prisma.depense.findUnique({
+      where: { id },
+      select: { statut: true }
+    });
+
+    if (!existingDepense) {
+      return { success: false, error: "Dépense non trouvée" };
+    }
+
+    if (existingDepense.statut === "Valide" || existingDepense.statut === "Rejete") {
+      return { success: false, error: "Une dépense validée ou rejetée ne peut plus être supprimée" };
+    }
+
     await prisma.depense.delete({
       where: { id }
     });
+
+    revalidatePath("/admin/depenses");
 
     return { success: true, message: "Dépense supprimée avec succès" };
 
   } catch (error) {
     console.error("Erreur lors de la suppression de la dépense:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+/**
+ * Valide une dépense
+ * 
+ * @param id - L'identifiant de la dépense à valider
+ * @returns Un objet avec success (boolean), message (string) en cas de succès, ou error (string) en cas d'échec
+ */
+export async function validateDepense(id: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    await prisma.depense.update({
+      where: { id },
+      data: { statut: "Valide" }
+    });
+
+    revalidatePath("/admin/depenses");
+    revalidatePath(`/admin/depenses/${id}/edition`);
+    revalidatePath(`/admin/depenses/${id}/consultation`);
+
+    return { success: true, message: "Dépense validée avec succès" };
+
+  } catch (error) {
+    console.error("Erreur lors de la validation de la dépense:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+/**
+ * Rejette une dépense
+ * 
+ * @param id - L'identifiant de la dépense à rejeter
+ * @returns Un objet avec success (boolean), message (string) en cas de succès, ou error (string) en cas d'échec
+ */
+export async function rejectDepense(id: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    await prisma.depense.update({
+      where: { id },
+      data: { statut: "Rejete" }
+    });
+
+    revalidatePath("/admin/depenses");
+    revalidatePath(`/admin/depenses/${id}/edition`);
+    revalidatePath(`/admin/depenses/${id}/consultation`);
+
+    return { success: true, message: "Dépense rejetée avec succès" };
+
+  } catch (error) {
+    console.error("Erreur lors du rejet de la dépense:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+/**
+ * Remet une dépense en attente
+ * 
+ * @param id - L'identifiant de la dépense à remettre en attente
+ * @returns Un objet avec success (boolean), message (string) en cas de succès, ou error (string) en cas d'échec
+ */
+export async function suspendDepense(id: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    await prisma.depense.update({
+      where: { id },
+      data: { statut: "EnAttente" }
+    });
+
+    revalidatePath("/admin/depenses");
+    revalidatePath(`/admin/depenses/${id}/edition`);
+    revalidatePath(`/admin/depenses/${id}/consultation`);
+
+    return { success: true, message: "Dépense remise en attente avec succès" };
+
+  } catch (error) {
+    console.error("Erreur lors de la suspension de la dépense:", error);
     return { success: false, error: "Erreur interne du serveur" };
   }
 }
@@ -262,6 +413,26 @@ export async function getDepenseById(id: string) {
             id: true,
             email: true,
           }
+        },
+        TypeDepense: {
+          select: {
+            id: true,
+            titre: true,
+            description: true,
+          }
+        },
+        Justificatifs: {
+          include: {
+            UploadedBy: {
+              select: {
+                id: true,
+                email: true,
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
         }
       }
     });
@@ -337,6 +508,13 @@ export async function filterDepenses(filters: {
             id: true,
             email: true,
           }
+        },
+        TypeDepense: {
+          select: {
+            id: true,
+            titre: true,
+            description: true,
+          }
         }
       },
       orderBy: {
@@ -354,6 +532,211 @@ export async function filterDepenses(filters: {
 
   } catch (error) {
     console.error("Erreur lors du filtrage des dépenses:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+/**
+ * Upload un justificatif pour une dépense
+ * 
+ * @param formData - FormData contenant le fichier (clé: "file") et depenseId (clé: "depenseId")
+ * @returns Un objet avec success (boolean), data (justificatif créé) en cas de succès, ou error (string) en cas d'échec
+ */
+export async function uploadJustificatif(formData: FormData) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const file = formData.get("file") as File;
+    const depenseId = formData.get("depenseId") as string;
+
+    if (!file) {
+      return { success: false, error: "Aucun fichier fourni" };
+    }
+
+    if (!depenseId) {
+      return { success: false, error: "ID de dépense requis" };
+    }
+
+    // Vérifier que la dépense existe
+    const depense = await prisma.depense.findUnique({
+      where: { id: depenseId }
+    });
+
+    if (!depense) {
+      return { success: false, error: "Dépense non trouvée" };
+    }
+
+    // Vérifier le type de fichier (PDF, images)
+    const allowedTypes = [
+      "application/pdf",
+      "image/jpeg",
+      "image/jpg",
+      "image/png",
+      "image/gif",
+      "image/webp",
+      "image/bmp"
+    ];
+    
+    if (!allowedTypes.includes(file.type)) {
+      return { success: false, error: "Type de fichier non autorisé. Formats acceptés: PDF, JPG, JPEG, PNG, GIF, WEBP, BMP" };
+    }
+
+    // Vérifier la taille (max 10MB)
+    const maxSize = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxSize) {
+      return { success: false, error: "Le fichier est trop volumineux. Taille maximale: 10MB" };
+    }
+
+    // Générer un nom de fichier unique
+    const timestamp = Date.now();
+    const randomString = Math.random().toString(36).substring(2, 15);
+    const extension = file.name.split('.').pop()?.toLowerCase();
+    const fileName = `justificatif_${timestamp}_${randomString}.${extension}`;
+
+    // Créer le répertoire s'il n'existe pas
+    const { writeFile, mkdir } = await import("fs/promises");
+    const { join } = await import("path");
+    const { existsSync } = await import("fs");
+    const uploadDir = join(process.cwd(), "public", "ressources", "justificatifs");
+    
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
+    }
+
+    // Sauvegarder le fichier
+    const bytes = await file.arrayBuffer();
+    const buffer = Buffer.from(bytes);
+    const filePath = join(uploadDir, fileName);
+    await writeFile(filePath, buffer);
+
+    // Créer l'enregistrement dans la base de données
+    const justificatif = await prisma.justificatifDepense.create({
+      data: {
+        depenseId: depenseId,
+        nomFichier: file.name,
+        chemin: `/ressources/justificatifs/${fileName}`,
+        typeMime: file.type,
+        taille: file.size,
+        uploadedBy: session.user.id,
+      },
+      include: {
+        UploadedBy: {
+          select: {
+            id: true,
+            email: true,
+          }
+        }
+      }
+    });
+
+    revalidatePath("/admin/depenses");
+    revalidatePath(`/admin/depenses/${depenseId}/edition`);
+
+    return { 
+      success: true, 
+      data: {
+        id: justificatif.id,
+        nomFichier: justificatif.nomFichier,
+        chemin: justificatif.chemin,
+        typeMime: justificatif.typeMime,
+        taille: justificatif.taille,
+        createdAt: justificatif.createdAt,
+      }
+    };
+
+  } catch (error) {
+    console.error("Erreur lors de l'upload du justificatif:", error);
+    return { success: false, error: "Erreur interne du serveur lors de l'upload" };
+  }
+}
+
+/**
+ * Supprime un justificatif
+ * 
+ * @param id - L'identifiant du justificatif à supprimer
+ * @returns Un objet avec success (boolean), message (string) en cas de succès, ou error (string) en cas d'échec
+ */
+export async function deleteJustificatif(id: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Récupérer le justificatif pour obtenir le chemin du fichier
+    const justificatif = await prisma.justificatifDepense.findUnique({
+      where: { id },
+      include: {
+        Depense: true
+      }
+    });
+
+    if (!justificatif) {
+      return { success: false, error: "Justificatif non trouvé" };
+    }
+
+    // Supprimer le fichier physique
+    try {
+      const { unlink } = await import("fs/promises");
+      const { join } = await import("path");
+      const filePath = join(process.cwd(), "public", justificatif.chemin);
+      await unlink(filePath);
+    } catch (fileError) {
+      console.error("Erreur lors de la suppression du fichier:", fileError);
+      // Continuer même si le fichier n'existe pas
+    }
+
+    // Supprimer l'enregistrement de la base de données
+    await prisma.justificatifDepense.delete({
+      where: { id }
+    });
+
+    revalidatePath("/admin/depenses");
+    revalidatePath(`/admin/depenses/${justificatif.depenseId}/edition`);
+
+    return { success: true, message: "Justificatif supprimé avec succès" };
+
+  } catch (error) {
+    console.error("Erreur lors de la suppression du justificatif:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+/**
+ * Récupère tous les justificatifs d'une dépense
+ * 
+ * @param depenseId - L'identifiant de la dépense
+ * @returns Un objet avec success (boolean), data (justificatifs[]) en cas de succès, ou error (string) en cas d'échec
+ */
+export async function getJustificatifsByDepense(depenseId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const justificatifs = await prisma.justificatifDepense.findMany({
+      where: { depenseId },
+      include: {
+        UploadedBy: {
+          select: {
+            id: true,
+            email: true,
+          }
+        }
+      },
+      orderBy: {
+        createdAt: 'desc'
+      }
+    });
+
+    return { success: true, data: justificatifs };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des justificatifs:", error);
     return { success: false, error: "Erreur interne du serveur" };
   }
 }

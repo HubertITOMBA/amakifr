@@ -27,16 +27,16 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
   }
 
   return (
-    <div className="overflow-x-auto">
+    <div className="overflow-x-auto -mx-4 sm:mx-0">
       <div className="max-h-[70vh] overflow-auto">
-        <table className="w-full">
+        <table className="w-full min-w-[640px]">
           <thead>
             {headers.map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-gray-200 dark:border-gray-700">
                 {headerGroup.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="text-left p-4 font-medium text-gray-500 dark:text-gray-400"
+                    className="text-left px-2 py-2 sm:px-4 sm:py-3 font-medium text-gray-500 dark:text-gray-400 text-xs sm:text-sm"
                   >
                     {header.isPlaceholder ? null : (
                       <SortButton
@@ -71,7 +71,7 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
                 `}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="p-4 text-gray-900 dark:text-gray-100">
+                  <td key={cell.id} className="px-2 py-2 sm:px-4 sm:py-3 text-gray-900 dark:text-gray-100 text-xs sm:text-sm">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

@@ -179,7 +179,9 @@ model User {
   adherent                    Adherent?
   role                        UserRole                     @default(Membre)
   status                      UserStatus                   @default(Inactif)
-  depenses                    Depense[] // Relation avec les dépenses
+  depenses                    Depense[]                    @relation("DepenseCreatedBy") // Relation avec les dépenses
+  typesDepenseCrees           TypeDepense[]                @relation("TypeDepenseCreatedBy") // Types de dépense créés
+  justificatifsUploades       JustificatifDepense[]        @relation("JustificatifUploadedBy") // Justificatifs uploadés
   typesCotisationMensuelle    TypeCotisationMensuelle[] // Types de cotisation créés
   cotisationsMensuelles       CotisationMensuelle[] // Cotisations mensuelles créées
   relancesCotisationMensuelle RelanceCotisationMensuelle[] // Relances créées
@@ -192,6 +194,12 @@ model User {
   messages                    Message[] // Messages envoyés
   postesTemplates             PosteTemplate[] // Postes créés
   messageReactions            MessageReaction[] // Réactions aux messages
+  configurationsFraisAdhesion ConfigurationFraisAdhesion[] @relation("ConfigurationFraisAdhesionCreatedBy") // Configurations de frais d'adhésion créées
+  notifications               Notification[] // Notifications reçues
+  documents                   Document[] // Documents uploadés
+  badgesAttribues             BadgeAttribution[] // Badges attribués à cet utilisateur
+  ressourcesCreees            Ressource[] @relation("RessourceCreatedBy") // Ressources créées
+  reservationsConfirmees      Reservation[] @relation("ReservationConfirmeePar") // Réservations confirmées
 
   lastLogin DateTime? @updatedAt
   createdAt DateTime  @default(now())
@@ -256,6 +264,14 @@ model Adherent {
   accepteCommunications       Boolean                      @default(true) // Acceptation des communications
   nombreEnfants               Int                          @default(0) // Nombre d'enfants
   evenementsFamiliaux         String?                      @db.Text // JSON array des types d'événements familiaux
+  // Champs pour la gestion des frais d'adhésion
+  datePremiereAdhesion        DateTime? // Date de première adhésion à l'association
+  fraisAdhesionPaye           Boolean                      @default(false) // Indique si les frais d'adhésion ont été payés
+  datePaiementFraisAdhesion   DateTime? // Date de paiement des frais d'adhésion
+  estAncienAdherent           Boolean                      @default(false) // Flag pour marquer les anciens adhérents
+  // Champs pour le passeport adhérent
+  numeroPasseport             String?                      @db.VarChar(50) // Numéro unique du passeport AMAKI
+  dateGenerationPasseport     DateTime? // Date de génération du passeport
   Adresse                     Adresse[]
   Cotisations                 Cotisation[]
   Telephones                  Telephone[]
@@ -274,12 +290,28 @@ model Adherent {
   Paiements                   PaiementCotisation[] // Paiements effectués
   Assistances                 Assistance[] // Assistances reçues
   Avoirs                      Avoir[] // Avoirs (excédents de paiement)
+  documents                   Document[]                   @relation("DocumentAdherent") // Documents liés à l'adhérent
+  Reservations                Reservation[] // Réservations effectuées
   created_at                  DateTime?                    @db.Timestamp(0)
   updated_at                  DateTime?                    @db.Timestamp(0)
   userId                      String                       @unique
   User                        User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("adherent")
+}
+
+// Configuration pour les frais d'adhésion
+model ConfigurationFraisAdhesion {
+  id                   String   @id @default(cuid())
+  montantFraisAdhesion Decimal  @db.Decimal(10, 2) // Montant des frais d'adhésion
+  actif                Boolean  @default(true)
+  description          String?  @db.Text
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+  createdBy            String
+  CreatedBy            User     @relation("ConfigurationFraisAdhesionCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@map("configuration_frais_adhesion")
 }
 
 model Adresse {
@@ -361,9 +393,9 @@ model ObligationCotisation {
   createdAt      DateTime       @default(now())
   updatedAt      DateTime       @updatedAt
 
-  Adherent  Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  Relances  Relance[]
-  Paiements PaiementCotisation[] // Paiements liés à cette obligation
+  Adherent          Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  Relances          Relance[]
+  Paiements         PaiementCotisation[] // Paiements liés à cette obligation
   UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette obligation
 
   @@map("obligations_cotisation")
@@ -512,25 +544,64 @@ model Vote {
   @@map("votes")
 }
 
-model Depense {
-  id           String   @id @default(cuid())
-  libelle      String   @db.VarChar(200)
-  montant      Decimal  @db.Decimal(10, 2)
-  dateDepense  DateTime
-  categorie    String   @db.VarChar(100) // ex: "Frais de fonctionnement", "Événements", "Matériel"
-  description  String?  @db.Text
-  justificatif String?  @db.VarChar(500) // URL du fichier uploadé
-  statut       String   @default("EnAttente") // EnAttente, Valide, Rejete
-  createdBy    String // ID de l'admin qui a créé la dépense
+model TypeDepense {
+  id          String   @id @default(cuid())
+  titre       String   @db.VarChar(200)
+  description String?  @db.Text
+  actif       Boolean  @default(true)
+  createdBy   String // ID de l'admin qui a créé le type
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   // Relations
-  CreatedBy User @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  CreatedBy User      @relation("TypeDepenseCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  Depenses  Depense[] // Dépenses de ce type
+
+  @@map("types_depense")
+}
+
+model Depense {
+  id            String   @id @default(cuid())
+  libelle       String   @db.VarChar(200)
+  montant       Decimal  @db.Decimal(10, 2)
+  dateDepense   DateTime
+  typeDepenseId String? // Référence au type de dépense (remplace categorie)
+  categorie     String?  @db.VarChar(100) // Conservé pour compatibilité, sera remplacé par typeDepenseId
+  description   String?  @db.Text
+  justificatif  String?  @db.VarChar(500) // URL du fichier uploadé (conservé pour compatibilité)
+  statut        String   @default("EnAttente") // EnAttente, Valide, Rejete
+  createdBy     String // ID de l'admin qui a créé la dépense
+
+  // Relations
+  CreatedBy     User                  @relation("DepenseCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  TypeDepense   TypeDepense?          @relation(fields: [typeDepenseId], references: [id], onDelete: SetNull)
+  Justificatifs JustificatifDepense[] // Justificatifs de la dépense
 
   // Métadonnées
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   @@map("depenses")
+}
+
+model JustificatifDepense {
+  id         String @id @default(cuid())
+  depenseId  String // Référence à la dépense
+  nomFichier String @db.VarChar(255) // Nom original du fichier
+  chemin     String @db.VarChar(500) // Chemin relatif dans /public/ressources/justificatifs
+  typeMime   String @db.VarChar(100) // Type MIME (application/pdf, image/jpeg, etc.)
+  taille     Int // Taille en octets
+  uploadedBy String // ID de l'admin qui a uploadé le fichier
+
+  // Relations
+  Depense    Depense @relation(fields: [depenseId], references: [id], onDelete: Cascade)
+  UploadedBy User    @relation("JustificatifUploadedBy", fields: [uploadedBy], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("justificatifs_depense")
 }
 
 model TypeCotisationMensuelle {
@@ -570,11 +641,11 @@ model CotisationMensuelle {
   createdBy        String // ID de l'admin qui a créé la cotisation
 
   // Relations
-  TypeCotisation TypeCotisationMensuelle      @relation(fields: [typeCotisationId], references: [id], onDelete: Cascade)
-  Adherent       Adherent                     @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  CreatedBy      User                         @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-  Relances       RelanceCotisationMensuelle[]
-  Paiements      PaiementCotisation[] // Paiements liés à cette cotisation mensuelle
+  TypeCotisation    TypeCotisationMensuelle      @relation(fields: [typeCotisationId], references: [id], onDelete: Cascade)
+  Adherent          Adherent                     @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  CreatedBy         User                         @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  Relances          RelanceCotisationMensuelle[]
+  Paiements         PaiementCotisation[] // Paiements liés à cette cotisation mensuelle
   UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette cotisation
 
   // Métadonnées
@@ -624,9 +695,9 @@ model DetteInitiale {
   createdBy      String // ID de l'admin qui a créé la dette
 
   // Relations
-  Adherent  Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  CreatedBy User                 @relation("DetteInitialeCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
-  Paiements PaiementCotisation[] // Paiements liés à cette dette
+  Adherent          Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  CreatedBy         User                 @relation("DetteInitialeCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  Paiements         PaiementCotisation[] // Paiements liés à cette dette
   UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette dette
 
   @@unique([adherentId, annee])
@@ -670,29 +741,29 @@ model PaiementCotisation {
 
 // Modèle pour les avoirs (excédents de paiement)
 model Avoir {
-  id            String   @id @default(cuid())
-  adherentId   String
-  montant       Decimal  @db.Decimal(10, 2) // Montant de l'avoir
+  id             String  @id @default(cuid())
+  adherentId     String
+  montant        Decimal @db.Decimal(10, 2) // Montant de l'avoir
   montantUtilise Decimal @default(0) @db.Decimal(10, 2) // Montant déjà utilisé
   montantRestant Decimal @db.Decimal(10, 2) // Montant restant disponible
-  
+
   // Origine de l'avoir
-  paiementId    String? @unique // ID du paiement qui a créé cet avoir (si applicable) - unique car un paiement ne peut créer qu'un seul avoir
-  description   String? @db.Text // Description de l'origine de l'avoir
-  
+  paiementId  String? @unique // ID du paiement qui a créé cet avoir (si applicable) - unique car un paiement ne peut créer qu'un seul avoir
+  description String? @db.Text // Description de l'origine de l'avoir
+
   // Utilisation de l'avoir
-  statut        String   @default("Disponible") // Disponible, Utilise, Expire
-  
+  statut String @default("Disponible") // Disponible, Utilise, Expire
+
   // Relations
-  Adherent      Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  Paiement      PaiementCotisation? @relation("AvoirFromPaiement", fields: [paiementId], references: [id], onDelete: SetNull)
-  Utilisations  UtilisationAvoir[] // Utilisations de cet avoir
-  
+  Adherent     Adherent            @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  Paiement     PaiementCotisation? @relation("AvoirFromPaiement", fields: [paiementId], references: [id], onDelete: SetNull)
+  Utilisations UtilisationAvoir[] // Utilisations de cet avoir
+
   // Métadonnées
-  createdAt     DateTime @default(now())
-  updatedAt     DateTime @updatedAt
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
   dateExpiration DateTime? // Date d'expiration de l'avoir (optionnel)
-  
+
   @@index([adherentId])
   @@index([statut])
   @@map("avoirs")
@@ -700,29 +771,29 @@ model Avoir {
 
 // Modèle pour les utilisations d'avoirs
 model UtilisationAvoir {
-  id            String   @id @default(cuid())
-  avoirId       String
-  montant       Decimal  @db.Decimal(10, 2) // Montant utilisé
-  
+  id      String  @id @default(cuid())
+  avoirId String
+  montant Decimal @db.Decimal(10, 2) // Montant utilisé
+
   // Lien vers ce qui a été payé avec cet avoir
   cotisationMensuelleId  String? // Si utilisé pour une cotisation mensuelle
   obligationCotisationId String? // Si utilisé pour une obligation
   detteInitialeId        String? // Si utilisé pour une dette initiale
   assistanceId           String? // Si utilisé pour une assistance
-  
-  description   String?  @db.Text
+
+  description     String?  @db.Text
   dateUtilisation DateTime @default(now())
-  
+
   // Relations
-  Avoir                 Avoir                 @relation(fields: [avoirId], references: [id], onDelete: Cascade)
-  CotisationMensuelle   CotisationMensuelle?  @relation(fields: [cotisationMensuelleId], references: [id], onDelete: SetNull)
-  ObligationCotisation  ObligationCotisation? @relation(fields: [obligationCotisationId], references: [id], onDelete: SetNull)
-  DetteInitiale         DetteInitiale?        @relation(fields: [detteInitialeId], references: [id], onDelete: SetNull)
-  Assistance            Assistance?           @relation(fields: [assistanceId], references: [id], onDelete: SetNull)
-  
+  Avoir                Avoir                 @relation(fields: [avoirId], references: [id], onDelete: Cascade)
+  CotisationMensuelle  CotisationMensuelle?  @relation(fields: [cotisationMensuelleId], references: [id], onDelete: SetNull)
+  ObligationCotisation ObligationCotisation? @relation(fields: [obligationCotisationId], references: [id], onDelete: SetNull)
+  DetteInitiale        DetteInitiale?        @relation(fields: [detteInitialeId], references: [id], onDelete: SetNull)
+  Assistance           Assistance?           @relation(fields: [assistanceId], references: [id], onDelete: SetNull)
+
   // Métadonnées
-  createdAt     DateTime @default(now())
-  
+  createdAt DateTime @default(now())
+
   @@index([avoirId])
   @@map("utilisations_avoir")
 }
@@ -743,9 +814,9 @@ model Assistance {
   createdBy      String // ID de l'admin qui a créé l'assistance
 
   // Relations
-  Adherent  Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  CreatedBy User                 @relation("AssistanceCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
-  Paiements PaiementCotisation[] // Paiements liés à cette assistance
+  Adherent          Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  CreatedBy         User                 @relation("AssistanceCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  Paiements         PaiementCotisation[] // Paiements liés à cette assistance
   UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette assistance
 
   @@map("assistances")
@@ -918,6 +989,26 @@ enum StatutIdee {
   DevenueProjet
 }
 
+enum TypeNotification {
+  Systeme
+  Email
+  Action
+  Cotisation
+  Idee
+  Election
+  Evenement
+  Autre
+}
+
+enum TypeDocument {
+  PDF
+  Image
+  Video
+  Excel
+  Word
+  Autre
+}
+
 // Modèle pour les idées de la boîte à idées
 model Idee {
   id                 String     @id @default(cuid())
@@ -960,6 +1051,52 @@ model Idee {
   @@map("idees")
 }
 
+// Enum pour le type de badge
+enum BadgeType {
+  Automatique
+  Manuel
+}
+
+// Modèle pour les badges
+model Badge {
+  id           String             @id @default(cuid())
+  nom          String             @db.VarChar(255)
+  description  String             @db.Text
+  icone        String             @db.VarChar(100) // Nom de l'icône lucide-react
+  couleur      String             @db.VarChar(50) // Couleur du badge (ex: "blue", "green", "gold")
+  type         BadgeType          @default(Manuel)
+  condition    String?            @db.Text // Condition JSON pour badges automatiques
+  actif        Boolean            @default(true)
+  ordre        Int                @default(0) // Ordre d'affichage
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  Attributions BadgeAttribution[]
+
+  @@index([type])
+  @@index([actif])
+  @@map("badges")
+}
+
+// Modèle pour les attributions de badges aux utilisateurs
+model BadgeAttribution {
+  id          String   @id @default(cuid())
+  badgeId     String
+  userId      String
+  attribuePar String? // ID de l'admin qui a attribué (si manuel)
+  raison      String?  @db.Text // Raison de l'attribution
+  createdAt   DateTime @default(now())
+
+  // Relations
+  Badge Badge @relation(fields: [badgeId], references: [id], onDelete: Cascade)
+  User  User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([badgeId, userId])
+  @@index([userId])
+  @@index([badgeId])
+  @@index([createdAt])
+  @@map("badge_attributions")
+}
+
 // Modèle pour les commentaires sur les idées
 model CommentaireIdee {
   id                String  @id @default(cuid())
@@ -999,4 +1136,138 @@ model ApprobationIdee {
   @@index([ideeId])
   @@index([adherentId])
   @@map("approbations_idee")
+}
+
+// Modèle pour les notifications utilisateur
+model Notification {
+  id        String           @id @default(cuid())
+  userId    String
+  type      TypeNotification @default(Systeme)
+  titre     String           @db.VarChar(255)
+  message   String           @db.Text
+  lien      String?          @db.VarChar(500) // URL optionnelle pour redirection
+  lue       Boolean          @default(false)
+  createdAt DateTime         @default(now())
+  User      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([lue])
+  @@index([createdAt])
+  @@map("notifications")
+}
+
+// Modèle pour les documents uploadés
+model Document {
+  id          String       @id @default(cuid())
+  userId      String
+  adherentId  String? // Optionnel, pour lier à un adhérent spécifique
+  nom         String       @db.VarChar(255) // Nom du fichier stocké
+  nomOriginal String       @db.VarChar(255) // Nom original du fichier
+  type        TypeDocument
+  categorie   String?      @db.VarChar(100) // Catégorie personnalisée
+  chemin      String       @db.VarChar(500) // Chemin relatif dans /public/ressources
+  taille      Int // Taille en bytes
+  mimeType    String       @db.VarChar(100)
+  description String?      @db.Text
+  estPublic   Boolean      @default(false) // Si visible par les admins
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  User        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Adherent    Adherent?    @relation("DocumentAdherent", fields: [adherentId], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([adherentId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("documents")
+}
+
+// Modèles pour le système de réservations et gestion de ressources
+
+enum TypeRessource {
+  Salle
+  Materiel
+  Vehicule
+  Autre
+}
+
+enum StatutReservation {
+  EnAttente
+  Confirmee
+  Annulee
+  Terminee
+}
+
+model Ressource {
+  id          String   @id @default(cuid())
+  nom         String   @db.VarChar(255)
+  type        TypeRessource
+  description String?  @db.Text
+  capacite    Int? // Pour les salles : nombre de places
+  localisation String? @db.VarChar(255) // Adresse ou emplacement
+  image       String?  @db.VarChar(500) // URL de l'image
+  
+  // Configuration
+  actif       Boolean  @default(true)
+  reservable  Boolean  @default(true) // Si la ressource peut être réservée
+  
+  // Horaires de disponibilité (optionnel)
+  horairesOuverture String? @db.Text // JSON : { "lundi": { "debut": "08:00", "fin": "18:00" }, ... }
+  
+  // Tarification (optionnel)
+  tarifHoraire Decimal? @db.Decimal(10, 2)
+  tarifJournalier Decimal? @db.Decimal(10, 2)
+  
+  // Relations
+  reservations Reservation[]
+  
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  createdBy String
+  CreatedBy User     @relation("RessourceCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  
+  @@map("ressources")
+}
+
+model Reservation {
+  id          String   @id @default(cuid())
+  ressourceId String
+  adherentId  String? // Optionnel pour permettre les réservations de visiteurs
+  
+  // Dates et heures
+  dateDebut   DateTime
+  dateFin     DateTime
+  dureeHeures Decimal? @db.Decimal(10, 2) // Durée en heures
+  
+  // Statut
+  statut      StatutReservation @default(EnAttente)
+  
+  // Informations de réservation
+  motif       String?  @db.Text // Raison de la réservation
+  nombrePersonnes Int? // Nombre de personnes (pour les salles)
+  commentaires String? @db.Text
+  
+  // Informations du visiteur (pour les non-adhérents)
+  visiteurNom       String? @db.VarChar(255)
+  visiteurEmail     String? @db.VarChar(255)
+  visiteurTelephone String? @db.VarChar(20)
+  
+  // Confirmation
+  confirmeePar     String? // ID de l'admin qui a confirmé
+  dateConfirmation DateTime?
+  
+  // Relations
+  Ressource Ressource @relation(fields: [ressourceId], references: [id], onDelete: Cascade)
+  Adherent  Adherent? @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  ConfirmeePar User?  @relation("ReservationConfirmeePar", fields: [confirmeePar], references: [id], onDelete: SetNull)
+  
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([ressourceId, dateDebut, dateFin])
+  @@index([adherentId])
+  @@index([statut])
+  @@map("reservations")
 }

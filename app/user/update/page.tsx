@@ -27,6 +27,7 @@ interface AdherentData {
   firstname: string;
   lastname: string;
   dateNaissance?: string;
+  datePremiereAdhesion?: string; // Date de première adhésion à l'association
   typeAdhesion?: string;
   profession?: string;
   centresInteret?: string;
@@ -116,6 +117,7 @@ export default function UpdateUserPage() {
               firstname: adherent.firstname || "",
               lastname: adherent.lastname || "",
               dateNaissance: adherent.dateNaissance ? new Date(adherent.dateNaissance).toISOString().split('T')[0] : "",
+              datePremiereAdhesion: adherent.datePremiereAdhesion ? new Date(adherent.datePremiereAdhesion).toISOString().split('T')[0] : "",
               typeAdhesion: adherent.typeAdhesion || "",
               profession: adherent.profession || "",
               centresInteret: adherent.centresInteret || "",
@@ -292,10 +294,10 @@ export default function UpdateUserPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="container mx-auto px-4 py-8 max-w-5xl">
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-5xl">
         {/* Header */}
-        <div className="mb-8">
-          <div className="flex justify-between items-start mb-6">
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
             <Link 
               href="/user/profile" 
               className="inline-flex items-center text-blue-700 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 font-medium transition-colors"
@@ -344,6 +346,10 @@ export default function UpdateUserPage() {
                   yPos += 6;
                   if (adherentData.dateNaissance) {
                     doc.text(`Date de naissance: ${new Date(adherentData.dateNaissance).toLocaleDateString('fr-FR')}`, 20, yPos);
+                    yPos += 6;
+                  }
+                  if (adherentData.datePremiereAdhesion) {
+                    doc.text(`Date de première adhésion: ${new Date(adherentData.datePremiereAdhesion).toLocaleDateString('fr-FR')}`, 20, yPos);
                     yPos += 6;
                   }
                   doc.text(`E-mail: ${userData.email || 'Non renseigné'}`, 20, yPos);
@@ -555,24 +561,24 @@ export default function UpdateUserPage() {
             </Button>
           </div>
           
-          <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent mb-3">
+          <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent mb-2 sm:mb-3">
             Fiche d'adhésion - Informations complètes
           </h1>
-          <p className="text-gray-700 dark:text-gray-300 text-lg">
+          <p className="text-gray-700 dark:text-gray-300 text-sm sm:text-base lg:text-lg">
             Complétez vos informations personnelles selon la fiche d'adhésion de l'association
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
+        <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {/* Photo de profil */}
           <Card className="!py-0 shadow-xl border-blue-200 dark:border-blue-800">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <User className="h-5 w-5" />
                 Photo de profil
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6 flex justify-center">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6 flex justify-center">
               <PhotoUpload
                 currentImage={userData.image || ""}
                 userName={userData.name || ""}
@@ -584,14 +590,14 @@ export default function UpdateUserPage() {
 
           {/* 1. Informations personnelles */}
           <Card className="!py-0 shadow-xl border-blue-200 dark:border-blue-800">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <User className="h-5 w-5" />
                 1. Informations personnelles
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6 space-y-3 sm:space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <Label htmlFor="civility" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Civilité</Label>
                   <Select
@@ -621,7 +627,7 @@ export default function UpdateUserPage() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                 <div>
                   <Label htmlFor="lastname" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Nom de famille</Label>
                   <Input
@@ -644,7 +650,24 @@ export default function UpdateUserPage() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
+                <div>
+                  <Label htmlFor="datePremiereAdhesion" className="text-sm font-semibold text-gray-700 dark:text-gray-200">
+                    Date de première adhésion
+                    <span className="text-xs text-gray-500 dark:text-gray-400 ml-2 font-normal">(optionnel)</span>
+                  </Label>
+                  <Input
+                    id="datePremiereAdhesion"
+                    type="date"
+                    value={adherentData.datePremiereAdhesion || ""}
+                    onChange={(e) => setAdherentData({ ...adherentData, datePremiereAdhesion: e.target.value })}
+                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    placeholder="Date de votre première adhésion à l'association"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    Si vous êtes un ancien adhérent, renseignez votre date de première adhésion pour ne pas payer les frais d'adhésion.
+                  </p>
+                </div>
                 <div>
                   <Label htmlFor="email" className="text-sm font-semibold text-gray-700 dark:text-gray-200">E-mail</Label>
                   <Input
@@ -662,14 +685,14 @@ export default function UpdateUserPage() {
 
           {/* Adresse */}
           <Card className="!py-0 shadow-xl border-green-200 dark:border-green-800">
-            <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+            <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <MapPin className="h-5 w-5" />
                 Adresse
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6 space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6 space-y-3 sm:space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
                 <div>
                   <Label htmlFor="streetnum" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Numéro de rue</Label>
                   <Input
@@ -702,7 +725,7 @@ export default function UpdateUserPage() {
                 </div>
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
                 <div>
                   <Label htmlFor="codepost" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Code postal</Label>
                   <Input
@@ -739,16 +762,16 @@ export default function UpdateUserPage() {
 
           {/* Téléphones */}
           <Card className="!py-0 shadow-xl border-purple-200 dark:border-purple-800">
-            <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+            <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Phone className="h-5 w-5" />
                 Téléphones
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6 space-y-4">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6 space-y-3 sm:space-y-4">
               {telephonesData.map((telephone, index) => (
-                <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 bg-gray-50 dark:bg-gray-800/50">
-                  <div className="flex justify-between items-center">
+                <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4 bg-gray-50 dark:bg-gray-800/50">
+                  <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
                     <h4 className="font-semibold text-gray-900 dark:text-white">
                       Téléphone {index + 1}
                     </h4>
@@ -776,7 +799,7 @@ export default function UpdateUserPage() {
                     </div>
                   </div>
                   
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3 sm:gap-4">
                     <div>
                       <Label htmlFor={`numero-${index}`} className="text-sm font-semibold text-gray-700 dark:text-gray-200">Numéro</Label>
                       <Input
@@ -832,13 +855,13 @@ export default function UpdateUserPage() {
 
           {/* 2. Type d'adhésion */}
           <Card className="!py-0 shadow-xl border-orange-200 dark:border-orange-800">
-            <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+            <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Building className="h-5 w-5" />
                 2. Type d'adhésion
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6 space-y-4">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6 space-y-3 sm:space-y-4">
               <div>
                 <Label htmlFor="typeAdhesion" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Type d'adhésion</Label>
                 <Select
@@ -860,13 +883,13 @@ export default function UpdateUserPage() {
 
           {/* 3. Informations familiales */}
           <Card className="!py-0 shadow-xl border-pink-200 dark:border-pink-800">
-            <CardHeader className="bg-gradient-to-r from-pink-500 to-pink-600 dark:from-pink-600 dark:to-pink-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+            <CardHeader className="bg-gradient-to-r from-pink-500 to-pink-600 dark:from-pink-600 dark:to-pink-700 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <Users className="h-5 w-5" />
                 3. Informations familiales
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6 space-y-4">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6 space-y-3 sm:space-y-4">
               <div>
                 <Label htmlFor="nombreEnfants" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Nombre d'enfants</Label>
                 <Input
@@ -897,8 +920,8 @@ export default function UpdateUserPage() {
                 <div className="space-y-4">
                   <Label className="text-sm font-semibold text-gray-700 dark:text-gray-200">Enfants (prénoms et dates de naissance / âges)</Label>
                   {enfantsData.map((enfant, index) => (
-                    <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 space-y-4 bg-gray-50 dark:bg-gray-800/50">
-                      <div className="flex justify-between items-center">
+                    <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-lg p-3 sm:p-4 space-y-3 sm:space-y-4 bg-gray-50 dark:bg-gray-800/50">
+                      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sm:gap-0">
                         <h4 className="font-semibold text-gray-900 dark:text-white">
                           Enfant {index + 1}
                         </h4>
@@ -913,7 +936,7 @@ export default function UpdateUserPage() {
                         </Button>
                       </div>
                       
-                      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
                         <div>
                           <Label htmlFor={`enfant-prenom-${index}`} className="text-sm font-semibold text-gray-700 dark:text-gray-200">Prénom</Label>
                           <Input
@@ -1018,7 +1041,7 @@ export default function UpdateUserPage() {
                 4. Informations complémentaires
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6 space-y-4">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6 space-y-3 sm:space-y-4">
               <div>
                 <Label htmlFor="profession" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Profession (optionnel)</Label>
                 <Input
@@ -1051,7 +1074,7 @@ export default function UpdateUserPage() {
                 5. Autorisations
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6 space-y-4">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6 space-y-3 sm:space-y-4">
               <div className="flex items-center space-x-2">
                 <Checkbox
                   id="autorisation-image"
@@ -1077,7 +1100,7 @@ export default function UpdateUserPage() {
 
           {/* Mention RGPD */}
           <Card className="border-2 border-blue-300 dark:border-blue-600 bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-50 dark:from-blue-900/20 dark:via-indigo-900/20 dark:to-blue-900/20 shadow-lg !py-0">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
               <CardTitle className="flex items-center gap-2 text-lg">
                 <div className="p-2 bg-white/20 rounded-lg">
                   <Info className="h-5 w-5" />
@@ -1085,27 +1108,27 @@ export default function UpdateUserPage() {
                 <span>Mention d'information RGPD</span>
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6">
-              <p className="text-sm leading-relaxed text-gray-800 dark:text-gray-200">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
+              <p className="text-xs sm:text-sm leading-relaxed text-gray-800 dark:text-gray-200">
                 Les informations recueillies sur ce formulaire sont enregistrées par l'association afin de gérer les adhésions et d'assurer l'assistance prévue dans les statuts, notamment lors des événements familiaux (naissance, mariage d'un enfant, décès, anniversaire). Les données collectées sont limitées à ce qui est strictement nécessaire. Elles sont destinées exclusivement aux membres du bureau de l'association et ne seront jamais transmises à des tiers sans votre accord. Vous pouvez exercer votre droit d'accès, de rectification ou de suppression de vos données en contactant l'association.
               </p>
             </CardContent>
           </Card>
 
           {/* Boutons d'action */}
-          <div className="flex justify-end gap-4 pt-4">
+          <div className="flex flex-col sm:flex-row justify-end gap-3 sm:gap-4 pt-4">
             <Button
               type="button"
               variant="outline"
               onClick={() => router.push("/user/profile")}
-              className="px-6"
+              className="w-full sm:w-auto px-6"
             >
               Annuler
             </Button>
             <Button
               type="submit"
               disabled={saving}
-              className="flex items-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg px-6"
+              className="w-full sm:w-auto flex items-center justify-center gap-2 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg px-6"
             >
               <Save className="h-4 w-4" />
               {saving ? "Sauvegarde..." : "Sauvegarder"}

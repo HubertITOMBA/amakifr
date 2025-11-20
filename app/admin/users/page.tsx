@@ -128,12 +128,22 @@ export default function AdminUsersPage() {
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   
   // Visibilité des colonnes - charger depuis localStorage
+  // Sur mobile, masquer certaines colonnes par défaut pour améliorer la lisibilité
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("admin-users-column-visibility");
         if (saved) {
           return JSON.parse(saved);
+        }
+        // Par défaut sur mobile, masquer email, date inscription et dernière connexion
+        const isMobile = window.innerWidth < 640;
+        if (isMobile) {
+          return {
+            email: false,
+            createdAt: false,
+            lastLogin: false,
+          };
         }
       } catch (error) {
         console.error("Erreur lors du chargement des préférences de colonnes:", error);
@@ -245,7 +255,7 @@ export default function AdminUsersPage() {
           ? `${user.adherent.civility || ''} ${user.adherent.firstname || ''} ${user.adherent.lastname || ''}`.trim()
           : user.name || "Sans nom";
         return (
-          <div className="font-medium text-gray-900 dark:text-gray-100">
+          <div className="font-medium text-gray-900 dark:text-gray-100 text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">
             {fullName}
           </div>
         );
@@ -254,7 +264,7 @@ export default function AdminUsersPage() {
     columnHelper.accessor("email", {
       header: "Email",
       cell: ({ row }) => (
-        <div className="text-sm text-gray-600 dark:text-gray-300">
+        <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 truncate max-w-[150px] sm:max-w-none">
           {row.original.email || "—"}
         </div>
       ),
@@ -286,8 +296,8 @@ export default function AdminUsersPage() {
       cell: ({ row }) => {
         const date = new Date(row.getValue("createdAt"));
         return (
-          <span className="text-sm text-gray-600 dark:text-gray-300">
-            {date.toLocaleDateString("fr-FR")}
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+            {date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
           </span>
         );
       },
@@ -296,11 +306,11 @@ export default function AdminUsersPage() {
       header: "Dernière connexion",
       cell: ({ row }) => {
         const lastLogin = row.getValue("lastLogin") as string | null;
-        if (!lastLogin) return <span className="text-sm text-gray-400">Jamais</span>;
+        if (!lastLogin) return <span className="text-xs sm:text-sm text-gray-400">Jamais</span>;
         const date = new Date(lastLogin);
         return (
-          <span className="text-sm text-gray-600 dark:text-gray-300">
-            {date.toLocaleDateString("fr-FR")}
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
+            {date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
           </span>
         );
       },
@@ -312,22 +322,22 @@ export default function AdminUsersPage() {
       cell: ({ row }) => {
         const user = row.original;
         return (
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
             <Link href={`/admin/users/${user.id}/consultation`}>
-              <Button size="sm" variant="outline" title="Voir">
-                <Eye className="h-4 w-4" />
+              <Button size="sm" variant="outline" title="Voir" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
             </Link>
             <Link href={`/admin/users/${user.id}/edition`}>
-              <Button size="sm" variant="outline" title="Éditer">
-                <Edit className="h-4 w-4" />
+              <Button size="sm" variant="outline" title="Éditer" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+                <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
             </Link>
             <Select 
               value={user.role} 
               onValueChange={(value) => handleRoleChange(user.id, value as UserRole)}
             >
-              <SelectTrigger className="w-28 h-8 text-xs">
+              <SelectTrigger className="w-24 sm:w-28 h-7 sm:h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -340,7 +350,7 @@ export default function AdminUsersPage() {
               value={user.status} 
               onValueChange={(value) => handleStatusChange(user.id, value as UserStatus)}
             >
-              <SelectTrigger className="w-28 h-8 text-xs">
+              <SelectTrigger className="w-20 sm:w-28 h-7 sm:h-8 text-xs">
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
@@ -400,30 +410,30 @@ export default function AdminUsersPage() {
   }, [users]);
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
             Gestion des Adhérents
           </h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">
+          <p className="text-gray-600 dark:text-gray-300 mt-1 sm:mt-2 text-sm sm:text-base">
             Gérez les membres de l'association
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
           {selectedUserIds.length > 0 && (
             <Button 
               variant="default" 
-              className="flex items-center space-x-2"
+              className="w-full sm:w-auto flex items-center justify-center space-x-2"
               onClick={() => setIsEmailModalOpen(true)}
             >
               <Mail className="h-4 w-4" />
               <span>Envoyer un email ({selectedUserIds.length})</span>
             </Button>
           )}
-          <Link href="/admin/users/gestion">
-            <Button className="flex items-center space-x-2">
+          <Link href="/admin/users/gestion" className="w-full sm:w-auto">
+            <Button className="w-full sm:w-auto flex items-center justify-center space-x-2">
               <Plus className="h-4 w-4" />
               <span>Ajouter un adhérent</span>
             </Button>
@@ -432,58 +442,58 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Stats Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+        <Card className="!py-0 border-2 border-blue-200 dark:border-blue-800/50 bg-white dark:bg-gray-900">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4 sm:px-6 bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 rounded-t-lg">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200">
               Total Adhérents
             </CardTitle>
-            <Users className="h-4 w-4 text-gray-400" />
+            <Users className="h-4 w-4 text-blue-500 dark:text-blue-400" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400">
               {stats.total}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
+        <Card className="!py-0 border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4 sm:px-6 bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 rounded-t-lg">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200">
               Adhérents Actifs
             </CardTitle>
-            <UserCheck className="h-4 w-4 text-gray-400" />
+            <UserCheck className="h-4 w-4 text-emerald-500 dark:text-emerald-400" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">
               {stats.actifs}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
+        <Card className="!py-0 border-2 border-purple-200 dark:border-purple-800/50 bg-white dark:bg-gray-900">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4 sm:px-6 bg-gradient-to-r from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-800/20 rounded-t-lg">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200">
               Administrateurs
             </CardTitle>
-            <Shield className="h-4 w-4 text-gray-400" />
+            <Shield className="h-4 w-4 text-purple-500 dark:text-purple-400" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400">
               {stats.admins}
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-gray-600 dark:text-gray-300">
+        <Card className="!py-0 border-2 border-pink-200 dark:border-pink-800/50 bg-white dark:bg-gray-900">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4 sm:px-6 bg-gradient-to-r from-pink-100 to-pink-50 dark:from-pink-900/30 dark:to-pink-800/20 rounded-t-lg">
+            <CardTitle className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200">
               Nouveaux ce mois
             </CardTitle>
-            <Users className="h-4 w-4 text-gray-400" />
+            <Users className="h-4 w-4 text-pink-500 dark:text-pink-400" />
           </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-gray-900 dark:text-white">
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="text-xl sm:text-2xl font-bold text-pink-600 dark:text-pink-400">
               {stats.ceMois}
             </div>
           </CardContent>
@@ -491,11 +501,11 @@ export default function AdminUsersPage() {
       </div>
 
       {/* Table */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <Users className="h-5 w-5" />
+      <Card className="!py-0 border-2 border-slate-200 dark:border-slate-800/50 bg-white dark:bg-gray-900">
+        <CardHeader className="pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900/30 dark:to-slate-800/20 rounded-t-lg">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
+            <CardTitle className="flex items-center gap-2 text-lg sm:text-xl text-gray-700 dark:text-gray-200">
+              <Users className="h-5 w-5 text-slate-500 dark:text-slate-400" />
               Liste des Adhérents
             </CardTitle>
             <ColumnVisibilityToggle 
@@ -504,9 +514,9 @@ export default function AdminUsersPage() {
             />
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
           {/* Filtres */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -548,7 +558,7 @@ export default function AdminUsersPage() {
               <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
                 {filteredUsers.length} adhérent(s) trouvé(s)
               </div>
-              <DataTable table={table} emptyMessage="Aucun adhérent trouvé" />
+              <DataTable table={table} emptyMessage="Aucun adhérent trouvé" compact={true} />
             </>
           )}
         </CardContent>

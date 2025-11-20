@@ -559,19 +559,19 @@ export default function AdminIdeesPage() {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Lightbulb className="h-8 w-8 text-blue-600" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Lightbulb className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
             Gestion des Idées
           </h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">
+          <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mt-1 sm:mt-2">
             Gérez toutes les idées soumises par les adhérents
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
           <ColumnVisibilityToggle 
             table={table} 
             storageKey="admin-idees-column-visibility"
@@ -580,9 +580,9 @@ export default function AdminIdeesPage() {
       </div>
 
       {/* Filtres */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-4">
+      <Card className="!py-0 border-2 border-slate-200 dark:border-slate-800/50 bg-white dark:bg-gray-900">
+        <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -609,13 +609,14 @@ export default function AdminIdeesPage() {
       </Card>
 
       {/* Table */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between">
-            <span>Liste des idées ({filteredData.length})</span>
+      <Card className="!py-0 border-2 border-amber-200 dark:border-amber-800/50 bg-white dark:bg-gray-900">
+        <CardHeader className="pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 bg-gradient-to-r from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/20 rounded-t-lg">
+          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl text-gray-700 dark:text-gray-200 font-bold">
+            <Lightbulb className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+            Liste des idées ({filteredData.length})
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
           {filteredData.length === 0 ? (
             <div className="py-12 text-center">
               <Lightbulb className="h-16 w-16 text-gray-400 mx-auto mb-4" />
@@ -633,12 +634,12 @@ export default function AdminIdeesPage() {
               <DataTable table={table} emptyMessage="Aucune idée trouvée" compact={true} />
               
               {/* Pagination */}
-              <div className="bg-white dark:bg-gray-800 mt-5 flex items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
-                <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+              <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
+                <div className="flex-1 text-xs sm:text-sm text-muted-foreground dark:text-gray-400 text-center sm:text-left">
                   {table.getFilteredRowModel().rows.length} ligne(s) au total
                 </div>
 
-                <div className="flex items-center space-x-6 lg:space-x-8">
+                <div className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8 w-full sm:w-auto justify-center sm:justify-end">
                   <div className="flex items-center space-x-2">
                     <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
                     <Select

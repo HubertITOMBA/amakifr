@@ -254,39 +254,42 @@ export default function AdminRelancesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-orange-50 via-white to-orange-50">
-      <Card className="mx-auto max-w-7xl shadow-lg border-orange-200 dark:border-orange-700/50 bg-white dark:bg-gray-900 !py-0">
-        <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 text-white pb-4 pt-4 px-6 gap-0">
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5" />
-              Relances ({filteredData.length})
-            </CardTitle>
-            <div className="flex items-center gap-2">
-              <ColumnVisibilityToggle 
-                table={table} 
-                storageKey="admin-relances-column-visibility"
-              />
-              <Button 
-                className="bg-white text-orange-600 hover:bg-orange-50"
-                onClick={handleCheckRelances}
-                disabled={processing}
-              >
-                {processing ? (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                    Vérification...
-                  </>
-                ) : (
-                  <>
-                    <RefreshCw className="h-4 w-4 mr-2" />
-                    Vérifier les relances
-                  </>
-                )}
-              </Button>
+      <div className="p-4 sm:p-6">
+        <Card className="mx-auto max-w-7xl shadow-lg border-2 border-amber-200 dark:border-amber-800/50 bg-white dark:bg-gray-900 !py-0">
+          <CardHeader className="bg-gradient-to-r from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/20 pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+            <div className="flex flex-col gap-3 sm:gap-0">
+              <div className="flex items-center justify-between">
+                <CardTitle className="flex items-center gap-2 text-lg sm:text-xl text-gray-700 dark:text-gray-200 font-bold">
+                  <AlertCircle className="h-5 w-5 text-amber-500 dark:text-amber-400" />
+                  Relances ({filteredData.length})
+                </CardTitle>
+                <ColumnVisibilityToggle 
+                  table={table} 
+                  storageKey="admin-relances-column-visibility"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  className="bg-white text-orange-600 hover:bg-orange-50 dark:bg-gray-800 dark:text-orange-400 dark:hover:bg-orange-900/20 w-full sm:w-auto"
+                  onClick={handleCheckRelances}
+                  disabled={processing}
+                >
+                  {processing ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
+                      Vérification...
+                    </>
+                  ) : (
+                    <>
+                      <RefreshCw className="h-4 w-4 mr-2" />
+                      Vérifier les relances
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-0 px-6 pb-6">
+          </CardHeader>
+          <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
           {/* Filtres et recherche */}
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
             <div className="relative flex-1">
@@ -406,6 +409,7 @@ export default function AdminRelancesPage() {
           )}
         </CardContent>
       </Card>
+      </div>
     </div>
   );
 }

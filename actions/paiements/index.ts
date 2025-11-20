@@ -204,7 +204,7 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
           where: { id: validatedData.cotisationMensuelleId },
           data: {
             montantPaye: nouveauMontantPaye,
-            montantRestant: nouveauMontantRestant.max(0),
+            montantRestant: nouveauMontantRestant.gt(0) ? nouveauMontantRestant : new Decimal(0),
             statut: nouveauStatut,
           },
         });
@@ -233,7 +233,7 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
           where: { id: validatedData.detteInitialeId },
           data: {
             montantPaye: nouveauMontantPaye,
-            montantRestant: nouveauMontantRestant.max(0),
+            montantRestant: nouveauMontantRestant.gt(0) ? nouveauMontantRestant : new Decimal(0),
           },
         });
 
@@ -262,7 +262,7 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
           where: { id: validatedData.assistanceId },
           data: {
             montantPaye: nouveauMontantPaye,
-            montantRestant: nouveauMontantRestant.max(0),
+            montantRestant: nouveauMontantRestant.gt(0) ? nouveauMontantRestant : new Decimal(0),
             statut: nouveauStatut,
           },
         });
@@ -293,7 +293,7 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
           where: { id: validatedData.obligationCotisationId },
           data: {
             montantPaye: nouveauMontantPaye,
-            montantRestant: nouveauMontantRestant.max(0),
+            montantRestant: nouveauMontantRestant.gt(0) ? nouveauMontantRestant : new Decimal(0),
             statut: nouveauStatut,
           },
         });
@@ -339,19 +339,68 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
       message += `. Un avoir de ${montantRestantAPayer.toFixed(2)}€ a été créé pour l'excédent.`;
     }
 
+    // Récupérer le paiement avec toutes ses relations pour convertir les Decimal
+    const paiementWithRelations = await prisma.paiementCotisation.findUnique({
+      where: { id: paiement.id },
+      include: {
+        CotisationMensuelle: true,
+        DetteInitiale: true,
+        Assistance: true,
+        ObligationCotisation: true,
+      },
+    });
+
+    // Construire l'objet de retour en convertissant tous les Decimal
+    const responseData: any = {
+      id: paiement.id,
+      adherentId: paiement.adherentId,
+      montant: Number(paiement.montant),
+      datePaiement: paiement.datePaiement,
+      moyenPaiement: paiement.moyenPaiement,
+      reference: paiement.reference,
+      description: paiement.description,
+      cotisationMensuelleId: paiement.cotisationMensuelleId,
+      detteInitialeId: paiement.detteInitialeId,
+      assistanceId: paiement.assistanceId,
+      obligationCotisationId: paiement.obligationCotisationId,
+      createdAt: paiement.createdAt,
+      updatedAt: paiement.updatedAt,
+      CotisationMensuelle: paiementWithRelations?.CotisationMensuelle ? {
+        ...paiementWithRelations.CotisationMensuelle,
+        montantAttendu: Number(paiementWithRelations.CotisationMensuelle.montantAttendu),
+        montantPaye: Number(paiementWithRelations.CotisationMensuelle.montantPaye),
+        montantRestant: Number(paiementWithRelations.CotisationMensuelle.montantRestant),
+      } : null,
+      DetteInitiale: paiementWithRelations?.DetteInitiale ? {
+        ...paiementWithRelations.DetteInitiale,
+        montant: Number(paiementWithRelations.DetteInitiale.montant),
+        montantPaye: Number(paiementWithRelations.DetteInitiale.montantPaye),
+        montantRestant: Number(paiementWithRelations.DetteInitiale.montantRestant),
+      } : null,
+      Assistance: paiementWithRelations?.Assistance ? {
+        ...paiementWithRelations.Assistance,
+        montant: Number(paiementWithRelations.Assistance.montant),
+        montantPaye: Number(paiementWithRelations.Assistance.montantPaye),
+        montantRestant: Number(paiementWithRelations.Assistance.montantRestant),
+      } : null,
+      ObligationCotisation: paiementWithRelations?.ObligationCotisation ? {
+        ...paiementWithRelations.ObligationCotisation,
+        montantAttendu: Number(paiementWithRelations.ObligationCotisation.montantAttendu),
+        montantPaye: Number(paiementWithRelations.ObligationCotisation.montantPaye),
+        montantRestant: Number(paiementWithRelations.ObligationCotisation.montantRestant),
+      } : null,
+      avoir: avoirCree ? {
+        ...avoirCree,
+        montant: Number(avoirCree.montant),
+        montantUtilise: Number(avoirCree.montantUtilise),
+        montantRestant: Number(avoirCree.montantRestant),
+      } : null,
+    };
+
     return {
       success: true,
       message,
-      data: {
-        ...paiement,
-        montant: Number(paiement.montant),
-        avoir: avoirCree ? {
-          ...avoirCree,
-          montant: Number(avoirCree.montant),
-          montantUtilise: Number(avoirCree.montantUtilise),
-          montantRestant: Number(avoirCree.montantRestant),
-        } : null,
-      },
+      data: responseData,
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -434,7 +483,7 @@ export async function getCumulDette(adherentId: string) {
     });
 
     // Dette nette = dette totale - avoirs disponibles
-    const detteNette = totalDette.minus(totalAvoirs).max(0);
+    const detteNette = totalDette.minus(totalAvoirs).gt(0) ? totalDette.minus(totalAvoirs) : new Decimal(0);
 
     return {
       success: true,
@@ -517,6 +566,14 @@ export async function createAssistance(data: z.infer<typeof CreateAssistanceSche
       },
     });
 
+    // Revalider les pages des adhérents et de gestion
+    // Lors de la création d'une assistance, tous les profils d'adhérents sont mis à jour
+    // (sauf celui de l'admin qui n'a pas de cotisations)
+    revalidatePath("/user/profile");
+    revalidatePath("/admin/finances/assistances");
+    revalidatePath("/admin/cotisations");
+    revalidatePath("/admin/cotisations/gestion");
+
     return {
       success: true,
       message: `Assistance de ${validatedData.montant}€ créée pour ${validatedData.type}`,
@@ -534,7 +591,11 @@ export async function createAssistance(data: z.infer<typeof CreateAssistanceSche
     console.error("Erreur lors de la création de l'assistance:", error);
     return { success: false, error: "Erreur lors de la création de l'assistance" };
   } finally {
-    revalidatePath("/admin");
+    // Revalider même en cas d'erreur partielle
+    revalidatePath("/user/profile");
+    revalidatePath("/admin/finances/assistances");
+    revalidatePath("/admin/cotisations");
+    revalidatePath("/admin/cotisations/gestion");
   }
 }
 
@@ -723,6 +784,30 @@ export async function getAllPaiements() {
       data: paiements.map((p) => ({
         ...p,
         montant: Number(p.montant),
+        CotisationMensuelle: p.CotisationMensuelle ? {
+          ...p.CotisationMensuelle,
+          montantAttendu: Number(p.CotisationMensuelle.montantAttendu),
+          montantPaye: Number(p.CotisationMensuelle.montantPaye),
+          montantRestant: Number(p.CotisationMensuelle.montantRestant),
+        } : null,
+        DetteInitiale: p.DetteInitiale ? {
+          ...p.DetteInitiale,
+          montant: Number(p.DetteInitiale.montant),
+          montantPaye: Number(p.DetteInitiale.montantPaye),
+          montantRestant: Number(p.DetteInitiale.montantRestant),
+        } : null,
+        Assistance: p.Assistance ? {
+          ...p.Assistance,
+          montant: Number(p.Assistance.montant),
+          montantPaye: Number(p.Assistance.montantPaye),
+          montantRestant: Number(p.Assistance.montantRestant),
+        } : null,
+        ObligationCotisation: p.ObligationCotisation ? {
+          ...p.ObligationCotisation,
+          montantAttendu: Number(p.ObligationCotisation.montantAttendu),
+          montantPaye: Number(p.ObligationCotisation.montantPaye),
+          montantRestant: Number(p.ObligationCotisation.montantRestant),
+        } : null,
       })),
     };
   } catch (error) {

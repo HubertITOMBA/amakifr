@@ -26,7 +26,7 @@ function getEmailHeader(): string {
     <!-- En-tête avec logo et fond bleu -->
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #093DB5; margin: 0;">
       <tr>
-        <td align="left" style="padding: 20px 30px; vertical-align: middle;">
+        <td align="left" style="padding: 15px 20px; vertical-align: middle;">
           <table cellpadding="0" cellspacing="0" border="0">
             <tr>
               <td align="left" style="vertical-align: middle; padding-right: 12px;">
@@ -41,7 +41,7 @@ function getEmailHeader(): string {
               </td>
               <td align="left" style="vertical-align: middle;">
                 <span style="color: #ffffff; font-size: 22px; font-weight: bold; text-shadow: 1px 1px 3px rgba(0,0,0,0.3); font-family: Arial, sans-serif; line-height: 50px;">
-                  <span style="color: #FF6B6B;">A</span>MAKI France
+                  AMA<span style="color: #FF6B6B;">K</span>I France
                 </span>
               </td>
             </tr>
@@ -58,8 +58,8 @@ function getEmailFooter(): string {
     <!-- Pied de page avec couleur de l'en-tête -->
     <table width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color: #093DB5; margin: 0;">
       <tr>
-        <td style="padding: 10px 30px; text-align: center;">
-          <p style="margin: 0; color: #ffffff; font-size: 12px; font-family: Arial, sans-serif;">© ${new Date().getFullYear()} AMAKI France - Tous droits réservés</p>
+        <td style="padding: 8px 20px; text-align: center;">
+          <p style="margin: 0; color: #ffffff; font-size: 11px; font-family: Arial, sans-serif;">© ${new Date().getFullYear()} AMAKI France - Tous droits réservés</p>
         </td>
       </tr>
     </table>
@@ -80,7 +80,7 @@ function wrapEmailContent(content: string): string {
           ${getEmailHeader()}
           
           <!-- Contenu principal -->
-          <div style="padding: 30px;">
+          <div style="padding: 20px;">
             ${content}
           </div>
           
@@ -96,14 +96,14 @@ export const sendTwoFactorTokenEmail = async(
 ) => {
     const content = `
       <div style="text-align: center;">
-        <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Authentification à deux facteurs</h1>
-        <p style="color: #666; margin-bottom: 20px;">Veuillez copier votre code OTP ci-dessous :</p>
-        <div style="display: inline-block; margin: 20px 0;">
-          <div style="background-color: #4a90e2; color: #ffffff; padding: 15px 30px; border-radius: 5px; font-size: 24px; font-weight: bold; letter-spacing: 3px;">
+        <h1 style="color: #4a90e2; margin-bottom: 12px; margin-top: 0; font-size: 20px;">Authentification à deux facteurs</h1>
+        <p style="color: #666; margin-bottom: 12px; font-size: 14px;">Veuillez copier votre code OTP ci-dessous :</p>
+        <div style="display: inline-block; margin: 12px 0;">
+          <div style="background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; font-size: 22px; font-weight: bold; letter-spacing: 3px;">
             ${token}
           </div>
         </div>
-        <p style="color: #999; font-size: 12px; margin-top: 20px;">
+        <p style="color: #999; font-size: 11px; margin-top: 12px;">
           Ce code est valide pendant 5 minutes. Ne le partagez avec personne.
         </p>
       </div>
@@ -130,18 +130,18 @@ export const sendPasswordResetToken = async(
 
   const content = `
     <div style="text-align: center;">
-      <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Réinitialisation de votre mot de passe</h1>
-      <p style="color: #666; margin-bottom: 30px;">Veuillez cliquer sur le bouton ci-dessous pour réinitialiser votre mot de passe :</p>
-      <div style="margin: 30px 0;">
-        <a href="${resetLink}" style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 30px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px;">
+      <h1 style="color: #4a90e2; margin-bottom: 12px; margin-top: 0; font-size: 20px;">Réinitialisation de votre mot de passe</h1>
+      <p style="color: #666; margin-bottom: 16px; font-size: 14px;">Veuillez cliquer sur le bouton ci-dessous pour réinitialiser votre mot de passe :</p>
+      <div style="margin: 16px 0;">
+        <a href="${resetLink}" style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 10px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 14px;">
           Réinitialiser votre mot de passe
         </a>
       </div>
-      <p style="color: #999; font-size: 12px; margin-top: 30px;">
+      <p style="color: #999; font-size: 11px; margin-top: 16px;">
         Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.<br />
         Ce lien est valide pendant 1 heure.
       </p>
-      <p style="color: #666; font-size: 12px; margin-top: 15px; word-break: break-all;">
+      <p style="color: #666; font-size: 11px; margin-top: 12px; word-break: break-all;">
         Ou copiez ce lien dans votre navigateur :<br />
         <a href="${resetLink}" style="color: #4a90e2; text-decoration: underline;">${resetLink}</a>
       </p>
@@ -166,27 +166,27 @@ export const sendContactEmail = async(
 ) => {
   const content = `
     <div>
-      <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Nouveau message de contact</h1>
+      <h1 style="color: #4a90e2; margin-bottom: 12px; margin-top: 0; font-size: 20px;">Nouveau message de contact</h1>
       
-      <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
-        <h2 style="color: #333; margin-top: 0; font-size: 18px;">${goal}</h2>
+      <div style="background-color: #f0f7ff; padding: 12px; border-radius: 5px; margin-bottom: 12px; border-left: 4px solid #4a90e2;">
+        <h2 style="color: #333; margin-top: 0; font-size: 16px;">${goal}</h2>
       </div>
       
-      <div style="margin-bottom: 20px;">
-        <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 10px;">Informations du contact</h3>
-        <p style="margin: 10px 0;"><strong>Nom :</strong> ${name}</p>
-        <p style="margin: 10px 0;"><strong>Email :</strong> <a href="mailto:${email}" style="color: #4a90e2;">${email}</a></p>
-        <p style="margin: 10px 0;"><strong>Téléphone :</strong> <a href="tel:${phone}" style="color: #4a90e2;">${phone}</a></p>
+      <div style="margin-bottom: 12px;">
+        <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 8px; font-size: 15px; margin-bottom: 8px;">Informations du contact</h3>
+        <p style="margin: 6px 0; font-size: 14px;"><strong>Nom :</strong> ${name}</p>
+        <p style="margin: 6px 0; font-size: 14px;"><strong>Email :</strong> <a href="mailto:${email}" style="color: #4a90e2;">${email}</a></p>
+        <p style="margin: 6px 0; font-size: 14px;"><strong>Téléphone :</strong> <a href="tel:${phone}" style="color: #4a90e2;">${phone}</a></p>
       </div>
       
-      <div style="margin-bottom: 20px;">
-        <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 10px;">Message</h3>
-        <div style="background-color: #f9f9f9; padding: 15px; border-radius: 5px; white-space: pre-wrap; color: #666;">
+      <div style="margin-bottom: 12px;">
+        <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 8px; font-size: 15px; margin-bottom: 8px;">Message</h3>
+        <div style="background-color: #f9f9f9; padding: 12px; border-radius: 5px; white-space: pre-wrap; color: #666; font-size: 14px;">
 ${message}
         </div>
       </div>
       
-      <p style="color: #666; font-size: 14px; margin-top: 20px;">
+      <p style="color: #666; font-size: 13px; margin-top: 12px;">
         Vous pouvez répondre directement à cet email ou contacter ${name} à <a href="mailto:${email}" style="color: #4a90e2;">${email}</a> ou au <a href="tel:${phone}" style="color: #4a90e2;">${phone}</a>.
       </p>
     </div>
@@ -354,24 +354,24 @@ export const sendUserStatusEmail = async(
   const config = statusConfig[status] || statusConfig["Inactif"];
 
   const content = `
-    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Mise à jour de votre compte</h1>
+    <h1 style="color: #4a90e2; margin-bottom: 12px; margin-top: 0; font-size: 20px;">Mise à jour de votre compte</h1>
   
-    <div style="background-color: ${config.bgColor}; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid ${config.color};">
-      <h2 style="color: #333; margin-top: 0;">${config.message}</h2>
-      <p style="color: #666; margin: 10px 0;">${config.details}</p>
+    <div style="background-color: ${config.bgColor}; padding: 12px; border-radius: 5px; margin-bottom: 12px; border-left: 4px solid ${config.color};">
+      <h2 style="color: #333; margin-top: 0; font-size: 16px;">${config.message}</h2>
+      <p style="color: #666; margin: 8px 0; font-size: 14px;">${config.details}</p>
     </div>
     
-    <div style="margin-bottom: 20px;">
-      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 10px;">Informations de votre compte</h3>
-      <p style="margin: 10px 0;"><strong>Utilisateur :</strong> ${userName}</p>
-      <p style="margin: 10px 0;"><strong>Statut :</strong> <span style="color: ${config.color}; font-weight: bold;">${status}</span></p>
+    <div style="margin-bottom: 12px;">
+      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 8px; font-size: 15px; margin-bottom: 8px;">Informations de votre compte</h3>
+      <p style="margin: 6px 0; font-size: 14px;"><strong>Utilisateur :</strong> ${userName}</p>
+      <p style="margin: 6px 0; font-size: 14px;"><strong>Statut :</strong> <span style="color: ${config.color}; font-weight: bold;">${status}</span></p>
     </div>
     
-    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+    <p style="margin-top: 16px; color: #666; font-size: 13px;">
       Pour toute question, n'hésitez pas à nous contacter.
     </p>
     
-    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+    <p style="margin-top: 12px; color: #999; font-size: 11px; border-top: 1px solid #eee; padding-top: 12px;">
       Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
     </p>
   `;
@@ -696,7 +696,7 @@ export const sendIdeeValidationEmail = async(
          target="_blank" 
          rel="noopener noreferrer"
          style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px;">
-        Voir ma idée
+        Voir ma boîte à idées
       </a>
     </div>
     
@@ -983,6 +983,81 @@ export const sendUserRegistrationThankYouEmail = async(
     to: email,
     subject: 'Bienvenue sur le portail AMAKI France !',
     html: wrapEmailContent(content)
+  });
+
+  if (error) {
+    console.log("RESEND_ERROR", error);
+    throw error;
+  }
+}
+
+/**
+ * Envoyer le passeport adhérent par email avec le PDF en pièce jointe
+ * 
+ * @param email - L'email de l'adhérent
+ * @param userName - Le nom de l'adhérent
+ * @param pdfBuffer - Le buffer du PDF du passeport
+ * @param numeroPasseport - Le numéro du passeport
+ */
+export const sendPasseportEmail = async(
+  email: string,
+  userName: string,
+  pdfBuffer: Buffer,
+  numeroPasseport: string
+) => {
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Votre passeport AMAKI est prêt !</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${userName},</p>
+      <p style="margin: 10px 0; color: #666;">Votre compte a été validé par l'administration. Votre passeport AMAKI est maintenant disponible !</p>
+    </div>
+    
+    <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+      <h2 style="color: #333; margin-top: 0;">🎉 Félicitations !</h2>
+      <p style="color: #666; margin: 10px 0;">Votre passeport AMAKI a été généré avec succès.</p>
+      <p style="color: #666; margin: 10px 0;"><strong>Numéro de passeport :</strong> ${numeroPasseport}</p>
+    </div>
+    
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <h3 style="color: #333; margin-top: 0; font-size: 18px;">📄 Votre passeport</h3>
+      <p style="color: #666; margin: 10px 0;">Votre passeport AMAKI est disponible en pièce jointe de cet email. Vous pouvez également le télécharger depuis votre profil à tout moment.</p>
+    </div>
+    
+    <div style="margin-bottom: 20px; text-align: center;">
+      <a 
+        href="${domain}/user/profile" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 10px;">
+        Accéder à mon profil
+      </a>
+    </div>
+    
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+      <p style="margin: 0; color: #856404;"><strong>💡 Astuce :</strong> Conservez ce passeport précieusement. Il atteste de votre adhésion à l'association AMAKI France.</p>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Pour toute question, n'hésitez pas à nous contacter à <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>.
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  const { error } = await resend.emails.send({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: `Votre passeport AMAKI - ${numeroPasseport}`,
+    html: wrapEmailContent(content),
+    attachments: [
+      {
+        filename: `Passeport-AMAKI-${numeroPasseport}.pdf`,
+        content: pdfBuffer.toString('base64'),
+      },
+    ],
   });
 
   if (error) {

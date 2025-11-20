@@ -31,30 +31,30 @@ export async function addPDFHeader(doc: any, title?: string): Promise<void> {
   const pageWidth = doc.internal.pageSize.getWidth();
   
   // Fond bleu pour l'en-tête (#093DB5 = RGB(9, 61, 181))
-  // Augmenter la hauteur de l'en-tête si un titre est fourni pour avoir plus d'espace
-  const headerHeight = title ? 60 : 50;
+  // Hauteur réduite de l'en-tête avec padding réduit
+  const headerHeight = title ? 45 : 40;
   doc.setFillColor(9, 61, 181);
   doc.rect(0, 0, pageWidth, headerHeight, 'F');
   
-  // Logo (si disponible)
+  // Logo (si disponible) - taille réduite et position ajustée
   if (logoBase64) {
     try {
       // jsPDF attend un data URI pour addImage
       const dataUri = `data:image/jpeg;base64,${logoBase64}`;
-      doc.addImage(dataUri, 'JPEG', 20, 10, 30, 30);
+      doc.addImage(dataUri, 'JPEG', 15, 8, 25, 25); // Position et taille réduites
     } catch (error) {
       console.error("Erreur lors de l'ajout du logo:", error);
       // Continuer sans logo si l'ajout échoue
     }
   }
   
-  // Texte "AMAKI France" avec "A" en rouge
-  doc.setFontSize(22);
+  // Texte "AMAKI France" avec "A" en rouge - taille réduite
+  doc.setFontSize(18);
   doc.setTextColor(255, 255, 255); // Blanc
   
   // Calculer la position du texte (après le logo)
-  const textX = logoBase64 ? 55 : 20;
-  const textY = 25;
+  const textX = logoBase64 ? 45 : 15;
+  const textY = 20;
   
   // Dessiner "A" en rouge (#FF6B6B = RGB(255, 107, 107))
   doc.setTextColor(255, 107, 107);
@@ -65,15 +65,15 @@ export async function addPDFHeader(doc: any, title?: string): Promise<void> {
   const textWidth = doc.getTextWidth('A');
   doc.text('MAKI France', textX + textWidth, textY);
   
-  // Titre optionnel (si fourni)
+  // Titre optionnel (si fourni) - taille et position réduites, centré
   if (title) {
-    doc.setFontSize(16);
+    doc.setFontSize(14);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255); // Blanc pour être visible sur le fond bleu
-    // Positionner le titre en dessous du logo et du texte "AMAKI France" avec un padding
-    // Le logo se termine à y=40 (10 + 30), le texte "AMAKI France" est à y=25
-    // On met le titre à y=52 pour avoir un espacement confortable de 12px après le logo
-    doc.text(title, 20, 52);
+    // Centrer le titre horizontalement
+    const titleWidth = doc.getTextWidth(title);
+    const titleX = (pageWidth - titleWidth) / 2;
+    doc.text(title, titleX, 38);
   }
 }
 
@@ -87,17 +87,17 @@ export function addPDFFooter(doc: any): void {
   for (let i = 1; i <= pageCount; i++) {
     doc.setPage(i);
     
-    // Fond bleu pour le pied de page (#093DB5 = RGB(9, 61, 181))
+    // Fond bleu pour le pied de page (#093DB5 = RGB(9, 61, 181)) - hauteur réduite
     doc.setFillColor(9, 61, 181);
-    doc.rect(0, pageHeight - 20, pageWidth, 20, 'F');
+    doc.rect(0, pageHeight - 15, pageWidth, 15, 'F');
     
-    // Texte du copyright en blanc
-    doc.setFontSize(10);
+    // Texte du copyright en blanc - taille réduite
+    doc.setFontSize(9);
     doc.setTextColor(255, 255, 255);
     doc.setFont('helvetica', 'normal');
     const footerText = `© ${new Date().getFullYear()} AMAKI France - Tous droits réservés`;
     const footerTextWidth = doc.getTextWidth(footerText);
-    doc.text(footerText, (pageWidth - footerTextWidth) / 2, pageHeight - 8);
+    doc.text(footerText, (pageWidth - footerTextWidth) / 2, pageHeight - 6);
   }
 }
 

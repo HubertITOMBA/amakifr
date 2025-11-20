@@ -21,6 +21,30 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 
+// Composant pour mettre en évidence une lettre dans le texte
+function HighlightedText({ text, highlightIndex }: { text: string; highlightIndex: number }) {
+  return (
+    <>
+      {text.split('').map((char, index) => {
+        if (char === ' ') {
+          return <span key={index}> </span>;
+        }
+        if (index === highlightIndex) {
+          return (
+            <span 
+              key={index} 
+              className="text-red-500 text-4xl font-bold inline-block transition-all duration-300"
+            >
+              {char}
+            </span>
+          );
+        }
+        return <span key={index}>{char}</span>;
+      })}
+    </>
+  );
+}
+
 export function Footer() {
   const quickLinks = [
     { name: "Accueil", href: "/", icon: Heart },
@@ -82,7 +106,7 @@ export function Footer() {
                   </div>
                   <div>
                     <h3 className="text-3xl font-bold bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent">
-                      AMAKI France
+                      <HighlightedText text="AMAKI France" highlightIndex={3} />
                     </h3>
                     <p className="text-sm text-purple-200">Association Reconnue d'Intérêt Général</p>
                   </div>
@@ -274,7 +298,9 @@ export function Footer() {
               className="text-gray-400 text-sm text-center md:text-left"
             >
               <p className="mb-2">
-                <span className="font-semibold text-white">AMAKI France</span> - Amicale des Anciens Élèves de Kipaku en France
+                <span className="font-semibold text-white">
+                  <HighlightedText text="AMAKI France" highlightIndex={3} />
+                </span> - Amicale des Anciens Élèves de Kipaku en France
               </p>
               <p>© 2026 Tous droits réservés. Fait avec ❤️ pour notre communauté.</p>
             </motion.div>

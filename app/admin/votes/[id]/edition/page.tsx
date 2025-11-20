@@ -140,12 +140,12 @@ export default function EditionVotePage() {
           <div className="space-y-2">
             <Label>Candidat (changer)</Label>
             <Input placeholder="Rechercher un candidat..." className="mb-2" value={candidacySearch} onChange={(e) => setCandidacySearch(e.target.value)} />
-            <Select value={form.candidacyId || ""} onValueChange={(v) => setForm({ ...form, candidacyId: v || null })}>
+            <Select value={form.candidacyId || "none"} onValueChange={(v) => setForm({ ...form, candidacyId: v === "none" ? null : v })}>
               <SelectTrigger>
                 <SelectValue placeholder={vote.candidacy?.adherent?.User?.name || "Vote blanc"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="">Vote blanc</SelectItem>
+                <SelectItem value="none">Vote blanc</SelectItem>
                 {filteredCandidacies.map(opt => (
                   <SelectItem key={opt.id} value={opt.id}>{opt.label}</SelectItem>
                 ))}

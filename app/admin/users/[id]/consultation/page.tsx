@@ -8,7 +8,10 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useEffect, useState } from "react";
 import { getUserByIdForAdmin } from "@/actions/user";
 import { UserRole, UserStatus } from "@prisma/client";
-import { Calendar, Users, Briefcase, Shield, Mail, Phone, MapPin, Building, CheckCircle2, XCircle, User, Sparkles } from "lucide-react";
+import { Calendar, Users, Briefcase, Shield, Mail, Phone, MapPin, Building, CheckCircle2, XCircle, User, Sparkles, FileText, Download } from "lucide-react";
+import { adminGeneratePasseport } from "@/actions/passeport";
+import { toast } from "sonner";
+import { Button } from "@/components/ui/button";
 
 const getRoleColor = (role: UserRole) => {
   switch (role) {
@@ -103,6 +106,7 @@ export default function ConsultationUserPage() {
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [generatingPasseport, setGeneratingPasseport] = useState(false);
 
   useEffect(() => {
     if (id) {
@@ -119,6 +123,31 @@ export default function ConsultationUserPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleGeneratePasseport = async () => {
+    if (!id) return;
+    
+    try {
+      setGeneratingPasseport(true);
+      const formData = new FormData();
+      formData.append("userId", id);
+      
+      const result = await adminGeneratePasseport(formData);
+      
+      if (result.success) {
+        toast.success(result.message || "Passeport généré avec succès");
+        // Recharger les données utilisateur pour afficher le nouveau numéro de passeport
+        await loadUser();
+      } else {
+        toast.error(result.error || "Erreur lors de la génération du passeport");
+      }
+    } catch (error) {
+      console.error("Erreur lors de la génération du passeport:", error);
+      toast.error("Erreur lors de la génération du passeport");
+    } finally {
+      setGeneratingPasseport(false);
     }
   };
 
@@ -337,6 +366,94 @@ export default function ConsultationUserPage() {
                 </CardContent>
               </Card>
             )}
+
+            {/* Passeport Adhérent */}
+            <Card className="shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-4 pt-4 px-6 gap-0">
+                <CardTitle className="flex items-center gap-2 text-lg">
+                  <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
+                    <FileText className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+                  </div>
+                  <span>Passeport Adhérent</span>
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-0 px-4 sm:px-6 pb-4 sm:pb-6">
+                <div className="space-y-3 sm:space-y-4">
+                  {adherent.numeroPasseport ? (
+                    <div className="space-y-2 sm:space-y-3">
+                      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 p-3 sm:p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-800">
+                        <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
+                          <div className="p-1.5 sm:p-2 bg-green-100 dark:bg-green-900/30 rounded-lg flex-shrink-0">
+                            <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Numéro de passeport</Label>
+                            <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5 sm:mt-1 break-all">
+                              {adherent.numeroPasseport}
+                            </div>
+                            {adherent.dateGenerationPasseport && (
+                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">
+                                Généré le {formatDate(adherent.dateGenerationPasseport)}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={handleGeneratePasseport}
+                        disabled={generatingPasseport || user.status !== "Actif"}
+                        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-sm h-9 sm:h-10 px-4"
+                      >
+                        {generatingPasseport ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            <span className="text-xs sm:text-sm">Génération en cours...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="h-4 w-4 mr-2" />
+                            <span className="text-xs sm:text-sm">Régénérer le passeport</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 sm:space-y-3">
+                      <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
+                        <div className="p-1.5 sm:p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex-shrink-0">
+                          <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600 dark:text-yellow-400" />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <Label className="text-xs sm:text-sm font-semibold text-gray-900 dark:text-white">Aucun passeport généré</Label>
+                          <div className="text-xs text-gray-600 dark:text-gray-400 mt-1 leading-relaxed">
+                            {user.status === "Actif" 
+                              ? "Le passeport peut être généré manuellement ou sera généré automatiquement lors de la validation du compte."
+                              : "Le compte doit être actif pour générer le passeport."}
+                          </div>
+                        </div>
+                      </div>
+                      <Button
+                        onClick={handleGeneratePasseport}
+                        disabled={generatingPasseport || user.status !== "Actif"}
+                        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed text-sm h-9 sm:h-10 px-4"
+                      >
+                        {generatingPasseport ? (
+                          <>
+                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                            <span className="text-xs sm:text-sm">Génération en cours...</span>
+                          </>
+                        ) : (
+                          <>
+                            <FileText className="h-4 w-4 mr-2" />
+                            <span className="text-xs sm:text-sm">Générer le passeport</span>
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
             {/* 2. Type d'adhésion */}
             <Card className="shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700 !py-0">

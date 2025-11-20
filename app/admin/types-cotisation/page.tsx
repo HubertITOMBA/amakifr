@@ -16,7 +16,6 @@ import {
   CheckCircle2, 
   Clock, 
   AlertTriangle,
-  DollarSign,
   Users,
   Calendar
 } from "lucide-react";
@@ -272,7 +271,7 @@ export default function AdminTypesCotisationMensuelle() {
                     {stats.totalDettes.toFixed(2).replace('.', ',')} €
                   </p>
                 </div>
-                <DollarSign className="h-8 w-8 text-orange-600" />
+                <Euro className="h-8 w-8 text-orange-600" />
               </div>
             </CardContent>
           </Card>
@@ -441,6 +440,11 @@ export default function AdminTypesCotisationMensuelle() {
                       />
                       <Euro className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
                     </div>
+                    {editingType && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
+                        ⚠️ La modification du montant n'affectera que les futures cotisations. Les cotisations déjà créées conservent leur montant initial.
+                      </p>
+                    )}
                   </div>
 
                   <div className="space-y-2">

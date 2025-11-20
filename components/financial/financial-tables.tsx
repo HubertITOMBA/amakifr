@@ -300,7 +300,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 px-2 lg:px-3 font-semibold text-blue-700 dark:text-blue-300"
+            className="h-7 px-2 font-semibold text-xs text-blue-700 dark:text-blue-300"
           >
             Type
             {column.getIsSorted() === "asc" ? (
@@ -312,8 +312,8 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         ),
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <Receipt className="h-4 w-4 text-blue-600" />
-            <span className="font-medium">{getTypeCotisationLabel(row.getValue("type"))}</span>
+            <Receipt className="h-3.5 w-3.5 text-blue-600" />
+            <span className="font-medium text-xs">{getTypeCotisationLabel(row.getValue("type"))}</span>
           </div>
         ),
       },
@@ -323,7 +323,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 px-2 lg:px-3 font-semibold text-green-700 dark:text-green-300"
+            className="h-7 px-2 font-semibold text-xs text-green-700 dark:text-green-300"
           >
             Montant
             {column.getIsSorted() === "asc" ? (
@@ -335,7 +335,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         ),
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <span className="font-bold text-green-700 dark:text-green-300">
+            <span className="font-bold text-xs text-green-700 dark:text-green-300">
               {parseFloat(row.getValue("montant")).toFixed(2).replace('.', ',')} €
             </span>
           </div>
@@ -357,8 +357,8 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         header: "Moyen de paiement",
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <CreditCard className="h-4 w-4 text-gray-600" />
-            <span>{getMoyenPaiementLabel(row.getValue("moyenPaiement"))}</span>
+            <CreditCard className="h-3.5 w-3.5 text-gray-600" />
+            <span className="text-xs">{getMoyenPaiementLabel(row.getValue("moyenPaiement"))}</span>
           </div>
         ),
       },
@@ -368,7 +368,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 px-2 lg:px-3 font-semibold text-purple-700 dark:text-purple-300"
+            className="h-7 px-2 font-semibold text-xs text-purple-700 dark:text-purple-300"
           >
             Date
             {column.getIsSorted() === "asc" ? (
@@ -380,8 +380,8 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         ),
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-purple-600" />
-            <span>{new Date(row.getValue("dateCotisation")).toLocaleDateString('fr-FR')}</span>
+            <Calendar className="h-3.5 w-3.5 text-purple-600" />
+            <span className="text-xs">{new Date(row.getValue("dateCotisation")).toLocaleDateString('fr-FR')}</span>
           </div>
         ),
       },
@@ -389,7 +389,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         accessorKey: "reference",
         header: "Référence",
         cell: ({ row }) => (
-          <span className="font-mono text-sm text-gray-600 dark:text-gray-400">
+          <span className="font-mono text-xs text-gray-600 dark:text-gray-400">
             {row.getValue("reference") || "N/A"}
           </span>
         ),
@@ -434,7 +434,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 px-2 lg:px-3 font-semibold text-blue-700 dark:text-blue-300"
+            className="h-7 px-2 font-semibold text-xs text-blue-700 dark:text-blue-300"
           >
             Type
             {column.getIsSorted() === "asc" ? (
@@ -446,8 +446,8 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         ),
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <AlertCircle className="h-4 w-4 text-orange-600" />
-            <span className="font-medium">{getTypeCotisationLabel(row.getValue("type"))}</span>
+            <AlertCircle className="h-3.5 w-3.5 text-orange-600" />
+            <span className="font-medium text-xs">{getTypeCotisationLabel(row.getValue("type"))}</span>
           </div>
         ),
       },
@@ -457,7 +457,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 px-2 lg:px-3 font-semibold text-gray-700 dark:text-gray-300"
+            className="h-7 px-2 font-semibold text-xs text-gray-700 dark:text-gray-300"
           >
             Attendu
             {column.getIsSorted() === "asc" ? (
@@ -469,7 +469,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         ),
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <span className="font-medium">{parseFloat(row.getValue("montantAttendu")).toFixed(2).replace('.', ',')} €</span>
+            <span className="font-medium text-xs">{parseFloat(row.getValue("montantAttendu")).toFixed(2).replace('.', ',')} €</span>
           </div>
         ),
       },
@@ -478,7 +478,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         header: "Payé",
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <span className="font-medium text-green-700 dark:text-green-300">
+            <span className="font-medium text-xs text-green-700 dark:text-green-300">
               {parseFloat(row.getValue("montantPaye")).toFixed(2).replace('.', ',')} €
             </span>
           </div>
@@ -491,7 +491,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
           const montant = parseFloat(row.getValue("montantRestant"));
           return (
             <div className="flex items-center gap-2">
-              <span className={`font-bold ${montant > 0 ? 'text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'}`}>
+              <span className={`font-bold text-xs ${montant > 0 ? 'text-red-700 dark:text-red-300' : 'text-green-700 dark:text-green-300'}`}>
                 {montant.toFixed(2).replace('.', ',')} €
               </span>
             </div>
@@ -516,7 +516,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}
-            className="h-8 px-2 lg:px-3 font-semibold text-purple-700 dark:text-purple-300"
+            className="h-7 px-2 font-semibold text-xs text-purple-700 dark:text-purple-300"
           >
             Échéance
             {column.getIsSorted() === "asc" ? (
@@ -528,8 +528,8 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         ),
         cell: ({ row }) => (
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-purple-600" />
-            <span>{new Date(row.getValue("dateEcheance")).toLocaleDateString('fr-FR')}</span>
+            <Calendar className="h-3.5 w-3.5 text-purple-600" />
+            <span className="text-xs">{new Date(row.getValue("dateEcheance")).toLocaleDateString('fr-FR')}</span>
           </div>
         ),
       },
@@ -537,7 +537,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
         accessorKey: "periode",
         header: "Période",
         cell: ({ row }) => (
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-xs text-gray-600 dark:text-gray-400">
             {row.getValue("periode")}
           </span>
         ),
@@ -663,7 +663,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
               </CardHeader>
               <CardContent className="p-0">
                 {/* Barre de recherche */}
-                <div className="p-3 border-b">
+                <div className="p-2 border-b">
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -702,7 +702,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
                       {cotisationsTable.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id} className="bg-gray-50 dark:bg-gray-800">
                           {headerGroup.headers.map((header) => (
-                            <TableHead key={header.id} className="font-semibold">
+                            <TableHead key={header.id} className="font-semibold text-xs px-2 py-1.5">
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(header.column.columnDef.header, header.getContext())}
@@ -719,7 +719,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
                             className="hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
                           >
                             {row.getVisibleCells().map((cell) => (
-                              <TableCell key={cell.id}>
+                              <TableCell key={cell.id} className="text-xs px-2 py-1.5">
                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
                               </TableCell>
                             ))}
@@ -740,7 +740,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
                 </div>
 
               {/* Totaux */}
-              <div className="p-3 border-t bg-blue-50 dark:bg-blue-900/10">
+              <div className="p-2 border-t bg-blue-50 dark:bg-blue-900/10">
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
                   <div className="text-center">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total des cotisations</p>
@@ -768,7 +768,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between p-3 border-t">
+              <div className="flex items-center justify-between p-2 border-t">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Page {cotisationsTable.getState().pagination.pageIndex + 1} sur{" "}
                   {cotisationsTable.getPageCount()}
@@ -813,7 +813,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
               </CardHeader>
               <CardContent className="p-0">
                 {/* Barre de recherche */}
-                <div className="p-3 border-b">
+                <div className="p-2 border-b">
                     <div className="flex items-center gap-2">
                       <div className="relative flex-1">
                         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -852,7 +852,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
                       {obligationsTable.getHeaderGroups().map((headerGroup) => (
                         <TableRow key={headerGroup.id} className="bg-gray-50 dark:bg-gray-800">
                           {headerGroup.headers.map((header) => (
-                            <TableHead key={header.id} className="font-semibold">
+                            <TableHead key={header.id} className="font-semibold text-xs px-2 py-1.5">
                               {header.isPlaceholder
                                 ? null
                                 : flexRender(header.column.columnDef.header, header.getContext())}
@@ -869,7 +869,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
                             className="hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
                           >
                             {row.getVisibleCells().map((cell) => (
-                              <TableCell key={cell.id}>
+                              <TableCell key={cell.id} className="text-xs px-2 py-1.5">
                                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
                               </TableCell>
                             ))}
@@ -890,7 +890,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
                 </div>
 
               {/* Totaux */}
-              <div className="p-3 border-t bg-orange-50 dark:bg-orange-900/10">
+              <div className="p-2 border-t bg-orange-50 dark:bg-orange-900/10">
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
                   <div className="text-center">
                     <p className="text-sm text-gray-600 dark:text-gray-400">Total attendu</p>
@@ -922,7 +922,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
               </div>
 
               {/* Pagination */}
-              <div className="flex items-center justify-between p-3 border-t">
+              <div className="flex items-center justify-between p-2 border-t">
                 <div className="text-sm text-gray-600 dark:text-gray-400">
                   Page {obligationsTable.getState().pagination.pageIndex + 1} sur{" "}
                   {obligationsTable.getPageCount()}

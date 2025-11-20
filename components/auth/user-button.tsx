@@ -90,6 +90,12 @@ export const UserButton = () => {
                 </Link>
               </DropdownMenuItem>
 
+              <DropdownMenuItem>
+                <Link href='/user/documents' className='w-full hover:bg-orange-300'>
+                  Mes Documents
+                </Link>
+              </DropdownMenuItem>
+
               <DropdownMenuItem className="hover:bg-orange-300">
                 <LogoutButton>
                   Déconnexion

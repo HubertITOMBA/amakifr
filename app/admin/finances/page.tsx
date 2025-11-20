@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Euro, TrendingUp, TrendingDown, AlertCircle, DollarSign, Receipt, HandHeart, FileText, RefreshCw } from "lucide-react";
+import { Euro, TrendingUp, TrendingDown, AlertCircle, Receipt, HandHeart, FileText, RefreshCw, BarChart3, UserCheck } from "lucide-react";
 import Link from "next/link";
 import { getFinancialStats } from "@/actions/paiements";
 import { toast } from "sonner";
@@ -43,22 +43,22 @@ export default function AdminFinancesPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
-      <div className="space-y-6">
+      <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
         {/* Header */}
         <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Euro className="h-8 w-8 text-blue-600" />
+          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Euro className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
             Gestion Financière
           </h1>
-          <div className="flex items-center justify-between">
-            <p className="text-gray-600 dark:text-gray-300 mt-2">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0 mt-2">
+            <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">
               Gérez les cotisations, paiements, dettes et assistances
             </p>
             <Button
               variant="outline"
               onClick={loadStats}
               disabled={loading}
-              className="mt-2"
+              className="w-full sm:w-auto"
             >
               <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
               Actualiser
@@ -67,25 +67,25 @@ export default function AdminFinancesPage() {
         </div>
 
         {/* Statistiques */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-          <Card className="shadow-lg border-red-200 dark:border-red-700/50 bg-white dark:bg-gray-900 !py-0">
-            <CardHeader className="bg-gradient-to-r from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <TrendingDown className="h-5 w-5" />
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <Card className="shadow-lg border-2 border-rose-200 dark:border-rose-800/50 bg-white dark:bg-gray-900 !py-0">
+            <CardHeader className="bg-gradient-to-r from-rose-100 to-rose-50 dark:from-rose-900/30 dark:to-rose-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                <TrendingDown className="h-4 w-4 sm:h-5 sm:w-5 text-rose-500 dark:text-rose-400" />
                 Dettes totales
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
               {loading ? (
                 <div className="animate-pulse">
                   <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
                 </div>
               ) : (
                 <div>
-                  <p className="text-3xl font-bold text-red-600 dark:text-red-300">
+                  <p className="text-2xl sm:text-3xl font-bold text-rose-600 dark:text-rose-400">
                     {stats.totalDettesInitiales.toFixed(2)} €
                   </p>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
                     {stats.nombreDettesInitiales} dette(s) • {stats.nombreAdherentsAvecDette} adhérent(s)
                   </p>
                 </div>
@@ -93,24 +93,24 @@ export default function AdminFinancesPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-lg border-green-200 dark:border-green-700/50 bg-white dark:bg-gray-900 !py-0">
-            <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <TrendingUp className="h-5 w-5" />
+          <Card className="shadow-lg border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900 !py-0">
+            <CardHeader className="bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                <TrendingUp className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 dark:text-emerald-400" />
                 Paiements totaux
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
               {loading ? (
                 <div className="animate-pulse">
                   <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
                 </div>
               ) : (
                 <div>
-                  <p className="text-3xl font-bold text-green-600 dark:text-green-300">
+                  <p className="text-2xl sm:text-3xl font-bold text-emerald-600 dark:text-emerald-400">
                     {stats.totalPaiements.toFixed(2)} €
                   </p>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
                     {stats.nombrePaiements} paiement(s) enregistré(s)
                   </p>
                 </div>
@@ -118,24 +118,24 @@ export default function AdminFinancesPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-lg border-purple-200 dark:border-purple-700/50 bg-white dark:bg-gray-900 !py-0">
-            <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <HandHeart className="h-5 w-5" />
+          <Card className="shadow-lg border-2 border-violet-200 dark:border-violet-800/50 bg-white dark:bg-gray-900 !py-0">
+            <CardHeader className="bg-gradient-to-r from-violet-100 to-violet-50 dark:from-violet-900/30 dark:to-violet-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                <HandHeart className="h-4 w-4 sm:h-5 sm:w-5 text-violet-500 dark:text-violet-400" />
                 Assistances en attente
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
               {loading ? (
                 <div className="animate-pulse">
                   <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
                 </div>
               ) : (
                 <div>
-                  <p className="text-3xl font-bold text-purple-600 dark:text-purple-300">
+                  <p className="text-2xl sm:text-3xl font-bold text-violet-600 dark:text-violet-400">
                     {stats.totalAssistancesEnAttente.toFixed(2)} €
                   </p>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                  <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-1">
                     {stats.nombreAssistances} assistance(s) en attente
                   </p>
                 </div>
@@ -143,28 +143,28 @@ export default function AdminFinancesPage() {
             </CardContent>
           </Card>
 
-          <Card className="shadow-lg border-blue-200 dark:border-blue-700/50 bg-white dark:bg-gray-900 !py-0">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <AlertCircle className="h-5 w-5" />
+          <Card className="shadow-lg border-2 border-sky-200 dark:border-sky-800/50 bg-white dark:bg-gray-900 !py-0">
+            <CardHeader className="bg-gradient-to-r from-sky-100 to-sky-50 dark:from-sky-900/30 dark:to-sky-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 text-sky-500 dark:text-sky-400" />
                 Solde net
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-6 pb-6 px-6">
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
               {loading ? (
                 <div className="animate-pulse">
                   <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded"></div>
                 </div>
               ) : (
                 <div>
-                  <p className={`text-3xl font-bold ${
+                  <p className={`text-2xl sm:text-3xl font-bold ${
                     (stats.totalDettesInitiales + stats.totalAssistancesEnAttente - stats.totalPaiements) >= 0
-                      ? "text-red-600 dark:text-red-300"
-                      : "text-green-600 dark:text-green-300"
+                      ? "text-rose-600 dark:text-rose-400"
+                      : "text-emerald-600 dark:text-emerald-400"
                   }`}>
                     {(stats.totalDettesInitiales + stats.totalAssistancesEnAttente - stats.totalPaiements).toFixed(2)} €
                   </p>
-                  <p className="text-sm text-gray-700 dark:text-gray-300 mt-1">
+                  <p className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 mt-1">
                     Dettes - Paiements
                   </p>
                 </div>
@@ -174,93 +174,133 @@ export default function AdminFinancesPage() {
         </div>
 
         {/* Cards de navigation */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4 lg:gap-6">
+          <Link href="/admin/finances/frais-adhesion">
+            <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer h-full !py-0">
+              <CardHeader className="bg-gradient-to-r from-indigo-100 to-indigo-50 dark:from-indigo-900/30 dark:to-indigo-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                  <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-500 dark:text-indigo-400" />
+                  Frais d'Adhésion
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-700 dark:text-gray-300">Gérer les frais</p>
+                    <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Anciens / Nouveaux</p>
+                  </div>
+                  <UserCheck className="h-8 w-8 text-indigo-500 dark:text-indigo-400" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
           <Link href="/admin/finances/dettes">
-            <Card className="shadow-lg border-blue-200 dark:border-blue-700/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer h-full !py-0">
-              <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
-                <CardTitle className="flex items-center gap-2">
-                  <FileText className="h-6 w-6" />
+            <Card className="shadow-lg border-2 border-blue-200 dark:border-blue-800/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer h-full !py-0">
+              <CardHeader className="bg-gradient-to-r from-blue-100 to-blue-50 dark:from-blue-900/30 dark:to-blue-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                  <FileText className="h-5 w-5 sm:h-6 sm:w-6 text-blue-500 dark:text-blue-400" />
                   Dettes Initiales
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6 pb-6 px-6">
+              <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-700 dark:text-gray-300">Gérer les dettes</p>
                     <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">2024, 2025, etc.</p>
                   </div>
-                  <TrendingDown className="h-8 w-8 text-blue-600 dark:text-blue-400" />
+                  <TrendingDown className="h-8 w-8 text-blue-500 dark:text-blue-400" />
                 </div>
               </CardContent>
             </Card>
           </Link>
 
           <Link href="/admin/finances/paiements">
-            <Card className="shadow-lg border-green-200 dark:border-green-700/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer h-full !py-0">
-              <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
-                <CardTitle className="flex items-center gap-2">
-                  <Receipt className="h-6 w-6" />
+            <Card className="shadow-lg border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer h-full !py-0">
+              <CardHeader className="bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                  <Receipt className="h-5 w-5 sm:h-6 sm:w-6 text-emerald-500 dark:text-emerald-400" />
                   Paiements
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6 pb-6 px-6">
+              <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-700 dark:text-gray-300">Enregistrer les paiements</p>
                     <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Partiels ou complets</p>
                   </div>
-                  <DollarSign className="h-8 w-8 text-green-600 dark:text-green-400" />
+                  <Euro className="h-8 w-8 text-emerald-500 dark:text-emerald-400" />
                 </div>
               </CardContent>
             </Card>
           </Link>
 
           <Link href="/admin/finances/assistances">
-            <Card className="shadow-lg border-purple-200 dark:border-purple-700/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer h-full !py-0">
-              <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
-                <CardTitle className="flex items-center gap-2">
-                  <HandHeart className="h-6 w-6" />
+            <Card className="shadow-lg border-2 border-violet-200 dark:border-violet-800/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer h-full !py-0">
+              <CardHeader className="bg-gradient-to-r from-violet-100 to-violet-50 dark:from-violet-900/30 dark:to-violet-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                  <HandHeart className="h-5 w-5 sm:h-6 sm:w-6 text-violet-500 dark:text-violet-400" />
                   Assistances
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6 pb-6 px-6">
+              <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-700 dark:text-gray-300">Gérer les assistances</p>
                     <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">50€ par événement</p>
                   </div>
-                  <HandHeart className="h-8 w-8 text-purple-600 dark:text-purple-400" />
+                  <HandHeart className="h-8 w-8 text-violet-500 dark:text-violet-400" />
                 </div>
               </CardContent>
             </Card>
           </Link>
 
           <Link href="/admin/finances/relances">
-            <Card className="shadow-lg border-orange-200 dark:border-orange-700/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer h-full !py-0">
-              <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 dark:from-orange-600 dark:to-orange-700 text-white rounded-t-lg pb-4 pt-4 px-6 gap-0">
-                <CardTitle className="flex items-center gap-2">
-                  <AlertCircle className="h-6 w-6" />
+            <Card className="shadow-lg border-2 border-amber-200 dark:border-amber-800/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer h-full !py-0">
+              <CardHeader className="bg-gradient-to-r from-amber-100 to-amber-50 dark:from-amber-900/30 dark:to-amber-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                  <AlertCircle className="h-5 w-5 sm:h-6 sm:w-6 text-amber-500 dark:text-amber-400" />
                   Relances
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-6 pb-6 px-6">
+              <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm text-gray-700 dark:text-gray-300">Gérer les relances</p>
                     <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Automatiques</p>
                   </div>
-                  <AlertCircle className="h-8 w-8 text-orange-600 dark:text-orange-400" />
+                  <AlertCircle className="h-8 w-8 text-amber-500 dark:text-amber-400" />
                 </div>
               </CardContent>
             </Card>
           </Link>
         </div>
 
+        {/* Card Synthèse Financière */}
+        <Link href="/admin/finances/synthese">
+          <Card className="shadow-lg border-2 border-indigo-200 dark:border-indigo-800/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer !py-0">
+            <CardHeader className="bg-gradient-to-r from-indigo-100 to-indigo-50 dark:from-indigo-900/30 dark:to-indigo-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 text-indigo-500 dark:text-indigo-400" />
+                Synthèse Financière
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">Tableau de bord complet</p>
+                  <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Export PDF • Tri • Filtres</p>
+                </div>
+                <BarChart3 className="h-8 w-8 text-indigo-500 dark:text-indigo-400" />
+              </div>
+            </CardContent>
+          </Card>
+        </Link>
+
         {/* Informations */}
-        <Card className="shadow-lg border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 !py-0">
-          <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b pb-4 pt-4 px-6 gap-0">
-            <CardTitle className="flex items-center gap-2 text-gray-900 dark:text-white">
-              <Euro className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+        <Card className="shadow-lg border-2 border-slate-200 dark:border-slate-800/50 bg-white dark:bg-gray-900 !py-0">
+          <CardHeader className="bg-gradient-to-r from-slate-50 to-slate-100 dark:from-slate-900/30 dark:to-slate-800/20 border-b pb-4 pt-4 px-6 gap-0">
+            <CardTitle className="flex items-center gap-2 text-gray-700 dark:text-gray-200">
+              <Euro className="h-5 w-5 text-slate-500 dark:text-slate-400" />
               Informations
             </CardTitle>
           </CardHeader>

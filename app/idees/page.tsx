@@ -262,29 +262,29 @@ export default function IdeesPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
       <Navbar />
       
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
+      <div className="container mx-auto px-4 sm:px-6 py-6 sm:py-8 max-w-6xl">
         {/* Header avec gradient professionnel */}
-        <div className="mb-8">
+        <div className="mb-6 sm:mb-8">
           <Card className="border-0 shadow-xl bg-white dark:bg-slate-800 border-slate-200 dark:border-slate-700">
             <CardHeader className="pb-4 bg-gradient-to-r from-blue-50 via-indigo-50 to-blue-50 dark:from-slate-800 dark:via-slate-800 dark:to-slate-800">
               <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-                <div className="flex items-center gap-3">
-                  <div className="p-3 bg-gradient-to-br from-blue-500 to-indigo-600 dark:from-blue-600 dark:to-indigo-700 rounded-lg shadow-md">
-                    <Lightbulb className="h-8 w-8 text-white" />
+                <div className="flex items-center gap-2 sm:gap-3">
+                  <div className="p-2 sm:p-3 bg-gradient-to-br from-blue-500 to-indigo-600 dark:from-blue-600 dark:to-indigo-700 rounded-lg shadow-md">
+                    <Lightbulb className="h-6 w-6 sm:h-8 sm:w-8 text-white" />
                   </div>
                   <div>
-                    <CardTitle className="text-3xl font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
+                    <CardTitle className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white mb-1 flex items-center gap-2">
                       Boîte à idées
-                      <Sparkles className="h-6 w-6 text-blue-600 dark:text-blue-400 animate-pulse" />
+                      <Sparkles className="h-5 w-5 sm:h-6 sm:w-6 text-blue-600 dark:text-blue-400 animate-pulse" />
                     </CardTitle>
-                    <p className="text-gray-600 dark:text-gray-300 text-sm sm:text-base">
+                    <p className="text-gray-600 dark:text-gray-300 text-xs sm:text-sm md:text-base">
                       Partagez vos idées et contribuez à l'association
                     </p>
                   </div>
                 </div>
                 {user && (
-                  <Link href="/user/profile">
-                    <Button className="bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600 border-0 shadow-lg hover:shadow-xl transition-all">
+                  <Link href="/user/profile" className="w-full sm:w-auto">
+                    <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white dark:bg-blue-700 dark:hover:bg-blue-600 border-0 shadow-lg hover:shadow-xl transition-all">
                       <Plus className="h-4 w-4 mr-2" />
                       Proposer une idée
                     </Button>
@@ -377,7 +377,7 @@ export default function IdeesPage() {
         </Card>
 
         {/* Liste des idées */}
-        <div className="space-y-6">
+        <div className="space-y-4 sm:space-y-6">
           {filteredIdees.length === 0 ? (
             <Card className="shadow-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
               <CardContent className="py-16 text-center">
@@ -421,21 +421,21 @@ export default function IdeesPage() {
                   key={idee.id} 
                   className="shadow-lg border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:shadow-xl transition-all duration-300 overflow-hidden group !py-0"
                 >
-                  <CardHeader className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 dark:from-blue-700 dark:via-blue-800 dark:to-indigo-800 text-white pb-4 pt-4 px-6 gap-0 mt-0">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <CardTitle className="text-xl font-bold mb-2 text-white leading-tight">
+                  <CardHeader className="bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 dark:from-blue-700 dark:via-blue-800 dark:to-indigo-800 text-white pb-4 pt-4 px-4 sm:px-6 gap-0 mt-0">
+                    <div className="flex items-start justify-between gap-3 sm:gap-4">
+                      <div className="flex-1 min-w-0 overflow-hidden">
+                        <CardTitle className="text-lg sm:text-xl font-bold mb-2 text-white leading-tight">
                           {idee.titre}
                         </CardTitle>
-                        <div className="flex flex-wrap items-center gap-3 text-sm text-blue-100 dark:text-blue-200">
-                          <div className="flex items-center gap-1.5 bg-white/10 dark:bg-white/5 px-2 py-1 rounded-md backdrop-blur-sm">
-                            <User className="h-4 w-4" />
-                            <span className="font-medium">
+                        <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm text-blue-100 dark:text-blue-200 overflow-x-auto -mx-1 sm:mx-0 px-1 sm:px-0">
+                          <div className="flex items-center gap-1 sm:gap-1.5 bg-white/10 dark:bg-white/5 px-2 py-1 rounded-md backdrop-blur-sm whitespace-nowrap flex-shrink-0">
+                            <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+                            <span className="font-medium truncate max-w-[120px] sm:max-w-none">
                               {idee.Adherent.firstname} {idee.Adherent.lastname}
                             </span>
                           </div>
-                          <div className="flex items-center gap-1.5 bg-white/10 dark:bg-white/5 px-2 py-1 rounded-md backdrop-blur-sm">
-                            <Calendar className="h-4 w-4" />
+                          <div className="flex items-center gap-1 sm:gap-1.5 bg-white/10 dark:bg-white/5 px-2 py-1 rounded-md backdrop-blur-sm whitespace-nowrap flex-shrink-0">
+                            <Calendar className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
                             <span>{dateFormatted}</span>
                           </div>
                         </div>
@@ -448,12 +448,12 @@ export default function IdeesPage() {
                     </p>
 
                     {/* Stats avec meilleur contraste */}
-                    <div className="flex flex-wrap items-center gap-3 mb-6 pb-6 border-b border-slate-200 dark:border-slate-700">
+                    <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-4 sm:mb-6 pb-4 sm:pb-6 border-b border-slate-200 dark:border-slate-700">
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleToggleApprobation(idee.id)}
-                        className={`transition-all ${
+                        className={`transition-all flex-1 sm:flex-initial ${
                           hasApprobation 
                             ? "bg-blue-50 dark:bg-blue-900/30 border-blue-300 dark:border-blue-600 text-blue-700 dark:text-blue-300" 
                             : "bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800"
@@ -462,18 +462,18 @@ export default function IdeesPage() {
                         title={!canComment ? "Seules les idées validées peuvent être approuvées" : ""}
                       >
                         <ThumbsUp className={`h-4 w-4 mr-2 ${hasApprobation ? "fill-current" : ""}`} />
-                        <span className="font-semibold">{idee.nombreApprobations}</span>
-                        <span className="ml-1">approbation{idee.nombreApprobations !== 1 ? "s" : ""}</span>
+                        <span className="font-semibold text-sm sm:text-base">{idee.nombreApprobations}</span>
+                        <span className="ml-1 text-xs sm:text-sm hidden sm:inline">approbation{idee.nombreApprobations !== 1 ? "s" : ""}</span>
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
                         onClick={() => handleToggleExpand(idee.id)}
-                        className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800"
+                        className="bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-gray-700 dark:text-gray-300 hover:bg-slate-50 dark:hover:bg-slate-800 flex-1 sm:flex-initial"
                       >
                         <MessageSquare className="h-4 w-4 mr-2" />
-                        <span className="font-semibold">{idee.nombreCommentaires}</span>
-                        <span className="ml-1">commentaire{idee.nombreCommentaires !== 1 ? "s" : ""}</span>
+                        <span className="font-semibold text-sm sm:text-base">{idee.nombreCommentaires}</span>
+                        <span className="ml-1 text-xs sm:text-sm hidden sm:inline">commentaire{idee.nombreCommentaires !== 1 ? "s" : ""}</span>
                       </Button>
                     </div>
 

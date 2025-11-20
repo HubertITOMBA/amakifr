@@ -35,7 +35,8 @@ import {
   Mail,
   Phone,
   Calendar,
-  Info
+  Info,
+  Settings
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAdherentsWithCotisations, createManualCotisation, updateCotisation } from "@/actions/cotisations";
@@ -450,79 +451,87 @@ export default function AdminCotisationManagement() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
-      <div className="space-y-6 p-6">
+      <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
         {/* En-tête */}
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
           <div>
-            <h1 className="text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
               Gestion des Cotisations
             </h1>
-            <p className="text-gray-700 dark:text-gray-300 mt-2 text-lg">
+            <p className="text-gray-700 dark:text-gray-300 mt-1 sm:mt-2 text-sm sm:text-base lg:text-lg">
               Suivi des cotisations et gestion des adhérents
             </p>
           </div>
-          <div className="flex items-center space-x-4">
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
             <Button
               onClick={() => window.location.href = '/admin/cotisations'}
-              className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg"
+              className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg"
             >
               <Calendar className="h-4 w-4 mr-2" />
               Créer Cotisations
+            </Button>
+            <Button
+              onClick={() => window.location.href = '/admin/types-cotisation'}
+              variant="outline"
+              className="w-full sm:w-auto border-purple-300 hover:bg-purple-50 dark:border-purple-700 dark:hover:bg-purple-900/20 text-purple-700 dark:text-purple-300 shadow-sm"
+            >
+              <Settings className="h-4 w-4 mr-2" />
+              Types de Cotisation
             </Button>
           </div>
         </div>
 
       {/* Statistiques */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3 sm:gap-4">
         <Card className="!py-0 border-blue-200 dark:border-blue-800 shadow-lg hover:shadow-xl transition-shadow">
-          <CardContent className="p-6 bg-gradient-to-br from-blue-50 to-white dark:from-blue-900/20 dark:to-gray-800">
+          <CardContent className="p-4 sm:p-6 bg-gradient-to-br from-blue-50/80 to-white dark:from-blue-900/20 dark:to-gray-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
+                <p className="text-xs sm:text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
                   Total Adhérents
                 </p>
-                <p className="text-3xl font-bold text-blue-900 dark:text-blue-100 mt-2">
+                <p className="text-2xl sm:text-3xl font-bold text-blue-900 dark:text-blue-100 mt-1 sm:mt-2">
                   {adherents.length}
                 </p>
               </div>
-              <div className="h-14 w-14 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
-                <Users className="h-7 w-7 text-blue-600 dark:text-blue-400" />
+              <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-blue-100 dark:bg-blue-900/40 flex items-center justify-center">
+                <Users className="h-6 w-6 sm:h-7 sm:w-7 text-blue-600 dark:text-blue-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="!py-0 border-red-200 dark:border-red-800 shadow-lg hover:shadow-xl transition-shadow">
-          <CardContent className="p-6 bg-gradient-to-br from-red-50 to-white dark:from-red-900/20 dark:to-gray-800">
+          <CardContent className="p-4 sm:p-6 bg-gradient-to-br from-red-50/80 to-white dark:from-red-900/20 dark:to-gray-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">
+                <p className="text-xs sm:text-sm font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">
                   En Retard
                 </p>
-                <p className="text-3xl font-bold text-red-900 dark:text-red-100 mt-2">
+                <p className="text-2xl sm:text-3xl font-bold text-red-900 dark:text-red-100 mt-1 sm:mt-2">
                   {adherentsEnRetard}
                 </p>
               </div>
-              <div className="h-14 w-14 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
-                <AlertTriangle className="h-7 w-7 text-red-600 dark:text-red-400" />
+              <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-red-100 dark:bg-red-900/40 flex items-center justify-center">
+                <AlertTriangle className="h-6 w-6 sm:h-7 sm:w-7 text-red-600 dark:text-red-400" />
               </div>
             </div>
           </CardContent>
         </Card>
 
         <Card className="!py-0 border-orange-200 dark:border-orange-800 shadow-lg hover:shadow-xl transition-shadow">
-          <CardContent className="p-6 bg-gradient-to-br from-orange-50 to-white dark:from-orange-900/20 dark:to-gray-800">
+          <CardContent className="p-4 sm:p-6 bg-gradient-to-br from-orange-50/80 to-white dark:from-orange-900/20 dark:to-gray-800">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wide">
+                <p className="text-xs sm:text-sm font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wide">
                   Total Dettes
                 </p>
-                <p className="text-3xl font-bold text-orange-900 dark:text-orange-100 mt-2">
+                <p className="text-2xl sm:text-3xl font-bold text-orange-900 dark:text-orange-100 mt-1 sm:mt-2">
                   {totalDettes.toFixed(2).replace('.', ',')} €
                 </p>
               </div>
-              <div className="h-14 w-14 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
-                <Euro className="h-7 w-7 text-orange-600 dark:text-orange-400" />
+              <div className="h-12 w-12 sm:h-14 sm:w-14 rounded-full bg-orange-100 dark:bg-orange-900/40 flex items-center justify-center">
+                <Euro className="h-6 w-6 sm:h-7 sm:w-7 text-orange-600 dark:text-orange-400" />
               </div>
             </div>
           </CardContent>
@@ -531,18 +540,18 @@ export default function AdminCotisationManagement() {
 
       {/* Tableau */}
       <Card className="!py-0 shadow-xl border-blue-200 dark:border-blue-800">
-        <CardHeader className="bg-gradient-to-r from-blue-600 to-blue-700 dark:from-blue-700 dark:to-blue-800 text-white rounded-t-lg">
-          <div className="flex justify-between items-center">
+        <CardHeader className="bg-gradient-to-r from-blue-500/90 to-blue-600/90 dark:from-blue-600/90 dark:to-blue-700/90 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
             <div>
-              <CardTitle className="text-2xl font-bold text-white flex items-center gap-3">
-                <Users className="h-6 w-6" />
+              <CardTitle className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 sm:gap-3">
+                <Users className="h-5 w-5 sm:h-6 sm:w-6" />
                 Liste des Adhérents
               </CardTitle>
-              <CardDescription className="text-blue-100 dark:text-blue-200 mt-2 text-base">
+              <CardDescription className="text-blue-100 dark:text-blue-200 mt-1 sm:mt-2 text-sm sm:text-base">
                 Gestion des cotisations et suivi des dettes
               </CardDescription>
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 w-full sm:w-auto">
               <ColumnVisibilityToggle 
                 table={table} 
                 storageKey="admin-cotisations-column-visibility"
@@ -638,9 +647,9 @@ export default function AdminCotisationManagement() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-6 pb-4 px-6">
+        <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
           {/* Filtres et recherche */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
@@ -668,15 +677,16 @@ export default function AdminCotisationManagement() {
           </div>
 
           {/* Table */}
-          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
-            <table className="w-full">
+          <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm overflow-x-auto -mx-4 sm:mx-0">
+            <div className="inline-block min-w-full align-middle px-4 sm:px-0">
+              <table className="w-full min-w-[800px]">
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id} className="border-b bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700">
                     {headerGroup.headers.map((header) => (
                       <th
                         key={header.id}
-                        className="px-4 py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider"
+                        className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider"
                       >
                         {header.isPlaceholder
                           ? null
@@ -705,26 +715,27 @@ export default function AdminCotisationManagement() {
                     `}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-3 py-2 whitespace-nowrap text-gray-900 dark:text-gray-100">
+                      <td key={cell.id} className="px-2 sm:px-3 py-2 text-xs sm:text-sm whitespace-nowrap text-gray-900 dark:text-gray-100">
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>
                     ))}
                   </tr>
                 ))}
               </tbody>
-            </table>
+              </table>
+            </div>
           </div>
 
           {/* Pagination */}
-          <div className="bg-white dark:bg-gray-800 mt-5 flex items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-6">
-            <div className="flex-1 text-sm text-muted-foreground dark:text-gray-400">
+          <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
+            <div className="flex-1 text-xs sm:text-sm text-muted-foreground dark:text-gray-400 text-center sm:text-left">
               {table.getFilteredRowModel().rows.length} adhérent(s) au total
             </div>
-            <div className="flex items-center space-x-2">
+            <div className="flex items-center space-x-2 w-full sm:w-auto justify-center sm:justify-end">
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 text-xs border-gray-300 dark:border-gray-600"
+                className="h-9 sm:h-8 text-xs border-gray-300 dark:border-gray-600 flex-1 sm:flex-initial"
                 onClick={() => table.previousPage()}
                 disabled={!table.getCanPreviousPage()}
               >
@@ -733,7 +744,7 @@ export default function AdminCotisationManagement() {
               <Button
                 variant="outline"
                 size="sm"
-                className="h-8 text-xs border-gray-300 dark:border-gray-600"
+                className="h-9 sm:h-8 text-xs border-gray-300 dark:border-gray-600 flex-1 sm:flex-initial"
                 onClick={() => table.nextPage()}
                 disabled={!table.getCanNextPage()}
               >

@@ -212,26 +212,33 @@ export default function AdminEvenementsPage() {
   });
 
   return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center justify-between mb-4">
-            <span className="flex items-center">
-              <Calendar className="h-5 w-5 mr-2" />
-              Gestion des Événements
-            </span>
-            <div className="flex items-center gap-2">
+    <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+      <Card className="!py-0 border-2 border-purple-200 dark:border-purple-800/50 bg-white dark:bg-gray-900">
+        <CardHeader className="bg-gradient-to-r from-purple-100 to-purple-50 dark:from-purple-900/30 dark:to-purple-800/20 pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+          <div className="flex flex-col gap-3 sm:gap-0">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl text-gray-700 dark:text-gray-200 font-bold">
+                <Calendar className="h-5 w-5 text-purple-500 dark:text-purple-400" />
+                Gestion des Événements
+              </CardTitle>
               <ColumnVisibilityToggle 
                 table={table} 
                 storageKey="admin-evenements-column-visibility"
               />
-              <Button onClick={() => router.push("/admin/evenements/gestion")}>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <Button 
+                onClick={() => router.push("/admin/evenements/gestion")}
+                className="w-full sm:w-auto"
+              >
                 <Plus className="h-4 w-4 mr-2" />
                 Nouvel événement
               </Button>
             </div>
-          </CardTitle>
-          <div className="flex flex-wrap items-center gap-3">
+          </div>
+        </CardHeader>
+        <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
             <div className="flex items-center gap-2 flex-1 min-w-[200px]">
               <Search className="h-4 w-4 text-gray-400" />
               <Input 
@@ -269,8 +276,6 @@ export default function AdminEvenementsPage() {
               </Select>
             </div>
           </div>
-        </CardHeader>
-        <CardContent>
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>

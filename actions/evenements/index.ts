@@ -415,6 +415,139 @@ export async function getPublicEvenements() {
 }
 
 /**
+ * Exporter tous les événements publics au format iCalendar (.ics)
+ * 
+ * @param dateDebut - Date de début pour filtrer les événements (optionnel)
+ * @param dateFin - Date de fin pour filtrer les événements (optionnel)
+ * @returns Le contenu du fichier .ics ou une erreur
+ */
+export async function exportAllEvenementsCalendar(dateDebut?: Date, dateFin?: Date) {
+  try {
+    const now = new Date();
+    
+    // Construire les filtres
+    const where: any = {
+      statut: "Publie",
+      dateAffichage: {
+        lte: now,
+      },
+      dateFinAffichage: {
+        gte: now,
+      },
+    };
+
+    // Ajouter les filtres de date si fournis
+    if (dateDebut || dateFin) {
+      where.dateDebut = {};
+      if (dateDebut) {
+        where.dateDebut.gte = dateDebut;
+      }
+      if (dateFin) {
+        where.dateDebut.lte = dateFin;
+      }
+    }
+
+    const evenements = await prisma.evenement.findMany({
+      where,
+      orderBy: {
+        dateDebut: "asc",
+      },
+    });
+
+    // Générer le contenu iCalendar
+    const icsLines = [
+      'BEGIN:VCALENDAR',
+      'VERSION:2.0',
+      'PRODID:-//AMAKI France//Event Calendar//FR',
+      'CALSCALE:GREGORIAN',
+      'METHOD:PUBLISH',
+      'X-WR-CALNAME:AMAKI France - Événements',
+      'X-WR-CALDESC:Calendrier des événements de l\'Amicale des anciens élèves de Kipaku en France',
+    ];
+
+    // Ajouter chaque événement
+    for (const evenement of evenements) {
+      const startDate = new Date(evenement.dateDebut);
+      const endDate = evenement.dateFin 
+        ? new Date(evenement.dateFin)
+        : new Date(startDate.getTime() + 2 * 60 * 60 * 1000); // Par défaut 2h après
+
+      // Formater les dates au format iCalendar (YYYYMMDDTHHMMSSZ)
+      const formatDate = (date: Date) => {
+        return date.toISOString().replace(/[-:]/g, '').split('.')[0] + 'Z';
+      };
+
+      const startDateFormatted = formatDate(startDate);
+      const endDateFormatted = formatDate(endDate);
+      const dtstamp = formatDate(new Date());
+
+      // Préparer la localisation
+      const location = evenement.adresse 
+        ? `${evenement.lieu || ''}, ${evenement.adresse}`.trim()
+        : evenement.lieu || '';
+
+      // Préparer la description
+      let description = evenement.description || '';
+      if (evenement.contenu) {
+        description += `\n\n${evenement.contenu}`;
+      }
+      if (evenement.prix) {
+        description += `\n\nPrix: ${evenement.prix}€`;
+      }
+      if (evenement.contactEmail) {
+        description += `\n\nContact: ${evenement.contactEmail}`;
+      }
+      if (evenement.contactTelephone) {
+        description += `\n\nTéléphone: ${evenement.contactTelephone}`;
+      }
+
+      // Échapper les caractères spéciaux pour iCalendar
+      const escapeIcs = (text: string) => {
+        return text
+          .replace(/\\/g, '\\\\')
+          .replace(/;/g, '\\;')
+          .replace(/,/g, '\\,')
+          .replace(/\n/g, '\\n')
+          .replace(/\r/g, '');
+      };
+
+      // Construire l'événement
+      icsLines.push('BEGIN:VEVENT');
+      icsLines.push(`UID:${evenement.id}@amaki.fr`);
+      icsLines.push(`DTSTAMP:${dtstamp}`);
+      icsLines.push(`DTSTART:${startDateFormatted}`);
+      icsLines.push(`DTEND:${endDateFormatted}`);
+      icsLines.push(`SUMMARY:${escapeIcs(evenement.titre)}`);
+      if (description) {
+        icsLines.push(`DESCRIPTION:${escapeIcs(description)}`);
+      }
+      if (location) {
+        icsLines.push(`LOCATION:${escapeIcs(location)}`);
+      }
+      icsLines.push(`URL:${process.env.NEXTAUTH_URL || 'https://amaki.fr'}/evenements/${evenement.id}`);
+      icsLines.push(`CATEGORIES:${evenement.categorie || 'General'}`);
+      icsLines.push('END:VEVENT');
+    }
+
+    icsLines.push('END:VCALENDAR');
+
+    const icsContent = icsLines.join('\r\n');
+
+    return { 
+      success: true, 
+      data: icsContent,
+      filename: `amaki-evenements-${new Date().toISOString().split('T')[0]}.ics`
+    };
+  } catch (error) {
+    console.error("Erreur lors de l'export du calendrier:", error);
+    return { 
+      success: false, 
+      error: "Erreur lors de l'export du calendrier" 
+    };
+  }
+}
+
+/**
  * Récupérer un événement par son ID (publique)
  * Pour les visiteurs non authentifiés, retourne uniquement les événements publiés
  * Pour les admins authentifiés, retourne tous les événements

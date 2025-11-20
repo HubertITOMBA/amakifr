@@ -2,7 +2,7 @@
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useSession } from "next-auth/react";
-import { redirect } from "next/navigation";
+import { redirect, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { 
   Users, 
@@ -16,7 +16,11 @@ import {
   Home,
   Menu,
   X,
-  Lightbulb
+  Lightbulb,
+  Award,
+  TrendingUp,
+  Bell,
+  Building2
 } from "lucide-react";
 import Link from "next/link";
 
@@ -26,6 +30,12 @@ const adminMenuItems = [
     href: "/admin",
     icon: BarChart3,
     description: "Vue d'ensemble des statistiques"
+  },
+  {
+    title: "Analytics",
+    href: "/admin/analytics",
+    icon: TrendingUp,
+    description: "Dashboard analytique avancé"
   },
   {
     title: "Candidatures",
@@ -78,6 +88,18 @@ const adminMenuItems = [
     description: "Gestion des élections"
   },
   {
+    title: "Bureau",
+    href: "/admin/bureau",
+    icon: Building2,
+    description: "Gestion du bureau et organigramme"
+  },
+  {
+    title: "Réservations",
+    href: "/admin/reservations",
+    icon: Calendar,
+    description: "Gestion des réservations de ressources"
+  },
+  {
     title: "Votes",
     href: "/admin/votes",
     icon: Shield,
@@ -90,10 +112,46 @@ const adminMenuItems = [
     description: "Gestion des idées soumises"
   },
   {
+    title: "Notifications",
+    href: "/admin/notifications",
+    icon: Mail,
+    description: "Créer et gérer les notifications"
+  },
+  {
+    title: "Rappels Automatiques",
+    href: "/admin/notifications/rappel",
+    icon: Bell,
+    description: "Gérer les rappels automatiques"
+  },
+  {
+    title: "Documents",
+    href: "/admin/documents",
+    icon: FileText,
+    description: "Gérer tous les documents des utilisateurs"
+  },
+  {
+    title: "Exports",
+    href: "/admin/exports",
+    icon: FileText,
+    description: "Exporter les données en Excel/CSV"
+  },
+  {
+    title: "Badges",
+    href: "/admin/badges",
+    icon: Award,
+    description: "Gestion des badges et récompenses"
+  },
+  {
     title: "Finances",
     href: "/admin/finances",
     icon: Euro,
     description: "Gestion financière"
+  },
+  {
+    title: "Relances Automatiques",
+    href: "/admin/relances/automatiques",
+    icon: Mail,
+    description: "Gestion des relances automatiques"
   },
   // {
   //   title: "Contenu",
@@ -122,6 +180,7 @@ export default function AdminLayout({
 }) {
   const { data: session, status } = useSession();
   const user = useCurrentUser();
+  const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
@@ -203,12 +262,18 @@ export default function AdminLayout({
               <Link
                 key={item.href}
                 href={item.href}
-                className="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors"
+                onClick={() => {
+                  // Fermer le menu mobile après le clic
+                  setSidebarOpen(false);
+                  // Forcer le rafraîchissement de la page
+                  router.refresh();
+                }}
+                className="flex items-center space-x-3 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors min-h-[44px] sm:min-h-0 touch-manipulation"
               >
-                <IconComponent className="h-5 w-5" />
-                <div>
-                  <div>{item.title}</div>
-                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                <IconComponent className="h-5 w-5 flex-shrink-0" />
+                <div className="min-w-0 flex-1">
+                  <div className="truncate">{item.title}</div>
+                  <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
                     {item.description}
                   </div>
                 </div>
@@ -221,9 +286,13 @@ export default function AdminLayout({
         <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
           <Link
             href="/"
-            className="flex items-center space-x-3 w-full px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group"
+            onClick={() => {
+              setSidebarOpen(false);
+              router.refresh();
+            }}
+            className="flex items-center space-x-3 w-full px-3 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors group min-h-[44px] sm:min-h-0 touch-manipulation"
           >
-            <Home className="h-4 w-4 group-hover:scale-110 transition-transform" />
+            <Home className="h-4 w-4 group-hover:scale-110 transition-transform flex-shrink-0" />
             <span>Retour à l'accueil</span>
           </Link>
         </div>
@@ -244,7 +313,8 @@ export default function AdminLayout({
           <div className="flex items-center justify-between px-6 py-4">
             <button
               onClick={() => setSidebarOpen(true)}
-              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700"
+              className="lg:hidden p-2 rounded-md text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 min-h-[44px] min-w-[44px] flex items-center justify-center touch-manipulation"
+              aria-label="Ouvrir le menu"
             >
               <Menu className="h-6 w-6" />
             </button>

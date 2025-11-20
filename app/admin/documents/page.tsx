@@ -1,0 +1,488 @@
+"use client";
+
+import { useState, useEffect, useCallback, useMemo } from "react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { 
+  FileText, 
+  Search, 
+  Filter, 
+  Download, 
+  Trash2, 
+  Eye, 
+  File,
+  Image,
+  Video,
+  Table as TableIcon,
+  X,
+  User
+} from "lucide-react";
+import { formatDistanceToNow, format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { getAllDocuments, adminDeleteDocument } from "@/actions/documents";
+import { toast } from "sonner";
+import { TypeDocument } from "@prisma/client";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  useReactTable,
+  getSortedRowModel,
+  SortingState,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  ColumnFiltersState,
+  VisibilityState,
+} from "@tanstack/react-table";
+import { DataTable } from "@/components/admin/DataTable";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+
+const columnHelper = createColumnHelper<any>();
+
+const getDocumentIcon = (type: TypeDocument) => {
+  switch (type) {
+    case TypeDocument.PDF:
+      return FileText;
+    case TypeDocument.Image:
+      return Image;
+    case TypeDocument.Video:
+      return Video;
+    case TypeDocument.Excel:
+      return TableIcon;
+    case TypeDocument.Word:
+      return FileText;
+    default:
+      return File;
+  }
+};
+
+const getDocumentColor = (type: TypeDocument) => {
+  switch (type) {
+    case TypeDocument.PDF:
+      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
+    case TypeDocument.Image:
+      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
+    case TypeDocument.Video:
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
+    case TypeDocument.Excel:
+      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+    case TypeDocument.Word:
+      return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200";
+    default:
+      return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+  }
+};
+
+const formatFileSize = (bytes: number) => {
+  if (bytes === 0) return "0 Bytes";
+  const k = 1024;
+  const sizes = ["Bytes", "KB", "MB", "GB"];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + " " + sizes[i];
+};
+
+export default function AdminDocumentsPage() {
+  const [documents, setDocuments] = useState<any[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterType, setFilterType] = useState<string>("all");
+  const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-documents-column-visibility");
+        if (saved) return JSON.parse(saved);
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences:", error);
+      }
+    }
+    return {};
+  });
+
+  // Debounce pour la recherche
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setGlobalFilter(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  const loadDocuments = useCallback(async () => {
+    try {
+      setLoading(true);
+      const options: any = {};
+
+      if (filterType !== "all") {
+        options.type = filterType as TypeDocument;
+      }
+
+      if (searchTerm.trim()) {
+        options.searchTerm = searchTerm.trim();
+      }
+
+      const result = await getAllDocuments(options);
+      if (result.success && result.documents) {
+        setDocuments(result.documents);
+      } else {
+        toast.error(result.error || "Erreur lors du chargement");
+        setDocuments([]);
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors du chargement des documents");
+      setDocuments([]);
+    } finally {
+      setLoading(false);
+    }
+  }, [filterType, searchTerm]);
+
+  useEffect(() => {
+    loadDocuments();
+  }, [loadDocuments]);
+
+  const handleDelete = async (documentId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir supprimer ce document ?")) {
+      return;
+    }
+
+    const result = await adminDeleteDocument(documentId);
+    if (result.success) {
+      setDocuments((prev) => prev.filter((d) => d.id !== documentId));
+      toast.success("Document supprimé avec succès");
+    } else {
+      toast.error(result.error || "Erreur");
+    }
+  };
+
+  // Extraire les catégories uniques
+  const categories = useMemo(() => {
+    return Array.from(
+      new Set(
+        documents
+          .map((d) => d.categorie)
+          .filter((c: string | null) => c !== null)
+      )
+    ) as string[];
+  }, [documents]);
+
+  // Filtrer les données
+  const filteredData = useMemo(() => {
+    return documents.filter((document) => {
+      // Filtre global (recherche)
+      if (globalFilter.trim()) {
+        const q = globalFilter.trim().toLowerCase();
+        const searchText = [
+          document.nomOriginal || "",
+          document.description || "",
+          document.categorie || "",
+          document.User?.name || "",
+          document.User?.email || "",
+          document.Adherent?.firstname || "",
+          document.Adherent?.lastname || "",
+        ].join(" ").toLowerCase();
+        if (!searchText.includes(q)) return false;
+      }
+
+      // Filtre par catégorie
+      if (filterCategory !== "all" && document.categorie !== filterCategory) {
+        return false;
+      }
+
+      return true;
+    });
+  }, [documents, globalFilter, filterCategory]);
+
+  const columns = useMemo(() => [
+    columnHelper.accessor("nomOriginal", {
+      header: "Nom du fichier",
+      cell: ({ row }) => {
+        const document = row.original;
+        const IconComponent = getDocumentIcon(document.type);
+        return (
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${getDocumentColor(document.type)}`}>
+              <IconComponent className="h-4 w-4 sm:h-5 sm:w-5" />
+            </div>
+            <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate">
+              {document.nomOriginal}
+            </span>
+          </div>
+        );
+      },
+      size: 250,
+      minSize: 200,
+      maxSize: 400,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("User", {
+      header: "Utilisateur",
+      cell: ({ row }) => {
+        const user = row.original.User;
+        const adherent = row.original.Adherent;
+        return (
+          <div className="flex items-center gap-2 min-w-0">
+            <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
+            <div className="min-w-0">
+              {adherent ? (
+                <div className="text-xs sm:text-sm text-gray-900 dark:text-white truncate">
+                  {adherent.firstname} {adherent.lastname}
+                </div>
+              ) : (
+                <div className="text-xs sm:text-sm text-gray-900 dark:text-white truncate">
+                  {user?.name || user?.email || "N/A"}
+                </div>
+              )}
+              {user?.email && (
+                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
+                  {user.email}
+                </div>
+              )}
+            </div>
+          </div>
+        );
+      },
+      size: 200,
+      minSize: 150,
+      maxSize: 300,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("type", {
+      header: "Type",
+      cell: ({ row }) => {
+        const type = row.getValue("type") as TypeDocument;
+        return (
+          <Badge
+            variant="outline"
+            className={`text-xs ${getDocumentColor(type)}`}
+          >
+            {type}
+          </Badge>
+        );
+      },
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("categorie", {
+      header: "Catégorie",
+      cell: ({ row }) => {
+        const categorie = row.getValue("categorie") as string | null;
+        return (
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+            {categorie || "-"}
+          </span>
+        );
+      },
+      size: 150,
+      minSize: 120,
+      maxSize: 200,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("taille", {
+      header: "Taille",
+      cell: ({ row }) => {
+        const taille = row.getValue("taille") as number;
+        return (
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+            {formatFileSize(taille)}
+          </span>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("createdAt", {
+      header: "Date",
+      cell: ({ row }) => {
+        const date = row.getValue("createdAt") as Date;
+        return (
+          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+            <div>{format(new Date(date), "dd/MM/yyyy", { locale: fr })}</div>
+            <div className="text-xs text-gray-500 dark:text-gray-500">
+              {formatDistanceToNow(new Date(date), { addSuffix: true, locale: fr })}
+            </div>
+          </div>
+        );
+      },
+      size: 150,
+      minSize: 120,
+      maxSize: 180,
+      enableResizing: true,
+    }),
+    columnHelper.display({
+      id: "actions",
+      header: "Actions",
+      meta: { forceVisible: true },
+      enableResizing: false,
+      cell: ({ row }) => {
+        const document = row.original;
+        return (
+          <div className="flex items-center gap-1 sm:gap-2">
+            <a
+              href={document.chemin}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-md border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+              title="Voir"
+            >
+              <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
+            </a>
+            <a
+              href={document.chemin}
+              download
+              className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              title="Télécharger"
+            >
+              <Download className="h-3 w-3 sm:h-4 sm:w-4 text-gray-600 dark:text-gray-400" />
+            </a>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleDelete(document.id)}
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+              title="Supprimer"
+            >
+              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+          </div>
+        );
+      },
+      size: 150,
+      minSize: 140,
+      maxSize: 180,
+    }),
+  ], []);
+
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(newVisibility);
+      try {
+        localStorage.setItem("admin-documents-column-visibility", JSON.stringify(newVisibility));
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde des préférences:", error);
+      }
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+    state: { sorting, columnFilters, globalFilter, columnVisibility },
+    defaultColumn: {
+      minSize: 50,
+      maxSize: 800,
+    },
+  });
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:to-slate-800">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
+        <Card className="!py-0 shadow-lg border-blue-200 dark:border-blue-800">
+          <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white py-4 sm:py-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
+                <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
+                Documents des adhérents ({documents.length})
+              </CardTitle>
+              <div>
+                <ColumnVisibilityToggle 
+                  table={table} 
+                  storageKey="admin-documents-column-visibility"
+                />
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-6">
+            {/* Filtres et recherche */}
+            <div className="flex flex-col sm:flex-row gap-4 mb-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Rechercher par nom, description, utilisateur..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10 text-sm h-9 sm:h-10"
+                />
+              </div>
+              <Select value={filterType} onValueChange={setFilterType}>
+                <SelectTrigger className="w-full sm:w-48 text-sm h-9 sm:h-10">
+                  <SelectValue placeholder="Type de document" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les types</SelectItem>
+                  <SelectItem value={TypeDocument.PDF}>PDF</SelectItem>
+                  <SelectItem value={TypeDocument.Image}>Image</SelectItem>
+                  <SelectItem value={TypeDocument.Video}>Vidéo</SelectItem>
+                  <SelectItem value={TypeDocument.Excel}>Excel</SelectItem>
+                  <SelectItem value={TypeDocument.Word}>Word</SelectItem>
+                  <SelectItem value={TypeDocument.Autre}>Autre</SelectItem>
+                </SelectContent>
+              </Select>
+              {categories.length > 0 && (
+                <Select value={filterCategory} onValueChange={setFilterCategory}>
+                  <SelectTrigger className="w-full sm:w-48 text-sm h-9 sm:h-10">
+                    <SelectValue placeholder="Catégorie" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Toutes les catégories</SelectItem>
+                    {categories.map((cat) => (
+                      <SelectItem key={cat} value={cat}>
+                        {cat}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
+              {(filterType !== "all" || filterCategory !== "all" || searchTerm) && (
+                <Button
+                  variant="outline"
+                  onClick={() => {
+                    setFilterType("all");
+                    setFilterCategory("all");
+                    setSearchTerm("");
+                  }}
+                  className="text-sm h-9 sm:h-10"
+                >
+                  <X className="h-4 w-4 mr-2" />
+                  Effacer
+                </Button>
+              )}
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+                  {filteredData.length} document(s) trouvé(s)
+                </div>
+                <DataTable table={table} emptyMessage="Aucun document trouvé" />
+              </>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
