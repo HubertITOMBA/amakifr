@@ -28,12 +28,28 @@ async function createDefaultTypesCotisationMensuelle() {
         ordre: 1
       },
       {
-        nom: "Cotisation Occasionnelle",
-        description: "Cotisation occasionnelle mensuelle",
+        nom: "Assistance anniversaire en salle",
+        description: "Assistance anniversaire en salle",
         montant: 50.00,
         obligatoire: true,
         actif: true,
         ordre: 2
+      },
+      {
+        nom: "Assistance mariage",
+        description: "Assistance mariage de l'adhérent ou de son enfant ",
+        montant: 50.00,
+        obligatoire: true,
+        actif: true,
+        ordre: 3
+      },
+      {
+        nom: "Assistance décès",
+        description: "Assistance décès d'un membre de la famille restreint de l'adhérent",
+        montant: 50.00,
+        obligatoire: true,
+        actif: true,
+        ordre: 4
       },
       {
         nom: "Formation",
@@ -41,7 +57,7 @@ async function createDefaultTypesCotisationMensuelle() {
         montant: 25.00,
         obligatoire: false,
         actif: true,
-        ordre: 3
+        ordre: 5
       },
       {
         nom: "Matériel",
@@ -49,7 +65,7 @@ async function createDefaultTypesCotisationMensuelle() {
         montant: 10.00,
         obligatoire: false,
         actif: true,
-        ordre: 4
+        ordre: 6
       }
     ];
 

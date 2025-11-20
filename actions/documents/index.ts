@@ -209,7 +209,7 @@ export async function getDocuments(options?: {
       where.adherentId = options.adherentId;
     }
 
-    const documents = await db.document.findMany({
+    const documents = await safeFindMany(db.document.findMany({
       where,
       orderBy: {
         createdAt: "desc",
@@ -223,7 +223,7 @@ export async function getDocuments(options?: {
           },
         },
       },
-    });
+    }));
 
     return {
       success: true,
@@ -408,7 +408,7 @@ export async function getAllDocuments(options?: {
       ];
     }
 
-    const documents = await db.document.findMany({
+    const documents = await safeFindMany(db.document.findMany({
       where,
       orderBy: {
         createdAt: "desc",
@@ -429,7 +429,7 @@ export async function getAllDocuments(options?: {
           },
         },
       },
-    });
+    }));
 
     return {
       success: true,

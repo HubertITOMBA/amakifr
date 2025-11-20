@@ -6,6 +6,7 @@ import { UserRole, TypeRessource, StatutReservation } from "@prisma/client";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { isAfter, isBefore, addDays, startOfDay, endOfDay } from "date-fns";
+import { safeFindMany } from "@/lib/prisma-helpers";
 
 const CreateRessourceSchema = z.object({
   nom: z.string().min(1, "Le nom est requis").max(255, "Le nom est trop long"),
@@ -90,7 +91,7 @@ export async function createRessource(formData: FormData) {
  */
 export async function getAllRessources() {
   try {
-    const ressources = await prisma.ressource.findMany({
+    const ressources = await safeFindMany(prisma.ressource.findMany({
       include: {
         _count: {
           select: {
@@ -101,7 +102,7 @@ export async function getAllRessources() {
       orderBy: {
         nom: "asc",
       },
-    });
+    }));
 
     return {
       success: true,
@@ -237,7 +238,7 @@ export async function getAllReservations() {
       return { success: false, error: "Non autorisé" };
     }
 
-    const reservations = await prisma.reservation.findMany({
+    const reservations = await safeFindMany(prisma.reservation.findMany({
       include: {
         Ressource: true,
         Adherent: {
@@ -255,7 +256,7 @@ export async function getAllReservations() {
       orderBy: {
         dateDebut: "desc",
       },
-    });
+    }));
 
     return {
       success: true,

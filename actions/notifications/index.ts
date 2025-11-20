@@ -138,14 +138,14 @@ export async function getNotifications(options?: {
       where.type = options.type;
     }
 
-    const notifications = await db.notification.findMany({
+    const notifications = await safeFindMany(db.notification.findMany({
       where,
       orderBy: {
         createdAt: "desc",
       },
       take: options?.limit || 50,
       skip: options?.offset || 0,
-    });
+    }));
 
     return {
       success: true,
@@ -186,7 +186,7 @@ export async function getAllNotifications(options?: {
       where.type = options.type;
     }
 
-    const notifications = await db.notification.findMany({
+    const notifications = await safeFindMany(db.notification.findMany({
       where,
       include: {
         User: {
@@ -202,7 +202,7 @@ export async function getAllNotifications(options?: {
       },
       take: options?.limit || 100,
       skip: options?.offset || 0,
-    });
+    }));
 
     return {
       success: true,

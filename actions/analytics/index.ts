@@ -6,6 +6,40 @@ import { UserRole } from "@prisma/client";
 import { subMonths, startOfMonth, endOfMonth, startOfYear, endOfYear, format } from "date-fns";
 
 /**
+ * Helper pour gérer l'absence de table dans Prisma
+ * Retourne 0 si la table n'existe pas (code P2021)
+ */
+async function safeCount(query: Promise<number>): Promise<number> {
+  try {
+    return await query;
+  } catch (error: any) {
+    // Si la table n'existe pas (code P2021 pour Prisma)
+    if (error?.code === 'P2021') {
+      return 0;
+    }
+    throw error;
+  }
+}
+
+/**
+ * Helper pour gérer l'absence de table dans Prisma pour aggregate
+ * Retourne un objet avec _sum: { montant: 0 } si la table n'existe pas
+ */
+async function safeAggregate<T extends { _sum: { montant?: any } }>(
+  query: Promise<T>
+): Promise<T> {
+  try {
+    return await query;
+  } catch (error: any) {
+    // Si la table n'existe pas (code P2021 pour Prisma)
+    if (error?.code === 'P2021') {
+      return { _sum: { montant: 0 } } as T;
+    }
+    throw error;
+  }
+}
+
+/**
  * Récupère toutes les statistiques analytiques pour le dashboard
  */
 export async function getAnalyticsDashboard(period: "week" | "month" | "quarter" | "year" = "month") {
@@ -199,7 +233,7 @@ async function getCotisationsStats(
   previousEndDate: Date
 ) {
   const [adherentsAjour, adherentsEnRetard, totalDettes, cotisationsPeriode, cotisationsPeriodePrecedente] = await Promise.all([
-    prisma.adherent.count({
+    safeCount(prisma.adherent.count({
       where: {
         ObligationsCotisation: {
           none: {
@@ -207,8 +241,8 @@ async function getCotisationsStats(
           },
         },
       },
-    }),
-    prisma.adherent.count({
+    })),
+    safeCount(prisma.adherent.count({
       where: {
         ObligationsCotisation: {
           some: {
@@ -216,25 +250,25 @@ async function getCotisationsStats(
           },
         },
       },
-    }),
-    prisma.obligationCotisation.aggregate({
+    })),
+    safeAggregate(prisma.obligationCotisation.aggregate({
       where: {
         statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] },
       },
       _sum: {
         montantRestant: true,
       },
-    }),
-    prisma.cotisation.count({
+    })),
+    safeCount(prisma.cotisation.count({
       where: {
         dateCotisation: { gte: startDate, lte: endDate },
       },
-    }),
-    prisma.cotisation.count({
+    })),
+    safeCount(prisma.cotisation.count({
       where: {
         dateCotisation: { gte: previousStartDate, lte: previousEndDate },
       },
-    }),
+    })),
   ]);
 
   const evolution = cotisationsPeriodePrecedente > 0
@@ -265,42 +299,42 @@ async function getFinancesStats(
   previousEndDate: Date
 ) {
   const [revenus, depenses, revenusPeriode, depensesPeriode, revenusPeriodePrecedente, depensesPeriodePrecedente] = await Promise.all([
-    prisma.paiementCotisation.aggregate({
+    safeAggregate(prisma.paiementCotisation.aggregate({
       where: { statut: "Valide" },
       _sum: { montant: true },
-    }),
-    prisma.depense.aggregate({
+    })),
+    safeAggregate(prisma.depense.aggregate({
       where: { statut: "Valide" },
       _sum: { montant: true },
-    }),
-    prisma.paiementCotisation.aggregate({
+    })),
+    safeAggregate(prisma.paiementCotisation.aggregate({
       where: {
         statut: "Valide",
         datePaiement: { gte: startDate, lte: endDate },
       },
       _sum: { montant: true },
-    }),
-    prisma.depense.aggregate({
+    })),
+    safeAggregate(prisma.depense.aggregate({
       where: {
         statut: "Valide",
         dateDepense: { gte: startDate, lte: endDate },
       },
       _sum: { montant: true },
-    }),
-    prisma.paiementCotisation.aggregate({
+    })),
+    safeAggregate(prisma.paiementCotisation.aggregate({
       where: {
         statut: "Valide",
         datePaiement: { gte: previousStartDate, lte: previousEndDate },
       },
       _sum: { montant: true },
-    }),
-    prisma.depense.aggregate({
+    })),
+    safeAggregate(prisma.depense.aggregate({
       where: {
         statut: "Valide",
         dateDepense: { gte: previousStartDate, lte: previousEndDate },
       },
       _sum: { montant: true },
-    }),
+    })),
   ]);
 
   const totalRevenus = Number(revenus._sum.montant || 0);
@@ -335,17 +369,17 @@ async function getIdeesStats(
   previousEndDate: Date
 ) {
   const [total, ideesPeriode, ideesPeriodePrecedente] = await Promise.all([
-    prisma.idee.count(),
-    prisma.idee.count({
+    safeCount(prisma.idee.count()),
+    safeCount(prisma.idee.count({
       where: {
         createdAt: { gte: startDate, lte: endDate },
       },
-    }),
-    prisma.idee.count({
+    })),
+    safeCount(prisma.idee.count({
       where: {
         createdAt: { gte: previousStartDate, lte: previousEndDate },
       },
-    }),
+    })),
   ]);
 
   const evolution = ideesPeriodePrecedente > 0
@@ -369,17 +403,17 @@ async function getDocumentsStats(
   previousEndDate: Date
 ) {
   const [total, documentsPeriode, documentsPeriodePrecedente] = await Promise.all([
-    prisma.document.count(),
-    prisma.document.count({
+    safeCount(prisma.document.count()),
+    safeCount(prisma.document.count({
       where: {
         createdAt: { gte: startDate, lte: endDate },
       },
-    }),
-    prisma.document.count({
+    })),
+    safeCount(prisma.document.count({
       where: {
         createdAt: { gte: previousStartDate, lte: previousEndDate },
       },
-    }),
+    })),
   ]);
 
   const evolution = documentsPeriodePrecedente > 0
@@ -403,19 +437,19 @@ async function getElectionsStats(
   previousEndDate: Date
 ) {
   const [total, ouvertes, totalVotes, electionsPeriode, electionsPeriodePrecedente] = await Promise.all([
-    prisma.election.count(),
-    prisma.election.count({ where: { status: "Ouverte" } }),
-    prisma.vote.count(),
-    prisma.election.count({
+    safeCount(prisma.election.count()),
+    safeCount(prisma.election.count({ where: { status: "Ouverte" } })),
+    safeCount(prisma.vote.count()),
+    safeCount(prisma.election.count({
       where: {
         dateOuverture: { gte: startDate, lte: endDate },
       },
-    }),
-    prisma.election.count({
+    })),
+    safeCount(prisma.election.count({
       where: {
         dateOuverture: { gte: previousStartDate, lte: previousEndDate },
       },
-    }),
+    })),
   ]);
 
   const evolution = electionsPeriodePrecedente > 0
@@ -439,26 +473,26 @@ async function getElectionsStats(
  */
 async function getEngagementStats(startDate: Date, endDate: Date) {
   const [documentsUploades, votesEffectues, participationsEvenements, ideesSoumises] = await Promise.all([
-    prisma.document.count({
+    safeCount(prisma.document.count({
       where: {
         createdAt: { gte: startDate, lte: endDate },
       },
-    }),
-    prisma.vote.count({
+    })),
+    safeCount(prisma.vote.count({
       where: {
         createdAt: { gte: startDate, lte: endDate },
       },
-    }),
-    prisma.inscriptionEvenement.count({
+    })),
+    safeCount(prisma.inscriptionEvenement.count({
       where: {
         createdAt: { gte: startDate, lte: endDate },
       },
-    }),
-    prisma.idee.count({
+    })),
+    safeCount(prisma.idee.count({
       where: {
         createdAt: { gte: startDate, lte: endDate },
       },
-    }),
+    })),
   ]);
 
   const totalActions = documentsUploades + votesEffectues + participationsEvenements + ideesSoumises;
@@ -614,11 +648,11 @@ async function getEvolutionEvenements(months: number = 12) {
     const start = startOfMonth(date);
     const end = endOfMonth(date);
 
-    const count = await prisma.evenement.count({
+    const count = await safeCount(prisma.evenement.count({
       where: {
         dateDebut: { gte: start, lte: end },
       },
-    });
+    }));
 
     data.push({
       mois: format(start, "MMM yyyy"),
@@ -642,7 +676,7 @@ async function getEvolutionCotisations(months: number = 12) {
     const start = startOfMonth(date);
     const end = endOfMonth(date);
 
-    const result = await prisma.cotisation.aggregate({
+    const result = await safeAggregate(prisma.cotisation.aggregate({
       where: {
         dateCotisation: { gte: start, lte: end },
         statut: "Valide",
@@ -650,7 +684,7 @@ async function getEvolutionCotisations(months: number = 12) {
       _sum: {
         montant: true,
       },
-    });
+    }));
 
     data.push({
       mois: format(start, "MMM yyyy"),
@@ -675,20 +709,20 @@ async function getEvolutionFinances(months: number = 12) {
     const end = endOfMonth(date);
 
     const [revenus, depenses] = await Promise.all([
-      prisma.paiementCotisation.aggregate({
+      safeAggregate(prisma.paiementCotisation.aggregate({
         where: {
           datePaiement: { gte: start, lte: end },
           statut: "Valide",
         },
         _sum: { montant: true },
-      }),
-      prisma.depense.aggregate({
+      })),
+      safeAggregate(prisma.depense.aggregate({
         where: {
           dateDepense: { gte: start, lte: end },
           statut: "Valide",
         },
         _sum: { montant: true },
-      }),
+      })),
     ]);
 
     data.push({

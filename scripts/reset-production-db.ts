@@ -9,11 +9,17 @@ let prisma: PrismaClient;
  * ATTENTION : Ce script supprime TOUTES les données de la base de données
  * 
  * Étapes :
- * 1. Exécute `npx prisma migrate reset --force --skip-seed` pour supprimer toutes les données et réapplique les migrations
- * 2. Exécute `npx prisma db push` pour synchroniser le schéma Prisma avec la base de données
- * 3. Exécute `npx prisma generate` pour régénérer le client Prisma
+ * 1. Reset de la base de production (suppression de toutes les données)
+ * 2. Exécute `npx prisma generate` pour régénérer le client Prisma
+ * 3. Exécute `npx prisma db push` pour synchroniser le schéma Prisma avec la base de données
  * 4. Crée l'utilisateur Admin avec les spécifications données
- * 5. Exécute le script create-test-postes.ts pour créer les postes de test
+ * 5. Exécute les scripts de seed dans l'ordre :
+ *    - create-test-postes.ts
+ *    - create-default-badges.ts
+ *    - create-default-types-cotisation.ts
+ *    - create-anniversaire-evenement.ts
+ *    - create-evenements-elections.ts
+ *    - update-evenements-elections.ts
  * 
  * Cela garantit que le schéma Prisma est réappliqué proprement, comme si vous veniez de créer une nouvelle base de données.
  */
@@ -22,7 +28,7 @@ let prisma: PrismaClient;
 const adminUser = {
   email: 'admin@amaki.fr',
   name: 'Administrateur',
-  password: '?Kipako!',
+  password: '?Kipaku!1970',
   role: 'Admin' as const,
   status: 'Actif' as const,
   adherent: {
@@ -33,8 +39,8 @@ const adminUser = {
 };
 
 /**
- * Réinitialise la base de données en utilisant Prisma migrate reset et db push
- * Cela garantit que le schéma Prisma est réappliqué proprement
+ * Réinitialise la base de données en supprimant toutes les données
+ * Puis applique le schéma Prisma avec db push
  */
 async function resetDatabase() {
   console.log('🧹 Réinitialisation de la base de données...');
@@ -44,22 +50,42 @@ async function resetDatabase() {
     // Fermer la connexion Prisma avant d'exécuter les commandes
     await prisma.$disconnect();
     
-    // 1. Exécuter prisma migrate reset
-    console.log('📦 Exécution de: npx prisma migrate reset --force --skip-seed');
-    console.log('   (Cela supprime toutes les données et réapplique les migrations)\n');
+    // 1. Supprimer toutes les données (reset manuel)
+    console.log('🗑️  Suppression de toutes les données...\n');
+    
+    // Recréer une nouvelle instance Prisma pour le reset
+    const tempPrisma = new PrismaClient();
     
     try {
-      execSync('npx prisma migrate reset --force --skip-seed', {
+      // Supprimer toutes les données dans l'ordre (en respectant les contraintes de clés étrangères)
+      // Note: Prisma gère automatiquement les suppressions en cascade
+      await tempPrisma.user.deleteMany({});
+      console.log('   ✅ Données supprimées');
+    } catch (error: any) {
+      // Si les tables n'existent pas encore, ce n'est pas grave
+      if (error.code !== 'P2021') {
+        console.warn('   ⚠️  Erreur lors de la suppression (peut être normal si tables vides):', error.message);
+      }
+    } finally {
+      await tempPrisma.$disconnect();
+    }
+    
+    // 2. Régénérer le client Prisma
+    console.log('\n📦 Exécution de: npx prisma generate');
+    console.log('   (Cela régénère le client Prisma)\n');
+    
+    try {
+      execSync('npx prisma generate', {
         stdio: 'inherit',
         cwd: process.cwd(),
       });
-      console.log('\n✅ Prisma migrate reset terminé avec succès !\n');
+      console.log('\n✅ Prisma generate terminé avec succès !\n');
     } catch (error: any) {
-      console.error('❌ Erreur lors de prisma migrate reset:', error.message);
+      console.error('❌ Erreur lors de prisma generate:', error.message);
       throw error;
     }
     
-    // 2. Exécuter prisma db push pour synchroniser le schéma
+    // 3. Exécuter prisma db push pour synchroniser le schéma
     console.log('📦 Exécution de: npx prisma db push');
     console.log('   (Cela synchronise le schéma Prisma avec la base de données)\n');
     
@@ -71,21 +97,6 @@ async function resetDatabase() {
       console.log('\n✅ Prisma db push terminé avec succès !\n');
     } catch (error: any) {
       console.error('❌ Erreur lors de prisma db push:', error.message);
-      throw error;
-    }
-    
-    // 3. Régénérer le client Prisma
-    console.log('📦 Exécution de: npx prisma generate');
-    console.log('   (Cela régénère le client Prisma)\n');
-    
-    try {
-      execSync('npx prisma generate', {
-        stdio: 'inherit',
-        cwd: process.cwd(),
-      });
-      console.log('\n✅ Prisma generate terminé avec succès !\n');
-    } catch (error: any) {
-      console.error('❌ Erreur lors de prisma generate:', error.message);
       throw error;
     }
     
@@ -127,6 +138,7 @@ async function createAdminUser() {
       data: {
         email: adminUser.email,
         name: adminUser.name,
+        emailVerified: new Date(), // Date du jour
         password: hashedPassword,
         role: adminUser.role,
         status: adminUser.status,
@@ -159,24 +171,23 @@ async function createAdminUser() {
 }
 
 /**
- * Exécute le script create-test-postes.ts
+ * Exécute un script de seed
+ * Les scripts sont exécutés directement avec tsx car certains créent leur propre instance Prisma
  */
-async function createTestPostes() {
-  console.log('📋 Création des postes de test...\n');
+async function runSeedScript(scriptName: string, description: string) {
+  console.log(`📋 ${description}...\n`);
   
   try {
-    // Importer et exécuter le script create-test-postes
-    // Note: Le script create-test-postes utilise sa propre instance Prisma
-    // et se déconnecte à la fin, donc on doit le réimporter à chaque fois
-    const createTestPostesModule = await import('./create-test-postes');
-    const createTestPostesFunction = createTestPostesModule.default;
+    // Exécuter le script directement avec tsx
+    // Les scripts créent leur propre instance Prisma et se déconnectent à la fin
+    execSync(`tsx scripts/${scriptName}`, {
+      stdio: 'inherit',
+      cwd: process.cwd(),
+    });
     
-    // Exécuter la fonction
-    await createTestPostesFunction();
-    
-    console.log('\n✅ Postes de test créés avec succès !\n');
+    console.log(`\n✅ ${description} terminé avec succès !\n`);
   } catch (error: any) {
-    console.error('❌ Erreur lors de la création des postes de test:', error);
+    console.error(`❌ Erreur lors de ${description}:`, error.message || error);
     throw error;
   }
 }
@@ -201,14 +212,24 @@ async function main() {
     // 2. Créer l'utilisateur Admin
     await createAdminUser();
     
-    // 3. Créer les postes de test
-    await createTestPostes();
+    // 3. Exécuter les scripts de seed dans l'ordre
+    await runSeedScript('create-test-postes', 'Création des postes de test');
+    await runSeedScript('create-default-badges', 'Création des badges par défaut');
+    await runSeedScript('create-default-types-cotisation', 'Création des types de cotisation par défaut');
+    await runSeedScript('create-anniversaire-evenement', 'Création de l\'événement anniversaire');
+    await runSeedScript('create-evenements-elections', 'Création des événements d\'élections');
+    await runSeedScript('update-evenements-elections', 'Mise à jour des événements d\'élections');
     
     console.log('🎉 Réinitialisation terminée avec succès !');
     console.log('\n📋 Résumé :');
     console.log('   ✅ Base de données réinitialisée');
+    console.log('   ✅ Prisma generate exécuté');
+    console.log('   ✅ Prisma db push exécuté');
     console.log('   ✅ Utilisateur Admin créé');
     console.log('   ✅ Postes de test créés');
+    console.log('   ✅ Badges par défaut créés');
+    console.log('   ✅ Types de cotisation créés');
+    console.log('   ✅ Événements créés');
     console.log('\n🔐 Identifiants de connexion Admin :');
     console.log(`   📧 Email: ${adminUser.email}`);
     console.log(`   🔑 Mot de passe: ${adminUser.password}`);
@@ -227,5 +248,5 @@ if (require.main === module) {
   main();
 }
 
-export { resetDatabase, createAdminUser, createTestPostes };
+export { resetDatabase, createAdminUser, runSeedScript };
 

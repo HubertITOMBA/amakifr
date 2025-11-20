@@ -219,8 +219,8 @@ async function sendRappelsLimiteCandidature(now: Date) {
 
   const elections = await prisma.election.findMany({
     where: {
-      statut: "Ouverte",
-      dateLimiteCandidature: {
+      status: "Ouverte",
+      dateClotureCandidature: {
         gte: now,
         lte: dateLimite,
       },
@@ -245,7 +245,7 @@ async function sendRappelsLimiteCandidature(now: Date) {
   });
 
   for (const election of elections) {
-    const joursRestants = differenceInDays(election.dateLimiteCandidature, now);
+    const joursRestants = differenceInDays(election.dateClotureCandidature, now);
 
     // Envoyer aux adhérents actifs qui n'ont pas encore candidaté
     const adherentsActifs = await prisma.adherent.findMany({
@@ -509,8 +509,8 @@ export async function getRappelsStats() {
       }),
       prisma.election.count({
         where: {
-          statut: "Ouverte",
-          dateLimiteCandidature: {
+          status: "Ouverte",
+          dateClotureCandidature: {
             gte: now,
             lte: date7Jours,
           },

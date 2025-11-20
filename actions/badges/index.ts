@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { UserRole } from "@prisma/client";
+import { safeFindMany } from "@/lib/prisma-helpers";
 
 // Schémas de validation
 const CreateBadgeSchema = z.object({
@@ -41,12 +42,12 @@ const AttribuerBadgeSchema = z.object({
  */
 export async function getAllBadges() {
   try {
-    const badges = await prisma.badge.findMany({
+    const badges = await safeFindMany(prisma.badge.findMany({
       orderBy: [
         { ordre: "asc" },
         { nom: "asc" },
       ],
-    });
+    }));
 
     return { success: true, data: badges };
   } catch (error) {
@@ -60,13 +61,13 @@ export async function getAllBadges() {
  */
 export async function getActiveBadges() {
   try {
-    const badges = await prisma.badge.findMany({
+    const badges = await safeFindMany(prisma.badge.findMany({
       where: { actif: true },
       orderBy: [
         { ordre: "asc" },
         { nom: "asc" },
       ],
-    });
+    }));
 
     return { success: true, data: badges };
   } catch (error) {
