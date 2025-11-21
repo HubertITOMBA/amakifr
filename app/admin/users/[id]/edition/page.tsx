@@ -5,10 +5,25 @@ import { Modal } from "@/components/Modal";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { useState, useEffect } from "react";
 import { getUserByIdForAdmin, adminUpdateUser, adminUpdateUserRole, adminUpdateUserStatus } from "@/actions/user";
+import { adminUpdateAdherent } from "@/actions/user/admin-update-adherent";
+import { getAllPostesTemplates } from "@/actions/postes";
 import { UserRole, UserStatus } from "@prisma/client";
-import { toast } from "sonner";
+import { toast } from "react-toastify";
+import { User, Mail, Calendar, Briefcase, Shield, MapPin, Phone } from "lucide-react";
+
+const formatDate = (date: string | Date | null | undefined) => {
+  if (!date) return "";
+  const d = new Date(date);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+};
 
 export default function EditionUserPage() {
   const params = useParams();
@@ -17,23 +32,67 @@ export default function EditionUserPage() {
   const [isDirty, setIsDirty] = useState(false);
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [form, setForm] = useState<{ name: string; email: string; role: UserRole; status: UserStatus }>({
+  const [postes, setPostes] = useState<any[]>([]);
+  
+  const [userForm, setUserForm] = useState<{ name: string; email: string; role: UserRole; status: UserStatus }>({
     name: "",
     email: "",
     role: UserRole.Membre,
     status: UserStatus.Inactif,
   });
-  const [initialForm, setInitialForm] = useState(form);
+  
+  const [adherentForm, setAdherentForm] = useState<{
+    civility: string | null;
+    firstname: string;
+    lastname: string;
+    dateNaissance: string | null;
+    typeAdhesion: string | null;
+    profession: string | null;
+    centresInteret: string | null;
+    autorisationImage: boolean;
+    accepteCommunications: boolean;
+    nombreEnfants: number;
+    posteTemplateId: string | null;
+  }>({
+    civility: null,
+    firstname: "",
+    lastname: "",
+    dateNaissance: null,
+    typeAdhesion: null,
+    profession: null,
+    centresInteret: null,
+    autorisationImage: false,
+    accepteCommunications: true,
+    nombreEnfants: 0,
+    posteTemplateId: null,
+  });
+  
+  const [initialUserForm, setInitialUserForm] = useState(userForm);
+  const [initialAdherentForm, setInitialAdherentForm] = useState(adherentForm);
 
   useEffect(() => {
     if (id) {
       loadUser();
+      loadPostes();
     }
   }, [id]);
 
   useEffect(() => {
-    setIsDirty(JSON.stringify(form) !== JSON.stringify(initialForm));
-  }, [form, initialForm]);
+    const userChanged = JSON.stringify(userForm) !== JSON.stringify(initialUserForm);
+    const adherentChanged = JSON.stringify(adherentForm) !== JSON.stringify(initialAdherentForm);
+    setIsDirty(userChanged || adherentChanged);
+  }, [userForm, adherentForm, initialUserForm, initialAdherentForm]);
+
+  const loadPostes = async () => {
+    try {
+      const res = await getAllPostesTemplates(true);
+      if (res.success && res.data) {
+        setPostes(res.data);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  };
 
   const loadUser = async () => {
     try {
@@ -41,14 +100,33 @@ export default function EditionUserPage() {
       const result = await getUserByIdForAdmin(id);
       if (result.success && result.user) {
         setUser(result.user);
-        const init = {
+        const userInit = {
           name: result.user.name || "",
           email: result.user.email || "",
           role: result.user.role,
           status: result.user.status,
         };
-        setForm(init);
-        setInitialForm(init);
+        setUserForm(userInit);
+        setInitialUserForm(userInit);
+
+        if (result.user.adherent) {
+          const adherent = result.user.adherent;
+          const adherentInit = {
+            civility: adherent.civility || null,
+            firstname: adherent.firstname || "",
+            lastname: adherent.lastname || "",
+            dateNaissance: adherent.dateNaissance ? formatDate(adherent.dateNaissance) : null,
+            typeAdhesion: adherent.typeAdhesion || null,
+            profession: adherent.profession || null,
+            centresInteret: adherent.centresInteret || null,
+            autorisationImage: adherent.autorisationImage || false,
+            accepteCommunications: adherent.accepteCommunications !== false,
+            nombreEnfants: adherent.nombreEnfants || 0,
+            posteTemplateId: adherent.PosteTemplate?.id || null,
+          };
+          setAdherentForm(adherentInit);
+          setInitialAdherentForm(adherentInit);
+        }
       }
     } finally {
       setLoading(false);
@@ -58,17 +136,16 @@ export default function EditionUserPage() {
   const handleSave = async () => {
     if (!user) return;
     try {
-      // Mettre à jour les informations de base
-      const nameChanged = form.name !== initialForm.name;
-      const emailChanged = form.email !== initialForm.email;
-      const roleChanged = form.role !== initialForm.role;
-      const statusChanged = form.status !== initialForm.status;
+      // Mettre à jour les informations utilisateur
+      const nameChanged = userForm.name !== initialUserForm.name;
+      const emailChanged = userForm.email !== initialUserForm.email;
+      const roleChanged = userForm.role !== initialUserForm.role;
+      const statusChanged = userForm.status !== initialUserForm.status;
 
-      // Mettre à jour nom et email
       if (nameChanged || emailChanged) {
         const res = await adminUpdateUser(user.id, {
-          ...(nameChanged && { name: form.name }),
-          ...(emailChanged && { email: form.email }),
+          ...(nameChanged && { name: userForm.name }),
+          ...(emailChanged && { email: userForm.email }),
         });
         if (!res.success) {
           toast.error(res.error || "Erreur lors de la mise à jour");
@@ -76,22 +153,47 @@ export default function EditionUserPage() {
         }
       }
 
-      // Mettre à jour le rôle
       if (roleChanged) {
-        const res = await adminUpdateUserRole(user.id, form.role);
+        const res = await adminUpdateUserRole(user.id, userForm.role);
         if (!res.success) {
           toast.error(res.error || "Erreur lors de la mise à jour du rôle");
           return;
         }
       }
 
-      // Mettre à jour le statut
       if (statusChanged) {
-        const res = await adminUpdateUserStatus(user.id, form.status);
+        const res = await adminUpdateUserStatus(user.id, userForm.status);
         if (!res.success) {
           toast.error(res.error || "Erreur lors de la mise à jour du statut");
           return;
         }
+      }
+
+      // Mettre à jour les informations adhérent
+      if (user.adherent) {
+        const adherentChanged = JSON.stringify(adherentForm) !== JSON.stringify(initialAdherentForm);
+        if (adherentChanged) {
+          const res = await adminUpdateAdherent(user.adherent.id, {
+            civility: adherentForm.civility as any,
+            firstname: adherentForm.firstname,
+            lastname: adherentForm.lastname,
+            dateNaissance: adherentForm.dateNaissance || null,
+            typeAdhesion: adherentForm.typeAdhesion as any,
+            profession: adherentForm.profession || null,
+            centresInteret: adherentForm.centresInteret || null,
+            autorisationImage: adherentForm.autorisationImage,
+            accepteCommunications: adherentForm.accepteCommunications,
+            nombreEnfants: adherentForm.nombreEnfants,
+            posteTemplateId: adherentForm.posteTemplateId || null,
+          });
+          if (!res.success) {
+            toast.error(res.error || "Erreur lors de la mise à jour de l'adhérent");
+            return;
+          }
+        }
+      }
+
+      if (statusChanged) {
         toast.success("Statut mis à jour. Un email de notification a été envoyé à l'utilisateur.");
       } else {
         toast.success("Utilisateur mis à jour");
@@ -138,58 +240,264 @@ export default function EditionUserPage() {
       onSave={handleSave}
       onCancel={() => router.back()}
     >
-      <div className="space-y-4">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div className="space-y-2">
-            <Label>Nom complet (depuis adhérent)</Label>
-            <Input value={fullName} disabled />
-            <p className="text-xs text-gray-500 mt-1">Le nom est géré via le profil adhérent</p>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input 
-              id="email" 
-              type="email"
-              value={form.email} 
-              onChange={(e) => setForm({ ...form, email: e.target.value })} 
-            />
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="name">Nom d'affichage</Label>
-            <Input 
-              id="name" 
-              value={form.name} 
-              onChange={(e) => setForm({ ...form, name: e.target.value })} 
-            />
-          </div>
-          <div className="space-y-2">
-            <Label>Rôle</Label>
-            <Select value={form.role} onValueChange={(v) => setForm({ ...form, role: v as UserRole })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choisir un rôle" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UserRole.Admin}>Admin</SelectItem>
-                <SelectItem value={UserRole.Membre}>Membre</SelectItem>
-                <SelectItem value={UserRole.Invite}>Invité</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-2">
-            <Label>Statut</Label>
-            <Select value={form.status} onValueChange={(v) => setForm({ ...form, status: v as UserStatus })}>
-              <SelectTrigger>
-                <SelectValue placeholder="Choisir un statut" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UserStatus.Actif}>Actif</SelectItem>
-                <SelectItem value={UserStatus.Inactif}>Inactif</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+      <div className="space-y-3 sm:space-y-4 max-h-[85vh] overflow-y-auto px-1">
+        {/* Informations utilisateur */}
+        <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+          <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg py-3 px-4">
+            <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+              <User className="h-5 w-5" />
+              Informations utilisateur
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="pt-3 px-4 pb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+              <div className="space-y-1">
+                <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                  <Mail className="h-3 w-3" />
+                  Email
+                </Label>
+                <Input 
+                  className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm"
+                  type="email"
+                  value={userForm.email} 
+                  onChange={(e) => setUserForm({ ...userForm, email: e.target.value })} 
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                  <User className="h-3 w-3" />
+                  Nom d'affichage
+                </Label>
+                <Input 
+                  className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm"
+                  value={userForm.name} 
+                  onChange={(e) => setUserForm({ ...userForm, name: e.target.value })} 
+                />
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                  <Shield className="h-3 w-3" />
+                  Rôle
+                </Label>
+                <Select value={userForm.role} onValueChange={(v) => setUserForm({ ...userForm, role: v as UserRole })}>
+                  <SelectTrigger className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm h-auto">
+                    <SelectValue placeholder="Choisir un rôle" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UserRole.Admin}>Admin</SelectItem>
+                    <SelectItem value={UserRole.Membre}>Membre</SelectItem>
+                    <SelectItem value={UserRole.Invite}>Invité</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                  <Shield className="h-3 w-3" />
+                  Statut
+                </Label>
+                <Select value={userForm.status} onValueChange={(v) => setUserForm({ ...userForm, status: v as UserStatus })}>
+                  <SelectTrigger className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm h-auto">
+                    <SelectValue placeholder="Choisir un statut" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={UserStatus.Actif}>Actif</SelectItem>
+                    <SelectItem value={UserStatus.Inactif}>Inactif</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {user.createdAt && (
+                <div className="space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                    <Calendar className="h-3 w-3" />
+                    Date d'inscription
+                  </Label>
+                  <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
+                    {(() => {
+                      const date = new Date(user.createdAt);
+                      const day = String(date.getDate()).padStart(2, "0");
+                      const month = String(date.getMonth() + 1).padStart(2, "0");
+                      const year = date.getFullYear();
+                      const hours = String(date.getHours()).padStart(2, "0");
+                      const minutes = String(date.getMinutes()).padStart(2, "0");
+                      return `${day}/${month}/${year} ${hours}:${minutes}`;
+                    })()}
+                  </div>
+                </div>
+              )}
+              {user.lastLogin && (
+                <div className="space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                    <Calendar className="h-3 w-3" />
+                    Dernière connexion
+                  </Label>
+                  <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
+                    {(() => {
+                      const date = new Date(user.lastLogin);
+                      const day = String(date.getDate()).padStart(2, "0");
+                      const month = String(date.getMonth() + 1).padStart(2, "0");
+                      const year = date.getFullYear();
+                      const hours = String(date.getHours()).padStart(2, "0");
+                      const minutes = String(date.getMinutes()).padStart(2, "0");
+                      return `${day}/${month}/${year} ${hours}:${minutes}`;
+                    })()}
+                  </div>
+                </div>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Informations adhérent */}
+        {user.adherent && (
+          <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+            <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-2 pt-2 px-3 sm:px-4 gap-0">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                <span>Informations adhérent</span>
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="pt-2 px-3 sm:px-4 pb-3 sm:pb-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                <div className="space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Civilité</Label>
+                  <Select value={adherentForm.civility || "none"} onValueChange={(v) => setAdherentForm({ ...adherentForm, civility: v === "none" ? null : v })}>
+                    <SelectTrigger className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm h-auto">
+                      <SelectValue placeholder="Sélectionner" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Aucune</SelectItem>
+                      <SelectItem value="Monsieur">Monsieur</SelectItem>
+                      <SelectItem value="Madame">Madame</SelectItem>
+                      <SelectItem value="Mademoiselle">Mademoiselle</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Prénom</Label>
+                  <Input 
+                    className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm"
+                    value={adherentForm.firstname} 
+                    onChange={(e) => setAdherentForm({ ...adherentForm, firstname: e.target.value })} 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Nom de famille</Label>
+                  <Input 
+                    className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm"
+                    value={adherentForm.lastname} 
+                    onChange={(e) => setAdherentForm({ ...adherentForm, lastname: e.target.value })} 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                    <Calendar className="h-3 w-3" />
+                    Date de naissance
+                  </Label>
+                  <Input 
+                    className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm"
+                    type="date"
+                    value={adherentForm.dateNaissance || ""} 
+                    onChange={(e) => setAdherentForm({ ...adherentForm, dateNaissance: e.target.value || null })} 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                    <Briefcase className="h-3 w-3" />
+                    Type d'adhésion
+                  </Label>
+                  <Select value={adherentForm.typeAdhesion || "none"} onValueChange={(v) => setAdherentForm({ ...adherentForm, typeAdhesion: v === "none" ? null : v })}>
+                    <SelectTrigger className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm h-auto">
+                      <SelectValue placeholder="Sélectionner" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Aucun</SelectItem>
+                      <SelectItem value="AdhesionAnnuelle">Adhésion annuelle</SelectItem>
+                      <SelectItem value="Renouvellement">Renouvellement</SelectItem>
+                      <SelectItem value="Autre">Autre</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                    <Briefcase className="h-3 w-3" />
+                    Poste
+                  </Label>
+                  <Select value={adherentForm.posteTemplateId || "none"} onValueChange={(v) => setAdherentForm({ ...adherentForm, posteTemplateId: v === "none" ? null : v })}>
+                    <SelectTrigger className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm h-auto">
+                      <SelectValue placeholder="Sélectionner un poste" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Aucun poste</SelectItem>
+                      {postes.map((poste) => (
+                        <SelectItem key={poste.id} value={poste.id}>
+                          {poste.libelle}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                    <Briefcase className="h-3 w-3" />
+                    Profession
+                  </Label>
+                  <Input 
+                    className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm"
+                    value={adherentForm.profession || ""} 
+                    onChange={(e) => setAdherentForm({ ...adherentForm, profession: e.target.value || null })} 
+                  />
+                </div>
+                <div className="space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                    <Briefcase className="h-3 w-3" />
+                    Nombre d'enfants
+                  </Label>
+                  <Input 
+                    className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm"
+                    type="number"
+                    min="0"
+                    value={adherentForm.nombreEnfants} 
+                    onChange={(e) => setAdherentForm({ ...adherentForm, nombreEnfants: parseInt(e.target.value) || 0 })} 
+                  />
+                </div>
+                <div className="sm:col-span-2 space-y-1">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                    <Briefcase className="h-3 w-3" />
+                    Centres d'intérêt
+                  </Label>
+                  <Textarea 
+                    className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm min-h-[80px]"
+                    value={adherentForm.centresInteret || ""} 
+                    onChange={(e) => setAdherentForm({ ...adherentForm, centresInteret: e.target.value || null })} 
+                  />
+                </div>
+                <div className="sm:col-span-2 space-y-2">
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-slate-800 rounded-md border border-blue-200 dark:border-slate-600">
+                    <Checkbox 
+                      id="autorisationImage"
+                      checked={adherentForm.autorisationImage}
+                      onCheckedChange={(checked) => setAdherentForm({ ...adherentForm, autorisationImage: checked === true })}
+                    />
+                    <Label htmlFor="autorisationImage" className="text-xs font-medium text-slate-900 dark:text-slate-100 cursor-pointer">
+                      Autorisation d'utilisation de l'image dans le cadre des activités de l'association
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2 p-2 bg-blue-50 dark:bg-slate-800 rounded-md border border-blue-200 dark:border-slate-600">
+                    <Checkbox 
+                      id="accepteCommunications"
+                      checked={adherentForm.accepteCommunications}
+                      onCheckedChange={(checked) => setAdherentForm({ ...adherentForm, accepteCommunications: checked === true })}
+                    />
+                    <Label htmlFor="accepteCommunications" className="text-xs font-medium text-slate-900 dark:text-slate-100 cursor-pointer">
+                      Acceptation des communications de l'association
+                    </Label>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </Modal>
   );
 }
-

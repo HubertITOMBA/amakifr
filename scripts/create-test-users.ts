@@ -286,6 +286,7 @@ async function createTestUsers() {
               civility: userData.adherent.civility,
               firstname: userData.adherent.firstname,
               lastname: userData.adherent.lastname,
+              // Le poste sera assigné par défaut lors de la création via la logique de l'application
             }
           }
         },

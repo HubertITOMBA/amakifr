@@ -77,11 +77,13 @@ const getTypeAdhesionLabel = (type: string | null | undefined) => {
 
 const formatDate = (date: string | Date | null | undefined) => {
   if (!date) return "—";
-  return new Date(date).toLocaleDateString("fr-FR", {
-    year: "numeric",
-    month: "long",
-    day: "numeric"
-  });
+  const d = new Date(date);
+  const day = String(d.getDate()).padStart(2, "0");
+  const month = String(d.getMonth() + 1).padStart(2, "0");
+  const year = d.getFullYear();
+  const hours = String(d.getHours()).padStart(2, "0");
+  const minutes = String(d.getMinutes()).padStart(2, "0");
+  return `${day}/${month}/${year} ${hours}:${minutes}`;
 };
 
 const getEvenementFamilialLabel = (type: string) => {
@@ -189,60 +191,49 @@ export default function ConsultationUserPage() {
 
   return (
     <Modal title="Détails de l'utilisateur" confirmOnClose={false}>
-      <div className="space-y-6 max-h-[85vh] overflow-y-auto px-1">
+      <div className="space-y-3 sm:space-y-4 max-h-[85vh] overflow-y-auto px-1">
         {/* Header avec nom et badges */}
-        <Card className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-blue-900/20 dark:via-slate-900 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800 shadow-lg !py-0">
-          <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg">
-            <div className="flex items-center justify-between">
-              <CardTitle className="flex items-center gap-3 text-xl">
-                <div className="relative">
-                  <div className="absolute inset-0 animate-pulse opacity-20">
-                    <Sparkles className="h-6 w-6" />
-                  </div>
-                  <User className="h-6 w-6 relative" />
-                </div>
+        <Card className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-blue-900/20 dark:via-slate-900 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800 shadow-md !py-0">
+          <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg py-3 px-4">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-sm sm:text-base">
+                <User className="h-5 w-5" />
                 {fullName}
               </CardTitle>
               <div className="flex items-center gap-2">
-                <Badge className={`${getRoleColor(user.role)} border text-xs px-3 py-1`}>
+                <Badge className={`${getRoleColor(user.role)} border text-xs px-2 py-0.5`}>
                   {getRoleLabel(user.role)}
                 </Badge>
-                <Badge className={`${getStatusColor(user.status)} border text-xs px-3 py-1`}>
+                <Badge className={`${getStatusColor(user.status)} border text-xs px-2 py-0.5`}>
                   {getStatusLabel(user.status)}
                 </Badge>
               </div>
             </div>
           </CardHeader>
-                <CardContent className="pt-0 px-6 pb-6">
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                  <Mail className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                </div>
-                <div>
-                  <Label className="text-xs text-gray-500 dark:text-gray-400">Email</Label>
-                  <div className="text-sm font-medium text-gray-900 dark:text-white">{user.email || "—"}</div>
+          <CardContent className="pt-3 px-4 pb-4">
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 sm:gap-3">
+              <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                <Mail className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                <div className="min-w-0">
+                  <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide">Email</Label>
+                  <div className="text-xs font-medium text-gray-900 dark:text-white truncate">{user.email || "—"}</div>
                 </div>
               </div>
               {user.createdAt && (
-                <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                  <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                    <Calendar className="h-5 w-5 text-green-600 dark:text-green-400" />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-500 dark:text-gray-400">Inscription</Label>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{formatDate(user.createdAt)}</div>
+                <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                  <Calendar className="h-4 w-4 text-green-600 dark:text-green-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide">Inscription</Label>
+                    <div className="text-xs font-medium text-gray-900 dark:text-white">{formatDate(user.createdAt)}</div>
                   </div>
                 </div>
               )}
               {user.lastLogin && (
-                <div className="flex items-center gap-3 p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
-                  <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                    <Calendar className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                  </div>
-                  <div>
-                    <Label className="text-xs text-gray-500 dark:text-gray-400">Dernière connexion</Label>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white">{formatDate(user.lastLogin)}</div>
+                <div className="flex items-center gap-2 p-2 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700">
+                  <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
+                  <div className="min-w-0">
+                    <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide">Dernière connexion</Label>
+                    <div className="text-xs font-medium text-gray-900 dark:text-white">{formatDate(user.lastLogin)}</div>
                   </div>
                 </div>
               )}
@@ -253,33 +244,31 @@ export default function ConsultationUserPage() {
         {adherent && (
           <>
             {/* 1. Informations personnelles */}
-            <Card className="shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700 !py-0">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-4 pt-4 px-6 gap-0">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                    <User className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                  </div>
+            <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-2 pt-2 px-3 sm:px-4 gap-0">
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                  <User className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                   <span>1. Informations personnelles</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-0 px-6 pb-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <CardContent className="pt-2 px-3 sm:px-4 pb-3 sm:pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Civilité</Label>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white p-2 bg-gray-50 dark:bg-gray-800 rounded-md">{adherent.civility || "—"}</div>
+                    <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Civilité</Label>
+                    <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">{adherent.civility || "—"}</div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Prénom</Label>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white p-2 bg-gray-50 dark:bg-gray-800 rounded-md">{adherent.firstname || "—"}</div>
+                    <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Prénom</Label>
+                    <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">{adherent.firstname || "—"}</div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Nom de famille</Label>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white p-2 bg-gray-50 dark:bg-gray-800 rounded-md">{adherent.lastname || "—"}</div>
+                    <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Nom de famille</Label>
+                    <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">{adherent.lastname || "—"}</div>
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Date de naissance</Label>
-                    <div className="text-sm font-medium text-gray-900 dark:text-white p-2 bg-gray-50 dark:bg-gray-800 rounded-md flex items-center gap-2">
-                      <Calendar className="h-4 w-4 text-gray-400" />
+                    <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Date de naissance</Label>
+                    <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm flex items-center gap-2">
+                      <Calendar className="h-3 w-3 text-gray-400 dark:text-slate-400" />
                       {adherent.dateNaissance ? formatDate(adherent.dateNaissance) : "—"}
                     </div>
                   </div>
@@ -289,21 +278,19 @@ export default function ConsultationUserPage() {
 
             {/* Adresse */}
             {adresse && (
-              <Card className="shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700 !py-0">
-                <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-4 pt-4 px-6 gap-0">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <div className="p-2 bg-green-100 dark:bg-green-900/30 rounded-lg">
-                      <MapPin className="h-5 w-5 text-green-600 dark:text-green-400" />
-                    </div>
+              <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-2 pt-2 px-3 sm:px-4 gap-0">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                    <MapPin className="h-4 w-4 text-green-600 dark:text-green-400" />
                     <span>Adresse</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 px-6 pb-6">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <CardContent className="pt-2 px-3 sm:px-4 pb-3 sm:pb-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                     {adresse.street1 && (
-                      <div className="md:col-span-2 space-y-1">
-                        <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Adresse complète</Label>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+                      <div className="sm:col-span-2 space-y-1">
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Adresse complète</Label>
+                        <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
                           {adresse.streetnum && `${adresse.streetnum} `}
                           {adresse.street1}
                           {adresse.street2 && `, ${adresse.street2}`}
@@ -312,16 +299,16 @@ export default function ConsultationUserPage() {
                     )}
                     {(adresse.codepost || adresse.city) && (
                       <div className="space-y-1">
-                        <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Code postal / Ville</Label>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Code postal / Ville</Label>
+                        <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
                           {adresse.codepost} {adresse.city}
                         </div>
                       </div>
                     )}
                     {adresse.country && (
                       <div className="space-y-1">
-                        <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Pays</Label>
-                        <div className="text-sm font-medium text-gray-900 dark:text-white p-2 bg-gray-50 dark:bg-gray-800 rounded-md">{adresse.country}</div>
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Pays</Label>
+                        <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">{adresse.country}</div>
                       </div>
                     )}
                   </div>
@@ -331,31 +318,27 @@ export default function ConsultationUserPage() {
 
             {/* Téléphones */}
             {adherent.Telephones && adherent.Telephones.length > 0 && (
-              <Card className="shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700 !py-0">
-                <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-4 pt-4 px-6 gap-0">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <div className="p-2 bg-purple-100 dark:bg-purple-900/30 rounded-lg">
-                      <Phone className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                    </div>
+              <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-2 pt-2 px-3 sm:px-4 gap-0">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                    <Phone className="h-4 w-4 text-purple-600 dark:text-purple-400" />
                     <span>Téléphones</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 px-6 pb-6">
-                  <div className="space-y-3">
+                <CardContent className="pt-2 px-3 sm:px-4 pb-3 sm:pb-4">
+                  <div className="space-y-2">
                     {adherent.Telephones.map((tel: any, idx: number) => (
-                      <div key={idx} className="flex items-center justify-between p-4 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-700 rounded-lg border border-gray-200 dark:border-gray-600 hover:shadow-md transition-shadow">
-                        <div className="flex items-center gap-3">
-                          <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                            <Phone className="h-4 w-4 text-blue-600 dark:text-blue-400" />
-                          </div>
-                          <div>
+                      <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-600">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <Phone className="h-3 w-3 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+                          <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-sm font-semibold text-gray-900 dark:text-white">{tel.numero}</span>
+                              <span className="text-xs font-medium text-gray-900 dark:text-white truncate">{tel.numero}</span>
                               {tel.estPrincipal && (
-                                <Badge variant="outline" className="text-xs border-blue-300 text-blue-700 dark:text-blue-300">Principal</Badge>
+                                <Badge variant="outline" className="text-[9px] border-blue-300 text-blue-700 dark:text-blue-300 px-1 py-0">Principal</Badge>
                               )}
                             </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                            <div className="text-[10px] text-gray-500 dark:text-gray-400">
                               {tel.type} {tel.description && `• ${tel.description}`}
                             </div>
                           </div>
@@ -368,10 +351,10 @@ export default function ConsultationUserPage() {
             )}
 
             {/* Passeport Adhérent */}
-            <Card className="shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700 !py-0">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-4 pt-4 px-6 gap-0">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <div className="p-2 bg-cyan-100 dark:bg-cyan-900/30 rounded-lg">
+            <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-2 pt-2 px-3 sm:px-4 gap-0">
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                  <div className="">
                     <FileText className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
                   </div>
                   <span>Passeport Adhérent</span>
@@ -383,12 +366,12 @@ export default function ConsultationUserPage() {
                     <div className="space-y-2 sm:space-y-3">
                       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-3 p-3 sm:p-4 bg-gradient-to-r from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 rounded-lg border border-green-200 dark:border-green-800">
                         <div className="flex items-center gap-2 sm:gap-3 flex-1 min-w-0">
-                          <div className="p-1.5 sm:p-2 bg-green-100 dark:bg-green-900/30 rounded-lg flex-shrink-0">
+                          <div className="p-1.5 sm: flex-shrink-0">
                             <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
                           </div>
                           <div className="min-w-0 flex-1">
                             <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Numéro de passeport</Label>
-                            <div className="text-base sm:text-lg font-bold text-gray-900 dark:text-white mt-0.5 sm:mt-1 break-all">
+                            <div className="text-base sm:text-sm sm:text-base font-bold text-gray-900 dark:text-white mt-0.5 sm:mt-1 break-all">
                               {adherent.numeroPasseport}
                             </div>
                             {adherent.dateGenerationPasseport && (
@@ -420,7 +403,7 @@ export default function ConsultationUserPage() {
                   ) : (
                     <div className="space-y-2 sm:space-y-3">
                       <div className="flex items-start gap-2 sm:gap-3 p-3 sm:p-4 bg-yellow-50 dark:bg-yellow-900/20 rounded-lg border border-yellow-200 dark:border-yellow-800">
-                        <div className="p-1.5 sm:p-2 bg-yellow-100 dark:bg-yellow-900/30 rounded-lg flex-shrink-0">
+                        <div className="p-1.5 sm: flex-shrink-0">
                           <XCircle className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-600 dark:text-yellow-400" />
                         </div>
                         <div className="flex-1 min-w-0">
@@ -456,36 +439,54 @@ export default function ConsultationUserPage() {
             </Card>
 
             {/* 2. Type d'adhésion */}
-            <Card className="shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700 !py-0">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-4 pt-4 px-6 gap-0">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <div className="p-2 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg">
+            <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-2 pt-2 px-3 sm:px-4 gap-0">
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                  <div className="">
                     <Building className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
                   </div>
                   <span>2. Type d'adhésion</span>
                 </CardTitle>
               </CardHeader>
-              <CardContent className="pt-0 px-6 pb-6">
-                <div className="space-y-1">
-                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Type d'adhésion</Label>
-                  <div className="text-sm font-medium text-gray-900 dark:text-white p-2 bg-gray-50 dark:bg-gray-800 rounded-md">
-                    {getTypeAdhesionLabel(adherent.typeAdhesion)}
+              <CardContent className="pt-2 px-3 sm:px-4 pb-3 sm:pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
+                  <div className="space-y-1">
+                    <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Type d'adhésion</Label>
+                    <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
+                      {getTypeAdhesionLabel(adherent.typeAdhesion)}
+                    </div>
                   </div>
+                  {adherent.PosteTemplate && (
+                    <div className="space-y-1">
+                      <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                        <Briefcase className="h-3 w-3" />
+                        Poste
+                      </Label>
+                      <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
+                        {adherent.PosteTemplate.libelle}
+                        {adherent.PosteTemplate.description && (
+                          <div className="text-[10px] text-gray-500 dark:text-gray-400 mt-1">
+                            {adherent.PosteTemplate.description}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
             {/* 3. Informations familiales */}
-            <Card className="shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700 !py-0">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-4 pt-4 px-6 gap-0">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <div className="p-2 bg-pink-100 dark:bg-pink-900/30 rounded-lg">
+            <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-2 pt-2 px-3 sm:px-4 gap-0">
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                  <div className="">
                     <Users className="h-5 w-5 text-pink-600 dark:text-pink-400" />
                   </div>
                   <span>3. Informations familiales</span>
                 </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 px-6 pb-6 space-y-4">
+                <CardContent className="pt-2 px-3 sm:px-4 pb-3 sm:pb-4 space-y-4">
                 <div className="space-y-1">
                   <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Nombre d'enfants</Label>
                   <div className="text-sm font-medium text-gray-900 dark:text-white p-2 bg-gray-50 dark:bg-gray-800 rounded-md w-fit">
@@ -501,7 +502,7 @@ export default function ConsultationUserPage() {
                         <div key={idx} className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 rounded-lg border border-blue-200 dark:border-blue-800 hover:shadow-md transition-shadow">
                           <div className="flex items-center justify-between">
                             <div className="flex items-center gap-3">
-                              <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                              <div className="">
                                 <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
                               </div>
                               <div>
@@ -537,16 +538,16 @@ export default function ConsultationUserPage() {
 
             {/* 4. Informations complémentaires */}
             {(adherent.profession || adherent.centresInteret) && (
-              <Card className="shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700 !py-0">
-                <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-4 pt-4 px-6 gap-0">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <div className="p-2 bg-amber-100 dark:bg-amber-900/30 rounded-lg">
+              <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+                <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-2 pt-2 px-3 sm:px-4 gap-0">
+                  <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                    <div className="">
                       <Briefcase className="h-5 w-5 text-amber-600 dark:text-amber-400" />
                     </div>
                     <span>4. Informations complémentaires</span>
                   </CardTitle>
                 </CardHeader>
-                <CardContent className="pt-0 px-6 pb-6">
+                <CardContent className="pt-2 px-3 sm:px-4 pb-3 sm:pb-4">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {adherent.profession && (
                       <div className="space-y-1">
@@ -566,16 +567,16 @@ export default function ConsultationUserPage() {
             )}
 
             {/* 5. Autorisations */}
-            <Card className="shadow-md hover:shadow-lg transition-shadow border-gray-200 dark:border-gray-700 !py-0">
-              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-4 pt-4 px-6 gap-0">
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <div className="p-2 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg">
+            <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
+              <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-gray-200 dark:border-gray-700 pb-2 pt-2 px-3 sm:px-4 gap-0">
+                <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                  <div className="">
                     <Shield className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                   </div>
                   <span>5. Autorisations</span>
                 </CardTitle>
               </CardHeader>
-                <CardContent className="pt-0 px-6 pb-6">
+                <CardContent className="pt-2 px-3 sm:px-4 pb-3 sm:pb-4">
                   <div className="space-y-3">
                     <div className={`flex items-center gap-3 p-4 rounded-lg border ${
                     adherent.autorisationImage 

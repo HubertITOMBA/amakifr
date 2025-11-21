@@ -2,10 +2,10 @@ import prisma from "../lib/prisma";
 
 /**
  * Script pour créer des fixtures de postes à pourvoir pour les tests
- * Ce script ajoute des postes supplémentaires à ceux déjà existants
+ * Ce script peut être exécuté plusieurs fois : il met à jour les postes existants ou crée de nouveaux postes
  */
 async function createTestPostes() {
-  console.log("🌱 Création des fixtures de postes à pourvoir...");
+  console.log("🌱 Création/Mise à jour des fixtures de postes à pourvoir...");
 
   try {
     // Récupérer un admin pour createdBy
@@ -20,6 +20,15 @@ async function createTestPostes() {
 
     // Postes supplémentaires pour les tests
     const postesToCreate = [
+      {
+        code: "MEMBRE",
+        libelle: "Membre de l'association",
+        description: "Poste pour les membres de l'association sans responsabilité particulière.",
+        ordre: 1,
+        nombreMandatsDefaut: 1,
+        dureeMandatDefaut: null, // Pas de durée de mandat pour les membres simples
+        actif: true,
+      },
       {
         code: "COMFOR",
         libelle: "Responsable Formation",
@@ -158,10 +167,10 @@ async function createTestPostes() {
     ];
 
     let createdCount = 0;
-    let skippedCount = 0;
+    let updatedCount = 0;
     const errors: string[] = [];
 
-    // Créer les postes un par un pour gérer les doublons
+    // Créer ou mettre à jour les postes un par un
     for (const poste of postesToCreate) {
       try {
         // Vérifier si le poste existe déjà
@@ -170,21 +179,32 @@ async function createTestPostes() {
         });
 
         if (existing) {
-          console.log(`⚠️  Poste ${poste.libelle} (${poste.code}) existe déjà, ignoré.`);
-          skippedCount++;
-          continue;
+          // Mettre à jour le poste existant
+          const updated = await prisma.posteTemplate.update({
+            where: { code: poste.code },
+            data: {
+              libelle: poste.libelle,
+              description: poste.description,
+              ordre: poste.ordre,
+              nombreMandatsDefaut: poste.nombreMandatsDefaut,
+              dureeMandatDefaut: poste.dureeMandatDefaut,
+              actif: poste.actif,
+              // Ne pas mettre à jour createdBy si le poste existe déjà
+            },
+          });
+          console.log(`🔄 ${updated.libelle} (${updated.code}) mis à jour`);
+          updatedCount++;
+        } else {
+          // Créer un nouveau poste
+          const created = await prisma.posteTemplate.create({
+            data: {
+              ...poste,
+              createdBy: admin.id,
+            },
+          });
+          console.log(`✅ ${created.libelle} (${created.code}) créé`);
+          createdCount++;
         }
-
-        // Créer le poste
-        const created = await prisma.posteTemplate.create({
-          data: {
-            ...poste,
-            createdBy: admin.id,
-          },
-        });
-
-        console.log(`✅ ${created.libelle} (${created.code}) créé`);
-        createdCount++;
       } catch (error: any) {
         const errorMsg = `Erreur pour ${poste.libelle}: ${error.message}`;
         console.error(`❌ ${errorMsg}`);
@@ -194,7 +214,7 @@ async function createTestPostes() {
 
     console.log("\n📊 Résumé :");
     console.log(`   ✅ ${createdCount} poste(s) créé(s)`);
-    console.log(`   ⚠️  ${skippedCount} poste(s) ignoré(s) (déjà existant)`);
+    console.log(`   🔄 ${updatedCount} poste(s) mis à jour`);
     if (errors.length > 0) {
       console.log(`   ❌ ${errors.length} erreur(s)`);
       errors.forEach((err) => console.log(`      - ${err}`));

@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { safeFindMany } from "@/lib/prisma-helpers";
 import { revalidatePath } from "next/cache";
 import { TypeNotification } from "@prisma/client";
 import { z } from "zod";

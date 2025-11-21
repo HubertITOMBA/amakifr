@@ -34,6 +34,11 @@ export const register = async (
         }
     })
 
+    // Récupérer le poste par défaut "Membre de l'association"
+    const posteMembre = await db.posteTemplate.findUnique({
+        where: { code: "MEMBRE" },
+    });
+
     await db.adherent.create({
         data: {
             User: {
@@ -41,6 +46,7 @@ export const register = async (
                     id: user.id
                 }
             },
+            posteTemplateId: posteMembre?.id || null, // Assigner le poste par défaut
         }  
     })
 

@@ -15,7 +15,9 @@ import {
   UserCheck,
   UserX,
   Plus,
-  Mail
+  Mail,
+  Award,
+  Briefcase
 } from "lucide-react";
 import { UserRole, UserStatus } from "@prisma/client";
 import { 
@@ -31,8 +33,10 @@ import {
 import { 
   getAllUsersForAdmin,
   adminUpdateUserRole,
-  adminUpdateUserStatus
+  adminUpdateUserStatus,
+  adminUpdateAdherentPoste
 } from "@/actions/user";
+import { getAllPostesTemplates } from "@/actions/postes";
 import Link from "next/link";
 import { toast } from "sonner";
 import { DataTable } from "@/components/admin/DataTable";
@@ -48,6 +52,15 @@ type UserData = {
   status: UserStatus;
   createdAt: string;
   lastLogin: string | null;
+  badgesAttribues: Array<{
+    id: string;
+    Badge: {
+      id: string;
+      nom: string;
+      icone: string;
+      couleur: string;
+    };
+  }>;
   adherent: {
     id: string;
     firstname: string;
@@ -62,6 +75,12 @@ type UserData = {
       city?: string | null;
       country?: string | null;
     }>;
+    PosteTemplate: {
+      id: string;
+      code: string;
+      libelle: string;
+      description: string | null;
+    } | null;
   } | null;
 };
 
@@ -126,6 +145,7 @@ export default function AdminUsersPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
+  const [postes, setPostes] = useState<Array<{ id: string; libelle: string; code: string }>>([]);
   
   // Visibilité des colonnes - charger depuis localStorage
   // Sur mobile, masquer certaines colonnes par défaut pour améliorer la lisibilité
@@ -163,11 +183,19 @@ export default function AdminUsersPage() {
   const loadAll = useCallback(async () => {
     try {
       setLoading(true);
-      const res = await getAllUsersForAdmin();
-      if (res.success && res.users) {
-        setUsers(res.users as UserData[]);
+      const [usersRes, postesRes] = await Promise.all([
+        getAllUsersForAdmin(),
+        getAllPostesTemplates(true) // Seulement les postes actifs
+      ]);
+      
+      if (usersRes.success && usersRes.users) {
+        setUsers(usersRes.users as UserData[]);
       } else {
-        toast.error(res.error || "Erreur lors du chargement");
+        toast.error(usersRes.error || "Erreur lors du chargement");
+      }
+      
+      if (postesRes.success && postesRes.data) {
+        setPostes(postesRes.data.map((p: any) => ({ id: p.id, libelle: p.libelle, code: p.code })));
       }
     } catch (error) {
       console.error("Erreur:", error);
@@ -216,6 +244,16 @@ export default function AdminUsersPage() {
       await loadAll();
     } else {
       toast.error(res.error || "Erreur lors de la mise à jour du statut");
+    }
+  }, [loadAll]);
+
+  const handlePosteChange = useCallback(async (adherentId: string, posteTemplateId: string | null) => {
+    const res = await adminUpdateAdherentPoste(adherentId, posteTemplateId);
+    if (res.success) {
+      toast.success(res.message || "Poste mis à jour");
+      await loadAll();
+    } else {
+      toast.error(res.error || "Erreur lors de la mise à jour du poste");
     }
   }, [loadAll]);
 
@@ -291,13 +329,100 @@ export default function AdminUsersPage() {
         );
       },
     }),
+    columnHelper.display({
+      id: "badges",
+      header: "Badges",
+      cell: ({ row }) => {
+        const user = row.original;
+        const badges = user.badgesAttribues || [];
+        if (badges.length === 0) {
+          return <span className="text-xs sm:text-sm text-gray-400">—</span>;
+        }
+        return (
+          <div className="flex items-center gap-1 flex-wrap">
+            {badges.slice(0, 3).map((attribution) => {
+              const badge = attribution.Badge;
+              // Utiliser une icône par défaut si l'icône n'est pas trouvée
+              const getBadgeColor = (couleur: string) => {
+                const colors: Record<string, string> = {
+                  blue: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+                  green: "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200",
+                  gold: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200",
+                  red: "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200",
+                  purple: "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200",
+                };
+                return colors[couleur.toLowerCase()] || "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+              };
+              return (
+                <Badge key={attribution.id} className={`${getBadgeColor(badge.couleur)} text-xs`} title={badge.nom}>
+                  <Award className="h-3 w-3 mr-1" />
+                  {badge.nom}
+                </Badge>
+              );
+            })}
+            {badges.length > 3 && (
+              <Badge variant="outline" className="text-xs">
+                +{badges.length - 3}
+              </Badge>
+            )}
+          </div>
+        );
+      },
+    }),
+    columnHelper.display({
+      id: "poste",
+      header: "Poste",
+      cell: ({ row }) => {
+        const user = row.original;
+        const adherent = user.adherent;
+        if (!adherent) {
+          return <span className="text-xs sm:text-sm text-gray-400">—</span>;
+        }
+        const currentPoste = adherent.PosteTemplate;
+        return (
+          <Select
+            value={currentPoste?.id || "none"}
+            onValueChange={(value) => {
+              handlePosteChange(adherent.id, value === "none" ? null : value);
+            }}
+          >
+            <SelectTrigger className="w-32 sm:w-40 h-7 sm:h-8 text-xs">
+              <SelectValue>
+                {currentPoste ? (
+                  <div className="flex items-center gap-1">
+                    <Briefcase className="h-3 w-3" />
+                    <span>{currentPoste.libelle}</span>
+                  </div>
+                ) : (
+                  "Aucun poste"
+                )}
+              </SelectValue>
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Aucun poste</SelectItem>
+              {postes.map((poste) => (
+                <SelectItem key={poste.id} value={poste.id}>
+                  {poste.libelle}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        );
+      },
+    }),
     columnHelper.accessor("createdAt", {
       header: "Date inscription",
       cell: ({ row }) => {
         const date = new Date(row.getValue("createdAt"));
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, "0");
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        const formatted = `${day}/${month}/${year} ${hours}:${minutes}`;
         return (
-          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
-            {date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap" title={formatted}>
+            {formatted}
           </span>
         );
       },
@@ -308,9 +433,15 @@ export default function AdminUsersPage() {
         const lastLogin = row.getValue("lastLogin") as string | null;
         if (!lastLogin) return <span className="text-xs sm:text-sm text-gray-400">Jamais</span>;
         const date = new Date(lastLogin);
+        const day = String(date.getDate()).padStart(2, "0");
+        const month = String(date.getMonth() + 1).padStart(2, "0");
+        const year = date.getFullYear();
+        const hours = String(date.getHours()).padStart(2, "0");
+        const minutes = String(date.getMinutes()).padStart(2, "0");
+        const formatted = `${day}/${month}/${year} ${hours}:${minutes}`;
         return (
-          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap">
-            {date.toLocaleDateString("fr-FR", { day: "2-digit", month: "2-digit", year: "2-digit" })}
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 whitespace-nowrap" title={formatted}>
+            {formatted}
           </span>
         );
       },
@@ -362,7 +493,7 @@ export default function AdminUsersPage() {
         );
       },
     }),
-  ], [handleRoleChange, handleStatusChange, filteredUsers]);
+  ], [handleRoleChange, handleStatusChange, handlePosteChange, postes, filteredUsers]);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 

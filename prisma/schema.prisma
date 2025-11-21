@@ -114,6 +114,7 @@ model PosteTemplate {
 
   // Relations
   positions Position[] // Positions utilisant ce template
+  adherents Adherent[] // Adhérents ayant ce poste
 
   // Métadonnées
   createdAt DateTime @default(now())
@@ -198,8 +199,8 @@ model User {
   notifications               Notification[] // Notifications reçues
   documents                   Document[] // Documents uploadés
   badgesAttribues             BadgeAttribution[] // Badges attribués à cet utilisateur
-  ressourcesCreees            Ressource[] @relation("RessourceCreatedBy") // Ressources créées
-  reservationsConfirmees      Reservation[] @relation("ReservationConfirmeePar") // Réservations confirmées
+  ressourcesCreees            Ressource[]                  @relation("RessourceCreatedBy") // Ressources créées
+  reservationsConfirmees      Reservation[]                @relation("ReservationConfirmeePar") // Réservations confirmées
 
   lastLogin DateTime? @updatedAt
   createdAt DateTime  @default(now())
@@ -272,6 +273,9 @@ model Adherent {
   // Champs pour le passeport adhérent
   numeroPasseport             String?                      @db.VarChar(50) // Numéro unique du passeport AMAKI
   dateGenerationPasseport     DateTime? // Date de génération du passeport
+  // Poste de l'adhérent dans l'association
+  posteTemplateId             String? // Poste de l'adhérent (par défaut: Membre de l'association)
+  PosteTemplate               PosteTemplate?               @relation(fields: [posteTemplateId], references: [id], onDelete: SetNull)
   Adresse                     Adresse[]
   Cotisations                 Cotisation[]
   Telephones                  Telephone[]
@@ -1199,73 +1203,73 @@ enum StatutReservation {
 }
 
 model Ressource {
-  id          String   @id @default(cuid())
-  nom         String   @db.VarChar(255)
-  type        TypeRessource
-  description String?  @db.Text
-  capacite    Int? // Pour les salles : nombre de places
-  localisation String? @db.VarChar(255) // Adresse ou emplacement
-  image       String?  @db.VarChar(500) // URL de l'image
-  
+  id           String        @id @default(cuid())
+  nom          String        @db.VarChar(255)
+  type         TypeRessource
+  description  String?       @db.Text
+  capacite     Int? // Pour les salles : nombre de places
+  localisation String?       @db.VarChar(255) // Adresse ou emplacement
+  image        String?       @db.VarChar(500) // URL de l'image
+
   // Configuration
-  actif       Boolean  @default(true)
-  reservable  Boolean  @default(true) // Si la ressource peut être réservée
-  
+  actif      Boolean @default(true)
+  reservable Boolean @default(true) // Si la ressource peut être réservée
+
   // Horaires de disponibilité (optionnel)
   horairesOuverture String? @db.Text // JSON : { "lundi": { "debut": "08:00", "fin": "18:00" }, ... }
-  
+
   // Tarification (optionnel)
-  tarifHoraire Decimal? @db.Decimal(10, 2)
+  tarifHoraire    Decimal? @db.Decimal(10, 2)
   tarifJournalier Decimal? @db.Decimal(10, 2)
-  
+
   // Relations
   reservations Reservation[]
-  
+
   // Métadonnées
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   createdBy String
   CreatedBy User     @relation("RessourceCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
-  
+
   @@map("ressources")
 }
 
 model Reservation {
-  id          String   @id @default(cuid())
+  id          String  @id @default(cuid())
   ressourceId String
   adherentId  String? // Optionnel pour permettre les réservations de visiteurs
-  
+
   // Dates et heures
   dateDebut   DateTime
   dateFin     DateTime
   dureeHeures Decimal? @db.Decimal(10, 2) // Durée en heures
-  
+
   // Statut
-  statut      StatutReservation @default(EnAttente)
-  
+  statut StatutReservation @default(EnAttente)
+
   // Informations de réservation
-  motif       String?  @db.Text // Raison de la réservation
+  motif           String? @db.Text // Raison de la réservation
   nombrePersonnes Int? // Nombre de personnes (pour les salles)
-  commentaires String? @db.Text
-  
+  commentaires    String? @db.Text
+
   // Informations du visiteur (pour les non-adhérents)
   visiteurNom       String? @db.VarChar(255)
   visiteurEmail     String? @db.VarChar(255)
   visiteurTelephone String? @db.VarChar(20)
-  
+
   // Confirmation
   confirmeePar     String? // ID de l'admin qui a confirmé
   dateConfirmation DateTime?
-  
+
   // Relations
-  Ressource Ressource @relation(fields: [ressourceId], references: [id], onDelete: Cascade)
-  Adherent  Adherent? @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  ConfirmeePar User?  @relation("ReservationConfirmeePar", fields: [confirmeePar], references: [id], onDelete: SetNull)
-  
+  Ressource    Ressource @relation(fields: [ressourceId], references: [id], onDelete: Cascade)
+  Adherent     Adherent? @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  ConfirmeePar User?     @relation("ReservationConfirmeePar", fields: [confirmeePar], references: [id], onDelete: SetNull)
+
   // Métadonnées
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
-  
+
   @@index([ressourceId, dateDebut, dateFin])
   @@index([adherentId])
   @@index([statut])

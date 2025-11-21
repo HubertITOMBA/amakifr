@@ -65,6 +65,13 @@ interface Relance {
   updatedAt: string;
 }
 
+interface PosteTemplate {
+  id: string;
+  code: string;
+  libelle: string;
+  description?: string;
+}
+
 interface Adherent {
   id: string;
   civility?: string;
@@ -72,6 +79,7 @@ interface Adherent {
   lastname: string;
   created_at?: string;
   updated_at?: string;
+  PosteTemplate?: PosteTemplate | null;
   Adresse: Adresse[];
   Telephones: Telephone[];
   Cotisations: Cotisation[];

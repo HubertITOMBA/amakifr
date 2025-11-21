@@ -4389,6 +4389,12 @@ export default function UserProfilePage() {
                   <Shield className="h-3 w-3 mr-0.5" />
                   {userRole}
                 </Badge>
+                {userProfile?.adherent?.PosteTemplate && (
+                  <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs">
+                    <Award className="h-3 w-3 mr-0.5" />
+                    {userProfile.adherent.PosteTemplate.libelle}
+                  </Badge>
+                )}
               </div>
             </div>
             

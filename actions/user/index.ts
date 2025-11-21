@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import prisma from "@/lib/prisma";
+import { revalidatePath } from "next/cache";
 import { Civilities, TypeTelephone, UserRole, TypeAdhesion, TypeCotisation } from "@prisma/client";
 import { writeFile } from "fs/promises";
 import { join } from "path";
@@ -170,6 +171,7 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
             Telephones: true,
             Cotisations: true,
             ObligationsCotisation: true,
+            PosteTemplate: true,
             DettesInitiales: {
               orderBy: {
                 annee: 'desc'
@@ -569,10 +571,16 @@ export async function updateUserData(
         adherentUpdateData.estAncienAdherent = false;
       }
 
+      // Récupérer le poste par défaut "Membre de l'association"
+      const posteMembre = await prisma.posteTemplate.findUnique({
+        where: { code: "MEMBRE" },
+      });
+
       adherent = await prisma.adherent.create({
         data: {
           ...adherentUpdateData,
           userId: session.user.id,
+          posteTemplateId: posteMembre?.id || null, // Assigner le poste par défaut
         }
       });
 
@@ -1026,12 +1034,40 @@ export async function getAllUsersForAdmin(): Promise<{ success: boolean; users?:
         email: true,
         status: true,
         role: true,
+        createdAt: true,
+        lastLogin: true,
+        badgesAttribues: {
+          select: {
+            id: true,
+            Badge: {
+              select: {
+                id: true,
+                nom: true,
+                icone: true,
+                couleur: true,
+              }
+            }
+          },
+          orderBy: {
+            createdAt: 'desc'
+          }
+        },
         adherent: {
           select: {
+            id: true,
             firstname: true,
             lastname: true,
+            civility: true,
             Adresse: true,
-            Telephones: true
+            Telephones: true,
+            PosteTemplate: {
+              select: {
+                id: true,
+                code: true,
+                libelle: true,
+                description: true,
+              }
+            }
           }
         }
       },
@@ -1063,7 +1099,15 @@ export async function getUserByIdForAdmin(userId: string): Promise<{ success: bo
           include: {
             Adresse: true,
             Telephones: true,
-            Enfants: true
+            Enfants: true,
+            PosteTemplate: {
+              select: {
+                id: true,
+                code: true,
+                libelle: true,
+                description: true,
+              }
+            }
           }
         }
       }
@@ -1211,5 +1255,69 @@ export async function adminUpdateUser(userId: string, data: { name?: string; ema
   } catch (e) {
     console.error("Erreur adminUpdateUser:", e);
     return { success: false, error: "Erreur lors de la mise à jour de l'utilisateur" };
+  }
+}
+
+/**
+ * Met à jour le poste d'un adhérent (admin uniquement)
+ * 
+ * @param adherentId - L'ID de l'adhérent
+ * @param posteTemplateId - L'ID du nouveau poste (peut être null pour retirer le poste)
+ * @returns Un objet avec success (boolean) et message (string) ou error (string)
+ */
+export async function adminUpdateAdherentPoste(
+  adherentId: string,
+  posteTemplateId: string | null
+): Promise<{ success: boolean; message?: string; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+
+    // Vérifier que l'adhérent existe
+    const adherent = await prisma.adherent.findUnique({
+      where: { id: adherentId },
+    });
+
+    if (!adherent) {
+      return { success: false, error: "Adhérent non trouvé" };
+    }
+
+    // Si un poste est spécifié, vérifier qu'il existe et est actif
+    if (posteTemplateId) {
+      const poste = await prisma.posteTemplate.findUnique({
+        where: { id: posteTemplateId },
+      });
+
+      if (!poste) {
+        return { success: false, error: "Poste non trouvé" };
+      }
+
+      if (!poste.actif) {
+        return { success: false, error: "Ce poste n'est pas actif" };
+      }
+    }
+
+    // Mettre à jour le poste de l'adhérent
+    await prisma.adherent.update({
+      where: { id: adherentId },
+      data: {
+        posteTemplateId: posteTemplateId || null,
+      },
+    });
+
+    revalidatePath("/admin/users");
+    revalidatePath(`/admin/users/${adherent.userId}/consultation`);
+
+    const message = posteTemplateId
+      ? "Poste mis à jour avec succès"
+      : "Poste retiré avec succès";
+
+    return { success: true, message };
+  } catch (e) {
+    console.error("Erreur adminUpdateAdherentPoste:", e);
+    return { success: false, error: "Erreur lors de la mise à jour du poste" };
   }
 }
