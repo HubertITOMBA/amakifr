@@ -28,7 +28,7 @@ let prisma: PrismaClient;
 const adminUser = {
   email: 'admin@amaki.fr',
   name: 'Administrateur',
-  password: '?Kipaku!1970',
+  password: '?Kipaku!',
   role: 'Admin' as const,
   status: 'Actif' as const,
   adherent: {

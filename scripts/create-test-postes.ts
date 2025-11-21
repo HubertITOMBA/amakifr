@@ -169,7 +169,7 @@ async function createTestPostes() {
           where: { code: poste.code },
         });
 
-        if (existing) {create-default-types-cotisation.ts
+        if (existing) {
           console.log(`⚠️  Poste ${poste.libelle} (${poste.code}) existe déjà, ignoré.`);
           skippedCount++;
           continue;

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,10 +8,20 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, Euro, Users, AlertTriangle, CheckCircle2, Clock } from "lucide-react";
-import { toast } from "sonner";
-import { createCotisationsMensuelles, getCotisationsMensuellesStats } from "@/actions/cotisations-mensuelles";
+import { Calendar, Euro, Users, AlertTriangle, CheckCircle2, Clock, Eye, Edit, Settings } from "lucide-react";
+import { toast } from "react-toastify";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import { createCotisationsMensuelles, getCotisationsMensuellesStats, getCotisationsMensuellesByPeriode, updateCotisationMensuelle } from "@/actions/cotisations-mensuelles";
 import { getAllTypesCotisationMensuelle } from "@/actions/cotisations-mensuelles";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  useReactTable,
+  getSortedRowModel,
+  SortingState,
+} from "@tanstack/react-table";
+import { DataTable } from "@/components/admin/DataTable";
 
 interface CotisationStats {
   totalTypesCotisation: number;
@@ -29,12 +39,64 @@ interface TypeCotisationMensuelle {
   obligatoire: boolean;
   actif: boolean;
   ordre: number;
+  _count?: {
+    CotisationsMensuelles: number;
+  };
+  CreatedBy?: {
+    email: string;
+  };
+}
+
+const columnHelper = createColumnHelper<TypeCotisationMensuelle & { selected?: boolean }>();
+
+interface CotisationMensuelle {
+  id: string;
+  periode: string;
+  annee: number;
+  mois: number;
+  montantAttendu: number;
+  montantPaye: number;
+  montantRestant: number;
+  statut: string;
+  dateEcheance: Date | string;
+  TypeCotisation: {
+    id: string;
+    nom: string;
+    description?: string | null;
+    montant: number;
+    obligatoire: boolean;
+  };
+  Adherent: {
+    id: string;
+    firstname: string;
+    lastname: string;
+    User: {
+      email: string;
+    };
+  };
+  CreatedBy: {
+    name?: string | null;
+    email: string;
+  };
+  _count: {
+    Paiements: number;
+  };
 }
 
 export default function AdminCotisationCreation() {
   const [loading, setLoading] = useState(false);
+  const [loadingCotisations, setLoadingCotisations] = useState(false);
   const [stats, setStats] = useState<CotisationStats | null>(null);
   const [typesCotisation, setTypesCotisation] = useState<TypeCotisationMensuelle[]>([]);
+  const [cotisationsMois, setCotisationsMois] = useState<CotisationMensuelle[]>([]);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [editingCotisation, setEditingCotisation] = useState<CotisationMensuelle | null>(null);
+  const [editFormData, setEditFormData] = useState({
+    montantAttendu: 0,
+    dateEcheance: "",
+    description: "",
+    statut: "EnAttente" as "EnAttente" | "PartiellementPaye" | "Paye" | "EnRetard",
+  });
   const [formData, setFormData] = useState({
     mois: new Date().getMonth() + 1,
     annee: new Date().getFullYear(),
@@ -60,6 +122,11 @@ export default function AdminCotisationCreation() {
     loadData();
   }, []);
 
+  // Charger les cotisations du mois sélectionné
+  useEffect(() => {
+    loadCotisationsMois();
+  }, [formData.mois, formData.annee]);
+
   const loadData = async () => {
     try {
       const [statsResult, typesResult] = await Promise.all([
@@ -81,6 +148,21 @@ export default function AdminCotisationCreation() {
       }
     } catch (error) {
       console.error("Erreur lors du chargement des données:", error);
+    }
+  };
+
+  const loadCotisationsMois = async () => {
+    try {
+      setLoadingCotisations(true);
+      const periode = `${formData.annee}-${formData.mois.toString().padStart(2, '0')}`;
+      const result = await getCotisationsMensuellesByPeriode(periode);
+      if (result.success && result.data) {
+        setCotisationsMois(result.data);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des cotisations du mois:", error);
+    } finally {
+      setLoadingCotisations(false);
     }
   };
 
@@ -119,6 +201,7 @@ export default function AdminCotisationCreation() {
             .map(type => type.id),
         });
         loadData(); // Recharger les données
+        loadCotisationsMois(); // Recharger les cotisations du mois
       } else {
         toast.error(result.error);
       }
@@ -282,56 +365,37 @@ export default function AdminCotisationCreation() {
 
               {/* Types de Cotisation */}
               <div className="space-y-2 md:col-span-2">
-                <Label>Types de Cotisation à Inclure</Label>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                  {typesCotisation.map((type) => (
-                    <div key={type.id} className="flex items-center space-x-3 p-3 border rounded-lg">
-                      <input
-                        type="checkbox"
-                        id={`type-${type.id}`}
-                        checked={formData.typeCotisationIds.includes(type.id)}
-                        onChange={(e) => {
-                          if (e.target.checked) {
-                            setFormData(prev => ({
-                              ...prev,
-                              typeCotisationIds: [...prev.typeCotisationIds, type.id]
-                            }));
-                          } else {
-                            setFormData(prev => ({
-                              ...prev,
-                              typeCotisationIds: prev.typeCotisationIds.filter(id => id !== type.id)
-                            }));
-                          }
-                        }}
-                        className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                      />
-                      <div className="flex-1">
-                        <label htmlFor={`type-${type.id}`} className="font-medium text-gray-900 dark:text-white cursor-pointer">
-                          {type.nom}
-                        </label>
-                        <div className="flex items-center justify-between mt-1">
-                          <span className="text-sm text-gray-600 dark:text-gray-300">
-                            {type.description}
-                          </span>
-                          <div className="flex items-center space-x-2">
-                            <span className="font-bold text-gray-900 dark:text-white">
-                              {type.montant.toFixed(2).replace('.', ',')} €
-                            </span>
-                            <Badge 
-                              className={
-                                type.obligatoire 
-                                  ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs" 
-                                  : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 text-xs"
-                              }
-                            >
-                              {type.obligatoire ? "Obligatoire" : "Optionnel"}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
+                <div className="flex items-center justify-between">
+                  <Label>Types de Cotisation à Inclure</Label>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const actifsIds = typesCotisation.filter(t => t.actif).map(t => t.id);
+                      if (formData.typeCotisationIds.length === actifsIds.length) {
+                        setFormData(prev => ({ ...prev, typeCotisationIds: [] }));
+                      } else {
+                        setFormData(prev => ({ ...prev, typeCotisationIds: actifsIds }));
+                      }
+                    }}
+                    className="text-xs"
+                  >
+                    {formData.typeCotisationIds.length === typesCotisation.filter(t => t.actif).length 
+                      ? "Tout désélectionner" 
+                      : "Tout sélectionner"}
+                  </Button>
                 </div>
+                <TypesCotisationTable 
+                  types={typesCotisation}
+                  selectedIds={formData.typeCotisationIds}
+                  onSelectionChange={(ids) => setFormData(prev => ({ ...prev, typeCotisationIds: ids }))}
+                  sorting={sorting}
+                  onSortingChange={setSorting}
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                  {formData.typeCotisationIds.length} type(s) sélectionné(s) sur {typesCotisation.filter(t => t.actif).length} actif(s)
+                </p>
               </div>
             </div>
 
@@ -408,6 +472,220 @@ export default function AdminCotisationCreation() {
         </CardContent>
       </Card>
 
+      {/* Types de cotisation sélectionnés pour le mois */}
+      {formData.typeCotisationIds.length > 0 && (
+        <Card className="border-blue-200 bg-blue-50/50 dark:border-blue-800 dark:bg-blue-900/10">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Settings className="h-5 w-5 text-blue-600" />
+              <span>
+                Types de cotisation sélectionnés pour {moisOptions.find(m => m.value === formData.mois)?.label} {formData.annee}
+              </span>
+              <Badge className="ml-2">{formData.typeCotisationIds.length}</Badge>
+            </CardTitle>
+            <CardDescription>
+              Liste des types de cotisation qui seront utilisés pour créer les cotisations mensuelles
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <TypesSelectionnesTable 
+              types={typesCotisation.filter(t => formData.typeCotisationIds.includes(t.id))}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Cotisations créées pour le mois */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center space-x-2">
+            <Calendar className="h-5 w-5 text-blue-600" />
+            <span>
+              Cotisations créées pour {moisOptions.find(m => m.value === formData.mois)?.label} {formData.annee}
+            </span>
+            {cotisationsMois.length > 0 && (
+              <Badge className="ml-2">{cotisationsMois.length}</Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Liste des cotisations mensuelles créées pour la période sélectionnée. 
+            Vous pouvez modifier uniquement les cotisations du mois en cours ou du mois suivant.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingCotisations ? (
+            <div className="flex items-center justify-center py-8">
+              <Clock className="h-5 w-5 animate-spin text-blue-600 mr-2" />
+              <span className="text-gray-600">Chargement...</span>
+            </div>
+          ) : cotisationsMois.length === 0 ? (
+            <div className="text-center py-8 text-gray-500">
+              <Calendar className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+              <p>Aucune cotisation créée pour cette période</p>
+            </div>
+          ) : (
+            <CotisationsMoisTable 
+              cotisations={cotisationsMois}
+              onEdit={(cotisation) => {
+                setEditingCotisation(cotisation);
+                setEditFormData({
+                  montantAttendu: cotisation.montantAttendu,
+                  dateEcheance: new Date(cotisation.dateEcheance).toISOString().split('T')[0],
+                  description: cotisation.description || "",
+                  statut: cotisation.statut as "EnAttente" | "PartiellementPaye" | "Paye" | "EnRetard",
+                });
+              }}
+            />
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Dialog d'édition */}
+      <Dialog open={!!editingCotisation} onOpenChange={(open) => !open && setEditingCotisation(null)}>
+        <DialogContent className="sm:max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Edit className="h-5 w-5" />
+              Modifier la cotisation
+            </DialogTitle>
+            <DialogDescription>
+              {editingCotisation && (
+                <>
+                  Modifier la cotisation de {editingCotisation.Adherent.firstname} {editingCotisation.Adherent.lastname} 
+                  pour le type "{editingCotisation.TypeCotisation.nom}"
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          {editingCotisation && (
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                setLoading(true);
+                try {
+                  const result = await updateCotisationMensuelle({
+                    id: editingCotisation.id,
+                    montantAttendu: editFormData.montantAttendu,
+                    dateEcheance: editFormData.dateEcheance,
+                    description: editFormData.description || undefined,
+                    statut: editFormData.statut,
+                  });
+
+                  if (result.success) {
+                    toast.success(result.message || "Cotisation mise à jour avec succès");
+                    setEditingCotisation(null);
+                    loadCotisationsMois();
+                    loadData();
+                  } else {
+                    toast.error(result.error || "Erreur lors de la mise à jour");
+                  }
+                } catch (error) {
+                  toast.error("Erreur lors de la mise à jour de la cotisation");
+                } finally {
+                  setLoading(false);
+                }
+              }}
+              className="space-y-4"
+            >
+              <div className="space-y-2">
+                <Label htmlFor="montantAttendu">Montant attendu *</Label>
+                <div className="relative">
+                  <Euro className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                  <Input
+                    id="montantAttendu"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editFormData.montantAttendu}
+                    onChange={(e) => setEditFormData({ ...editFormData, montantAttendu: parseFloat(e.target.value) || 0 })}
+                    className="pl-10"
+                    required
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dateEcheance">Date d'échéance *</Label>
+                <Input
+                  id="dateEcheance"
+                  type="date"
+                  value={editFormData.dateEcheance}
+                  onChange={(e) => setEditFormData({ ...editFormData, dateEcheance: e.target.value })}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="statut">Statut *</Label>
+                <Select
+                  value={editFormData.statut}
+                  onValueChange={(value) => setEditFormData({ ...editFormData, statut: value as typeof editFormData.statut })}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="EnAttente">En attente</SelectItem>
+                    <SelectItem value="PartiellementPaye">Partiellement payé</SelectItem>
+                    <SelectItem value="Paye">Payé</SelectItem>
+                    <SelectItem value="EnRetard">En retard</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={editFormData.description}
+                  onChange={(e) => setEditFormData({ ...editFormData, description: e.target.value })}
+                  rows={3}
+                  placeholder="Description optionnelle..."
+                />
+              </div>
+
+              <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+                <div className="text-sm text-blue-800 dark:text-blue-200">
+                  <strong>Informations actuelles :</strong>
+                  <div className="mt-2 space-y-1">
+                    <div>Montant payé : {editingCotisation.montantPaye.toFixed(2).replace(".", ",")} €</div>
+                    <div>Montant restant : {editingCotisation.montantRestant.toFixed(2).replace(".", ",")} €</div>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setEditingCotisation(null)}
+                  disabled={loading}
+                >
+                  Annuler
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={loading}
+                  className="bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {loading ? (
+                    <>
+                      <Clock className="h-4 w-4 mr-2 animate-spin" />
+                      Mise à jour...
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Enregistrer
+                    </>
+                  )}
+                </Button>
+              </DialogFooter>
+            </form>
+          )}
+        </DialogContent>
+      </Dialog>
+
       {/* Informations importantes */}
       <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
         <CardContent className="p-6">
@@ -428,6 +706,569 @@ export default function AdminCotisationCreation() {
           </div>
         </CardContent>
       </Card>
+    </div>
+  );
+}
+
+// Composant Table pour les types de cotisation
+function TypesCotisationTable({
+  types,
+  selectedIds,
+  onSelectionChange,
+  sorting,
+  onSortingChange,
+}: {
+  types: TypeCotisationMensuelle[];
+  selectedIds: string[];
+  onSelectionChange: (ids: string[]) => void;
+  sorting: SortingState;
+  onSortingChange: (sorting: SortingState) => void;
+}) {
+  const data = useMemo(() => types.map(type => ({
+    ...type,
+    selected: selectedIds.includes(type.id),
+  })), [types, selectedIds]);
+
+  const columns = useMemo(() => [
+    columnHelper.display({
+      id: "select",
+      header: () => (
+        <input
+          type="checkbox"
+          checked={types.length > 0 && selectedIds.length === types.filter(t => t.actif).length}
+          onChange={(e) => {
+            if (e.target.checked) {
+              const actifsIds = types.filter(t => t.actif).map(t => t.id);
+              onSelectionChange(actifsIds);
+            } else {
+              onSelectionChange([]);
+            }
+          }}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+        />
+      ),
+      cell: ({ row }) => (
+        <input
+          type="checkbox"
+          checked={row.original.selected}
+          onChange={(e) => {
+            if (e.target.checked) {
+              onSelectionChange([...selectedIds, row.original.id]);
+            } else {
+              onSelectionChange(selectedIds.filter(id => id !== row.original.id));
+            }
+          }}
+          disabled={!row.original.actif}
+          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
+        />
+      ),
+      size: 50,
+      enableResizing: false,
+    }),
+    columnHelper.accessor("nom", {
+      header: "Nom",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-2">
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            {row.getValue("nom")}
+          </span>
+          {!row.original.actif && (
+            <Badge className="bg-gray-100 text-gray-600 text-xs">Inactif</Badge>
+          )}
+        </div>
+      ),
+      size: 150,
+      minSize: 120,
+      maxSize: 200,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("description", {
+      header: "Description",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600 dark:text-gray-300 max-w-xs truncate block">
+          {row.getValue("description") || "-"}
+        </span>
+      ),
+      size: 200,
+      minSize: 150,
+      maxSize: 300,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("montant", {
+      header: "Montant",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Euro className="h-4 w-4 text-gray-500" />
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {row.getValue("montant").toFixed(2).replace(".", ",")} €
+          </span>
+        </div>
+      ),
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("obligatoire", {
+      header: "Type",
+      cell: ({ row }) => (
+        <Badge 
+          className={
+            row.getValue("obligatoire")
+              ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs"
+              : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 text-xs"
+          }
+        >
+          {row.getValue("obligatoire") ? "Obligatoire" : "Optionnel"}
+        </Badge>
+      ),
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("ordre", {
+      header: "Ordre",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600 dark:text-gray-300">
+          #{row.getValue("ordre")}
+        </span>
+      ),
+      size: 80,
+      minSize: 60,
+      maxSize: 100,
+      enableResizing: true,
+    }),
+    columnHelper.display({
+      id: "actions",
+      header: "Actions",
+      meta: { forceVisible: true },
+      enableResizing: false,
+      cell: ({ row }) => {
+        const type = row.original;
+        return (
+          <div className="flex items-center gap-1 sm:gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
+              onClick={() => {
+                toast.info(`Voir les détails de ${type.nom}`);
+                // TODO: Implémenter la vue détaillée
+              }}
+              title="Voir les détails"
+            >
+              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
+              onClick={() => {
+                toast.info(`Éditer ${type.nom}`);
+                // TODO: Implémenter l'édition
+              }}
+              title="Éditer"
+            >
+              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+          </div>
+        );
+      },
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+    }),
+  ], [selectedIds, types, onSelectionChange]);
+
+  const table = useReactTable({
+    data,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    onSortingChange: onSortingChange,
+    state: { sorting },
+    defaultColumn: {
+      minSize: 50,
+      maxSize: 800,
+    },
+  });
+
+  return (
+    <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-900">
+      <div className="max-h-96 overflow-y-auto">
+        <DataTable table={table} emptyMessage="Aucun type de cotisation disponible" compact={true} />
+      </div>
+    </div>
+  );
+}
+
+// Composant pour afficher les types de cotisation sélectionnés
+function TypesSelectionnesTable({ types }: { types: TypeCotisationMensuelle[] }) {
+  if (types.length === 0) {
+    return (
+      <div className="text-center py-8 text-gray-500">
+        <Settings className="h-12 w-12 mx-auto mb-4 text-gray-400" />
+        <p>Aucun type de cotisation sélectionné</p>
+      </div>
+    );
+  }
+
+  // Calculer le total des montants
+  const totalMontant = types.reduce((sum, type) => sum + type.montant, 0);
+  const typesObligatoires = types.filter(t => t.obligatoire).length;
+  const typesOptionnels = types.filter(t => !t.obligatoire).length;
+
+  return (
+    <div className="space-y-4">
+      {/* Statistiques rapides */}
+      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+        <div className="bg-white dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="text-xs text-gray-600 dark:text-gray-400">Total sélectionné</div>
+          <div className="text-lg font-bold text-gray-900 dark:text-white">{types.length}</div>
+        </div>
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg border border-blue-200 dark:border-blue-800">
+          <div className="text-xs text-gray-600 dark:text-gray-400">Obligatoires</div>
+          <div className="text-lg font-bold text-blue-600 dark:text-blue-400">{typesObligatoires}</div>
+        </div>
+        <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg border border-gray-200 dark:border-gray-700">
+          <div className="text-xs text-gray-600 dark:text-gray-400">Optionnels</div>
+          <div className="text-lg font-bold text-gray-900 dark:text-white">{typesOptionnels}</div>
+        </div>
+      </div>
+
+      {/* Montant total */}
+      <div className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 p-4 rounded-lg border border-blue-200 dark:border-blue-800">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <Euro className="h-5 w-5 text-blue-600" />
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Montant total des types sélectionnés</span>
+          </div>
+          <span className="text-2xl font-bold text-blue-600 dark:text-blue-400">
+            {totalMontant.toFixed(2).replace(".", ",")} €
+          </span>
+        </div>
+        <p className="text-xs text-gray-600 dark:text-gray-400 mt-2">
+          Note: Le montant réel par adhérent sera calculé en fonction du forfait + les assistances du mois
+        </p>
+      </div>
+
+      {/* Liste des types */}
+      <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-900">
+        <table className="w-full">
+          <thead className="bg-gray-50 dark:bg-gray-800">
+            <tr>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                Nom
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                Description
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                Montant
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                Type
+              </th>
+              <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 dark:text-gray-300 uppercase tracking-wider">
+                Ordre
+              </th>
+            </tr>
+          </thead>
+          <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+            {types
+              .sort((a, b) => {
+                // Trier par ordre, puis par nom
+                if (a.ordre !== b.ordre) return a.ordre - b.ordre;
+                return a.nom.localeCompare(b.nom);
+              })
+              .map((type) => (
+                <tr key={type.id} className="hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                        {type.nom}
+                      </span>
+                      {!type.actif && (
+                        <Badge className="bg-gray-100 text-gray-600 text-xs">Inactif</Badge>
+                      )}
+                    </div>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className="text-sm text-gray-600 dark:text-gray-300 max-w-xs truncate block">
+                      {type.description || "-"}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <div className="flex items-center gap-1">
+                      <Euro className="h-4 w-4 text-gray-500" />
+                      <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+                        {type.montant.toFixed(2).replace(".", ",")} €
+                      </span>
+                    </div>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <Badge 
+                      className={
+                        type.obligatoire
+                          ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 text-xs"
+                      }
+                    >
+                      {type.obligatoire ? "Obligatoire" : "Optionnel"}
+                    </Badge>
+                  </td>
+                  <td className="px-4 py-3 whitespace-nowrap">
+                    <span className="text-sm text-gray-600 dark:text-gray-300">
+                      #{type.ordre}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// Composant Table pour afficher les cotisations créées du mois avec possibilité d'édition
+function CotisationsMoisTable({ 
+  cotisations, 
+  onEdit 
+}: { 
+  cotisations: CotisationMensuelle[];
+  onEdit: (cotisation: CotisationMensuelle) => void;
+}) {
+  // Vérifier si une cotisation peut être modifiée (mois en cours ou mois en cours + 1)
+  const canEdit = (cotisation: CotisationMensuelle) => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+
+    const isCurrentMonth = cotisation.annee === currentYear && cotisation.mois === currentMonth;
+    const isNextMonth = cotisation.annee === nextYear && cotisation.mois === nextMonth;
+
+    return isCurrentMonth || isNextMonth;
+  };
+
+  // Grouper les cotisations par mois, puis par type (forfait en premier)
+  const groupedCotisations = useMemo(() => {
+    const grouped: Record<string, CotisationMensuelle[]> = {};
+    
+    cotisations.forEach((cotisation) => {
+      const moisKey = `${cotisation.annee}-${cotisation.mois.toString().padStart(2, '0')}`;
+      
+      if (!grouped[moisKey]) {
+        grouped[moisKey] = [];
+      }
+      grouped[moisKey].push(cotisation);
+    });
+
+    // Trier chaque groupe : forfait en premier, puis les autres par nom
+    Object.keys(grouped).forEach((moisKey) => {
+      grouped[moisKey].sort((a, b) => {
+        const aIsForfait = a.TypeCotisation.nom.toLowerCase().includes('forfait');
+        const bIsForfait = b.TypeCotisation.nom.toLowerCase().includes('forfait');
+        
+        if (aIsForfait && !bIsForfait) return -1;
+        if (!aIsForfait && bIsForfait) return 1;
+        return a.TypeCotisation.nom.localeCompare(b.TypeCotisation.nom);
+      });
+    });
+
+    return grouped;
+  }, [cotisations]);
+
+  // Obtenir les noms de mois
+  const getMonthName = (mois: number) => {
+    const moisNames = [
+      "janvier", "février", "mars", "avril", "mai", "juin",
+      "juillet", "août", "septembre", "octobre", "novembre", "décembre"
+    ];
+    return moisNames[mois - 1] || "";
+  };
+
+  // Statistiques
+  const stats = useMemo(() => {
+    const total = cotisations.length;
+    const totalMontant = cotisations.reduce((sum, c) => sum + c.montantAttendu, 0);
+    const totalPaye = cotisations.reduce((sum, c) => sum + c.montantPaye, 0);
+    const totalRestant = cotisations.reduce((sum, c) => sum + c.montantRestant, 0);
+    const payees = cotisations.filter(c => c.statut === "Paye").length;
+    const enAttente = cotisations.filter(c => c.statut === "EnAttente").length;
+    const enRetard = cotisations.filter(c => c.statut === "EnRetard").length;
+
+    return {
+      total,
+      totalMontant,
+      totalPaye,
+      totalRestant,
+      payees,
+      enAttente,
+      enRetard,
+    };
+  }, [cotisations]);
+
+  return (
+    <div className="space-y-4">
+      {/* Statistiques */}
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        <div className="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg">
+          <div className="text-xs text-gray-600 dark:text-gray-400">Total</div>
+          <div className="text-lg font-bold text-gray-900 dark:text-white">{stats.total}</div>
+        </div>
+        <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+          <div className="text-xs text-gray-600 dark:text-gray-400">Payées</div>
+          <div className="text-lg font-bold text-green-600 dark:text-green-400">{stats.payees}</div>
+        </div>
+        <div className="bg-yellow-50 dark:bg-yellow-900/20 p-3 rounded-lg">
+          <div className="text-xs text-gray-600 dark:text-gray-400">En attente</div>
+          <div className="text-lg font-bold text-yellow-600 dark:text-yellow-400">{stats.enAttente}</div>
+        </div>
+        <div className="bg-red-50 dark:bg-red-900/20 p-3 rounded-lg">
+          <div className="text-xs text-gray-600 dark:text-gray-400">En retard</div>
+          <div className="text-lg font-bold text-red-600 dark:text-red-400">{stats.enRetard}</div>
+        </div>
+      </div>
+
+      {/* Totaux financiers */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+          <div className="text-xs text-gray-600 dark:text-gray-400">Montant total attendu</div>
+          <div className="text-lg font-bold text-gray-900 dark:text-white">
+            {stats.totalMontant.toFixed(2).replace(".", ",")} €
+          </div>
+        </div>
+        <div className="bg-green-50 dark:bg-green-900/20 p-3 rounded-lg">
+          <div className="text-xs text-gray-600 dark:text-gray-400">Montant total payé</div>
+          <div className="text-lg font-bold text-green-600 dark:text-green-400">
+            {stats.totalPaye.toFixed(2).replace(".", ",")} €
+          </div>
+        </div>
+        <div className="bg-orange-50 dark:bg-orange-900/20 p-3 rounded-lg">
+          <div className="text-xs text-gray-600 dark:text-gray-400">Montant total restant</div>
+          <div className="text-lg font-bold text-orange-600 dark:text-orange-400">
+            {stats.totalRestant.toFixed(2).replace(".", ",")} €
+          </div>
+        </div>
+      </div>
+
+      {/* Liste organisée par mois */}
+      <div className="space-y-4">
+        {Object.entries(groupedCotisations)
+          .sort(([a], [b]) => a.localeCompare(b))
+          .map(([moisKey, cotisationsMois]) => {
+            const [annee, mois] = moisKey.split('-');
+            const moisNum = parseInt(mois);
+            const anneeNum = parseInt(annee);
+            const moisNom = getMonthName(moisNum);
+            
+            // Calculer le total pour ce mois
+            const totalMois = cotisationsMois.reduce((sum, c) => sum + c.montantAttendu, 0);
+            
+            return (
+              <Card key={moisKey} className="border-gray-200 dark:border-gray-700">
+                <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 pb-3">
+                  <CardTitle className="text-base">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Calendar className="h-5 w-5 text-blue-600" />
+                        <span className="font-semibold text-gray-900 dark:text-gray-100 capitalize">
+                          {moisNom} {anneeNum}
+                        </span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Euro className="h-4 w-4 text-gray-600" />
+                        <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
+                          {totalMois.toFixed(2).replace(".", ",")} €
+                        </span>
+                      </div>
+                    </div>
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="p-4">
+                  <div className="space-y-2">
+                    {cotisationsMois.map((cotisation, index) => {
+                      const isForfait = cotisation.TypeCotisation.nom.toLowerCase().includes('forfait');
+                      const editable = canEdit(cotisation);
+                      
+                      return (
+                        <div
+                          key={cotisation.id}
+                          className={`flex items-center justify-between p-3 rounded-md border ${
+                            isForfait
+                              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                              : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
+                          } ${index < cotisationsMois.length - 1 ? 'mb-2' : ''}`}
+                        >
+                          <div className="flex-1 flex items-center gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-sm font-medium ${
+                                  isForfait
+                                    ? 'text-blue-900 dark:text-blue-100'
+                                    : 'text-gray-900 dark:text-gray-100'
+                                }`}>
+                                  {cotisation.TypeCotisation.nom}
+                                </span>
+                                {!isForfait && (
+                                  <Badge className="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 text-xs">
+                                    Assistance
+                                  </Badge>
+                                )}
+                              </div>
+                            </div>
+                            <div className="flex items-center gap-1">
+                              <Euro className="h-4 w-4 text-gray-500" />
+                              <span className="text-sm font-semibold text-gray-900 dark:text-gray-100 w-24 text-right">
+                                {cotisation.montantAttendu.toFixed(2).replace(".", ",")} €
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              {cotisation.statut === "Paye" && (
+                                <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
+                                  <CheckCircle2 className="h-3 w-3 mr-1" />Payé
+                                </Badge>
+                              )}
+                              {cotisation.statut === "EnAttente" && (
+                                <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs">
+                                  <Clock className="h-3 w-3 mr-1" />En attente
+                                </Badge>
+                              )}
+                              {cotisation.statut === "EnRetard" && (
+                                <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs">
+                                  <AlertTriangle className="h-3 w-3 mr-1" />En retard
+                                </Badge>
+                              )}
+                              {cotisation.statut === "PartiellementPaye" && (
+                                <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 text-xs">
+                                  Partiellement payé
+                                </Badge>
+                              )}
+                            </div>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
+                              onClick={() => onEdit(cotisation)}
+                              disabled={!editable}
+                              title={editable ? "Modifier la cotisation" : "Modification uniquement pour le mois en cours ou le mois suivant"}
+                            >
+                              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })}
+      </div>
     </div>
   );
 }

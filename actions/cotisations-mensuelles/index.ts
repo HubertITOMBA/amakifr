@@ -35,6 +35,14 @@ const CreateCotisationMensuelleSchema = z.object({
   adherentsIds: z.array(z.string()).optional(),
 });
 
+const UpdateCotisationMensuelleSchema = z.object({
+  id: z.string().min(1, "ID requis"),
+  montantAttendu: z.number().min(0, "Le montant doit être positif").optional(),
+  dateEcheance: z.string().optional(),
+  description: z.string().optional(),
+  statut: z.enum(["EnAttente", "PartiellementPaye", "Paye", "EnRetard"]).optional(),
+});
+
 // Créer un nouveau type de cotisation mensuelle
 export async function createTypeCotisationMensuelle(data: z.infer<typeof CreateTypeCotisationSchema>) {
   try {
@@ -526,6 +534,217 @@ export async function getCotisationsMensuellesStats() {
 
   } catch (error) {
     console.error("Erreur lors de la récupération des statistiques:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+/**
+ * Met à jour une cotisation mensuelle (uniquement pour le mois en cours ou mois en cours + 1)
+ * 
+ * @param data - Les données de mise à jour contenant l'ID et les champs à modifier
+ * @returns Un objet avec success (boolean), data (cotisation mise à jour) en cas de succès, 
+ *          ou error (string) en cas d'échec
+ */
+export async function updateCotisationMensuelle(data: z.infer<typeof UpdateCotisationMensuelleSchema>) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const validatedData = UpdateCotisationMensuelleSchema.parse(data);
+
+    // Récupérer la cotisation existante
+    const cotisation = await prisma.cotisationMensuelle.findUnique({
+      where: { id: validatedData.id },
+      include: {
+        TypeCotisation: true
+      }
+    });
+
+    if (!cotisation) {
+      return { success: false, error: "Cotisation non trouvée" };
+    }
+
+    // Vérifier que la cotisation est du mois en cours ou mois en cours + 1
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+
+    const isCurrentMonth = cotisation.annee === currentYear && cotisation.mois === currentMonth;
+    const isNextMonth = cotisation.annee === nextYear && cotisation.mois === nextMonth;
+
+    if (!isCurrentMonth && !isNextMonth) {
+      return { 
+        success: false, 
+        error: "Seules les cotisations du mois en cours ou du mois suivant peuvent être modifiées" 
+      };
+    }
+
+    // Préparer les données de mise à jour
+    const updateData: any = {};
+    
+    if (validatedData.montantAttendu !== undefined) {
+      updateData.montantAttendu = validatedData.montantAttendu;
+      // Recalculer le montant restant si le montant attendu change
+      const montantPaye = Number(cotisation.montantPaye);
+      const nouveauMontantRestant = validatedData.montantAttendu - montantPaye;
+      updateData.montantRestant = nouveauMontantRestant >= 0 ? nouveauMontantRestant : 0;
+      
+      // Mettre à jour le statut en fonction du montant restant
+      if (nouveauMontantRestant <= 0) {
+        updateData.statut = "Paye";
+      } else if (montantPaye > 0) {
+        updateData.statut = "PartiellementPaye";
+      } else {
+        updateData.statut = cotisation.statut === "EnRetard" ? "EnRetard" : "EnAttente";
+      }
+    }
+
+    if (validatedData.dateEcheance) {
+      updateData.dateEcheance = new Date(validatedData.dateEcheance);
+    }
+
+    if (validatedData.description !== undefined) {
+      updateData.description = validatedData.description;
+    }
+
+    if (validatedData.statut !== undefined) {
+      updateData.statut = validatedData.statut;
+    }
+
+    // Mettre à jour la cotisation
+    const cotisationUpdated = await prisma.cotisationMensuelle.update({
+      where: { id: validatedData.id },
+      data: updateData,
+      include: {
+        TypeCotisation: {
+          select: {
+            id: true,
+            nom: true,
+            description: true,
+            montant: true,
+            obligatoire: true,
+          }
+        },
+        Adherent: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            User: {
+              select: {
+                email: true
+              }
+            }
+          }
+        }
+      }
+    });
+
+    // Convertir les Decimal en nombres
+    const cotisationConverted = {
+      ...cotisationUpdated,
+      montantAttendu: Number(cotisationUpdated.montantAttendu),
+      montantPaye: Number(cotisationUpdated.montantPaye),
+      montantRestant: Number(cotisationUpdated.montantRestant),
+      TypeCotisation: {
+        ...cotisationUpdated.TypeCotisation,
+        montant: Number(cotisationUpdated.TypeCotisation.montant)
+      }
+    };
+
+    revalidatePath("/admin/cotisations");
+    revalidatePath("/admin/cotisations/gestion");
+    revalidatePath("/user/profile");
+
+    return { success: true, data: cotisationConverted, message: "Cotisation mise à jour avec succès" };
+
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour de la cotisation mensuelle:", error);
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+/**
+ * Récupère les cotisations mensuelles créées pour une période donnée
+ * 
+ * @param periode - La période au format "YYYY-MM" (ex: "2024-01")
+ * @returns Un objet avec success (boolean), data (array de cotisations) en cas de succès, 
+ *          ou error (string) en cas d'échec
+ */
+export async function getCotisationsMensuellesByPeriode(periode: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const cotisationsMensuelles = await prisma.cotisationMensuelle.findMany({
+      where: {
+        periode: periode
+      },
+      include: {
+        TypeCotisation: {
+          select: {
+            id: true,
+            nom: true,
+            description: true,
+            montant: true,
+            obligatoire: true,
+          }
+        },
+        Adherent: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            User: {
+              select: {
+                email: true
+              }
+            }
+          }
+        },
+        CreatedBy: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        _count: {
+          select: {
+            Paiements: true
+          }
+        }
+      },
+      orderBy: [
+        { TypeCotisation: { ordre: 'asc' } },
+        { Adherent: { User: { email: 'asc' } } }
+      ]
+    });
+
+    // Conversion des Decimal en nombres
+    const cotisationsConverted = cotisationsMensuelles.map((cotisation: any) => ({
+      ...cotisation,
+      montantAttendu: Number(cotisation.montantAttendu),
+      montantPaye: Number(cotisation.montantPaye),
+      montantRestant: Number(cotisation.montantRestant),
+      TypeCotisation: {
+        ...cotisation.TypeCotisation,
+        montant: Number(cotisation.TypeCotisation.montant)
+      }
+    }));
+
+    return { success: true, data: cotisationsConverted };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération des cotisations mensuelles:", error);
     return { success: false, error: "Erreur interne du serveur" };
   }
 }

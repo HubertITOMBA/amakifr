@@ -1,12 +1,15 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
 import { 
   Settings, 
   Euro, 
@@ -17,9 +20,19 @@ import {
   Clock, 
   AlertTriangle,
   Users,
-  Calendar
+  Calendar,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  Columns,
+  Eye,
+  X,
+  Info,
+  FileText
 } from "lucide-react";
-import { toast } from "sonner";
+import { toast } from "react-toastify";
 import { 
   getAllTypesCotisationMensuelle, 
   createTypeCotisationMensuelle, 
@@ -27,15 +40,27 @@ import {
   deleteTypeCotisationMensuelle,
   getCotisationsMensuellesStats
 } from "@/actions/cotisations-mensuelles";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  useReactTable,
+  getSortedRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  SortingState,
+  ColumnFiltersState,
+  VisibilityState,
+} from "@tanstack/react-table";
+import { DataTable } from "@/components/admin/DataTable";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+import { ViewDialog } from "./ViewDialog";
 
 interface TypeCotisationMensuelle {
   id: string;
   nom: string;
   description?: string;
   montant: number;
-  obligatoire: boolean;
   actif: boolean;
-  ordre: number;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -56,6 +81,8 @@ interface Stats {
   adherentsEnRetard: number;
 }
 
+const columnHelper = createColumnHelper<TypeCotisationMensuelle>();
+
 export default function AdminTypesCotisationMensuelle() {
   const [typesCotisation, setTypesCotisation] = useState<TypeCotisationMensuelle[]>([]);
   const [stats, setStats] = useState<Stats | null>(null);
@@ -66,16 +93,40 @@ export default function AdminTypesCotisationMensuelle() {
     nom: "",
     description: "",
     montant: 0,
-    obligatoire: true,
     actif: true,
-    ordre: 0,
   });
+
+  // États pour TanStack Table
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-types-cotisation-column-visibility");
+        if (saved) return JSON.parse(saved);
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences:", error);
+      }
+    }
+    return {};
+  });
+
+  // Debounce pour la recherche
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setGlobalFilter(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     loadData();
   }, []);
 
-  const loadData = async () => {
+  const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [typesResult, statsResult] = await Promise.all([
@@ -83,13 +134,13 @@ export default function AdminTypesCotisationMensuelle() {
         getCotisationsMensuellesStats()
       ]);
 
-      if (typesResult.success) {
+      if (typesResult.success && typesResult.data) {
         setTypesCotisation(typesResult.data);
       } else {
-        toast.error(typesResult.error);
+        toast.error(typesResult.error || "Erreur lors du chargement des types");
       }
 
-      if (statsResult.success) {
+      if (statsResult.success && statsResult.data) {
         setStats(statsResult.data);
       }
     } catch (error) {
@@ -97,7 +148,195 @@ export default function AdminTypesCotisationMensuelle() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  // Filtrer les données
+  const filteredData = useMemo(() => {
+    return typesCotisation.filter(item => {
+      // Filtre global (recherche)
+      if (globalFilter.trim()) {
+        const q = globalFilter.trim().toLowerCase();
+        const searchText = [
+          item.nom || "",
+          item.description || "",
+          item.montant.toString(),
+          item.CreatedBy?.email || "",
+        ].join(" ").toLowerCase();
+        if (!searchText.includes(q)) return false;
+      }
+      
+      // Filtre par statut (actif/inactif)
+      if (statusFilter !== "all") {
+        if (statusFilter === "actif" && !item.actif) return false;
+        if (statusFilter === "inactif" && item.actif) return false;
+      }
+      
+      return true;
+    });
+  }, [typesCotisation, globalFilter, statusFilter]);
+
+  const columns = useMemo(() => [
+    columnHelper.accessor("nom", {
+      header: "Nom",
+      cell: ({ row }) => (
+        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {row.getValue("nom")}
+        </span>
+      ),
+      size: 200,
+      minSize: 150,
+      maxSize: 300,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("description", {
+      header: "Description",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600 dark:text-gray-300 max-w-xs truncate block">
+          {row.getValue("description") || "-"}
+        </span>
+      ),
+      size: 200,
+      minSize: 150,
+      maxSize: 300,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("montant", {
+      header: "Montant",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Euro className="h-4 w-4 text-gray-500" />
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {row.getValue("montant").toFixed(2).replace(".", ",")} €
+          </span>
+        </div>
+      ),
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("actif", {
+      header: "Statut",
+      cell: ({ row }) => (
+        <Badge
+          className={
+            row.getValue("actif")
+              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs"
+              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs"
+          }
+        >
+          {row.getValue("actif") ? "Actif" : "Inactif"}
+        </Badge>
+      ),
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+      enableResizing: true,
+    }),
+    columnHelper.display({
+      id: "utilisations",
+      header: "Utilisations",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600 dark:text-gray-300">
+          {row.original._count?.CotisationsMensuelles || 0} cotisation(s)
+        </span>
+      ),
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("CreatedBy.email", {
+      header: "Créé par",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600 dark:text-gray-300">
+          {row.original.CreatedBy?.email || "-"}
+        </span>
+      ),
+      size: 150,
+      minSize: 120,
+      maxSize: 200,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("createdAt", {
+      header: "Date de création",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-600 dark:text-gray-300">
+          {new Date(row.getValue("createdAt")).toLocaleDateString("fr-FR")}
+        </span>
+      ),
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+      enableResizing: true,
+    }),
+    columnHelper.display({
+      id: "actions",
+      header: "Actions",
+      meta: { forceVisible: true },
+      enableResizing: false,
+      cell: ({ row }) => {
+        const type = row.original;
+        return (
+          <div className="flex items-center gap-1 sm:gap-2">
+            <ViewDialog type={type} />
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
+              onClick={() => handleEdit(type)}
+              title="Éditer"
+            >
+              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-red-300 hover:bg-red-50"
+              onClick={() => handleDelete(type.id)}
+              title="Supprimer"
+            >
+              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
+            </Button>
+          </div>
+        );
+      },
+      size: 150,
+      minSize: 120,
+      maxSize: 180,
+    }),
+  ], []);
+
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(newVisibility);
+      try {
+        localStorage.setItem("admin-types-cotisation-column-visibility", JSON.stringify(newVisibility));
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde des préférences:", error);
+      }
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+    state: { sorting, columnFilters, globalFilter, columnVisibility },
+    defaultColumn: {
+      minSize: 50,
+      maxSize: 800,
+    },
+  });
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -122,13 +361,11 @@ export default function AdminTypesCotisationMensuelle() {
           nom: "",
           description: "",
           montant: 0,
-          obligatoire: true,
           actif: true,
-          ordre: 0,
         });
         loadData();
       } else {
-        toast.error(result.error);
+        toast.error(result.error || "Erreur lors de la sauvegarde");
       }
     } catch (error) {
       toast.error("Erreur lors de la sauvegarde");
@@ -146,7 +383,7 @@ export default function AdminTypesCotisationMensuelle() {
         toast.success("Type supprimé");
         loadData();
       } else {
-        toast.error(result.error);
+        toast.error(result.error || "Erreur lors de la suppression");
       }
     } catch (error) {
       toast.error("Erreur lors de la suppression");
@@ -159,9 +396,7 @@ export default function AdminTypesCotisationMensuelle() {
       nom: type.nom,
       description: type.description || "",
       montant: type.montant,
-      obligatoire: type.obligatoire,
       actif: type.actif,
-      ordre: type.ordre,
     });
     setShowForm(true);
   };
@@ -178,255 +413,329 @@ export default function AdminTypesCotisationMensuelle() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* En-tête */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-            Types de Cotisation Mensuelle
-          </h1>
-          <p className="text-gray-600 dark:text-gray-300 mt-2">
-            Gérer les types de cotisation mensuelle et leurs paramètres
-          </p>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
+      <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+        {/* En-tête */}
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+          <div>
+            <h1 className="text-2xl sm:text-3xl lg:text-4xl font-bold bg-gradient-to-r from-blue-600 to-blue-800 dark:from-blue-400 dark:to-blue-600 bg-clip-text text-transparent">
+              Types de Cotisation Mensuelle
+            </h1>
+            <p className="text-gray-700 dark:text-gray-300 mt-1 sm:mt-2 text-sm sm:text-base lg:text-lg">
+              Gérer les types de cotisation mensuelle et leurs paramètres
+            </p>
+          </div>
         </div>
-        <Button
-          onClick={() => {
-            setEditingType(null);
-            setFormData({
-              nom: "",
-              description: "",
-              montant: 0,
-              obligatoire: true,
-              actif: true,
-              ordre: 0,
-            });
-            setShowForm(true);
-          }}
-          className="bg-blue-600 hover:bg-blue-700 text-white"
-        >
-          <Plus className="h-4 w-4 mr-2" />
-          Nouveau Type
-        </Button>
-      </div>
 
-      {/* Statistiques */}
-      {stats && (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Total Types
-                  </p>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">
-                    {stats.totalTypesCotisation}
-                  </p>
-                </div>
-                <Settings className="h-8 w-8 text-blue-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Types Actifs
-                  </p>
-                  <p className="text-2xl font-bold text-green-600">
-                    {stats.typesActifs}
-                  </p>
-                </div>
-                <CheckCircle2 className="h-8 w-8 text-green-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Cotisations Mois
-                  </p>
-                  <p className="text-2xl font-bold text-purple-600">
-                    {stats.totalCotisationsMois}
-                  </p>
-                </div>
-                <Calendar className="h-8 w-8 text-purple-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Total Dettes
-                  </p>
-                  <p className="text-2xl font-bold text-orange-600">
-                    {stats.totalDettes.toFixed(2).replace('.', ',')} €
-                  </p>
-                </div>
-                <Euro className="h-8 w-8 text-orange-600" />
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    En Retard
-                  </p>
-                  <p className="text-2xl font-bold text-red-600">
-                    {stats.adherentsEnRetard}
-                  </p>
-                </div>
-                <AlertTriangle className="h-8 w-8 text-red-600" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Liste des types */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {typesCotisation.map((type) => (
-          <Card key={type.id} className="hover:shadow-lg transition-shadow">
-            <CardHeader>
-              <div className="flex justify-between items-start">
-                <div>
-                  <CardTitle className="text-lg">{type.nom}</CardTitle>
-                  <CardDescription className="mt-1">
-                    {type.description || "Aucune description"}
-                  </CardDescription>
-                </div>
-                <div className="flex space-x-1">
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleEdit(type)}
-                    className="text-blue-600 hover:text-blue-700"
-                  >
-                    <Edit className="h-3 w-3" />
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => handleDelete(type.id)}
-                    className="text-red-600 hover:text-red-700"
-                  >
-                    <Trash2 className="h-3 w-3" />
-                  </Button>
-                </div>
-              </div>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
+        {/* Statistiques */}
+        {stats && (
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3 sm:gap-4">
+            <Card className="shadow-md border-blue-200 dark:border-blue-800 hover:shadow-lg transition-shadow">
+              <CardContent className="p-4 sm:p-6 bg-gradient-to-br from-blue-50/80 to-white dark:from-blue-900/20 dark:to-gray-800">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Montant
-                  </span>
-                  <span className="text-lg font-bold text-gray-900 dark:text-white">
-                    {type.montant.toFixed(2).replace('.', ',')} €
-                  </span>
+                  <div>
+                    <p className="text-xs sm:text-sm font-semibold text-blue-700 dark:text-blue-300 uppercase tracking-wide">
+                      Total Types
+                    </p>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-blue-900 dark:text-blue-100 mt-1 sm:mt-2">
+                      {stats.totalTypesCotisation}
+                    </p>
+                  </div>
+                  <Settings className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400" />
                 </div>
+              </CardContent>
+            </Card>
 
+            <Card className="shadow-md border-green-200 dark:border-green-800 hover:shadow-lg transition-shadow">
+              <CardContent className="p-4 sm:p-6 bg-gradient-to-br from-green-50/80 to-white dark:from-green-900/20 dark:to-gray-800">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Statut
-                  </span>
-                  <Badge 
-                    className={
-                      type.actif 
-                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
-                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                    }
-                  >
-                    {type.actif ? "Actif" : "Inactif"}
-                  </Badge>
+                  <div>
+                    <p className="text-xs sm:text-sm font-semibold text-green-700 dark:text-green-300 uppercase tracking-wide">
+                      Types Actifs
+                    </p>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-green-900 dark:text-green-100 mt-1 sm:mt-2">
+                      {stats.typesActifs}
+                    </p>
+                  </div>
+                  <CheckCircle2 className="h-6 w-6 sm:h-8 sm:w-8 text-green-600 dark:text-green-400" />
                 </div>
+              </CardContent>
+            </Card>
 
+            <Card className="shadow-md border-purple-200 dark:border-purple-800 hover:shadow-lg transition-shadow">
+              <CardContent className="p-4 sm:p-6 bg-gradient-to-br from-purple-50/80 to-white dark:from-purple-900/20 dark:to-gray-800">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Type
-                  </span>
-                  <Badge 
-                    className={
-                      type.obligatoire 
-                        ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" 
-                        : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200"
-                    }
-                  >
-                    {type.obligatoire ? "Obligatoire" : "Optionnel"}
-                  </Badge>
+                  <div>
+                    <p className="text-xs sm:text-sm font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wide">
+                      Cotisations Mois
+                    </p>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-purple-900 dark:text-purple-100 mt-1 sm:mt-2">
+                      {stats.totalCotisationsMois}
+                    </p>
+                  </div>
+                  <Calendar className="h-6 w-6 sm:h-8 sm:w-8 text-purple-600 dark:text-purple-400" />
                 </div>
+              </CardContent>
+            </Card>
 
+            <Card className="shadow-md border-orange-200 dark:border-orange-800 hover:shadow-lg transition-shadow">
+              <CardContent className="p-4 sm:p-6 bg-gradient-to-br from-orange-50/80 to-white dark:from-orange-900/20 dark:to-gray-800">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Ordre
-                  </span>
-                  <span className="text-sm text-gray-600 dark:text-gray-300">
-                    #{type.ordre}
-                  </span>
+                  <div>
+                    <p className="text-xs sm:text-sm font-semibold text-orange-700 dark:text-orange-300 uppercase tracking-wide">
+                      Total Dettes
+                    </p>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-orange-900 dark:text-orange-100 mt-1 sm:mt-2">
+                      {stats.totalDettes.toFixed(2).replace('.', ',')} €
+                    </p>
+                  </div>
+                  <Euro className="h-6 w-6 sm:h-8 sm:w-8 text-orange-600 dark:text-orange-400" />
                 </div>
+              </CardContent>
+            </Card>
 
+            <Card className="shadow-md border-red-200 dark:border-red-800 hover:shadow-lg transition-shadow">
+              <CardContent className="p-4 sm:p-6 bg-gradient-to-br from-red-50/80 to-white dark:from-red-900/20 dark:to-gray-800">
                 <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-600 dark:text-gray-300">
-                    Utilisations
-                  </span>
-                  <span className="text-sm text-gray-600 dark:text-gray-300">
-                    {type._count.CotisationsMensuelles} cotisation(s)
-                  </span>
+                  <div>
+                    <p className="text-xs sm:text-sm font-semibold text-red-700 dark:text-red-300 uppercase tracking-wide">
+                      En Retard
+                    </p>
+                    <p className="text-xl sm:text-2xl lg:text-3xl font-bold text-red-900 dark:text-red-100 mt-1 sm:mt-2">
+                      {stats.adherentsEnRetard}
+                    </p>
+                  </div>
+                  <AlertTriangle className="h-6 w-6 sm:h-8 sm:w-8 text-red-600 dark:text-red-400" />
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
 
-                <div className="pt-2 border-t">
-                  <p className="text-xs text-gray-500">
-                    Créé par: {type.CreatedBy.email}
-                  </p>
-                  <p className="text-xs text-gray-500">
-                    {new Date(type.createdAt).toLocaleDateString('fr-FR')}
-                  </p>
-                </div>
+        {/* Card principale avec liste */}
+        <Card className="shadow-lg border-blue-200 dark:border-blue-800">
+          <CardHeader className="bg-gradient-to-r from-blue-500/90 to-blue-600/90 dark:from-blue-600/90 dark:to-blue-700/90 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+              <div>
+                <CardTitle className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 sm:gap-3">
+                  <Settings className="h-5 w-5 sm:h-6 sm:w-6" />
+                  Liste des Types de Cotisation
+                </CardTitle>
+                <CardDescription className="text-blue-100 dark:text-blue-200 mt-1 sm:mt-2 text-sm sm:text-base">
+                  Gérer les types de cotisation mensuelle et leurs paramètres
+                </CardDescription>
               </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+              <div className="flex items-center space-x-2 w-full sm:w-auto">
+                <ColumnVisibilityToggle 
+                  table={table} 
+                  storageKey="admin-types-cotisation-column-visibility"
+                />
+                <Button
+                  onClick={() => {
+                    setEditingType(null);
+                    setFormData({
+                      nom: "",
+                      description: "",
+                      montant: 0,
+                      actif: true,
+                    });
+                    setShowForm(true);
+                  }}
+                  className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg"
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nouveau Type
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
 
-      {/* Modal de création/édition */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <CardHeader>
-              <CardTitle>
-                {editingType ? "Modifier le Type" : "Nouveau Type de Cotisation"}
-              </CardTitle>
-              <CardDescription>
-                {editingType ? "Modifier les paramètres du type" : "Créer un nouveau type de cotisation mensuelle"}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+            {/* Filtres et recherche */}
+            <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Rechercher par nom, description, montant..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select value={statusFilter} onValueChange={setStatusFilter}>
+                <SelectTrigger className="w-full sm:w-48">
+                  <SelectValue placeholder="Filtrer par statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="actif">Actifs</SelectItem>
+                  <SelectItem value="inactif">Inactifs</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {loading ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+              </div>
+            ) : (
+              <>
+                <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+                  {filteredData.length} type(s) trouvé(s)
+                </div>
+                <DataTable table={table} emptyMessage="Aucun type de cotisation trouvé" compact={true} />
+                
+                {/* Pagination */}
+                <div className="bg-white dark:bg-gray-800 mt-5 flex items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
+                  <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+                    {table.getFilteredRowModel().rows.length} ligne(s) au total
+                  </div>
+
+                  <div className="flex items-center space-x-6 lg:space-x-8">
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+                      <Select
+                        value={`${table.getState().pagination.pageSize}`}
+                        onValueChange={(value) => {
+                          table.setPageSize(Number(value));
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-[70px]">
+                          <SelectValue placeholder={table.getState().pagination.pageSize} />
+                        </SelectTrigger>
+                        <SelectContent side="top">
+                          {[10, 20, 30, 40, 50].map((pageSize) => (
+                            <SelectItem key={pageSize} value={`${pageSize}`}>
+                              {pageSize}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex w-[100px] items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300">
+                      Page {table.getState().pagination.pageIndex + 1} sur{" "}
+                      {table.getPageCount()}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        className="hidden h-8 w-8 p-0 lg:flex"
+                        onClick={() => table.setPageIndex(0)}
+                        disabled={!table.getCanPreviousPage()}
+                      >
+                        <span className="sr-only">Aller à la première page</span>
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => table.previousPage()}
+                        disabled={!table.getCanPreviousPage()}
+                      >
+                        <span className="sr-only">Page précédente</span>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => table.nextPage()}
+                        disabled={!table.getCanNextPage()}
+                      >
+                        <span className="sr-only">Page suivante</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="hidden h-8 w-8 p-0 lg:flex"
+                        onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                        disabled={!table.getCanNextPage()}
+                      >
+                        <span className="sr-only">Aller à la dernière page</span>
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Modal de création/édition */}
+        <Dialog open={showForm} onOpenChange={setShowForm}>
+          <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0">
+            {/* Header avec gradient */}
+            <div className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white p-6 rounded-t-lg">
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center">
+                    {editingType ? (
+                      <Edit className="h-6 w-6 text-white" />
+                    ) : (
+                      <Plus className="h-6 w-6 text-white" />
+                    )}
+                  </div>
+                  <div>
+                    <DialogTitle className="text-2xl font-bold text-white mb-1">
+                      {editingType ? "Modifier le Type" : "Nouveau Type de Cotisation"}
+                    </DialogTitle>
+                    <DialogDescription className="text-blue-100 text-sm">
+                      {editingType ? "Modifier les paramètres du type" : "Créer un nouveau type de cotisation mensuelle"}
+                    </DialogDescription>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    setShowForm(false);
+                    setEditingType(null);
+                    setFormData({
+                      nom: "",
+                      description: "",
+                      montant: 0,
+                      actif: true,
+                    });
+                  }}
+                  className="h-8 w-8 p-0 text-white hover:bg-white/20 hover:text-white"
+                >
+                  <X className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Contenu principal */}
+            <div className="p-6 space-y-4 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800">
               <form onSubmit={handleSubmit} className="space-y-4">
+                <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2 flex items-center gap-2">
+                  <Info className="h-5 w-5 text-blue-600" />
+                  Informations du type
+                </h3>
+
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="nom">Nom *</Label>
+                  {/* Nom */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 px-2 py-1 rounded-t-md">
+                      <FileText className="h-3 w-3" />
+                      Nom *
+                    </label>
                     <Input
                       id="nom"
                       value={formData.nom}
                       onChange={(e) => setFormData({ ...formData, nom: e.target.value })}
                       placeholder="ex: Forfait Mensuel"
                       required
+                      className="rounded-md rounded-tl-none border-blue-200 dark:border-blue-800 border-t-0 focus:border-blue-400 focus:ring-blue-400"
                     />
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="montant">Montant *</Label>
+                  {/* Montant */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 px-2 py-1 rounded-t-md">
+                      <Euro className="h-3 w-3" />
+                      Montant * (€)
+                    </label>
                     <div className="relative">
                       <Input
                         id="montant"
@@ -434,120 +743,140 @@ export default function AdminTypesCotisationMensuelle() {
                         step="0.01"
                         min="0"
                         value={formData.montant}
-                        onChange={(e) => setFormData({ ...formData, montant: parseFloat(e.target.value) })}
+                        onChange={(e) => setFormData({ ...formData, montant: parseFloat(e.target.value) || 0 })}
                         placeholder="0.00"
                         required
+                        className="rounded-md rounded-tl-none border-blue-200 dark:border-blue-800 border-t-0 focus:border-blue-400 focus:ring-blue-400 pr-10"
                       />
-                      <Euro className="absolute right-3 top-3 h-4 w-4 text-gray-400" />
+                      <Euro className="absolute right-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
                     </div>
                     {editingType && (
-                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1">
-                        ⚠️ La modification du montant n'affectera que les futures cotisations. Les cotisations déjà créées conservent leur montant initial.
+                      <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                        <AlertTriangle className="h-3 w-3" />
+                        La modification du montant n'affectera que les futures cotisations. Les cotisations déjà créées conservent leur montant initial.
                       </p>
                     )}
                   </div>
 
-                  <div className="space-y-2">
-                    <Label htmlFor="ordre">Ordre d'affichage</Label>
-                    <Input
-                      id="ordre"
-                      type="number"
-                      min="0"
-                      value={formData.ordre}
-                      onChange={(e) => setFormData({ ...formData, ordre: parseInt(e.target.value) })}
-                      placeholder="0"
+                  {/* Statut */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 px-2 py-1 rounded-t-md">
+                      <CheckCircle2 className="h-3 w-3" />
+                      Statut
+                    </label>
+                    <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-blue-900/20 rounded-md rounded-tl-none border border-blue-200 dark:border-blue-800 border-t-0 shadow-sm">
+                      <div className="flex items-center space-x-3">
+                        <input
+                          type="checkbox"
+                          id="actif"
+                          checked={formData.actif}
+                          onChange={(e) => setFormData({ ...formData, actif: e.target.checked })}
+                          className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                        />
+                        <Label htmlFor="actif" className="cursor-pointer text-sm font-medium text-slate-900 dark:text-slate-100">
+                          Type actif
+                        </Label>
+                        <Badge
+                          className={
+                            formData.actif
+                              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs ml-auto"
+                              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs ml-auto"
+                          }
+                        >
+                          {formData.actif ? "Actif" : "Inactif"}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Description */}
+                  <div className="space-y-1 md:col-span-2">
+                    <label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 px-2 py-1 rounded-t-md">
+                      <FileText className="h-3 w-3" />
+                      Description
+                    </label>
+                    <Textarea
+                      id="description"
+                      value={formData.description}
+                      onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                      placeholder="Description du type de cotisation (optionnel)"
+                      rows={3}
+                      className="rounded-md rounded-tl-none border-blue-200 dark:border-blue-800 border-t-0 focus:border-blue-400 focus:ring-blue-400 resize-none"
                     />
                   </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="obligatoire">Type</Label>
-                    <select
-                      id="obligatoire"
-                      value={formData.obligatoire.toString()}
-                      onChange={(e) => setFormData({ ...formData, obligatoire: e.target.value === 'true' })}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                    >
-                      <option value="true">Obligatoire</option>
-                      <option value="false">Optionnel</option>
-                    </select>
-                  </div>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="description">Description</Label>
-                  <textarea
-                    id="description"
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    placeholder="Description du type de cotisation"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:border-gray-600 dark:bg-gray-800 dark:text-white"
-                    rows={3}
-                  />
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <input
-                    type="checkbox"
-                    id="actif"
-                    checked={formData.actif}
-                    onChange={(e) => setFormData({ ...formData, actif: e.target.checked })}
-                    className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-                  />
-                  <Label htmlFor="actif">Type actif (peut être utilisé)</Label>
-                </div>
-
-                <div className="flex justify-end space-x-2">
+                {/* Footer */}
+                <div className="flex justify-end gap-3 pt-4 border-t border-slate-200 dark:border-gray-700">
                   <Button
                     type="button"
                     variant="outline"
-                    onClick={() => setShowForm(false)}
+                    onClick={() => {
+                      setShowForm(false);
+                      setEditingType(null);
+                      setFormData({
+                        nom: "",
+                        description: "",
+                        montant: 0,
+                        actif: true,
+                      });
+                    }}
+                    className="bg-white hover:bg-slate-50 border-slate-300 text-slate-700 hover:text-slate-900 shadow-sm"
                   >
                     Annuler
                   </Button>
                   <Button 
                     type="submit" 
                     disabled={loading}
-                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                    className="bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg"
                   >
                     {loading ? (
                       <>
                         <Clock className="h-4 w-4 mr-2 animate-spin" />
-                        Sauvegarde...
+                        Enregistrement...
+                      </>
+                    ) : editingType ? (
+                      <>
+                        <Edit className="h-4 w-4 mr-2" />
+                        Modifier
                       </>
                     ) : (
                       <>
-                        <CheckCircle2 className="h-4 w-4 mr-2" />
-                        {editingType ? "Modifier" : "Créer"}
+                        <Plus className="h-4 w-4 mr-2" />
+                        Créer
                       </>
                     )}
                   </Button>
                 </div>
               </form>
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {/* Informations importantes */}
-      <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
-        <AlertDescription className="space-y-2">
-          <div className="flex items-start space-x-3">
-            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
-            <div>
-              <h3 className="font-medium text-amber-800 dark:text-amber-200">
-                Informations Importantes
-              </h3>
-              <ul className="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1">
-                <li>• Les types obligatoires sont automatiquement inclus dans les cotisations mensuelles</li>
-                <li>• Les types optionnels peuvent être ajoutés selon les besoins</li>
-                <li>• L'ordre détermine l'affichage dans les interfaces</li>
-                <li>• Un type inactif ne peut pas être utilisé pour créer de nouvelles cotisations</li>
-                <li>• La suppression d'un type est impossible s'il est utilisé dans des cotisations</li>
-              </ul>
             </div>
-          </div>
-        </AlertDescription>
-      </Alert>
+          </DialogContent>
+        </Dialog>
+
+        {/* Informations importantes */}
+        <Card className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 shadow-md">
+          <CardContent className="p-4 sm:p-6">
+            <Alert className="border-0 bg-transparent">
+              <AlertDescription className="space-y-2">
+                <div className="flex items-start space-x-3">
+                  <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5" />
+                  <div>
+                    <h3 className="font-medium text-amber-800 dark:text-amber-200">
+                      Informations Importantes
+                    </h3>
+                    <ul className="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1">
+                      <li>• Tous les types de cotisations sont obligatoires dans l'association mais ne sont pas applicables tous les mois</li>
+                      <li>• Si un adhérent ne paie pas sa cotisation du mois, le montant devient une dette qu'il doit à l'association</li>
+                      <li>• Un type inactif ne peut pas être utilisé pour créer de nouvelles cotisations</li>
+                      <li>• La suppression d'un type est impossible s'il est utilisé dans des cotisations</li>
+                    </ul>
+                  </div>
+                </div>
+              </AlertDescription>
+            </Alert>
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 }
