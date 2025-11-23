@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         fileName,
         mimeType,
         totalSize,
-        metadata: null,
+        metadata: metadata || null, // Stocker les métadonnées même si c'est le premier chunk
       });
     } else {
       const storage = chunkStorage.get(uploadId)!;
@@ -102,8 +102,33 @@ export async function POST(request: NextRequest) {
 
     const storage = chunkStorage.get(uploadId)!;
 
+    // Log pour débogage
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Chunk ${chunkIndex + 1}/${totalChunks} reçu pour uploadId ${uploadId}:`, {
+        receivedChunks: storage.receivedChunks.size,
+        totalChunks,
+        hasMetadata: !!storage.metadata,
+        isLastChunk,
+        fileName,
+        mimeType,
+      });
+    }
+
     // Vérifier si tous les chunks sont reçus
-    if (storage.receivedChunks.size === totalChunks && storage.metadata) {
+    // Pour les fichiers en un seul chunk (images souvent < 5MB), vérifier que les métadonnées sont présentes
+    const allChunksReceived = storage.receivedChunks.size === totalChunks;
+    const hasMetadata = storage.metadata !== null;
+    
+    // Log pour débogage
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Vérification assemblage:`, {
+        allChunksReceived,
+        hasMetadata,
+        readyToAssemble: allChunksReceived && hasMetadata,
+      });
+    }
+    
+    if (allChunksReceived && hasMetadata) {
       // Tous les chunks sont reçus, assembler le fichier final
       const finalDir = join(process.cwd(), "public", "ressources", "galeries");
       if (!existsSync(finalDir)) {
@@ -119,6 +144,9 @@ export async function POST(request: NextRequest) {
       for (let i = 0; i < totalChunks; i++) {
         const chunkFilePath = join(tempDir, `${uploadId}_chunk_${i}`);
         try {
+          if (!existsSync(chunkFilePath)) {
+            throw new Error(`Fichier chunk ${i} introuvable: ${chunkFilePath}`);
+          }
           const chunkData = await readFile(chunkFilePath);
           chunks.push(chunkData);
           // Supprimer le chunk temporaire
@@ -128,17 +156,45 @@ export async function POST(request: NextRequest) {
           // Nettoyer les chunks déjà lus
           for (let j = 0; j < i; j++) {
             try {
-              await unlink(join(tempDir, `${uploadId}_chunk_${j}`));
+              const chunkToDelete = join(tempDir, `${uploadId}_chunk_${j}`);
+              if (existsSync(chunkToDelete)) {
+                await unlink(chunkToDelete);
+              }
             } catch (e) {
               // Ignorer les erreurs de suppression
             }
           }
-          throw new Error(`Chunk ${i} manquant ou corrompu`);
+          // Nettoyer le stockage
+          chunkStorage.delete(uploadId);
+          throw new Error(`Chunk ${i} manquant ou corrompu: ${error instanceof Error ? error.message : String(error)}`);
         }
       }
 
       // Écrire le fichier final
-      await writeFile(finalPath, Buffer.concat(chunks));
+      const finalBuffer = Buffer.concat(chunks);
+      
+      // Vérifier que la taille correspond
+      if (finalBuffer.length !== storage.totalSize) {
+        console.error(`Taille du fichier final incorrecte: attendu ${storage.totalSize}, obtenu ${finalBuffer.length}`);
+        // Nettoyer le stockage
+        chunkStorage.delete(uploadId);
+        return NextResponse.json(
+          { success: false, error: "Taille du fichier final incorrecte" },
+          { status: 500 }
+        );
+      }
+      
+      await writeFile(finalPath, finalBuffer);
+      
+      // Vérifier que le fichier a bien été écrit
+      if (!existsSync(finalPath)) {
+        console.error(`Le fichier final n'a pas été créé: ${finalPath}`);
+        chunkStorage.delete(uploadId);
+        return NextResponse.json(
+          { success: false, error: "Erreur lors de l'écriture du fichier final" },
+          { status: 500 }
+        );
+      }
 
       // Nettoyer le stockage
       chunkStorage.delete(uploadId);
@@ -214,7 +270,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Chunk reçu, mais pas encore tous les chunks
+    // Chunk reçu, mais pas encore tous les chunks ou métadonnées manquantes
+    // Pour les fichiers en un seul chunk, on doit attendre que les métadonnées soient reçues
+    if (allChunksReceived && !hasMetadata) {
+      return NextResponse.json({
+        success: true,
+        message: `Chunk ${chunkIndex + 1}/${totalChunks} reçu, en attente des métadonnées...`,
+        progress: Math.round((storage.receivedChunks.size / totalChunks) * 100),
+      });
+    }
+    
     return NextResponse.json({
       success: true,
       message: `Chunk ${chunkIndex + 1}/${totalChunks} reçu`,

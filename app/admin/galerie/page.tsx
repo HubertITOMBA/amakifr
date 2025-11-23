@@ -248,8 +248,15 @@ export default function AdminGaleriePage() {
         });
 
         if (!response.ok) {
-          const result = await response.json().catch(() => ({ error: "Erreur inconnue" }));
-          return { success: false, error: result.error || `Erreur ${response.status}` };
+          const errorText = await response.text();
+          let errorData;
+          try {
+            errorData = JSON.parse(errorText);
+          } catch {
+            errorData = { error: errorText || `Erreur ${response.status}` };
+          }
+          console.error(`Erreur lors de l'upload du chunk ${chunkIndex + 1}/${totalChunks}:`, errorData);
+          return { success: false, error: errorData.error || `Erreur ${response.status}` };
         }
 
         const result = await response.json();
@@ -258,14 +265,40 @@ export default function AdminGaleriePage() {
         const progress = Math.round(((chunkIndex + 1) / totalChunks) * 100);
         setUploadProgress(progress);
 
+        // Log pour débogage
+        if (process.env.NODE_ENV === 'development') {
+          console.log(`Chunk ${chunkIndex + 1}/${totalChunks} uploadé:`, {
+            success: result.success,
+            hasMedia: !!result.media,
+            isLastChunk,
+            message: result.message,
+          });
+        }
+
         // Si c'est le dernier chunk et que l'upload est terminé
-        if (isLastChunk && result.success && result.media) {
-          return { success: true, media: result.media };
+        if (isLastChunk && result.success) {
+          if (result.media) {
+            return { success: true, media: result.media };
+          } else {
+            // Si les métadonnées ne sont pas encore traitées, attendre un peu et réessayer
+            // Cela peut arriver si le serveur n'a pas encore assemblé le fichier
+            console.warn("Dernier chunk envoyé mais média non retourné, attente...");
+            // Pour les fichiers en un seul chunk, le serveur devrait traiter immédiatement
+            // Si ce n'est pas le cas, il y a un problème
+            if (totalChunks === 1) {
+              return { success: false, error: "Erreur: le fichier n'a pas été traité correctement par le serveur" };
+            }
+          }
         }
 
         // Si ce n'est pas le dernier chunk, continuer avec le suivant
         if (!isLastChunk && result.success) {
           continue;
+        }
+
+        // Si on arrive ici, il y a un problème
+        if (!result.success) {
+          return { success: false, error: result.error || "Erreur lors de l'upload du chunk" };
         }
       }
 
