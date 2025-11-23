@@ -108,6 +108,17 @@ npx prisma migrate deploy || {
     npx prisma migrate status
 }
 
+# Nettoyage du cache Next.js avant le build
+echo -e "${BLUE}🧹 Nettoyage du cache Next.js...${NC}"
+if [ -d ".next" ]; then
+  rm -rf .next
+  echo -e "${GREEN}✅ Cache .next supprimé${NC}"
+fi
+if [ -d "node_modules/.cache" ]; then
+  rm -rf node_modules/.cache
+  echo -e "${GREEN}✅ Cache node_modules/.cache supprimé${NC}"
+fi
+
 # Build de production
 echo -e "${BLUE}🔨 Build de production...${NC}"
 npm run build
