@@ -570,7 +570,7 @@ export default function EvenementDetailPage() {
                       src={allImages[currentImageIndex]}
                       alt={evenement.titre}
                       fill
-                      className="object-cover"
+                      className="object-contain"
                       sizes="(max-width: 768px) 100vw, 66vw"
                       priority
                       unoptimized={allImages[currentImageIndex]?.startsWith('/')}
@@ -1035,7 +1035,14 @@ export default function EvenementDetailPage() {
                   <Button
                     variant="outline"
                     className="w-full"
-                    onClick={() => router.push(`/admin/evenements/${evenement.id}/edition`)}
+                    onClick={() => {
+                      // Stocker la page actuelle pour pouvoir y revenir après annulation
+                      if (typeof window !== "undefined") {
+                        sessionStorage.setItem("previousEventPage", window.location.pathname);
+                      }
+                      router.push(`/admin/evenements/${evenement.id}/edition`);
+                      router.refresh();
+                    }}
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Modifier l'événement

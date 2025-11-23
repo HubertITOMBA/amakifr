@@ -3,7 +3,6 @@
 import { useForm } from 'react-hook-form'
 import { useState, useTransition } from "react";
 import { redirect, useSearchParams, useRouter } from "next/navigation";
-import { signIn } from "next-auth/react";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginSchema } from '@/schemas';
@@ -47,24 +46,28 @@ const LoginForm = () => {
     })
 
     const onSubmit = (data: z.infer<typeof LoginSchema>) => {
-      console.log(data);
+      setError("");
+      setSuccess("");
       startTransition(async () => {
         try {
-          const result = await signIn("credentials", {
-            email: data.email,
-            password: data.password,
-            redirect: false,
-          });
-
+          const result = await login(data, callbackUrl);
+          
           if (result?.error) {
-            setError("Identifiants non valides!");
+            setError(result.error);
             form.reset();
-          } else if (result?.ok) {
-            // Connexion réussie - redirection automatique
-            window.location.href = callbackUrl || "/";
+          } else if (result?.success) {
+            setSuccess(result.success);
+            // Si twoFactor est activé, rediriger vers la page de vérification
+            if (result.twoFactor) {
+              setShowTwoFactor(true);
+            } else {
+              // Connexion réussie - redirection automatique
+              window.location.href = callbackUrl || "/";
+            }
           }
         } catch (error) {
           setError("Une erreur s'est produite !");
+          console.error("Erreur de connexion:", error);
         }
       });
     }

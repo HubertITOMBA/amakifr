@@ -42,6 +42,21 @@ export const NewPasswordSchema = z.object({
     }),
 });
 
+export const ChangePasswordSchema = z.object({
+    currentPassword: z.string().min(1, {
+        message: "Le mot de passe actuel est requis"
+    }),
+    newPassword: z.string().min(6, {
+        message: "Le nouveau mot de passe doit contenir au moins 6 caractères"
+    }),
+    confirmPassword: z.string().min(1, {
+        message: "La confirmation du mot de passe est requise"
+    }),
+}).refine((data) => data.newPassword === data.confirmPassword, {
+    message: "Les mots de passe ne correspondent pas",
+    path: ["confirmPassword"],
+});
+
 
 export const profilSchema = z.object({
     name: z.string(),

@@ -48,7 +48,7 @@ export default function Emblacarousel() {
                 <div className="embla__container h-full">
                     <div className="embla__slide flex items-center justify-center bg-blue-700 text-3xl font-bold text-white">Amaki France</div>
                     <div className="embla__slide flex items-center justify-center bg-amber-500 text-3xl font-bold text-white ">Amicale des anciens </div>
-                    <div className="embla__slide flex items-center justify-center bg-blue-700  text-3xl font-bold text-white">de Kipako en France</div>
+                    <div className="embla__slide flex items-center justify-center bg-blue-700  text-3xl font-bold text-white">de Kipaku en France</div>
                      <div className="embla__slide flex items-center justify-center bg-cyan-500 text-3xl font-bold text-white "> Site en construction</div>
                      <div className="embla__slide flex items-center justify-center bg-red-500 text-3xl font-bold text-white ">Prochaine réunion</div>
                      <div className="embla__slide flex items-center justify-center bg-red-500 text-3xl font-bold text-white ">Le 29 Septembre 2025</div>

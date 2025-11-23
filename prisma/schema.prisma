@@ -201,6 +201,7 @@ model User {
   badgesAttribues             BadgeAttribution[] // Badges attribués à cet utilisateur
   ressourcesCreees            Ressource[]                  @relation("RessourceCreatedBy") // Ressources créées
   reservationsConfirmees      Reservation[]                @relation("ReservationConfirmeePar") // Réservations confirmées
+  mediaGalerieCrees           MediaGalerie[]               @relation("MediaGalerieCreatedBy") // Médias de galerie créés
 
   lastLogin DateTime? @updatedAt
   createdAt DateTime  @default(now())
@@ -840,6 +841,7 @@ model Evenement {
   adresse               String?   @db.Text
   categorie             String    @default("General") @db.VarChar(50) // General, Formation, Social, Sportif, Culturel
   statut                String    @default("Brouillon") // Brouillon, Publie, Archive
+  estPublic             Boolean   @default(true) // Si true : visible par tout le monde sur /evenements, si false : réservé aux adhérents sur /agenda
   imagePrincipale       String?   @db.VarChar(500) // URL de l'image principale
   images                String?   @db.Text // JSON array des URLs d'images supplémentaires
   prix                  Decimal?  @db.Decimal(10, 2) // Prix de participation (optionnel)
@@ -1274,4 +1276,37 @@ model Reservation {
   @@index([adherentId])
   @@index([statut])
   @@map("reservations")
+}
+
+// Modèle pour la galerie (photos et vidéos)
+model MediaGalerie {
+  id          String   @id @default(cuid())
+  titre       String   @db.VarChar(255)
+  description String?  @db.Text
+  type        String // "image" ou "video"
+  chemin      String   @db.VarChar(500) // Chemin relatif dans /public/ressources/galeries
+  nomFichier  String   @db.VarChar(255) // Nom du fichier original
+  mimeType    String   @db.VarChar(100)
+  taille      Int // Taille en bytes
+  categorie   String   @db.VarChar(100) // "Événements Officiels", "Événements Sociaux", "Actions Caritatives", "Formations et Conférences"
+  couleur     String   @default("blue") @db.VarChar(50) // "blue", "green", "purple", "orange"
+  date        DateTime // Date de l'événement ou de la prise
+  lieu        String?  @db.VarChar(200) // Lieu où la photo/vidéo a été prise
+  ordre       Int      @default(0) // Ordre d'affichage dans la catégorie
+  actif       Boolean  @default(true) // Si le média est visible publiquement
+  createdBy   String // ID de l'admin qui a ajouté le média
+
+  // Relations
+  CreatedBy User @relation("MediaGalerieCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([categorie])
+  @@index([type])
+  @@index([actif])
+  @@index([ordre])
+  @@index([date])
+  @@map("media_galerie")
 }

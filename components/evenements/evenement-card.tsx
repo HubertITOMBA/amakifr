@@ -104,7 +104,7 @@ export function EvenementCard({
               src={evenement.imagePrincipale}
               alt={evenement.titre}
               fill
-              className="object-cover"
+              className="object-contain"
               sizes="(max-width: 768px) 100vw, 33vw"
               unoptimized={evenement.imagePrincipale.startsWith('/')}
               onError={(e) => {

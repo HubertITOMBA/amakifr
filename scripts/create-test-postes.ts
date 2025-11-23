@@ -3,6 +3,10 @@ import prisma from "../lib/prisma";
 /**
  * Script pour créer des fixtures de postes à pourvoir pour les tests
  * Ce script peut être exécuté plusieurs fois : il met à jour les postes existants ou crée de nouveaux postes
+ * 
+ * Ce script contient la liste complète des postes, fusionnée depuis :
+ * - seed-postes-templates.ts (postes de direction)
+ * - create-test-postes.ts (postes supplémentaires)
  */
 async function createTestPostes() {
   console.log("🌱 Création/Mise à jour des fixtures de postes à pourvoir...");
@@ -18,13 +22,87 @@ async function createTestPostes() {
       return;
     }
 
-    // Postes supplémentaires pour les tests
+    // Liste complète des postes (fusion de seed-postes-templates.ts et create-test-postes.ts)
     const postesToCreate = [
+      // Postes de direction (depuis seed-postes-templates.ts)
+      {
+        code: "PRESID",
+        libelle: "Président",
+        description: "Responsable de la direction de l'association",
+        ordre: 1,
+        nombreMandatsDefaut: 1,
+        dureeMandatDefaut: 24,
+        actif: true,
+      },
+      {
+        code: "VICEPR",
+        libelle: "Vice-Président",
+        description: "Assiste le président dans ses fonctions",
+        ordre: 2,
+        nombreMandatsDefaut: 1,
+        dureeMandatDefaut: 24,
+        actif: true,
+      },
+      {
+        code: "SECRET",
+        libelle: "Secrétaire",
+        description: "Gère l'administration et la communication de l'association",
+        ordre: 3,
+        nombreMandatsDefaut: 1,
+        dureeMandatDefaut: 24,
+        actif: true,
+      },
+      {
+        code: "VICESE",
+        libelle: "Vice-Secrétaire",
+        description: "Assiste le secrétaire dans ses fonctions",
+        ordre: 4,
+        nombreMandatsDefaut: 1,
+        dureeMandatDefaut: 24,
+        actif: true,
+      },
+      {
+        code: "TRESOR",
+        libelle: "Trésorier",
+        description: "Gère les finances de l'association",
+        ordre: 5,
+        nombreMandatsDefaut: 1,
+        dureeMandatDefaut: 24,
+        actif: true,
+      },
+      {
+        code: "VICETR",
+        libelle: "Vice-Trésorier",
+        description: "Assiste le trésorier dans ses fonctions",
+        ordre: 6,
+        nombreMandatsDefaut: 1,
+        dureeMandatDefaut: 24,
+        actif: true,
+      },
+      {
+        code: "COMCPT",
+        libelle: "Commissaire aux comptes",
+        description: "Contrôle les comptes de l'association",
+        ordre: 7,
+        nombreMandatsDefaut: 1,
+        dureeMandatDefaut: 24,
+        actif: true,
+      },
+      {
+        code: "MEMCDI",
+        libelle: "Membre du comité directeur",
+        description: "Membre du comité directeur de l'association",
+        ordre: 8,
+        nombreMandatsDefaut: 1,
+        dureeMandatDefaut: 24,
+        actif: true,
+      },
+      // Postes supplémentaires (depuis create-test-postes.ts)
       {
         code: "MEMBRE",
         libelle: "Membre de l'association",
         description: "Poste pour les membres de l'association sans responsabilité particulière.",
-        ordre: 1,
+        ordre: 9,
         nombreMandatsDefaut: 1,
         dureeMandatDefaut: null, // Pas de durée de mandat pour les membres simples
         actif: true,

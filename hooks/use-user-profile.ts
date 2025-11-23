@@ -109,16 +109,27 @@ export function useUserProfile() {
     const fetchUserProfile = async () => {
       try {
         setLoading(true);
+        setError(null);
         const result = await getUserData();
         
         if (result.success && result.user) {
           setUserProfile(result.user);
         } else {
-          throw new Error(result.error || "Erreur lors de la récupération des données");
+          // Ne pas lancer d'erreur si l'utilisateur n'est pas connecté (cas normal)
+          // Seulement définir une erreur pour les vraies erreurs serveur
+          if (result.error && result.error !== "Non autorisé") {
+            setError(result.error);
+            console.error("Erreur lors de la récupération du profil:", result.error);
+          } else {
+            // Utilisateur non connecté - ce n'est pas une erreur
+            setUserProfile(null);
+            setError(null);
+          }
         }
       } catch (err) {
         console.error("Erreur lors du chargement du profil:", err);
         setError(err instanceof Error ? err.message : "Erreur inconnue");
+        setUserProfile(null);
       } finally {
         setLoading(false);
       }

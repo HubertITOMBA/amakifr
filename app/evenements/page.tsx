@@ -28,7 +28,8 @@ import {
   CheckCircle2,
   AlertCircle,
   X,
-  Download
+  Download,
+  Loader2
 } from "lucide-react";
 import { toast } from "sonner";
 import { getPublicEvenements, inscrireEvenement, inscrireVisiteurEvenement, exportAllEvenementsCalendar, type EvenementData } from "@/actions/evenements";
@@ -303,7 +304,15 @@ export default function PublicEvenementsPage() {
           </div>
           
           {/* Carousel des événements */}
-          {evenements.length > 0 ? (
+          {loading ? (
+            <div className="relative w-full h-[600px] overflow-hidden rounded-2xl shadow-2xl bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600 flex items-center justify-center">
+              <div className="text-center text-white z-10">
+                <Loader2 className="h-16 w-16 mx-auto mb-6 animate-spin opacity-90" />
+                <h2 className="text-2xl sm:text-3xl font-bold mb-4">Chargement des événements...</h2>
+                <p className="text-lg sm:text-xl opacity-90">Veuillez patienter</p>
+              </div>
+            </div>
+          ) : evenements.length > 0 ? (
             <EventsCarousel 
               events={evenements.slice(0, 10).map(ev => ({
                 id: ev.id,
@@ -409,7 +418,7 @@ export default function PublicEvenementsPage() {
                         src={evenement.imagePrincipale}
                         alt={evenement.titre}
                         fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
+                        className="object-contain group-hover:scale-105 transition-transform duration-300"
                         sizes="(max-width: 768px) 100vw, 33vw"
                         unoptimized={evenement.imagePrincipale.startsWith('/')}
                         onError={(e) => {

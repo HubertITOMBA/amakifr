@@ -138,7 +138,14 @@ export default function AdminEvenementsPage() {
             <Button 
               size="sm" 
               variant="outline"
-              onClick={() => router.push(`/admin/evenements/${e.id}/edition`)}
+              onClick={() => {
+                // Stocker la page actuelle pour pouvoir y revenir après annulation
+                if (typeof window !== "undefined") {
+                  sessionStorage.setItem("previousEventPage", window.location.pathname);
+                }
+                router.push(`/admin/evenements/${e.id}/edition`);
+                router.refresh();
+              }}
             >
               <Edit className="h-4 w-4" />
             </Button>

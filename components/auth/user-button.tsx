@@ -15,17 +15,25 @@ import {
  } from "@/components/ui/avatar";
 import { useSession } from "next-auth/react";
 import { useSessionUpdate } from "@/hooks/use-session-update";
+import { useUserProfile } from "@/hooks/use-user-profile";
 import { LogoutButton } from '@/components/auth/logout-button';
 import Link from "next/link";
-import Image from "next/image";
 import { Button } from "../ui/button";
 import { LoginButton } from "./login-button";
+import { ChangePasswordDialog } from "@/components/user/ChangePasswordDialog";
+import { Lock } from "lucide-react";
 
 
 export const UserButton = () => {
     const { data: session, status } = useSession();
     const { forceUpdate } = useSessionUpdate();
+    const { userProfile } = useUserProfile();
     const user = session?.user;
+    
+    // Récupérer l'image de l'utilisateur (priorité à userProfile, puis session)
+    const userImage = userProfile?.image || user?.image;
+    
+    // Déterminer les initiales pour l'avatar
     const firstInitial = user?.name?.charAt(0).toUpperCase() ?? 'U';
 
     // Debug logs (seulement en développement)
@@ -33,6 +41,8 @@ export const UserButton = () => {
         console.log("UserButton - Status:", status);
         console.log("UserButton - Session:", session);
         console.log("UserButton - User:", user);
+        console.log("UserButton - UserProfile:", userProfile);
+        console.log("UserButton - UserImage:", userImage);
     }
 
     // Gestion des états de chargement
@@ -48,23 +58,17 @@ export const UserButton = () => {
        <div className="flex gap-2 items-center">
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-            <div className='flex items-center'>
-                
-                {/* <Avatar>
-                    <AvatarImage src={user?.image || ""} />
-                    <AvatarFallback className="bg-harpOrange">
-                        <FaUser className="text-white" />
+            <div className='flex items-center cursor-pointer'>
+                <Avatar className="w-10 h-10 border-2 border-harpOrange">
+                    <AvatarImage 
+                        src={userImage || undefined} 
+                        alt={user?.name || "Utilisateur"}
+                        className="object-cover"
+                    />
+                    <AvatarFallback className="bg-harpOrange text-white font-semibold">
+                        {firstInitial}
                     </AvatarFallback>  
-                    {firstInitial}  
-                </Avatar>  */}
-              {/* <Button
-                variant='ghost'
-                className='relativee w-8 h-8 rounded-full ml-2 flex items-center justify-center bg-harpOrange text-white'
-                >
-                  
-                 {firstInitial}
-                </Button> */}
-                <Image src="/ressources/avatar.png" alt="" width={40} height={40} className="rounded-full"/>  
+                </Avatar>
             </div>
             
             </DropdownMenuTrigger>
@@ -94,6 +98,17 @@ export const UserButton = () => {
                 <Link href='/user/documents' className='w-full hover:bg-orange-300'>
                   Mes Documents
                 </Link>
+              </DropdownMenuItem>
+
+              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="p-0">
+                <ChangePasswordDialog
+                  trigger={
+                    <button type="button" className='w-full flex items-center hover:bg-orange-300 py-2 px-2 text-left'>
+                      <Lock className="h-4 w-4 mr-2" />
+                      Changer le mot de passe
+                    </button>
+                  }
+                />
               </DropdownMenuItem>
 
               <DropdownMenuItem className="hover:bg-orange-300">

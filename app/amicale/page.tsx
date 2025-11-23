@@ -1,10 +1,13 @@
 "use client";
 
+import { useState } from "react";
 import { Navbar } from "@/components/home/Navbar";
 import { Footer } from "@/components/home/Footer";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { StatuAmaki } from "@/components/statuamaki";
+import { Conditions } from "@/components/conditions";
 import { 
   Users, 
   Target, 
@@ -21,7 +24,9 @@ import {
   Calendar,
   MapPin,
   Mail,
-  Phone
+  Phone,
+  FileText,
+  Scale
 } from "lucide-react";
 import Image from "next/image";
 
@@ -30,7 +35,7 @@ const objectives = [
   {
     id: 1,
     title: "Intégration",
-    description: "Faciliter l'intégration des anciens élèves de Kipako en France",
+    description: "Faciliter l'intégration des anciens élèves de Kipaku en France",
     icon: Handshake,
     color: "blue",
     details: [
@@ -149,9 +154,14 @@ const colorClasses = {
 };
 
 export default function AmicalePage() {
+  const [statuOpen, setStatuOpen] = useState(false);
+  const [conditionsOpen, setConditionsOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
       <Navbar />
+      <StatuAmaki open={statuOpen} onOpenChange={setStatuOpen} />
+      <Conditions open={conditionsOpen} onOpenChange={setConditionsOpen} />
       
       {/* Hero Section */}
       <section className="relative py-8 sm:py-12 md:py-16 lg:py-20 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">
@@ -163,7 +173,10 @@ export default function AmicalePage() {
             </div>
           </div>
           <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-3 sm:mb-4 md:mb-6 text-white drop-shadow-lg">
-            L'Amicale AMAKI
+            AMA<span className=" text-red-500 font-semibold">K</span>I  France
+            
+              
+             
           </h1>
           <p className="text-sm sm:text-base md:text-lg lg:text-xl xl:text-2xl mb-4 sm:mb-6 md:mb-8 text-purple-100 px-4">
             Qui sommes-nous et quels sont nos objectifs
@@ -189,9 +202,9 @@ export default function AmicalePage() {
               Qui Sommes-Nous ?
             </h2>
             <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto px-4">
-              L'Amicale des Anciens Élèves de Kipako en France (AMAKI France) est une association 
+              L'Amicale des Anciens Élèves de Kipaku en France (AMAKI France) est une association 
               à but non lucratif créée en 2016 pour rassembler et accompagner les anciens élèves 
-              de l'École de Kipako établis en France.
+              de l'École de Kipaku établis en France.
             </p>
           </div>
 
@@ -377,6 +390,62 @@ export default function AmicalePage() {
         </div>
       </section>
 
+      {/* Section Informations Légales */}
+      <section className="py-8 sm:py-12 md:py-16 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-slate-800 dark:to-slate-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-6 sm:mb-8 md:mb-12">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3 md:mb-4">
+              Informations Légales
+            </h2>
+            <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto px-4">
+              Consultez notre statut juridique et les conditions d'adhésion à l'association
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 sm:gap-6 md:gap-8 max-w-3xl mx-auto">
+            <Card className="p-4 sm:p-6 md:p-8 hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-blue-500" onClick={() => setStatuOpen(true)}>
+              <div className="text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="p-4 bg-blue-100 dark:bg-blue-900 rounded-full">
+                    <Scale className="h-8 w-8 sm:h-10 sm:w-10 text-blue-600 dark:text-blue-400" />
+                  </div>
+                </div>
+                <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
+                  Notre Statut
+                </h3>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4 sm:mb-6">
+                  Consultez le statut juridique de l'association AMAKI France
+                </p>
+                <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Consulter le statut
+                </Button>
+              </div>
+            </Card>
+
+            <Card className="p-4 sm:p-6 md:p-8 hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-purple-500" onClick={() => setConditionsOpen(true)}>
+              <div className="text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="p-4 bg-purple-100 dark:bg-purple-900 rounded-full">
+                    <FileText className="h-8 w-8 sm:h-10 sm:w-10 text-purple-600 dark:text-purple-400" />
+                  </div>
+                </div>
+                <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
+                  Conditions d'Adhésion
+                </h3>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4 sm:mb-6">
+                  Découvrez les conditions et modalités pour rejoindre l'association
+                </p>
+                <Button className="w-full bg-purple-600 hover:bg-purple-700 text-white">
+                  <CheckCircle className="h-4 w-4 mr-2" />
+                  Voir les conditions
+                </Button>
+              </div>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Section Contact */}
       <section className="py-8 sm:py-12 md:py-16 bg-white dark:bg-slate-900">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -385,7 +454,7 @@ export default function AmicalePage() {
               Rejoignez-Nous
             </h2>
             <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto px-4">
-              Vous êtes un ancien élève de Kipako ? Rejoignez notre communauté et participez à nos activités
+              Vous êtes un ancien élève de Kipaku ? Rejoignez notre communauté et participez à nos activités
             </p>
           </div>
 

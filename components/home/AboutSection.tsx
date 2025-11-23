@@ -153,7 +153,7 @@ export function AboutSection() {
             <div className="relative p-4 bg-gradient-to-br from-blue-100/60 via-indigo-100/60 to-purple-100/60 dark:from-blue-900/30 dark:via-indigo-900/30 dark:to-purple-900/30 rounded-3xl shadow-2xl">
               {/* <div className="relative h-96 rounded-2xl overflow-hidden border-4 border-white/50 dark:border-slate-700/50">
                 <Image
-                  src="/images/logoAmaki.jpeg"
+                  src="/images/logoAmakiOld.jpeg"
                   alt="Équipe AMAKI"
                   fill
                   className="object-cover"

@@ -22,6 +22,7 @@ const EvenementSchema = z.object({
   adresse: z.string().optional(),
   categorie: z.enum(["General", "Formation", "Social", "Sportif", "Culturel"]).default("General"),
   statut: z.enum(["Brouillon", "Publie", "Archive"]).default("Brouillon"),
+  estPublic: z.boolean().default(true), // Si true : visible par tout le monde sur /evenements, si false : réservé aux adhérents sur /agenda
   imagePrincipale: z.string().optional(),
   images: z.string().optional(), // JSON string
   prix: z.string().optional(),
@@ -156,6 +157,7 @@ export async function createEvenement(data: z.infer<typeof EvenementSchema>) {
         adresse: validatedData.adresse,
         categorie: validatedData.categorie,
         statut: validatedData.statut,
+        estPublic: validatedData.estPublic,
         imagePrincipale: validatedData.imagePrincipale,
         images: images ? JSON.stringify(images) : null,
         prix,
@@ -171,6 +173,7 @@ export async function createEvenement(data: z.infer<typeof EvenementSchema>) {
 
     revalidatePath("/admin/evenements");
     revalidatePath("/evenements");
+    revalidatePath("/agenda");
 
     // Conversion des Decimal vers Number pour le client
     const evenementFormatted = {
@@ -250,6 +253,7 @@ export async function updateEvenement(id: string, data: z.infer<typeof Evenement
         adresse: validatedData.adresse,
         categorie: validatedData.categorie,
         statut: validatedData.statut,
+        estPublic: validatedData.estPublic,
         imagePrincipale: validatedData.imagePrincipale,
         images: images ? JSON.stringify(images) : null,
         prix,
@@ -264,6 +268,7 @@ export async function updateEvenement(id: string, data: z.infer<typeof Evenement
 
     revalidatePath("/admin/evenements");
     revalidatePath("/evenements");
+    revalidatePath("/agenda");
 
     // Conversion des Decimal vers Number pour le client
     const evenementFormatted = {
@@ -375,6 +380,7 @@ export async function getPublicEvenements() {
     const evenements = await prisma.evenement.findMany({
       where: {
         statut: "Publie",
+        estPublic: true, // Uniquement les événements publics
         dateAffichage: {
           lte: now,
         },
@@ -415,6 +421,73 @@ export async function getPublicEvenements() {
 }
 
 /**
+ * Récupérer tous les événements pour les adhérents (publics + privés)
+ * Nécessite une session active
+ * 
+ * @returns Tous les événements publiés (publics et privés) accessibles aux adhérents
+ */
+export async function getAdherentEvenements() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Vous devez être connecté pour accéder à l'agenda" };
+    }
+
+    // Vérifier que l'utilisateur est un adhérent ou admin
+    const adherent = await prisma.adherent.findUnique({
+      where: { userId: session.user.id },
+    });
+
+    if (!adherent && session.user.role !== "Admin") {
+      return { success: false, error: "Vous devez être adhérent pour accéder à l'agenda" };
+    }
+
+    const now = new Date();
+    
+    const evenements = await prisma.evenement.findMany({
+      where: {
+        statut: "Publie",
+        // Pas de filtre sur estPublic : on récupère tous les événements (publics + privés)
+        dateAffichage: {
+          lte: now,
+        },
+        dateFinAffichage: {
+          gte: now,
+        },
+      },
+      include: {
+        CreatedBy: {
+          select: {
+            name: true,
+          },
+        },
+        _count: {
+          select: {
+            Inscriptions: true,
+          },
+        },
+      },
+      orderBy: {
+        dateDebut: "asc",
+      },
+    });
+
+    // Conversion des données pour le client
+    const evenementsFormatted = evenements.map(evenement => ({
+      ...evenement,
+      prix: evenement.prix ? Number(evenement.prix) : null,
+      images: evenement.images ? JSON.parse(evenement.images) : null,
+      tags: evenement.tags ? JSON.parse(evenement.tags) : null,
+    }));
+
+    return { success: true, data: evenementsFormatted };
+  } catch (error) {
+    console.error("Erreur lors de la récupération des événements adhérents:", error);
+    return { success: false, error: "Erreur lors de la récupération des événements" };
+  }
+}
+
+/**
  * Exporter tous les événements publics au format iCalendar (.ics)
  * 
  * @param dateDebut - Date de début pour filtrer les événements (optionnel)
@@ -428,6 +501,7 @@ export async function exportAllEvenementsCalendar(dateDebut?: Date, dateFin?: Da
     // Construire les filtres
     const where: any = {
       statut: "Publie",
+      estPublic: true, // Uniquement les événements publics pour l'export
       dateAffichage: {
         lte: now,
       },
@@ -586,7 +660,7 @@ export async function getEvenementById(id: string) {
       return { success: false, error: "Événement non trouvé" };
     }
 
-    // Vérifier que l'événement est accessible publiquement si l'utilisateur n'est pas admin
+    // Vérifier que l'événement est accessible si l'utilisateur n'est pas admin
     if (!isAdmin) {
       const now = new Date();
       if (
@@ -595,6 +669,22 @@ export async function getEvenementById(id: string) {
         evenement.dateFinAffichage < now
       ) {
         return { success: false, error: "Événement non trouvé" };
+      }
+
+      // Si l'événement est privé, vérifier que l'utilisateur est un adhérent connecté
+      if (!evenement.estPublic) {
+        const session = await auth();
+        if (!session?.user?.id) {
+          return { success: false, error: "Cet événement est réservé aux adhérents. Veuillez vous connecter." };
+        }
+
+        const adherent = await prisma.adherent.findUnique({
+          where: { userId: session.user.id },
+        });
+
+        if (!adherent) {
+          return { success: false, error: "Cet événement est réservé aux adhérents." };
+        }
       }
     }
 

@@ -54,10 +54,20 @@ export const {
 
 			if (user.id) {
 				const existingUser = await getUserById(user.id);
-				if (!existingUser || !existingUser.emailVerified) {
+				
+				// Si l'utilisateur n'existe pas, refuser la connexion
+				if (!existingUser) {
+					console.error("[auth] Utilisateur non trouvé lors de la connexion:", user.id);
+					return false;
+				}
+				
+				// Vérifier que l'email est vérifié (emailVerified doit être une date, pas null)
+				if (!existingUser.emailVerified) {
+					console.warn("[auth] Tentative de connexion avec email non vérifié:", existingUser.email);
 					return false;
 				}
 			}
+			
 			return true;
 		},
 

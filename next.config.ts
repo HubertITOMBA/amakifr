@@ -102,11 +102,26 @@ const nextConfig: NextConfig = {
     // domains supprimé car deprecated
   },
 
-  // Augmenter la limite de taille pour les Server Actions (pour l'upload d'images)
+  // Augmenter la limite de taille pour les Server Actions (pour l'upload de vidéos jusqu'à 5GB)
+  // Cette limite correspond à la configuration nginx (client_max_body_size 5G)
+  // Note: Pour les routes API, Next.js limite le body à 10MB côté client.
+  // C'est pourquoi nous utilisons l'upload par chunks pour contourner cette limite.
   experimental: {
     serverActions: {
-      bodySizeLimit: '10mb',
+      bodySizeLimit: '5gb',
     },
+  },
+
+  // Rewrite pour servir les fichiers statiques uploadés via l'API
+  // En production, les fichiers dans /public/ressources/* ne sont pas servis automatiquement
+  // Cette configuration redirige /ressources/* vers /api/ressources/* qui sert les fichiers
+  async rewrites() {
+    return [
+      {
+        source: '/ressources/:path*',
+        destination: '/api/ressources/:path*',
+      },
+    ];
   },
 
 };

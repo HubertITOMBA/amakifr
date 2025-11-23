@@ -16,13 +16,26 @@ import {
   Clock,
   Play,
   Eye,
-  Download
+  Download,
+  Loader2,
+  X
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Image from "next/image";
+import { getMediaGalerieByCategory } from "@/actions/galerie";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
 
-// Données d'exemple pour la galerie
-const galleryData = {
+// Descriptions par défaut pour les catégories
+const categoryDescriptions: Record<string, string> = {
+  "Événements Officiels": "Cérémonies, assemblées générales et moments importants de notre association",
+  "Événements Sociaux": "Fêtes, anniversaires, rencontres conviviales et moments de partage",
+  "Actions Caritatives": "Nos initiatives solidaires et actions d'entraide",
+  "Formations et Conférences": "Sessions de formation, conférences et développement professionnel",
+};
+
+// Données d'exemple pour la galerie (fallback si pas de données)
+const galleryDataFallback = {
   "Événements Officiels": {
     description: "Cérémonies, assemblées générales et moments importants de notre association",
     color: "blue",
@@ -43,7 +56,7 @@ const galleryData = {
         title: "Cérémonie d'ouverture",
         date: "10 Janvier 2023",
         location: "Lyon, France",
-        src: "/images/logoAmaki.jpeg",
+        src: "/images/logoAmakiOld.jpeg",
         alt: "Cérémonie d'ouverture",
         description: "Discours d'ouverture du président de l'association"
       },
@@ -69,7 +82,7 @@ const galleryData = {
         title: "Anniversaire de l'association",
         date: "5 Mai 2023",
         location: "Toulouse, France",
-        src: "/images/logoAmaki.jpeg",
+        src: "/images/logoAmakiOld.jpeg",
         alt: "Anniversaire AMAKI",
         description: "Célébration des 15 ans de l'association avec tous les membres"
       },
@@ -89,7 +102,7 @@ const galleryData = {
         title: "Barbecue d'été",
         date: "15 Juillet 2023",
         location: "Bordeaux, France",
-        src: "/images/logoAmaki.jpeg",
+        src: "/images/logoAmakiOld.jpeg",
         alt: "Barbecue d'été",
         description: "Rencontre décontractée dans un parc de Bordeaux"
       }
@@ -114,8 +127,8 @@ const galleryData = {
         type: "video",
         title: "Mission humanitaire",
         date: "8 Novembre 2023",
-        location: "Kipako, Congo",
-        src: "/images/logoAmaki.jpeg",
+        location: "Kipaku, Congo",
+        src: "/images/logoAmakiOld.jpeg",
         alt: "Mission humanitaire",
         description: "Retour au pays pour des actions de solidarité"
       },
@@ -141,7 +154,7 @@ const galleryData = {
         title: "Conférence sur l'entrepreneuriat",
         date: "18 Septembre 2023",
         location: "Paris, France",
-        src: "/images/logoAmaki.jpeg",
+        src: "/images/logoAmakiOld.jpeg",
         alt: "Conférence entrepreneuriat",
         description: "Formation sur la création d'entreprise en France"
       },
@@ -161,7 +174,7 @@ const galleryData = {
         title: "Séminaire leadership",
         date: "30 Avril 2023",
         location: "Marseille, France",
-        src: "/images/logoAmaki.jpeg",
+        src: "/images/logoAmakiOld.jpeg",
         alt: "Séminaire leadership",
         description: "Développement des compétences managériales"
       }
@@ -199,6 +212,55 @@ const colorClasses = {
 export default function GaleriePage() {
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedItem, setSelectedItem] = useState<any>(null);
+  const [galleryData, setGalleryData] = useState<Record<string, { description: string; color: string; items: any[] }>>({});
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const loadGalleryData = async () => {
+      try {
+        setLoading(true);
+        const result = await getMediaGalerieByCategory(true); // Seulement les médias actifs
+        
+        if (result.success && result.data) {
+          // Transformer les données de la base en format attendu
+          const transformed: Record<string, { description: string; color: string; items: any[] }> = {};
+          
+          Object.keys(result.data).forEach((categorie) => {
+            const medias = result.data[categorie];
+            if (medias && medias.length > 0) {
+              const firstMedia = medias[0];
+              transformed[categorie] = {
+                description: categoryDescriptions[categorie] || "",
+                color: firstMedia.couleur || "blue",
+                items: medias.map((media: any) => ({
+                  id: media.id,
+                  type: media.type,
+                  title: media.titre,
+                  date: format(new Date(media.date), "dd MMMM yyyy", { locale: fr }),
+                  location: media.lieu || "",
+                  src: media.chemin,
+                  alt: media.titre,
+                  description: media.description || "",
+                })),
+              };
+            }
+          });
+          
+          setGalleryData(transformed);
+        } else {
+          // Utiliser les données de fallback si erreur
+          setGalleryData(galleryDataFallback);
+        }
+      } catch (error) {
+        console.error("Erreur lors du chargement de la galerie:", error);
+        setGalleryData(galleryDataFallback);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadGalleryData();
+  }, []);
 
   const categories = Object.keys(galleryData);
 
@@ -263,7 +325,14 @@ export default function GaleriePage() {
       {/* Contenu de la galerie */}
       <section className="py-8 sm:py-12 md:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {selectedCategory ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-blue-600" />
+                <p className="text-gray-600 dark:text-gray-400">Chargement de la galerie...</p>
+              </div>
+            </div>
+          ) : selectedCategory ? (
             // Affichage d'une catégorie spécifique
             <div className="space-y-4 sm:space-y-6 md:space-y-8">
               <div className="text-center mb-6 sm:mb-8 md:mb-12">
@@ -276,19 +345,40 @@ export default function GaleriePage() {
               </div>
               
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 md:gap-8">
-                {galleryData[selectedCategory as keyof typeof galleryData].items.map((item) => (
+                {galleryData[selectedCategory as keyof typeof galleryData].items.map((item) => {
+                  const categoryData = galleryData[selectedCategory as keyof typeof galleryData];
+                  const colorClass = colorClasses[categoryData.color as keyof typeof colorClasses];
+                  
+                  return (
                   <Card 
                     key={item.id} 
                     className="overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group"
                     onClick={() => setSelectedItem(item)}
                   >
-                    <div className="relative h-48 sm:h-56 md:h-64 overflow-hidden">
-                      <Image
-                        src={item.src}
-                        alt={item.alt}
-                        fill
-                        className="object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
+                    <div className={`relative h-48 sm:h-56 md:h-64 overflow-hidden bg-gradient-to-br ${colorClass.bg}`}>
+                      {item.type === "video" ? (
+                        <video
+                          src={item.src}
+                          className="w-full h-full object-contain"
+                          preload="metadata"
+                          muted
+                          onError={(e) => {
+                            console.error("Erreur de chargement vidéo:", item.src);
+                          }}
+                        />
+                      ) : (
+                        <Image
+                          src={item.src}
+                          alt={item.alt}
+                          fill
+                          className="object-contain group-hover:scale-105 transition-transform duration-300"
+                          sizes="(max-width: 768px) 100vw, 33vw"
+                          unoptimized={item.src?.startsWith('/')}
+                          onError={(e) => {
+                            console.error("Erreur de chargement image:", item.src);
+                          }}
+                        />
+                      )}
                       <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
                       <div className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4">
                         {item.type === "video" ? (
@@ -330,8 +420,19 @@ export default function GaleriePage() {
                       </div>
                     </CardContent>
                   </Card>
-                ))}
+                  );
+                })}
               </div>
+            </div>
+          ) : categories.length === 0 ? (
+            <div className="text-center py-16">
+              <Camera className="h-16 w-16 mx-auto mb-4 text-gray-400" />
+              <h3 className="text-xl font-semibold text-gray-900 dark:text-white mb-2">
+                Aucun média disponible
+              </h3>
+              <p className="text-gray-600 dark:text-gray-400">
+                La galerie sera bientôt remplie de nos meilleurs moments.
+              </p>
             </div>
           ) : (
             // Affichage de toutes les catégories
@@ -358,13 +459,30 @@ export default function GaleriePage() {
                           className={`overflow-hidden hover:shadow-xl transition-all duration-300 cursor-pointer group bg-gradient-to-br ${colorClass.bg} border ${colorClass.border}`}
                           onClick={() => setSelectedItem(item)}
                         >
-                          <div className="relative h-40 sm:h-44 md:h-48 overflow-hidden">
-                            <Image
-                              src={item.src}
-                              alt={item.alt}
-                              fill
-                              className="object-cover group-hover:scale-105 transition-transform duration-300"
-                            />
+                          <div className={`relative h-40 sm:h-44 md:h-48 overflow-hidden bg-gradient-to-br ${colorClass.bg}`}>
+                            {item.type === "video" ? (
+                              <video
+                                src={item.src}
+                                className="w-full h-full object-contain"
+                                preload="metadata"
+                                muted
+                                onError={(e) => {
+                                  console.error("Erreur de chargement vidéo:", item.src);
+                                }}
+                              />
+                            ) : (
+                              <Image
+                                src={item.src}
+                                alt={item.alt}
+                                fill
+                                className="object-contain group-hover:scale-105 transition-transform duration-300"
+                                sizes="(max-width: 768px) 100vw, 33vw"
+                                unoptimized={item.src?.startsWith('/')}
+                                onError={(e) => {
+                                  console.error("Erreur de chargement image:", item.src);
+                                }}
+                              />
+                            )}
                             <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors duration-300" />
                             <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
                               {item.type === "video" ? (
@@ -428,26 +546,36 @@ export default function GaleriePage() {
       {selectedItem && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white dark:bg-slate-900 rounded-xl sm:rounded-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden flex flex-col">
-            <div className="relative h-48 sm:h-64 md:h-80 lg:h-96 flex-shrink-0">
-              <Image
-                src={selectedItem.src}
-                alt={selectedItem.alt}
-                fill
-                className="object-cover"
-              />
+            <div className="relative h-48 sm:h-64 md:h-80 lg:h-96 flex-shrink-0 bg-gradient-to-br from-blue-100 to-purple-100 dark:from-blue-900 dark:to-purple-900">
+              {selectedItem.type === "video" ? (
+                <video
+                  src={selectedItem.src}
+                  controls
+                  className="w-full h-full object-contain"
+                  autoPlay
+                  onError={(e) => {
+                    console.error("Erreur de chargement vidéo dans le modal:", selectedItem.src);
+                  }}
+                />
+              ) : (
+                <Image
+                  src={selectedItem.src}
+                  alt={selectedItem.alt}
+                  fill
+                  className="object-contain"
+                  sizes="(max-width: 768px) 100vw, 66vw"
+                  unoptimized={selectedItem.src?.startsWith('/')}
+                  onError={(e) => {
+                    console.error("Erreur de chargement image dans le modal:", selectedItem.src);
+                  }}
+                />
+              )}
               <button
                 onClick={() => setSelectedItem(null)}
-                className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 bg-white/90 hover:bg-white rounded-full p-2 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center"
+                className="absolute top-2 right-2 sm:top-3 sm:right-3 md:top-4 md:right-4 bg-white/90 hover:bg-white rounded-full p-2 transition-colors min-h-[44px] min-w-[44px] flex items-center justify-center z-10"
               >
                 <X className="h-5 w-5 sm:h-6 sm:w-6 text-gray-800" />
               </button>
-              {selectedItem.type === "video" && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="bg-white/90 rounded-full p-4 sm:p-5 md:p-6">
-                    <Play className="h-8 w-8 sm:h-10 sm:w-10 md:h-12 md:w-12 text-gray-800" />
-                  </div>
-                </div>
-              )}
             </div>
             <div className="p-4 sm:p-6 md:p-8 flex-1 overflow-y-auto">
               <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">

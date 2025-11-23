@@ -20,7 +20,8 @@ import {
   Award,
   TrendingUp,
   Bell,
-  Building2
+  Building2,
+  Camera
 } from "lucide-react";
 import Link from "next/link";
 
@@ -140,6 +141,12 @@ const adminMenuItems = [
     href: "/admin/badges",
     icon: Award,
     description: "Gestion des badges et récompenses"
+  },
+  {
+    title: "Galerie",
+    href: "/admin/galerie",
+    icon: Camera,
+    description: "Gestion de la galerie photos et vidéos"
   },
   {
     title: "Finances",

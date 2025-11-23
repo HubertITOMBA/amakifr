@@ -60,6 +60,9 @@ export function ImageUpload({
     try {
       const formData = new FormData();
       formData.append('file', file);
+      if (folder) {
+        formData.append('folder', folder);
+      }
       
       // Utiliser la fonction spécifique pour les événements si le folder est "evenements"
       const result = folder === "evenements" 
@@ -175,7 +178,7 @@ export function ImageUpload({
                       src={displayImage}
                       alt="Preview"
                       fill
-                      className="object-cover"
+                      className="object-contain"
                       sizes="(max-width: 768px) 100vw, 50vw"
                       unoptimized={displayImage.startsWith('/')}
                     />
@@ -220,7 +223,7 @@ export function ImageUpload({
               src={value}
               alt="Preview"
               fill
-              className="object-cover"
+              className="object-contain"
               sizes="(max-width: 768px) 100vw, 50vw"
               unoptimized={value.startsWith('/')}
               onError={() => {

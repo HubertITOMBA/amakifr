@@ -70,13 +70,13 @@ import {
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUserProfile } from "@/hooks/use-user-profile";
-import { PhotoUpload } from "@/components/ui/photo-upload";
 import { updateUserData, getUserCandidatures, getUserVotes, getAllCandidatesForProfile } from "@/actions/user";
 import { downloadPasseportPDF } from "@/actions/passeport";
 import { differenceInYears, differenceInMonths } from "date-fns";
 import { toast } from "sonner";
 import { FinancialTables } from "@/components/financial/financial-tables";
 import { NotificationPreferences } from "@/components/user/NotificationPreferences";
+import { ChangePasswordDialog } from "@/components/user/ChangePasswordDialog";
 import { getIdeesByUser, getAllIdees, createIdee, updateIdee, deleteIdee, createCommentaire, toggleApprobation } from "@/actions/idees";
 import { getDocuments, deleteDocument } from "@/actions/documents";
 import { getUserBadges } from "@/actions/badges";
@@ -679,7 +679,6 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
 export default function UserProfilePage() {
   const user = useCurrentUser();
   const { userProfile, loading: profileLoading, error: profileError } = useUserProfile();
-  const [currentImage, setCurrentImage] = useState(user?.image || "");
   const [activeSection, setActiveSection] = useState<MenuSection>('profile');
   const [candidatures, setCandidatures] = useState<any[]>([]);
   const [votes, setVotes] = useState<any[]>([]);
@@ -727,14 +726,6 @@ export default function UserProfilePage() {
   const [editingEnfant, setEditingEnfant] = useState<any>(null);
   const [enfantFormData, setEnfantFormData] = useState({ prenom: '', dateNaissance: '', age: undefined as number | undefined });
 
-  // Synchroniser l'image avec les données utilisateur
-  useEffect(() => {
-    if (userProfile?.image) {
-      setCurrentImage(userProfile.image);
-    } else if (user?.image) {
-      setCurrentImage(user.image);
-    }
-  }, [userProfile?.image, user?.image]);
 
   // Charger les données selon la section active
   useEffect(() => {
@@ -984,30 +975,6 @@ export default function UserProfilePage() {
     }
   };
 
-  const handleImageChange = async (imageUrl: string) => {
-    setCurrentImage(imageUrl);
-    try {
-      const result = await updateUserData(
-        {
-          ...user,
-          image: imageUrl
-        },
-        {},
-        {},
-        []
-      );
-
-      if (result.success) {
-        toast.success("Photo mise à jour avec succès !");
-        window.location.reload();
-      } else {
-        throw new Error(result.message || 'Erreur lors de la mise à jour');
-      }
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour de l\'image:', error);
-      toast.error("Erreur lors de la mise à jour de l'image");
-    }
-  };
 
   if (!user) {
     return (
@@ -3717,10 +3684,14 @@ export default function UserProfilePage() {
                       Modifier le profil
                     </Button>
                   </Link>
-                  <Button className="w-full" variant="outline">
-                    <Shield className="h-4 w-4 mr-2" />
-                    Sécurité
-                  </Button>
+                  <ChangePasswordDialog
+                    trigger={
+                      <Button className="w-full" variant="outline">
+                        <Shield className="h-4 w-4 mr-2" />
+                        Changer le mot de passe
+                      </Button>
+                    }
+                  />
                   <Button className="w-full" variant="outline">
                     <Settings className="h-4 w-4 mr-2" />
                     Préférences
@@ -4367,12 +4338,16 @@ export default function UserProfilePage() {
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center gap-2 sm:gap-3 md:gap-4">
             <div className="relative flex-shrink-0">
-              <PhotoUpload
-                currentImage={currentImage}
-                userName={user.name || ""}
-                onImageChange={handleImageChange}
-                size="sm"
-              />
+              <Avatar className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 border-4 border-white shadow-2xl">
+                <AvatarImage 
+                  src={userProfile?.image || user?.image || ""} 
+                  alt={user.name || "Utilisateur"}
+                  className="object-cover"
+                />
+                <AvatarFallback className="text-2xl sm:text-3xl md:text-4xl bg-white text-gray-800">
+                  {(user.name || "U").charAt(0).toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
             </div>
             
             <div className="flex-1 text-center sm:text-left min-w-0">
@@ -4415,10 +4390,14 @@ export default function UserProfilePage() {
                   <span className="hidden sm:inline">Modifier</span>
                 </Button>
               </Link>
-              <Button className="bg-white/90 text-blue-600 hover:bg-white dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 font-medium shadow-sm">
-                <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                <span className="hidden sm:inline ml-1">Paramètres</span>
-              </Button>
+              <ChangePasswordDialog
+                trigger={
+                  <Button className="bg-white/90 text-blue-600 hover:bg-white dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 font-medium shadow-sm">
+                    <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                    <span className="hidden sm:inline ml-1">Paramètres</span>
+                  </Button>
+                }
+              />
             </div>
           </div>
         </div>

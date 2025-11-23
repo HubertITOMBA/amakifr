@@ -21,12 +21,20 @@ import {
   Star,
   CheckCircle,
   AlertCircle,
-  Info
+  Info,
+  Loader2,
+  X
 } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { getAdherentEvenements } from "@/actions/evenements";
+import { format } from "date-fns";
+import { fr } from "date-fns/locale";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
+import { toast } from "sonner";
 
-// Données d'exemple pour l'agenda
-const agendaData = {
+// Données d'exemple pour l'agenda (fallback)
+const agendaDataFallback = {
   "Ce Mois": [
     {
       id: 1,
@@ -71,7 +79,7 @@ const agendaData = {
       title: "Mission Humanitaire",
       date: "2024-02-05",
       time: "08:00",
-      location: "Kipako, Congo",
+      location: "Kipaku, Congo",
       type: "humanitaire",
       status: "confirmed",
       attendees: 15,
@@ -202,9 +210,121 @@ const statusColors = {
 };
 
 export default function AgendaPage() {
+  const { data: session, status } = useSession();
+  const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
+  const [agendaData, setAgendaData] = useState<Record<string, any[]>>({});
+  const [loading, setLoading] = useState(true);
+
+  // Vérifier l'authentification et le statut d'adhérent
+  useEffect(() => {
+    if (status === "loading") return; // Attendre le chargement de la session
+    
+    if (status === "unauthenticated") {
+      // Rediriger silencieusement vers la page publique des événements
+      // Ne pas afficher de toast car cela peut être dû à une déconnexion
+      router.push("/evenements");
+      return;
+    }
+
+    if (status === "authenticated") {
+      loadAgendaData();
+    }
+  }, [status, router]);
+
+  const loadAgendaData = async () => {
+    try {
+      setLoading(true);
+      const result = await getAdherentEvenements();
+        
+      if (result.success && result.data) {
+        const evenements = result.data;
+        
+        // Si erreur d'autorisation, rediriger vers la page publique des événements
+        if (result.error && (result.error.includes("connecté") || result.error.includes("adhérent"))) {
+          // Ne pas afficher de toast car cela peut être dû à une déconnexion
+          // Rediriger silencieusement vers la page publique
+          router.push("/evenements");
+          return;
+        }
+        
+        const now = new Date();
+        const currentMonth = now.getMonth();
+        const currentYear = now.getFullYear();
+        const nextMonth = new Date(currentYear, currentMonth + 1, 1);
+        
+        // Organiser les événements par catégories temporelles
+        const organized: Record<string, any[]> = {
+          "Ce Mois": [],
+          "Prochain Mois": [],
+          "Événements Spéciaux": []
+        };
+
+        evenements.forEach((event: any) => {
+          const eventDate = new Date(event.dateDebut);
+          const eventMonth = eventDate.getMonth();
+          const eventYear = eventDate.getFullYear();
+          
+          // Extraire l'heure de la date
+          const time = format(eventDate, "HH:mm", { locale: fr });
+          
+          // Mapper les catégories aux types de couleur
+          const categoryToTypeMap: Record<string, string> = {
+            "general": "officiel",
+            "formation": "formation",
+            "social": "social",
+            "sportif": "social", // Les événements sportifs sont traités comme sociaux
+            "culturel": "social", // Les événements culturels sont traités comme sociaux
+          };
+          
+          const category = event.categorie?.toLowerCase() || "general";
+          const eventType = categoryToTypeMap[category] || "officiel";
+          
+          const eventData = {
+            id: event.id,
+            title: event.titre,
+            date: event.dateDebut,
+            time: time,
+            location: event.lieu || event.adresse || "",
+            type: eventType,
+            status: "confirmed" as const,
+            attendees: event._count?.Inscriptions || 0,
+            description: event.description || "",
+            priority: event.tags?.includes("important") ? "high" as const : "medium" as const,
+          };
+
+          // Catégoriser par période
+          if (eventYear === currentYear && eventMonth === currentMonth) {
+            organized["Ce Mois"].push(eventData);
+          } else if (eventYear === nextMonth.getFullYear() && eventMonth === nextMonth.getMonth()) {
+            organized["Prochain Mois"].push(eventData);
+          } else {
+            // Événements spéciaux (futurs ou passés importants)
+            if (eventDate >= now || event.tags?.includes("important")) {
+              organized["Événements Spéciaux"].push(eventData);
+            }
+          }
+        });
+
+        // Trier chaque catégorie par date
+        Object.keys(organized).forEach((key) => {
+          organized[key].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+        });
+
+        setAgendaData(organized);
+      } else {
+        // Utiliser les données de fallback si erreur
+        setAgendaData(agendaDataFallback);
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement de l'agenda:", error);
+      setAgendaData(agendaDataFallback);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   const categories = Object.keys(agendaData);
   const allEvents = Object.values(agendaData).flat();
@@ -215,14 +335,9 @@ export default function AgendaPage() {
     event.location.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('fr-FR', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric'
-    });
+  const formatDate = (dateString: string | Date) => {
+    const date = typeof dateString === "string" ? new Date(dateString) : dateString;
+    return format(date, "EEEE d MMMM yyyy", { locale: fr });
   };
 
   return (
@@ -313,7 +428,14 @@ export default function AgendaPage() {
       {/* Contenu de l'agenda */}
       <section className="py-8 sm:py-12 md:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          {selectedCategory ? (
+          {loading ? (
+            <div className="flex items-center justify-center py-16">
+              <div className="text-center">
+                <Loader2 className="h-12 w-12 mx-auto mb-4 animate-spin text-blue-600" />
+                <p className="text-gray-600 dark:text-gray-400">Chargement de l'agenda...</p>
+              </div>
+            </div>
+          ) : selectedCategory ? (
             // Affichage d'une catégorie spécifique
             <div className="space-y-4 sm:space-y-6 md:space-y-8">
               <div className="text-center mb-6 sm:mb-8 md:mb-12">
@@ -329,8 +451,8 @@ export default function AgendaPage() {
               
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6 md:gap-8">
                 {agendaData[selectedCategory as keyof typeof agendaData].map((event) => {
-                  const typeColor = typeColors[event.type as keyof typeof typeColors];
-                  const statusColor = statusColors[event.status as keyof typeof statusColors];
+                  const typeColor = typeColors[event.type as keyof typeof typeColors] || typeColors.officiel;
+                  const statusColor = statusColors[event.status as keyof typeof statusColors] || statusColors.confirmed;
                   const StatusIcon = statusColor.icon;
 
                   return (
@@ -418,8 +540,8 @@ export default function AgendaPage() {
                     
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5 md:gap-6">
                       {categoryEvents.slice(0, 3).map((event) => {
-                        const typeColor = typeColors[event.type as keyof typeof typeColors];
-                        const statusColor = statusColors[event.status as keyof typeof statusColors];
+                        const typeColor = typeColors[event.type as keyof typeof typeColors] || typeColors.officiel;
+                        const statusColor = statusColors[event.status as keyof typeof statusColors] || statusColors.confirmed;
                         const StatusIcon = statusColor.icon;
 
                         return (
@@ -489,10 +611,10 @@ export default function AgendaPage() {
               <div className="flex items-start justify-between mb-4 sm:mb-5 md:mb-6 gap-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-3 sm:mb-4 flex-wrap">
-                    <Badge className={`${typeColors[selectedEvent.type as keyof typeof typeColors].badge} text-white text-xs sm:text-sm`}>
+                    <Badge className={`${(typeColors[selectedEvent.type as keyof typeof typeColors] || typeColors.officiel).badge} text-white text-xs sm:text-sm`}>
                       {selectedEvent.type}
                     </Badge>
-                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${statusColors[selectedEvent.status as keyof typeof statusColors].bg} ${statusColors[selectedEvent.status as keyof typeof statusColors].text}`}>
+                    <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${(statusColors[selectedEvent.status as keyof typeof statusColors] || statusColors.confirmed).bg} ${(statusColors[selectedEvent.status as keyof typeof statusColors] || statusColors.confirmed).text}`}>
                       {(() => {
                         const StatusIconForModal = statusColors[selectedEvent.status as keyof typeof statusColors]?.icon;
                         const IconComponent = StatusIconForModal;
