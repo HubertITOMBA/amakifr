@@ -510,6 +510,7 @@ interface CotisationMois {
 
 function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }) {
   const [sorting, setSorting] = useState<SortingState>([{ id: 'type', desc: false }]);
+  const { userProfile, loading: profileLoading } = useUserProfile();
 
   const columnHelper = createColumnHelper<CotisationMois>();
 
@@ -580,13 +581,31 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
           }
           
           // Déterminer le type de paiement
+          // Attendre que le profil soit chargé avant d'afficher le bouton
+          if (profileLoading) {
+            return (
+              <div className="flex items-center justify-center">
+                <div className="h-4 w-4 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+              </div>
+            );
+          }
+          
+          const adherentId = userProfile?.adherent?.id;
+          if (!adherentId) {
+            // Si pas d'adhérent, ne pas afficher le bouton
+            return null;
+          }
+          
+          // Utiliser montantRestant déjà déclaré plus haut (ligne 559)
           let paymentUrl = '/paiement?';
+          paymentUrl += `adherentId=${adherentId}&montant=${montantRestant}`;
+          
           if (row.original.isCotisationMensuelle && row.original.cotisationMensuelleId) {
-            paymentUrl += `type=cotisation-mensuelle&id=${row.original.cotisationMensuelleId}`;
-          } else if (row.original.isAssistance) {
-            paymentUrl += `type=assistance&id=${row.original.assistanceId}`;
+            paymentUrl += `&type=cotisation-mensuelle&id=${row.original.cotisationMensuelleId}`;
+          } else if (row.original.isAssistance && row.original.assistanceId) {
+            paymentUrl += `&type=assistance&id=${row.original.assistanceId}`;
           } else {
-            paymentUrl += `type=cotisation&id=${row.original.id}`;
+            paymentUrl += `&type=obligation&id=${row.original.id}`;
           }
           
           return (
@@ -601,7 +620,7 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
         },
       }),
     ],
-    []
+    [userProfile, profileLoading]
   );
 
   const table = useReactTable({

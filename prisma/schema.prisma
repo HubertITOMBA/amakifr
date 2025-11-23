@@ -57,6 +57,9 @@ enum MoyenPaiement {
   Cheque
   Virement
   CarteBancaire
+  Stripe
+  PayPal
+  GooglePay
 }
 
 enum TypeTelephone {
@@ -725,8 +728,16 @@ model PaiementCotisation {
   detteInitialeId        String? // Si le paiement concerne une dette initiale
   assistanceId           String? // Si le paiement concerne une assistance
 
-  statut    String @default("Valide") // Valide, Annule, EnAttente
-  createdBy String // ID de l'admin qui a enregistré le paiement
+  // Informations pour les paiements en ligne
+  stripePaymentIntentId String? @unique @db.VarChar(255) // ID du PaymentIntent Stripe
+  stripeSessionId       String? @unique @db.VarChar(255) // ID de la session Stripe Checkout
+  paypalOrderId         String? @unique @db.VarChar(255) // ID de la commande PayPal
+  transactionId         String? @unique @db.VarChar(255) // ID de transaction unique (pour tous les prestataires)
+  receiptUrl            String? @db.VarChar(500) // URL du reçu PDF généré
+  receiptGenerated      Boolean @default(false) // Si le reçu a été généré
+
+  statut    String @default("Valide") // Valide, Annule, EnAttente, EnCours (pour paiements en ligne)
+  createdBy String // ID de l'admin qui a enregistré le paiement (ou "system" pour paiements en ligne)
 
   // Relations
   Adherent             Adherent              @relation(fields: [adherentId], references: [id], onDelete: Cascade)
