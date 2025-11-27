@@ -146,7 +146,7 @@ async function sendWelcomeEmail(
     
     <div style="margin-bottom: 20px; text-align: center;">
       <a 
-        href="${domain}/auth/login" 
+        href="${domain}/auth/sign-in" 
         target="_blank" 
         rel="noopener noreferrer"
         style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 10px;">

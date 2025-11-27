@@ -1,5 +1,6 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Navbar } from "@/components/home/Navbar";
 import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -11,7 +12,16 @@ import { useSession } from "next-auth/react";
 
 export default function EvenementsPage() {
   const { data: session, status } = useSession();
-  const isAuthenticated = status === "authenticated" && !!session?.user;
+  const [mounted, setMounted] = useState(false);
+  
+  // S'assurer que le composant est monté côté client pour éviter les problèmes d'hydratation
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+  
+  // Vérifier que l'utilisateur est authentifié
+  // On attend que le composant soit monté et que le statut soit déterminé
+  const isAuthenticated = mounted && status === "authenticated" && !!session?.user && !!session.user.id;
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-100 dark:from-slate-800 dark:to-slate-700">
       <Navbar />

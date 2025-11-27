@@ -34,7 +34,6 @@ const LoginForm = () => {
     const searchParams = useSearchParams();
     const router = useRouter();
     const { update: updateSession } = useSession();
-    const callbackUrl = searchParams.get('callbackUrl')
     const urlError = searchParams.get("error") === "OAuthAccountNotLinked"
     ? "E-mail déjà utilisé avec un autre fournisseur !"
     : ""; 
@@ -52,7 +51,7 @@ const LoginForm = () => {
       setSuccess("");
       startTransition(async () => {
         try {
-          const result = await login(data, callbackUrl);
+          const result = await login(data, null); // Ne plus utiliser callbackUrl
           
           if (result?.error) {
             setError(result.error);
@@ -79,9 +78,8 @@ const LoginForm = () => {
               // Attendre encore un peu pour que la session soit propagée
               await new Promise(resolve => setTimeout(resolve, 300));
               
-              // Utiliser router.push au lieu de window.location.href pour une navigation
-              // plus fluide qui préserve l'état de la session
-              router.push(callbackUrl || "/");
+              // Toujours rediriger vers la page d'accueil après la connexion
+              router.push("/");
             }
           }
         } catch (error) {

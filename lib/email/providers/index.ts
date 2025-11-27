@@ -68,7 +68,14 @@ export async function createEmailProvider(): Promise<EmailProviderInterface> {
       const from = process.env.SENDGRID_FROM;
 
       if (!apiKey || !from) {
+        console.error("SENDGRID_CONFIG_ERROR: SENDGRID_API_KEY et SENDGRID_FROM sont requis quand EMAIL_PROVIDER=sendgrid");
         throw new Error("SENDGRID_API_KEY et SENDGRID_FROM sont requis quand EMAIL_PROVIDER=sendgrid");
+      }
+
+      // Vérifier que la clé API n'est pas vide ou invalide
+      if (apiKey.trim() === '' || apiKey.length < 20) {
+        console.error("SENDGRID_CONFIG_ERROR: La clé API SendGrid semble invalide (trop courte ou vide)");
+        throw new Error("La clé API SendGrid est invalide. Vérifiez SENDGRID_API_KEY dans les variables d'environnement.");
       }
 
       const config: SendGridConfig = {

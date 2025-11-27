@@ -14,7 +14,9 @@ export const publicRoutes = [
     "/resultats",
     "/vote",
     "/elections",
-    "/candidatures", 
+    "/candidatures",
+    "/candidats",
+    "/extrat",
 ];
 
 /**

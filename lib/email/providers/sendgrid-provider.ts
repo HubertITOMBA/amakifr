@@ -38,7 +38,30 @@ export class SendGridProvider implements EmailProviderInterface {
       return { success: true };
     } catch (error: any) {
       console.error("SENDGRID_ERROR", error);
-      return { success: false, error: error.response?.body || error.message };
+      
+      // Extraire les détails de l'erreur SendGrid
+      const errorDetails = {
+        message: error.message,
+        code: error.code,
+        response: error.response ? {
+          statusCode: error.response.statusCode,
+          body: error.response.body,
+          headers: error.response.headers
+        } : undefined
+      };
+      
+      // Logger les détails complets pour le débogage
+      console.error("SENDGRID_ERROR_DETAILS", JSON.stringify(errorDetails, null, 2));
+      
+      // Si c'est une erreur 401 (Unauthorized), fournir un message plus explicite
+      if (error.code === 401 || (error.response?.statusCode === 401)) {
+        console.error("SENDGRID_AUTH_ERROR: La clé API SendGrid est invalide ou manquante. Vérifiez SENDGRID_API_KEY dans les variables d'environnement.");
+      }
+      
+      return { 
+        success: false, 
+        error: errorDetails
+      };
     }
   }
 }

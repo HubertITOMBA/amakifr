@@ -9,13 +9,29 @@ const domain = process.env.NEXT_PUBLIC_APP_URL
  * Fonction helper pour envoyer un email via le provider configuré
  */
 async function sendEmail(options: EmailOptions): Promise<void> {
-  const provider = await getEmailProvider();
-  const result = await provider.send(options);
-  
-  if (!result.success) {
-    const errorMessage = result.error?.message || result.error || "Erreur inconnue lors de l'envoi de l'email";
-    console.error("EMAIL_ERROR", errorMessage);
-    throw new Error(errorMessage);
+  try {
+    const provider = await getEmailProvider();
+    const result = await provider.send(options);
+    
+    if (!result.success) {
+      const errorMessage = result.error?.message || result.error || "Erreur inconnue lors de l'envoi de l'email";
+      console.error("EMAIL_ERROR", result.error);
+      
+      // Si c'est une erreur d'authentification (401), logger plus d'informations
+      if (result.error && typeof result.error === 'object' && 'code' in result.error && result.error.code === 401) {
+        console.error("EMAIL_AUTH_ERROR: Les credentials du provider email sont invalides. Vérifiez les variables d'environnement.");
+      }
+      
+      throw new Error(errorMessage);
+    }
+  } catch (error: any) {
+    // Logger l'erreur complète pour le débogage
+    console.error("EMAIL_ERROR", {
+      message: error.message,
+      error: error,
+      stack: error.stack
+    });
+    throw error;
   }
 }
 
@@ -124,19 +140,22 @@ export const sendTwoFactorTokenEmail = async(
     `;
 
     await sendEmail({
-      from: "webmaster@amaki.fr",
-      to: email,
-      subject: "Authentification à deux facteurs",
-      html: wrapEmailContent(content)
-    });
+        from: "webmaster@amaki.fr",
+        to: email,
+        subject: "Authentification à deux facteurs",
+        html: wrapEmailContent(content)
+      });
 }
 
 
 export const sendPasswordResetToken = async(
   email: string,
-  token: string
+  token: string,
+  baseUrl?: string
 ) => {
-  const resetLink = `${domain}/auth/new-password?token=${token}`
+  // Utiliser l'URL fournie, ou utiliser la variable d'environnement en fallback
+  const appUrl = baseUrl || domain || 'http://localhost:9050';
+  const resetLink = `${appUrl}/auth/new-password?token=${token}`
 
   const content = `
     <div style="text-align: center;">
@@ -203,11 +222,11 @@ ${message}
   `;
   
   await sendEmail({
-    from: 'webmaster@amaki.fr',
-    to: "asso.amaki@gmail.com",
-    subject: `${goal}`,
-    html: wrapEmailContent(content)
-  });
+      from: 'webmaster@amaki.fr',
+      to: "asso.amaki@gmail.com",
+      subject: `${goal}`,
+      html: wrapEmailContent(content)
+    });
 }
 
 /**

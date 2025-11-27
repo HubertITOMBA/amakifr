@@ -209,6 +209,20 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
     const validatedData = CreateCotisationMensuelleSchema.parse(data);
     const periode = `${validatedData.annee}-${validatedData.mois.toString().padStart(2, '0')}`;
 
+    // Vérifier si des cotisations existent déjà pour cette période
+    const existingCotisations = await prisma.cotisationMensuelle.findFirst({
+      where: {
+        periode,
+      },
+    });
+
+    if (existingCotisations) {
+      return { 
+        success: false, 
+        error: `Des cotisations existent déjà pour la période ${periode}. Une cotisation du mois ne peut être créée qu'une seule fois par mois.` 
+      };
+    }
+
     // Récupérer tous les adhérents actifs SAUF l'administrateur
     // L'administrateur ne cotise ni le frais d'adhésion, ni la cotisation forfaitaire, ni les assistances
     const adherents = await prisma.adherent.findMany({
@@ -381,7 +395,7 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
       }
     }
 
-    let message = `${createdCount} cotisation(s) mensuelle(s) créées pour ${adherents.length} adhérent(s) (l'administrateur est exclu). Chaque cotisation inclut le forfait mensuel + les assistances du mois.`;
+    let message = `${createdCount} cotisation(s) mensuelle(s) créées pour ${adherents.length} adhérent(s). Chaque cotisation inclut le forfait mensuel + les assistances du mois.`;
     if (avoirsAppliques > 0) {
       message += ` ${avoirsAppliques} cotisation(s) ont été partiellement ou totalement payées avec des avoirs disponibles.`;
     }

@@ -5,17 +5,9 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { Decimal } from "@prisma/client/runtime/library";
 
-// Initialiser Stripe uniquement si la clé est disponible
-// Évite les erreurs lors du build si STRIPE_SECRET_KEY n'est pas définie
-function getStripeInstance(): Stripe | null {
-  const apiKey = process.env.STRIPE_SECRET_KEY;
-  if (!apiKey || apiKey.trim() === "") {
-    return null;
-  }
-  return new Stripe(apiKey, {
-    apiVersion: "2024-12-18.acacia",
-  });
-}
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || "", {
+  apiVersion: "2024-12-18.acacia",
+});
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 
@@ -26,15 +18,6 @@ const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 export async function POST(request: NextRequest) {
   const body = await request.text();
   const signature = (await headers()).get("stripe-signature");
-
-  // Vérifier que Stripe est configuré
-  const stripe = getStripeInstance();
-  if (!stripe) {
-    return NextResponse.json(
-      { error: "Stripe n'est pas configuré. STRIPE_SECRET_KEY est requis." },
-      { status: 500 }
-    );
-  }
 
   if (!signature || !webhookSecret) {
     return NextResponse.json(

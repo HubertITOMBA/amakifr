@@ -14,6 +14,8 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { createCotisationsMensuelles, getCotisationsMensuellesStats, getCotisationsMensuellesByPeriode, updateCotisationMensuelle } from "@/actions/cotisations-mensuelles";
 import { getAllTypesCotisationMensuelle } from "@/actions/cotisations-mensuelles";
+import { useRouter } from "next/navigation";
+import { ViewDialog } from "@/app/admin/types-cotisation/ViewDialog";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -84,6 +86,7 @@ interface CotisationMensuelle {
 }
 
 export default function AdminCotisationCreation() {
+  const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [loadingCotisations, setLoadingCotisations] = useState(false);
   const [stats, setStats] = useState<CotisationStats | null>(null);
@@ -724,6 +727,7 @@ function TypesCotisationTable({
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
 }) {
+  const router = useRouter();
   const data = useMemo(() => types.map(type => ({
     ...type,
     selected: selectedIds.includes(type.id),
@@ -846,29 +850,31 @@ function TypesCotisationTable({
       enableResizing: false,
       cell: ({ row }) => {
         const type = row.original;
+        // Convertir le type pour correspondre à l'interface ViewDialog
+        const typeForView = {
+          ...type,
+          createdBy: type.CreatedBy?.email || "",
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+          CreatedBy: type.CreatedBy || { id: "", email: "" },
+          _count: type._count || { CotisationsMensuelles: 0 },
+        };
         return (
           <div className="flex items-center gap-1 sm:gap-2">
+            <ViewDialog type={typeForView as any} />
             <Button
               variant="outline"
               size="sm"
               className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
               onClick={() => {
-                toast.info(`Voir les détails de ${type.nom}`);
-                // TODO: Implémenter la vue détaillée
+                // Rediriger vers la page de gestion des types pour éditer
+                router.push(`/admin/types-cotisation`);
+                // Afficher un message pour indiquer qu'il faut sélectionner le type à éditer
+                setTimeout(() => {
+                  toast.info(`Redirection vers la page de gestion des types de cotisation. Veuillez utiliser le bouton "Éditer" pour modifier "${type.nom}".`);
+                }, 500);
               }}
-              title="Voir les détails"
-            >
-              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
-              onClick={() => {
-                toast.info(`Éditer ${type.nom}`);
-                // TODO: Implémenter l'édition
-              }}
-              title="Éditer"
+              title="Éditer le type de cotisation"
             >
               <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
             </Button>
@@ -879,7 +885,7 @@ function TypesCotisationTable({
       minSize: 100,
       maxSize: 150,
     }),
-  ], [selectedIds, types, onSelectionChange]);
+  ], [selectedIds, types, onSelectionChange, router]);
 
   const table = useReactTable({
     data,

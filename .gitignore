@@ -38,11 +38,6 @@ PROMPTEUR.txt
 data/geonames/*
 *.md
 
-# Large files - geonames data
-allCountries.zip
-geonames_allCountries.zip
-data/geonames/allCountries.txt
-
 # vercel
 .vercel
 

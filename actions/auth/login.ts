@@ -47,7 +47,7 @@ export const login = async (
             {
                 email,
                 password,
-                redirectTo: callbackUrl || DEFAULT_LOGIN_REDIRECT
+                redirectTo: DEFAULT_LOGIN_REDIRECT // Toujours rediriger vers la page d'accueil
             }
         )
         // Si signIn retourne sans erreur, la connexion a réussi
