@@ -5,6 +5,7 @@ import { Modal } from "@/components/Modal";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEffect, useState } from "react";
 import { getUserByIdForAdmin } from "@/actions/user";
 import { UserRole, UserStatus } from "@prisma/client";
@@ -195,11 +196,23 @@ export default function ConsultationUserPage() {
         {/* Header avec nom et badges */}
         <Card className="bg-gradient-to-br from-blue-50 via-white to-indigo-50 dark:from-blue-900/20 dark:via-slate-900 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800 shadow-md !py-0">
           <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg py-3 px-4">
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <CardTitle className="flex items-center gap-2 text-base sm:text-sm sm:text-base">
-                <User className="h-5 w-5" />
-                {fullName}
-              </CardTitle>
+            <div className="flex items-center justify-between flex-wrap gap-3">
+              <div className="flex items-center gap-3">
+                <Avatar className="h-12 w-12 sm:h-16 sm:w-16 border-2 border-white/30 shadow-lg flex-shrink-0">
+                  <AvatarImage 
+                    src={user.image || undefined} 
+                    alt={fullName}
+                    className="object-cover"
+                  />
+                  <AvatarFallback className="bg-white/20 text-white text-lg sm:text-xl font-bold">
+                    {fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <CardTitle className="flex items-center gap-2 text-base sm:text-lg">
+                  <User className="h-5 w-5" />
+                  {fullName}
+                </CardTitle>
+              </div>
               <div className="flex items-center gap-2">
                 <Badge className={`${getRoleColor(user.role)} border text-xs px-2 py-0.5`}>
                   {getRoleLabel(user.role)}

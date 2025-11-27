@@ -1,8 +1,10 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Loader2 } from "lucide-react";
 import { 
   Users, 
   Calendar, 
@@ -14,46 +16,8 @@ import {
   ArrowUpRight,
   ArrowDownRight
 } from "lucide-react";
-
-// Données d'exemple pour le dashboard
-const stats = [
-  {
-    title: "Total Membres",
-    value: "124",
-    change: "+12%",
-    changeType: "positive" as const,
-    icon: Users,
-    description: "Membres actifs cette année",
-    color: "blue"
-  },
-  {
-    title: "Événements",
-    value: "8",
-    change: "+2",
-    changeType: "positive" as const,
-    icon: Calendar,
-    description: "Événements ce mois",
-    color: "purple"
-  },
-  {
-    title: "Newsletter",
-    value: "89",
-    change: "+15%",
-    changeType: "positive" as const,
-    icon: Mail,
-    description: "Abonnés à la newsletter",
-    color: "pink"
-  },
-  {
-    title: "Engagement",
-    value: "94%",
-    change: "+5%",
-    changeType: "positive" as const,
-    icon: TrendingUp,
-    description: "Taux d'engagement moyen",
-    color: "teal"
-  }
-];
+import { getDashboardStats, getRecentActivities, getUpcomingEvents } from "@/actions/admin/dashboard";
+import { toast } from "react-toastify";
 
 // Couleurs pastel pour les cards
 const cardColors = {
@@ -95,69 +59,122 @@ const cardColors = {
   }
 };
 
-const recentActivities = [
-  {
-    id: 1,
-    type: "user",
-    action: "Nouveau membre inscrit",
-    user: "Jean Dupont",
-    time: "Il y a 2 heures",
-    status: "success"
-  },
-  {
-    id: 2,
-    type: "event",
-    action: "Événement créé",
-    user: "Marie Martin",
-    time: "Il y a 4 heures",
-    status: "info"
-  },
-  {
-    id: 3,
-    type: "newsletter",
-    action: "Newsletter envoyée",
-    user: "Système",
-    time: "Il y a 1 jour",
-    status: "success"
-  },
-  {
-    id: 4,
-    type: "user",
-    action: "Profil mis à jour",
-    user: "Pierre Durand",
-    time: "Il y a 2 jours",
-    status: "info"
-  }
-];
-
-const upcomingEvents = [
-  {
-    id: 1,
-    title: "Assemblée Générale",
-    date: "2024-02-15",
-    time: "14:00",
-    attendees: 45,
-    status: "confirmed"
-  },
-  {
-    id: 2,
-    title: "Formation Leadership",
-    date: "2024-02-22",
-    time: "09:00",
-    attendees: 20,
-    status: "confirmed"
-  },
-  {
-    id: 3,
-    title: "Soirée Networking",
-    date: "2024-02-28",
-    time: "19:00",
-    attendees: 30,
-    status: "pending"
-  }
-];
-
 export default function AdminDashboard() {
+  const [loading, setLoading] = useState(true);
+  const [stats, setStats] = useState<Array<{
+    title: string;
+    value: string;
+    change: string;
+    changeType: "positive" | "negative";
+    icon: typeof Users;
+    description: string;
+    color: string;
+  }>>([]);
+  const [recentActivities, setRecentActivities] = useState<Array<{
+    id: string;
+    type: "user" | "event" | "newsletter" | "profile";
+    action: string;
+    user: string;
+    time: string;
+    status: "success" | "info" | "warning";
+  }>>([]);
+  const [upcomingEvents, setUpcomingEvents] = useState<Array<{
+    id: string;
+    title: string;
+    date: string;
+    time: string;
+    attendees: number;
+    status: "confirmed" | "pending";
+  }>>([]);
+
+  useEffect(() => {
+    loadDashboardData();
+  }, []);
+
+  const loadDashboardData = async () => {
+    try {
+      setLoading(true);
+      
+      const [statsResult, activitiesResult, eventsResult] = await Promise.all([
+        getDashboardStats(),
+        getRecentActivities(10),
+        getUpcomingEvents(5),
+      ]);
+
+      if (statsResult.success && statsResult.stats) {
+        const statsData = [
+          {
+            title: "Total Membres",
+            value: statsResult.stats.totalMembres.value,
+            change: statsResult.stats.totalMembres.change,
+            changeType: statsResult.stats.totalMembres.changeType as "positive" | "negative",
+            icon: Users,
+            description: statsResult.stats.totalMembres.description,
+            color: "blue",
+          },
+          {
+            title: "Événements",
+            value: statsResult.stats.evenements.value,
+            change: statsResult.stats.evenements.change,
+            changeType: statsResult.stats.evenements.changeType as "positive" | "negative",
+            icon: Calendar,
+            description: statsResult.stats.evenements.description,
+            color: "purple",
+          },
+          {
+            title: "Newsletter",
+            value: statsResult.stats.newsletter.value,
+            change: statsResult.stats.newsletter.change,
+            changeType: statsResult.stats.newsletter.changeType as "positive" | "negative",
+            icon: Mail,
+            description: statsResult.stats.newsletter.description,
+            color: "pink",
+          },
+          {
+            title: "Engagement",
+            value: statsResult.stats.engagement.value,
+            change: statsResult.stats.engagement.change,
+            changeType: statsResult.stats.engagement.changeType as "positive" | "negative",
+            icon: TrendingUp,
+            description: statsResult.stats.engagement.description,
+            color: "teal",
+          },
+        ];
+        setStats(statsData);
+      } else {
+        toast.error(statsResult.error || "Erreur lors du chargement des statistiques");
+      }
+
+      if (activitiesResult.success && activitiesResult.activities) {
+        setRecentActivities(activitiesResult.activities);
+      } else {
+        toast.error(activitiesResult.error || "Erreur lors du chargement des activités");
+      }
+
+      if (eventsResult.success && eventsResult.events) {
+        setUpcomingEvents(eventsResult.events.map(event => ({
+          ...event,
+          status: event.status as "confirmed" | "pending",
+        })));
+      } else {
+        toast.error(eventsResult.error || "Erreur lors du chargement des événements");
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement du dashboard:", error);
+      toast.error("Erreur lors du chargement des données");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-4 sm:space-y-6">
       {/* Header */}
@@ -291,7 +308,7 @@ export default function AdminDashboard() {
                         {event.title}
                       </h4>
                       <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        {new Date(event.date).toLocaleDateString('fr-FR')} à {event.time}
+                        {event.date} à {event.time}
                       </p>
                       <p className="text-xs text-gray-500 dark:text-gray-400">
                         {event.attendees} participants

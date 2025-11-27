@@ -1,9 +1,23 @@
-import { Resend } from "resend"
 import { readFileSync } from "fs"
 import { join } from "path"
+import { getEmailProvider } from "./email/providers"
+import type { EmailOptions } from "./email/providers/types"
 
-const resend = new Resend(process.env.RESEND_API_KEY)
 const domain = process.env.NEXT_PUBLIC_APP_URL
+
+/**
+ * Fonction helper pour envoyer un email via le provider configuré
+ */
+async function sendEmail(options: EmailOptions): Promise<void> {
+  const provider = await getEmailProvider();
+  const result = await provider.send(options);
+  
+  if (!result.success) {
+    const errorMessage = result.error?.message || result.error || "Erreur inconnue lors de l'envoi de l'email";
+    console.error("EMAIL_ERROR", errorMessage);
+    throw new Error(errorMessage);
+  }
+}
 
 // Fonction pour encoder l'image logo en base64
 function getLogoBase64(): string {
@@ -109,16 +123,12 @@ export const sendTwoFactorTokenEmail = async(
       </div>
     `;
 
-    const { error } = await resend.emails.send({
-        from: "webmaster@amaki.fr",
-        to: email,
-        subject: "Authentification à deux facteurs",
-        html: wrapEmailContent(content)
-      });
-  
-      if (error) {
-        console.log("RESEND_ERROR",error)
-      }
+    await sendEmail({
+      from: "webmaster@amaki.fr",
+      to: email,
+      subject: "Authentification à deux facteurs",
+      html: wrapEmailContent(content)
+    });
 }
 
 
@@ -148,7 +158,7 @@ export const sendPasswordResetToken = async(
     </div>
   `;
 
-  await resend.emails.send({
+  await sendEmail({
     from: "webmaster@amaki.fr",
     to: email,
     subject: "Réinitialiser votre mot de passe",
@@ -192,16 +202,12 @@ ${message}
     </div>
   `;
   
-  const { error } = await resend.emails.send({
-      from: 'webmaster@amaki.fr',
-      to: "asso.amaki@gmail.com",
-      subject: `${goal}`,
-      html: wrapEmailContent(content)
-    });
-
-    if (error) {
-      console.log("RESEND_ERROR",error)
-    }
+  await sendEmail({
+    from: 'webmaster@amaki.fr',
+    to: "asso.amaki@gmail.com",
+    subject: `${goal}`,
+    html: wrapEmailContent(content)
+  });
 }
 
 /**
@@ -244,17 +250,12 @@ export const sendVisiteurInscriptionEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: adminEmail,
     subject: `Nouvelle inscription de visiteur : ${evenementTitre}`,
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -315,17 +316,12 @@ export const sendCandidacyStatusEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: `Statut de votre candidature : ${electionTitre}`,
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -376,17 +372,12 @@ export const sendUserStatusEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: `Statut de votre compte AMAKI France`,
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -438,17 +429,12 @@ export const sendAdherentInscriptionConfirmationEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: `Confirmation d'inscription : ${evenementTitre}`,
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -504,17 +490,12 @@ export const sendVisiteurInscriptionConfirmationEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: `Confirmation d'inscription : ${evenementTitre}`,
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -552,17 +533,12 @@ export const sendCustomEmailToUsers = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: subject,
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -651,17 +627,12 @@ export const sendEventInvitationEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: `Invitation : ${evenementTitre}`,
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -709,17 +680,12 @@ export const sendIdeeValidationEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: `Votre idée "${ideeTitre}" a été validée`,
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -777,17 +743,12 @@ export const sendIdeeRejetEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: `Votre idée "${ideeTitre}" a été rejetée`,
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -845,17 +806,12 @@ export const sendCommentaireSupprimeEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: `Votre commentaire sur "${ideeTitre}" a été supprimé`,
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -902,15 +858,15 @@ export const sendNewUserNotificationEmail = async(
   const recipients = ["asso.amaki@gmail.com", "hubert.itomba@orange.fr","f3sbtevry@gmail.com"];
   
   for (const recipient of recipients) {
-    const { error } = await resend.emails.send({
-      from: 'noreply@amaki.fr',
-      to: recipient,
-      subject: `Nouvelle inscription : ${userName}`,
-      html: wrapEmailContent(content)
-    });
-
-    if (error) {
-      console.log("RESEND_ERROR pour", recipient, error);
+    try {
+      await sendEmail({
+        from: 'noreply@amaki.fr',
+        to: recipient,
+        subject: `Nouvelle inscription : ${userName}`,
+        html: wrapEmailContent(content)
+      });
+    } catch (error) {
+      console.log("EMAIL_ERROR pour", recipient, error);
       // Ne pas throw pour ne pas bloquer l'inscription si l'email échoue
     }
   }
@@ -978,17 +934,12 @@ export const sendUserRegistrationThankYouEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: 'Bienvenue sur le portail AMAKI France !',
     html: wrapEmailContent(content)
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }
 
 /**
@@ -1047,7 +998,7 @@ export const sendPasseportEmail = async(
     </p>
   `;
 
-  const { error } = await resend.emails.send({
+  await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
     subject: `Votre passeport AMAKI - ${numeroPasseport}`,
@@ -1059,9 +1010,4 @@ export const sendPasseportEmail = async(
       },
     ],
   });
-
-  if (error) {
-    console.log("RESEND_ERROR", error);
-    throw error;
-  }
 }

@@ -1,6 +1,7 @@
 "use client"
 
 import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import { 
     Dialog, 
     DialogContent,
@@ -22,14 +23,13 @@ export const LoginButton = ({
         asChild
     } : LoginButtonProps) => {
 
-        const router = useRouter();
         const pathname = usePathname();
 
-        const onClick = () => {
-            // Inclure l'URL actuelle comme callbackUrl pour rediriger après connexion
-            const callbackUrl = encodeURIComponent(pathname);
-            router.push(`/auth/sign-in?callbackUrl=${callbackUrl}`);
-          }
+        // Utiliser Link au lieu de router.push pour éviter les problèmes de navigation
+        const getHref = () => {
+            const callbackUrl = encodeURIComponent(pathname || "/");
+            return `/auth/sign-in?callbackUrl=${callbackUrl}`;
+        }
 
          if (mode === "modal") {
             return (
@@ -46,9 +46,9 @@ export const LoginButton = ({
         }
          
     return (
-        <span onClick={onClick} className="cursor-pointer">
+        <Link href={getHref()} className="cursor-pointer">
             {children}
-        </span>
+        </Link>
     )
    
 

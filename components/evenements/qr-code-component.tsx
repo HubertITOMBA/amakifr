@@ -19,22 +19,8 @@ export default function QRCodeComponent({ url, size = 200 }: QRCodeComponentProp
     
     if (!ctx) return;
 
-    // Créer un QR Code simple avec une API en ligne
-    // Alternative: utiliser qrcode.react si installé
-    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}`;
-    
-    // Créer une image pour le QR Code
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = () => {
-      canvas.width = size;
-      canvas.height = size;
-      ctx.fillStyle = 'white';
-      ctx.fillRect(0, 0, size, size);
-      ctx.drawImage(img, 0, 0, size, size);
-    };
-    img.onerror = () => {
-      // Fallback: dessiner un QR code simple
+    // Fonction de fallback pour dessiner un QR code simple
+    const drawFallback = () => {
       canvas.width = size;
       canvas.height = size;
       ctx.fillStyle = 'white';
@@ -46,7 +32,47 @@ export default function QRCodeComponent({ url, size = 200 }: QRCodeComponentProp
       ctx.fillText('QR Code', size / 2, size / 2 - 10);
       ctx.fillText('Indisponible', size / 2, size / 2 + 10);
     };
-    img.src = qrUrl;
+
+    // Vérifier si on est en développement HTTP pour éviter les erreurs SSL
+    const isDevelopment = process.env.NODE_ENV === 'development';
+    const isSecureContext = typeof window !== 'undefined' && window.location.protocol === 'https:';
+    
+    // En développement HTTP, utiliser directement le fallback
+    if (isDevelopment && !isSecureContext) {
+      drawFallback();
+      return;
+    }
+
+    // Créer un QR Code simple avec une API en ligne
+    // Alternative: utiliser qrcode.react si installé
+    const qrUrl = `https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encodeURIComponent(url)}`;
+    
+    // Créer une image pour le QR Code
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    img.onload = () => {
+      try {
+        canvas.width = size;
+        canvas.height = size;
+        ctx.fillStyle = 'white';
+        ctx.fillRect(0, 0, size, size);
+        ctx.drawImage(img, 0, 0, size, size);
+      } catch (error) {
+        console.error('Erreur lors du dessin du QR Code:', error);
+        drawFallback();
+      }
+    };
+    img.onerror = (error) => {
+      console.error('Erreur lors du chargement du QR Code:', error);
+      drawFallback();
+    };
+    
+    try {
+      img.src = qrUrl;
+    } catch (error) {
+      console.error('Erreur lors de la création de l\'image QR Code:', error);
+      drawFallback();
+    }
   }, [url, size]);
 
   return (

@@ -2,7 +2,7 @@
 
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useSession } from "next-auth/react";
-import { redirect, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { 
   Users, 
@@ -39,18 +39,6 @@ const adminMenuItems = [
     description: "Dashboard analytique avancé"
   },
   {
-    title: "Candidatures",
-    href: "/admin/candidatures",
-    icon: Users,
-    description: "Gestion des candidatures"
-  },
-  {
-    title: "Postes",
-    href: "/admin/postes",
-    icon: Calendar,
-    description: "Gestion des postes électoraux"
-  },
-  {
     title: "Adhérents",
     href: "/admin/users",
     icon: Users,
@@ -83,12 +71,6 @@ const adminMenuItems = [
     description: "Gestion des événements"
   },
   {
-    title: "Élections",
-    href: "/admin/elections",
-    icon: Calendar,
-    description: "Gestion des élections"
-  },
-  {
     title: "Bureau",
     href: "/admin/bureau",
     icon: Building2,
@@ -99,12 +81,6 @@ const adminMenuItems = [
     href: "/admin/reservations",
     icon: Calendar,
     description: "Gestion des réservations de ressources"
-  },
-  {
-    title: "Votes",
-    href: "/admin/votes",
-    icon: Shield,
-    description: "Votes et résultats"
   },
   {
     title: "Boîte à idées",
@@ -172,6 +148,31 @@ const adminMenuItems = [
   //   icon: Mail,
   //   description: "Gestion des abonnements"
   // },
+  // Menus périodiques (élections) - placés à la fin car peu fréquemment consultés
+  {
+    title: "Postes",
+    href: "/admin/postes",
+    icon: Calendar,
+    description: "Gestion des postes électoraux"
+  },
+  {
+    title: "Élections",
+    href: "/admin/elections",
+    icon: Calendar,
+    description: "Gestion des élections"
+  },
+  {
+    title: "Votes",
+    href: "/admin/votes",
+    icon: Shield,
+    description: "Votes et résultats"
+  },
+  {
+    title: "Candidatures",
+    href: "/admin/candidatures",
+    icon: Users,
+    description: "Gestion des candidatures"
+  },
   {
     title: "Paramètres",
     href: "/admin/settings",
@@ -192,13 +193,15 @@ export default function AdminLayout({
 
   useEffect(() => {
     if (status === "unauthenticated") {
-      redirect("/auth/sign-in");
+      router.push("/auth/sign-in");
+      return;
     }
     
     if (status === "authenticated" && user?.role !== "Admin") {
-      redirect("/");
+      router.push("/");
+      return;
     }
-  }, [status, user?.role]);
+  }, [status, user?.role, router]);
 
 
   if (status === "loading") {

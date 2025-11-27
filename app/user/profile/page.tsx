@@ -1,6 +1,8 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, Suspense } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useSession } from "next-auth/react";
 import { Navbar } from "@/components/home/Navbar";
 import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -123,6 +125,8 @@ interface DetteInitiale {
 
 // Composant Table pour les dettes initiales
 function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
+  const router = useRouter();
+  const { userProfile } = useUserProfile();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'annee', desc: true }]);
 
   const columnHelper = createColumnHelper<DetteInitiale>();
@@ -245,8 +249,48 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
           );
         },
       }),
+      columnHelper.display({
+        id: 'actions',
+        header: 'Actions',
+        cell: ({ row }) => {
+          const dette = row.original;
+          const montantRestant = parseFloat(dette.montantRestant.toString());
+          const adherentId = userProfile?.adherent?.id;
+          
+          const handlePayer = () => {
+            if (!adherentId) {
+              toast.error("Impossible de récupérer votre identifiant");
+              return;
+            }
+            
+            router.push(
+              `/paiement?type=dette-initiale&id=${dette.id}&adherentId=${adherentId}&montant=${montantRestant}`
+            );
+          };
+
+          if (montantRestant <= 0) {
+            return (
+              <span className="text-xs text-gray-400 dark:text-gray-500">
+                Payée
+              </span>
+            );
+          }
+
+          return (
+            <Button
+              onClick={handlePayer}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white h-7 sm:h-8 text-xs px-2 sm:px-3"
+            >
+              <Euro className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Payer</span>
+              <span className="sm:hidden">€</span>
+            </Button>
+          );
+        },
+      }),
     ],
-    []
+    [router, userProfile]
   );
 
   const table = useReactTable({
@@ -509,14 +553,19 @@ interface CotisationMois {
 }
 
 function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }) {
+  const router = useRouter();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'type', desc: false }]);
   const { userProfile, loading: profileLoading } = useUserProfile();
 
   const columnHelper = createColumnHelper<CotisationMois>();
 
-  // Calculer le total du mois
+  // Calculer le total du mois et le montant restant total
   const totalMois = useMemo(() => {
     return cotisations.reduce((sum, cot) => sum + cot.montant, 0);
+  }, [cotisations]);
+
+  const totalRestantMois = useMemo(() => {
+    return cotisations.reduce((sum, cot) => sum + parseFloat(cot.montantRestant.toString()), 0);
   }, [cotisations]);
 
   const columns = useMemo<ColumnDef<CotisationMois>[]>(
@@ -609,18 +658,20 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
           }
           
           return (
-            <a href={paymentUrl}>
-              <Button size="sm" className="bg-blue-600 hover:bg-blue-700 text-white h-7 sm:h-8 text-xs px-2 sm:px-3">
-                <CreditCard className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
-                <span className="hidden sm:inline">Payer</span>
-                <span className="sm:hidden">€</span>
-              </Button>
-            </a>
+            <Button
+              onClick={() => router.push(paymentUrl)}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white h-7 sm:h-8 text-xs px-2 sm:px-3"
+            >
+              <Euro className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Payer</span>
+              <span className="sm:hidden">€</span>
+            </Button>
           );
         },
       }),
     ],
-    [userProfile, profileLoading]
+    [router, userProfile, profileLoading]
   );
 
   const table = useReactTable({
@@ -684,21 +735,63 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
       
       {/* Ligne de total */}
       {cotisations.length > 0 && totalMois > 0 && (
-        <div className="flex justify-end items-center gap-3 px-4 sm:px-0 pt-2 border-t border-gray-200 dark:border-gray-700">
-          <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">Total du mois :</span>
-          <span className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">
-            {totalMois.toFixed(2).replace('.', ',')} €
-          </span>
+        <div className="flex justify-between items-center gap-3 px-4 sm:px-0 pt-2 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center gap-3">
+            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">Total du mois :</span>
+            <span className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">
+              {totalMois.toFixed(2).replace('.', ',')} €
+            </span>
+            {totalRestantMois > 0 && (
+              <span className="text-xs sm:text-sm text-red-600 dark:text-red-400">
+                (Reste : {totalRestantMois.toFixed(2).replace('.', ',')} €)
+              </span>
+            )}
+          </div>
+          {totalRestantMois > 0 && (
+            <Button
+              onClick={() => {
+                const adherentId = userProfile?.adherent?.id;
+                if (!adherentId) {
+                  toast.error("Impossible de récupérer votre identifiant");
+                  return;
+                }
+                router.push(
+                  `/paiement?type=general&adherentId=${adherentId}&montant=${totalRestantMois}`
+                );
+              }}
+              size="sm"
+              className="bg-blue-600 hover:bg-blue-700 text-white h-7 sm:h-8 text-xs px-2 sm:px-3"
+            >
+              <Euro className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <span className="hidden sm:inline">Payer le total</span>
+              <span className="sm:hidden">Payer</span>
+            </Button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-export default function UserProfilePage() {
+function UserProfilePageContent() {
+  const searchParams = useSearchParams();
   const user = useCurrentUser();
   const { userProfile, loading: profileLoading, error: profileError } = useUserProfile();
-  const [activeSection, setActiveSection] = useState<MenuSection>('profile');
+  
+  // Initialiser activeSection depuis les paramètres d'URL ou par défaut 'profile'
+  const sectionFromUrl = searchParams.get('section') as MenuSection | null;
+  const [activeSection, setActiveSection] = useState<MenuSection>(
+    (sectionFromUrl && ['profile', 'statistiques', 'cotisations', 'candidatures', 'votes', 'candidates', 'idees', 'documents', 'badges', 'enfants', 'passeport', 'notifications', 'settings'].includes(sectionFromUrl))
+      ? sectionFromUrl
+      : 'profile'
+  );
+
+  // Mettre à jour activeSection si le paramètre d'URL change
+  useEffect(() => {
+    if (sectionFromUrl && ['profile', 'statistiques', 'cotisations', 'candidatures', 'votes', 'candidates', 'idees', 'documents', 'badges', 'enfants', 'passeport', 'notifications', 'settings'].includes(sectionFromUrl)) {
+      setActiveSection(sectionFromUrl);
+    }
+  }, [sectionFromUrl]);
   const [candidatures, setCandidatures] = useState<any[]>([]);
   const [votes, setVotes] = useState<any[]>([]);
   const [candidates, setCandidates] = useState<any[]>([]);
@@ -4509,5 +4602,20 @@ export default function UserProfilePage() {
 
       <Footer />
     </div>
+  );
+}
+
+export default function UserProfilePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600 dark:text-gray-300">Chargement...</p>
+        </div>
+      </div>
+    }>
+      <UserProfilePageContent />
+    </Suspense>
   );
 }

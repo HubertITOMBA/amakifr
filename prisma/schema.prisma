@@ -264,6 +264,7 @@ model Adherent {
   dateNaissance               DateTime? // Date de naissance
   typeAdhesion                TypeAdhesion? // Type d'adhésion
   profession                  String?                      @db.VarChar(255) // Profession (optionnel)
+  anneePromotion              String?                      @db.VarChar(10) // Année de promotion à Kipaku (ex: "2010" ou "Non")
   centresInteret              String?                      @db.Text // Centres d'intérêt
   autorisationImage           Boolean                      @default(false) // Autorisation d'utilisation de l'image
   accepteCommunications       Boolean                      @default(true) // Acceptation des communications
@@ -323,20 +324,68 @@ model ConfigurationFraisAdhesion {
 }
 
 model Adresse {
-  id         String   @id @default(cuid())
-  adherentId String
-  streetnum  String?
-  street1    String?
-  street2    String?
-  codepost   String?
-  city       String?
-  country    String?
-  createdAt  DateTime @default(now())
-  updatedAt  DateTime @updatedAt
+  id          String   @id @default(cuid())
+  adherentId  String
+  streetnum   String?
+  street1     String?
+  street2     String?
+  codepost    String?
+  city        String?
+  country     String?
+  // Champs pour l'API BAN (Base Adresse Nationale)
+  banId       String?  @db.VarChar(100) // ID de l'adresse dans l'API BAN
+  label       String?  @db.VarChar(500) // Adresse complète formatée (ex: "10 Rue de la Paix, 75001 Paris")
+  housenumber String?  @db.VarChar(20) // Numéro de maison
+  street      String?  @db.VarChar(200) // Nom de la rue
+  postcode    String?  @db.VarChar(10) // Code postal (normalisé)
+  citycode    String?  @db.VarChar(10) // Code INSEE de la commune
+  department  String?  @db.VarChar(10) // Code département
+  region      String?  @db.VarChar(100) // Nom de la région
+  latitude    Float? // Coordonnée GPS latitude
+  longitude   Float? // Coordonnée GPS longitude
+  score       Float? // Score de pertinence (0-1)
+  type        String?  @db.VarChar(50) // Type d'adresse (housenumber, street, municipality, etc.)
+  metadata    Json? // Métadonnées supplémentaires de l'API BAN
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
 
   Adherent Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
 
+  @@index([banId])
+  @@index([postcode])
+  @@index([citycode])
+  @@index([department])
   @@map("adresse")
+}
+
+// Table pour stocker les adresses normalisées de l'API BAN (cache)
+model BanAddress {
+  id          String   @id @default(cuid())
+  banId       String   @unique @db.VarChar(100) // ID unique de l'API BAN
+  label       String   @db.VarChar(500) // Adresse complète formatée
+  housenumber String?  @db.VarChar(20)
+  street      String?  @db.VarChar(200)
+  postcode    String   @db.VarChar(10)
+  city        String   @db.VarChar(200)
+  citycode    String   @db.VarChar(10) // Code INSEE
+  department  String?  @db.VarChar(10)
+  region      String?  @db.VarChar(100)
+  latitude    Float
+  longitude   Float
+  score       Float? // Score de pertinence
+  type        String   @db.VarChar(50) // housenumber, street, municipality, etc.
+  metadata    Json? // Métadonnées complètes de l'API BAN
+  searchText  String?  @db.Text // Texte de recherche pour indexation
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([postcode])
+  @@index([citycode])
+  @@index([department])
+  @@index([city])
+  @@index([street])
+  @@index([searchText])
+  @@map("ban_address")
 }
 
 model Cotisation {
@@ -1320,4 +1369,150 @@ model MediaGalerie {
   @@index([ordre])
   @@index([date])
   @@map("media_galerie")
+}
+
+// Table pour stocker les villes Geonames
+model GeonamesCity {
+  id             Int     @id @default(autoincrement())
+  geonameId      Int     @unique
+  name           String  @db.VarChar(200)
+  asciiName      String? @db.VarChar(200)
+  alternateNames String? @db.Text
+  latitude       Float?
+  longitude      Float?
+  countryCode    String  @db.VarChar(2)
+  admin1Code     String? @db.VarChar(20) // Code région/département
+  admin2Code     String? @db.VarChar(80)
+  admin3Code     String? @db.VarChar(20)
+  admin4Code     String? @db.VarChar(20)
+  population     BigInt?
+  elevation      Int?
+  timezone       String? @db.VarChar(40)
+  featureClass   String? @db.VarChar(1)
+  featureCode    String? @db.VarChar(10)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([countryCode])
+  @@index([name])
+  @@index([asciiName])
+  @@index([countryCode, name])
+  @@map("geonames_city")
+}
+
+// Table pour stocker les pays Geonames
+model GeonamesCountry {
+  id             Int     @id @default(autoincrement())
+  geonameId      Int     @unique
+  name           String  @db.VarChar(200)
+  asciiName      String? @db.VarChar(200)
+  alternateNames String? @db.Text
+  latitude       Float?
+  longitude      Float?
+  countryCode    String  @unique @db.VarChar(2) // Code pays ISO 2 lettres (unique)
+  cc2            String? @db.VarChar(60) // Codes pays alternatifs
+  admin1Code     String? @db.VarChar(20)
+  admin2Code     String? @db.VarChar(80)
+  admin3Code     String? @db.VarChar(20)
+  admin4Code     String? @db.VarChar(20)
+  population     BigInt?
+  elevation      Int?
+  timezone       String? @db.VarChar(40)
+  featureClass   String  @db.VarChar(1) // 'A' pour administrative boundaries
+  featureCode    String  @db.VarChar(10) // 'PCLI' pour independent political entity
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([countryCode])
+  @@index([name])
+  @@index([asciiName])
+  @@index([featureClass, featureCode])
+  @@map("geonames_country")
+}
+
+// Table pour stocker les pays depuis Carto ou autres sources
+model Country {
+  id           Int     @id @default(autoincrement())
+  name         String  @db.VarChar(200)
+  nameEn       String? @db.VarChar(200) // Nom en anglais
+  nameFr       String? @db.VarChar(200) // Nom en français
+  code         String  @unique @db.VarChar(2) // Code ISO 2 lettres (unique)
+  code3        String? @db.VarChar(3) // Code ISO 3 lettres
+  capital      String? @db.VarChar(200) // Capitale
+  region       String? @db.VarChar(100) // Région (Europe, Afrique, etc.)
+  subregion    String? @db.VarChar(100) // Sous-région
+  latitude     Float? // Latitude de la capitale ou du centre
+  longitude    Float? // Longitude de la capitale ou du centre
+  population   BigInt? // Population
+  area         Float? // Superficie en km²
+  currency     String? @db.VarChar(10) // Code devise (EUR, USD, etc.)
+  currencyName String? @db.VarChar(100) // Nom de la devise
+  languages    String? @db.Text // Langues (JSON array)
+  timezones    String? @db.Text // Fuseaux horaires (JSON array)
+  flag         String? @db.VarChar(500) // URL du drapeau
+  source       String  @default("carto") @db.VarChar(50) // Source des données (carto, restcountries, etc.)
+  externalId   String? @db.VarChar(100) // ID externe (pour référence)
+  metadata     Json? // Métadonnées supplémentaires (JSON)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([code])
+  @@index([name])
+  @@index([nameFr])
+  @@index([region])
+  @@index([source])
+  @@map("country")
+}
+
+// Table pour stocker les villes depuis Carto ou autres sources
+model City {
+  id          Int     @id @default(autoincrement())
+  name        String  @db.VarChar(200)
+  nameEn      String? @db.VarChar(200) // Nom en anglais
+  nameFr      String? @db.VarChar(200) // Nom en français
+  countryCode String  @db.VarChar(2) // Code pays ISO 2 lettres
+  region      String? @db.VarChar(100) // Région/État/Province
+  department  String? @db.VarChar(100) // Département (pour la France)
+  postalCode  String? @db.VarChar(20) // Code postal
+  latitude    Float?
+  longitude   Float?
+  population  BigInt? // Population
+  elevation   Int? // Altitude en mètres
+  timezone    String? @db.VarChar(50) // Fuseau horaire
+  isCapital   Boolean @default(false) // Si c'est une capitale
+  isMajor     Boolean @default(false) // Si c'est une grande ville
+  source      String  @default("carto") @db.VarChar(50) // Source des données
+  externalId  String? @db.VarChar(100) // ID externe
+  metadata    Json? // Métadonnées supplémentaires (JSON)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([countryCode])
+  @@index([name])
+  @@index([nameFr])
+  @@index([countryCode, name])
+  @@index([postalCode])
+  @@index([region])
+  @@index([source])
+  @@map("city")
+}
+
+// Table pour stocker les configurations de l'application
+model AppSettings {
+  id          String   @id @default(cuid())
+  key         String   @unique @db.VarChar(100) // Clé unique pour identifier le paramètre
+  value       String   @db.Text // Valeur du paramètre (peut être JSON)
+  description String?  @db.VarChar(500) // Description du paramètre
+  category    String   @default("general") @db.VarChar(50) // Catégorie (email, payment, general, etc.)
+  updatedBy   String? // ID de l'utilisateur qui a modifié
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@index([key])
+  @@index([category])
+  @@map("app_settings")
 }

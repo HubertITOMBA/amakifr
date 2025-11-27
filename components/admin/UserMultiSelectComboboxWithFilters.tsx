@@ -173,13 +173,21 @@ export function UserMultiSelectComboboxWithFilters({
                     className="mr-1 max-w-[150px]"
                   >
                     <span className="truncate">{getDisplayName(user)}</span>
-                    <button
-                      type="button"
+                    <span
+                      role="button"
+                      tabIndex={0}
                       onClick={(e) => handleRemoveUser(user.id, e)}
-                      className="ml-1 rounded-full hover:bg-gray-300 dark:hover:bg-gray-700"
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault();
+                          handleRemoveUser(user.id, e as any);
+                        }
+                      }}
+                      className="ml-1 rounded-full hover:bg-gray-300 dark:hover:bg-gray-700 cursor-pointer inline-flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500"
+                      aria-label={`Supprimer ${getDisplayName(user)}`}
                     >
                       <X className="h-3 w-3" />
-                    </button>
+                    </span>
                   </Badge>
                 ))}
                 {selectedUsers.length > 3 && (

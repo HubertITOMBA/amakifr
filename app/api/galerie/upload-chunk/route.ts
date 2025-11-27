@@ -3,6 +3,7 @@ import { auth } from '@/auth';
 import { writeFile, readFile, unlink } from 'fs/promises';
 import { join } from 'path';
 import { existsSync, mkdirSync } from 'fs';
+import { validateFileContent, validateFileSize } from '@/lib/file-validation';
 
 // Stockage temporaire des chunks en mémoire (en production, utiliser Redis ou une base de données)
 const chunkStorage = new Map<string, {
@@ -181,6 +182,42 @@ export async function POST(request: NextRequest) {
         return NextResponse.json(
           { success: false, error: "Taille du fichier final incorrecte" },
           { status: 500 }
+        );
+      }
+      
+      // Validation de sécurité : vérifier le contenu réel du fichier (magic bytes)
+      const fileValidation = await validateFileContent(
+        finalBuffer,
+        storage.mimeType,
+        storage.fileName
+      );
+      
+      if (!fileValidation.valid) {
+        console.error('Validation du fichier échouée:', fileValidation.error);
+        // Nettoyer le stockage
+        chunkStorage.delete(uploadId);
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: fileValidation.error || 'Le fichier est invalide ou potentiellement malveillant' 
+          },
+          { status: 400 }
+        );
+      }
+      
+      // Validation de la taille
+      const sizeValidation = validateFileSize(
+        finalBuffer.length,
+        storage.mimeType.startsWith('image/') ? 10 * 1024 * 1024 : 5 * 1024 * 1024 * 1024,
+        storage.mimeType.startsWith('image/') ? 'image' : 'video'
+      );
+      
+      if (!sizeValidation.valid) {
+        console.error('Validation de la taille échouée:', sizeValidation.error);
+        chunkStorage.delete(uploadId);
+        return NextResponse.json(
+          { success: false, error: sizeValidation.error },
+          { status: 400 }
         );
       }
       

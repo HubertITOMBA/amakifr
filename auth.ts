@@ -11,6 +11,7 @@ export const {
 	signIn,
 	signOut,
 } = NextAuth({
+	trustHost: true, // Permettre l'accès depuis différentes URLs en développement
 	pages: {
 		signIn: "/auth/sign-in",
 		error: "/auth/error",
@@ -113,6 +114,20 @@ export const {
 	session: {
 		strategy: "jwt",
 		maxAge: 30 * 60,
+	},
+	// Configuration des cookies pour permettre l'accès depuis localhost et l'adresse réseau
+	cookies: {
+		sessionToken: {
+			name: process.env.NODE_ENV === 'production' 
+				? '__Secure-next-auth.session-token'
+				: 'next-auth.session-token',
+			options: {
+				httpOnly: true,
+				sameSite: 'lax',
+				path: '/',
+				secure: process.env.NODE_ENV === 'production',
+			},
+		},
 	},
 	...authConfig,
 });

@@ -10,8 +10,8 @@ interface AuthSessionProviderProps {
 export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
   return (
     <SessionProvider 
-      refetchInterval={0}
-      refetchOnWindowFocus={false}
+      refetchInterval={5 * 60} // Rafraîchir la session toutes les 5 minutes
+      refetchOnWindowFocus={true} // Rafraîchir quand la fenêtre reprend le focus
     >
       {children}
     </SessionProvider>

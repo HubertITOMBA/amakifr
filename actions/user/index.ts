@@ -1005,10 +1005,10 @@ export async function getAdherentsLight(): Promise<{ success: boolean; adherents
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    const user = await db.user.findUnique({ where: { id: session.user.id } });
     if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
 
-    const adherents = await prisma.adherent.findMany({
+    const adherents = await db.adherent.findMany({
       include: { User: { select: { email: true } } },
       orderBy: [ { lastname: 'asc' }, { firstname: 'asc' } ] as any
     });
@@ -1027,10 +1027,10 @@ export async function getAllUsersForAdmin(): Promise<{ success: boolean; users?:
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
-    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    const user = await db.user.findUnique({ where: { id: session.user.id } });
     if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
 
-    const users = await prisma.user.findMany({
+    const users = await db.user.findMany({
       select: {
         id: true,
         name: true,
@@ -1079,10 +1079,23 @@ export async function getAllUsersForAdmin(): Promise<{ success: boolean; users?:
       ]
     });
 
-    return { success: true, users };
-  } catch (e) {
+    // Sérialiser les dates pour éviter les erreurs de sérialisation
+    const serializedUsers = users.map(user => ({
+      ...user,
+      createdAt: user.createdAt.toISOString(),
+      lastLogin: user.lastLogin ? user.lastLogin.toISOString() : null,
+    }));
+
+    return { success: true, users: serializedUsers };
+  } catch (e: any) {
     console.error("Erreur getAllUsersForAdmin:", e);
-    return { success: false, error: "Erreur lors du chargement des utilisateurs" };
+    const errorMessage = e?.message || "Erreur lors du chargement des utilisateurs";
+    // Si c'est une erreur liée au client Prisma, donner plus de détails
+    if (errorMessage.includes("appSettings") || errorMessage.includes("Cannot read")) {
+      console.error("⚠️ Le client Prisma semble obsolète. Redémarrez le serveur Next.js.");
+      return { success: false, error: "Erreur de configuration. Veuillez redémarrer le serveur." };
+    }
+    return { success: false, error: errorMessage };
   }
 }
 

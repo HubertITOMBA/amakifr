@@ -94,6 +94,10 @@ export const NewVerificationForm = () => {
                     if (response.success) {
                         form.reset();
                         setSuccess(response.success);
+                        // Rediriger vers la page d'onboarding après 1.5 secondes
+                        setTimeout(() => {
+                            window.location.href = '/auth/onboarding';
+                        }, 1500);
                     }
                     setIsAnimating(false);
                 })

@@ -21,6 +21,10 @@ export const RegisterSchema = z.object({
     name: z.string().min(3, {
         message: "Le nom est obligatoire" 
     }),
+    // Champs optionnels pour améliorer le profil
+    anneePromotion: z.string().optional(), // Année de promotion (ex: "2010" ou "Je ne suis pas ancien élève")
+    pays: z.string().optional(), // Pays de résidence
+    ville: z.string().optional(), // Ville de résidence
 }) 
 
 export const ResetSchema = z.object({

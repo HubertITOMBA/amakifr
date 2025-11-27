@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { 
   Settings, 
   Mail, 
@@ -27,6 +28,8 @@ import {
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getEmailProviderFromDB, updateEmailProvider } from "@/actions/admin/settings";
+import type { EmailProvider } from "@/lib/email/providers/types";
 
 export default function AdminSettingsPage() {
   const [activeTab, setActiveTab] = useState("general");
@@ -42,6 +45,7 @@ export default function AdminSettingsPage() {
 
   // Paramètres d'email
   const [emailSettings, setEmailSettings] = useState({
+    provider: (process.env.EMAIL_PROVIDER || 'resend') as EmailProvider,
     fromNoreply: "noreply@amaki.fr",
     fromWebmaster: "webmaster@amaki.fr",
     adminNotificationEmail: "asso.amaki@gmail.com",
@@ -69,7 +73,19 @@ export default function AdminSettingsPage() {
   useEffect(() => {
     loadSettings();
     loadSystemStats();
+    loadEmailProvider();
   }, []);
+
+  const loadEmailProvider = async () => {
+    try {
+      const provider = await getEmailProviderFromDB();
+      if (provider) {
+        setEmailSettings(prev => ({ ...prev, provider }));
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement du provider email:", error);
+    }
+  };
 
   const loadSettings = () => {
     // Charger depuis localStorage
@@ -115,23 +131,35 @@ export default function AdminSettingsPage() {
     }
   };
 
-  const saveSettings = (category: string) => {
+  const saveSettings = async (category: string) => {
     setSaving(true);
     try {
       switch (category) {
         case "general":
           localStorage.setItem("admin-settings-general", JSON.stringify(generalSettings));
+          toast.success("Paramètres sauvegardés avec succès");
           break;
         case "email":
-          localStorage.setItem("admin-settings-email", JSON.stringify(emailSettings));
+          // Sauvegarder le provider dans la base de données
+          const providerResult = await updateEmailProvider({ provider: emailSettings.provider });
+          if (providerResult.success) {
+            // Sauvegarder les autres paramètres dans localStorage
+            const { provider, ...otherSettings } = emailSettings;
+            localStorage.setItem("admin-settings-email", JSON.stringify(otherSettings));
+            toast.success(providerResult.message || "Paramètres sauvegardés avec succès");
+          } else {
+            toast.error(providerResult.error || "Erreur lors de la sauvegarde");
+            return;
+          }
           break;
         case "display":
           localStorage.setItem("admin-settings-display", JSON.stringify(displaySettings));
+          toast.success("Paramètres sauvegardés avec succès");
           break;
       }
-      toast.success("Paramètres sauvegardés avec succès");
     } catch (error) {
       toast.error("Erreur lors de la sauvegarde");
+      console.error("Erreur:", error);
     } finally {
       setSaving(false);
     }
@@ -252,6 +280,57 @@ export default function AdminSettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Provider Email</h3>
+                
+                <div className="space-y-2">
+                  <Label htmlFor="emailProvider">Provider email par défaut</Label>
+                  <Select
+                    value={emailSettings.provider}
+                    onValueChange={(value) => setEmailSettings({ ...emailSettings, provider: value as EmailProvider })}
+                  >
+                    <SelectTrigger id="emailProvider" className="w-full">
+                      <SelectValue placeholder="Sélectionner un provider" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="resend">Resend</SelectItem>
+                      <SelectItem value="smtp">SMTP (Gmail, Outlook, etc.)</SelectItem>
+                      <SelectItem value="sendgrid">SendGrid</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">
+                    Le provider sélectionné sera utilisé pour tous les envois d'emails de l'application.
+                    Les clés API doivent être configurées dans les variables d'environnement.
+                  </p>
+                  {emailSettings.provider === 'resend' && (
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        Resend nécessite la variable d'environnement <code className="text-xs">RESEND_API_KEY</code>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {emailSettings.provider === 'smtp' && (
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        SMTP nécessite les variables : <code className="text-xs">SMTP_HOST</code>, <code className="text-xs">SMTP_PORT</code>, <code className="text-xs">SMTP_USER</code>, <code className="text-xs">SMTP_PASS</code>, <code className="text-xs">SMTP_FROM</code>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                  {emailSettings.provider === 'sendgrid' && (
+                    <Alert>
+                      <Info className="h-4 w-4" />
+                      <AlertDescription>
+                        SendGrid nécessite les variables : <code className="text-xs">SENDGRID_API_KEY</code>, <code className="text-xs">SENDGRID_FROM</code>
+                      </AlertDescription>
+                    </Alert>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Adresses d'expéditeur</h3>
                 

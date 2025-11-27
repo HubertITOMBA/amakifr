@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
+import '@/lib/env-init';
 import "react-toastify/dist/ReactToastify.css";
 import { Navbar } from "@/components/home/Navbar";
 import { Hero } from "@/components/home/Hero";
@@ -17,17 +18,34 @@ import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],
+  display: "swap",
+  preload: false, // Désactiver le preload pour éviter les problèmes SSL en développement
+  fallback: ["system-ui", "arial"],
+  adjustFontFallback: true,
 });
 
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
+  display: "swap",
+  preload: false, // Désactiver le preload pour éviter les problèmes SSL en développement
+  fallback: ["monospace"],
+  adjustFontFallback: true,
 });
 
 export const metadata: Metadata = {
   title: "AMAKI France",
   description: "Portail de l'Amicale des anciens élèves de Kipaku en France",
   manifest: "/manifest.json",
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+    apple: [
+      { url: "/web-app-manifest-192x192.png", sizes: "192x192", type: "image/png" },
+    ],
+  },
   appleWebApp: {
     capable: true,
     statusBarStyle: "default",

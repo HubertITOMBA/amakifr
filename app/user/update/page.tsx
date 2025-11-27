@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -15,6 +15,10 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { toast } from "sonner";
 import { PhotoUpload } from "@/components/ui/photo-upload";
 import { getUserData, updateUserData } from "@/actions/user";
+import { CountryAutocomplete } from "@/components/forms/country-autocomplete";
+import { CityAutocomplete } from "@/components/forms/city-autocomplete";
+import { AddressAutocomplete } from "@/components/forms/address-autocomplete";
+import type { AddressResult } from "@/actions/location/search-address";
 
 interface UserData {
   name: string;
@@ -95,6 +99,62 @@ export default function UpdateUserPage() {
   
   const [telephonesData, setTelephonesData] = useState<TelephoneData[]>([]);
   const [enfantsData, setEnfantsData] = useState<EnfantData[]>([]);
+  
+  // Code pays pour l'autocomplétion des villes
+  const [countryCode, setCountryCode] = useState<string>("FR");
+  
+  // Callbacks mémorisés pour éviter les boucles infinies
+  const handleCityChange = useCallback((value: string) => {
+    setAdresseData(prev => ({ ...prev, city: value }));
+  }, []);
+  
+  const handleCountryChange = useCallback((value: string) => {
+    setAdresseData(prev => ({ ...prev, country: value, city: "" }));
+  }, []);
+  
+  const handleCountryCodeChange = useCallback((code: string) => {
+    setCountryCode(code);
+  }, []);
+  
+  const handleAddressChange = useCallback((address: AddressResult | null) => {
+    if (address) {
+      // Extraire le nom de la rue depuis le label (format: "10 rue de la Paix, 75001 Paris")
+      const labelParts = address.label.split(",");
+      const streetPart = labelParts[0] || "";
+      // Enlever le numéro de rue si présent au début
+      const streetName = streetPart.replace(/^\d+\s*/, "").trim();
+      
+      // Utiliser address.street si disponible, sinon extraire depuis le label
+      const finalStreetName = address.street || streetName;
+      
+      // Détecter si c'est un code postal français (5 chiffres)
+      const isFrenchPostcode = address.postcode && /^\d{5}$/.test(address.postcode);
+      
+      // Mettre à jour le code pays si c'est la France
+      if (isFrenchPostcode) {
+        setCountryCode("FR");
+      }
+      
+      // Mettre à jour toutes les données d'adresse, y compris la ville
+      setAdresseData(prev => ({
+        ...prev,
+        streetnum: address.housenumber || "",
+        street1: finalStreetName, // Nom de la rue (sans numéro, sans code postal, sans ville)
+        codepost: address.postcode || "",
+        city: address.city || "", // La ville est maintenant correctement remplie
+        // Si c'est un code postal français, mettre "France"
+        country: isFrenchPostcode ? "France" : prev.country,
+      }));
+    } else {
+      // Si l'adresse est null, réinitialiser
+      setAdresseData(prev => ({
+        ...prev,
+        street1: "",
+        codepost: "",
+        city: "",
+      }));
+    }
+  }, []);
 
   // Charger les données utilisateur
   useEffect(() => {
@@ -698,20 +758,23 @@ export default function UpdateUserPage() {
                   <Input
                     id="streetnum"
                     value={adresseData.streetnum}
-                    onChange={(e) => setAdresseData({ ...adresseData, streetnum: e.target.value })}
+                    onChange={(e) => setAdresseData(prev => ({ ...prev, streetnum: e.target.value }))}
                     placeholder="123"
                     className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    disabled={saving}
                   />
                 </div>
-                <div>
+                <div className="relative z-[15]">
                   <Label htmlFor="street1" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Rue</Label>
-                  <Input
-                    id="street1"
-                    value={adresseData.street1}
-                    onChange={(e) => setAdresseData({ ...adresseData, street1: e.target.value })}
-                    placeholder="Rue de la Paix"
-                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  <AddressAutocomplete
+                    value={adresseData.street1 || ""}
+                    onValueChange={handleAddressChange}
+                    placeholder="Tapez une rue (ex: rue de la Paix, Paris)"
+                    disabled={saving}
                   />
+                  <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                    La sélection remplira automatiquement le code postal, la ville et le pays
+                  </p>
                 </div>
                 <div>
                   <Label htmlFor="street2" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Complément d'adresse</Label>
@@ -721,6 +784,7 @@ export default function UpdateUserPage() {
                     onChange={(e) => setAdresseData({ ...adresseData, street2: e.target.value })}
                     placeholder="Appartement, étage..."
                     className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    disabled={saving}
                   />
                 </div>
               </div>
@@ -731,29 +795,36 @@ export default function UpdateUserPage() {
                   <Input
                     id="codepost"
                     value={adresseData.codepost}
-                    onChange={(e) => setAdresseData({ ...adresseData, codepost: e.target.value })}
+                    onChange={(e) => setAdresseData(prev => ({ ...prev, codepost: e.target.value }))}
                     placeholder="75001"
                     className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                    disabled={saving}
+                    readOnly={!!adresseData.codepost && /^\d{5}$/.test(adresseData.codepost)}
                   />
+                  {adresseData.codepost && /^\d{5}$/.test(adresseData.codepost) && (
+                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                      Rempli automatiquement depuis la rue
+                    </p>
+                  )}
                 </div>
-                <div>
+                <div className="relative z-[10]">
                   <Label htmlFor="city" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Ville</Label>
-                  <Input
-                    id="city"
-                    value={adresseData.city}
-                    onChange={(e) => setAdresseData({ ...adresseData, city: e.target.value })}
-                    placeholder="Paris"
-                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  <CityAutocomplete
+                    value={adresseData.city || ""}
+                    onValueChange={handleCityChange}
+                    countryCode={countryCode}
+                    placeholder="Sélectionner une ville..."
+                    disabled={saving || !countryCode}
                   />
                 </div>
-                <div>
+                <div className="relative z-[5]">
                   <Label htmlFor="country" className="text-sm font-semibold text-gray-700 dark:text-gray-200">Pays</Label>
-                  <Input
-                    id="country"
-                    value={adresseData.country}
-                    onChange={(e) => setAdresseData({ ...adresseData, country: e.target.value })}
-                    placeholder="France"
-                    className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
+                  <CountryAutocomplete
+                    value={adresseData.country || ""}
+                    onValueChange={handleCountryChange}
+                    onCountryCodeChange={handleCountryCodeChange}
+                    placeholder="Sélectionner un pays..."
+                    disabled={saving}
                   />
                 </div>
               </div>

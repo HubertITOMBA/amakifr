@@ -18,7 +18,7 @@ export const register = async (
         return { error: "Informations de connexion invalides !" }
     }
 
-    const { email, password, name } = validatedFields.data
+    const { email, password, name, anneePromotion, pays, ville } = validatedFields.data
     const hashPassword = await bcrypt.hash(password, 10)
 
     const existingUser = await getUserByEmail(email)
@@ -33,6 +33,33 @@ export const register = async (
             password: hashPassword
         }
     })
+
+    // Stocker les informations optionnelles dans centresInteret (JSON) pour pays et ville
+    const infoSupplementaires: {
+        pays?: string;
+        ville?: string;
+    } = {};
+    
+    if (pays) infoSupplementaires.pays = pays;
+    if (ville) infoSupplementaires.ville = ville;
+
+    // Créer l'adhérent avec les informations supplémentaires
+    try {
+        await db.adherent.create({
+            data: {
+                userId: user.id,
+                firstname: name.split(' ')[0] || name,
+                lastname: name.split(' ').slice(1).join(' ') || name,
+                anneePromotion: anneePromotion || null,
+                centresInteret: Object.keys(infoSupplementaires).length > 0 
+                    ? JSON.stringify(infoSupplementaires) 
+                    : null,
+            }
+        });
+    } catch (error) {
+        console.error("Erreur lors de la création de l'adhérent:", error);
+        // Ne pas bloquer l'inscription si la création de l'adhérent échoue
+    }
 
     // await db.adherent.create({
     //     data: {

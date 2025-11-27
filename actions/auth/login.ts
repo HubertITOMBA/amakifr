@@ -40,7 +40,9 @@ export const login = async (
     }
 
     try {
-        await signIn(
+        // signIn peut lancer une NEXT_REDIRECT qui est normale dans Next.js
+        // On essaie de capturer cette erreur spéciale
+        const result = await signIn(
             "credentials",
             {
                 email,
@@ -48,7 +50,17 @@ export const login = async (
                 redirectTo: callbackUrl || DEFAULT_LOGIN_REDIRECT
             }
         )
-    } catch (error) {
+        // Si signIn retourne sans erreur, la connexion a réussi
+        // La redirection sera gérée automatiquement par NextAuth
+        return { success: "Connexion réussie !" }
+    } catch (error: any) {
+        // NextAuth peut lancer une NEXT_REDIRECT qui est une erreur spéciale
+        // que Next.js gère automatiquement. Si c'est le cas, la connexion a réussi
+        if (error?.digest?.startsWith('NEXT_REDIRECT') || error?.message?.includes('NEXT_REDIRECT')) {
+            // La redirection est en cours, la connexion a réussi
+            return { success: "Connexion réussie !" }
+        }
+        
         if(error instanceof AuthError) {
             switch(error.type){
                 case "CredentialsSignin":

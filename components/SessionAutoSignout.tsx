@@ -7,7 +7,7 @@ export default function SessionAutoSignout() {
     const SIGNOUT_URL = "/api/auth/signout-quick";
 
     const DEFAULT_DELAY_MS = 1000; // couverture fermetures rapides
-    const DEFAULT_INACTIVITY_MS = 10 * 60 * 1000; // 10 minutes
+    const DEFAULT_INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes
 
     const envDelay = Number(process.env.NEXT_PUBLIC_SESSION_SIGNOUT_DELAY_MS);
     const envInactivity = Number(process.env.NEXT_PUBLIC_SESSION_INACTIVITY_MS);

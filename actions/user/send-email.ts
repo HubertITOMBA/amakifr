@@ -1,7 +1,7 @@
 "use server";
 
 import { auth } from "@/auth";
-import prisma from "@/lib/prisma";
+import { db } from "@/lib/db";
 import { sendCustomEmailToUsers } from "@/lib/mail";
 
 export interface SendEmailData {
@@ -23,7 +23,7 @@ export async function sendCustomEmailToAdherents(
     }
 
     // Vérifier que l'utilisateur est admin
-    const user = await prisma.user.findUnique({
+    const user = await db.user.findUnique({
       where: { id: session.user.id! },
       select: { role: true },
     });
@@ -46,7 +46,7 @@ export async function sendCustomEmailToAdherents(
     }
 
     // Récupérer les utilisateurs avec leurs emails
-    const users = await prisma.user.findMany({
+    const users = await db.user.findMany({
       where: {
         id: { in: emailData.userIds },
       },

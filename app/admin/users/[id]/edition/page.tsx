@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
 import { getUserByIdForAdmin, adminUpdateUser, adminUpdateUserRole, adminUpdateUserStatus } from "@/actions/user";
 import { adminUpdateAdherent } from "@/actions/user/admin-update-adherent";
@@ -248,29 +249,37 @@ export default function EditionUserPage() {
       <div className="space-y-2 sm:space-y-3 max-h-[85vh] overflow-y-auto px-1">
         {/* Informations utilisateur */}
         <Card className="shadow-sm hover:shadow-md transition-shadow border-gray-200 dark:border-gray-700 !py-0">
-          <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg py-1.5 px-2 sm:px-3">
-            <CardTitle className="flex items-center gap-2 text-xs sm:text-sm">
-              <User className="h-3.5 w-3.5" />
-              Informations utilisateur
-            </CardTitle>
+          <CardHeader className="bg-gradient-to-r from-blue-500 to-indigo-600 text-white rounded-t-lg py-2 px-2 sm:px-3">
+            <div className="flex items-center justify-between flex-wrap gap-2">
+              <div className="flex items-center gap-2 sm:gap-3">
+                <Avatar className="h-10 w-10 sm:h-14 sm:w-14 border-2 border-white/30 shadow-lg flex-shrink-0">
+                  <AvatarImage 
+                    src={userForm.image || undefined} 
+                    alt={fullName}
+                    className="object-cover"
+                  />
+                  <AvatarFallback className="bg-white/20 text-white text-sm sm:text-base font-bold">
+                    {fullName.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2) || "U"}
+                  </AvatarFallback>
+                </Avatar>
+                <CardTitle className="flex items-center gap-2 text-xs sm:text-sm">
+                  <User className="h-3.5 w-3.5" />
+                  Informations utilisateur
+                </CardTitle>
+              </div>
+              <div className="flex items-center gap-1.5">
+                <ImageUpload
+                  value={userForm.image || ""}
+                  onChange={(url) => setUserForm({ ...userForm, image: url })}
+                  label=""
+                  folder="users"
+                  maxSize={5}
+                />
+              </div>
+            </div>
           </CardHeader>
           <CardContent className="pt-1.5 px-2 sm:px-3 pb-2 sm:pb-3">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5 sm:gap-2">
-              <div className="sm:col-span-2 space-y-1">
-                <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-t-md">
-                  <ImageIcon className="h-3 w-3" />
-                  Photo de profil
-                </Label>
-                <div className="p-1.5 sm:p-2 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 shadow-sm">
-                  <ImageUpload
-                    value={userForm.image || ""}
-                    onChange={(url) => setUserForm({ ...userForm, image: url })}
-                    label=""
-                    folder="users"
-                    maxSize={5}
-                  />
-                </div>
-              </div>
               <div className="space-y-1">
                 <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-t-md">
                   <Mail className="h-3 w-3" />

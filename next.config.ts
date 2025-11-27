@@ -75,6 +75,15 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  
+  // En développement, forcer l'utilisation de HTTP et éviter 0.0.0.0
+  // Le navigateur ne peut pas accéder à 0.0.0.0, il doit utiliser localhost ou l'IP réseau
+  ...(process.env.NODE_ENV === 'development' && {
+    // Désactiver la génération d'URLs absolues pour les assets en développement
+    // Cela permet au navigateur d'utiliser l'URL relative depuis laquelle la page a été chargée
+    assetPrefix: undefined,
+  }),
+
 
   images: {
     remotePatterns: [

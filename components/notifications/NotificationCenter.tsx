@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Bell, Check, CheckCheck, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -23,6 +23,7 @@ import {
 } from "@/actions/notifications";
 import { toast } from "sonner";
 import { TypeNotification } from "@prisma/client";
+import { useSession } from "next-auth/react";
 
 const getNotificationIcon = (type: TypeNotification) => {
   switch (type) {
@@ -67,12 +68,22 @@ const getNotificationColor = (type: TypeNotification) => {
 };
 
 export function NotificationCenter() {
+  const { data: session, status } = useSession();
   const [notifications, setNotifications] = useState<any[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
+  const isAuthenticated = status === "authenticated" && session?.user?.id;
 
-  const loadNotifications = async () => {
+  const loadNotifications = useCallback(async () => {
+    // Ne pas charger si l'utilisateur n'est pas authentifié
+    if (!isAuthenticated) {
+      setNotifications([]);
+      setUnreadCount(0);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const [notificationsResult, countResult] = await Promise.all([
@@ -82,24 +93,82 @@ export function NotificationCenter() {
 
       if (notificationsResult.success && notificationsResult.notifications) {
         setNotifications(notificationsResult.notifications);
+      } else if (notificationsResult.error) {
+        // Ne logger que si ce n'est pas une erreur normale (non autorisé, connexion, fetch)
+        const errorMessage = notificationsResult.error.toLowerCase();
+        const isNormalError = 
+          errorMessage.includes('non autorisé') ||
+          errorMessage.includes('connection') ||
+          errorMessage.includes('fetch') ||
+          errorMessage.includes('network') ||
+          errorMessage.includes('refused');
+        
+        if (!isNormalError) {
+          console.error("Erreur lors du chargement des notifications:", notificationsResult.error);
+        }
       }
 
       if (countResult.success && countResult.count !== undefined) {
         setUnreadCount(countResult.count);
+      } else if (countResult.error) {
+        // Ne logger que si ce n'est pas une erreur normale (non autorisé, connexion, fetch)
+        const errorMessage = countResult.error.toLowerCase();
+        const isNormalError = 
+          errorMessage.includes('non autorisé') ||
+          errorMessage.includes('connection') ||
+          errorMessage.includes('fetch') ||
+          errorMessage.includes('network') ||
+          errorMessage.includes('refused');
+        
+        if (!isNormalError) {
+          console.error("Erreur lors du comptage des notifications:", countResult.error);
+        }
       }
-    } catch (error) {
-      console.error("Erreur lors du chargement des notifications:", error);
+    } catch (error: any) {
+      // Ignorer les erreurs de connexion (ERR_CONNECTION_REFUSED, Failed to fetch)
+      const errorMessage = error?.message?.toLowerCase() || String(error).toLowerCase();
+      if (
+        !errorMessage.includes('connection') &&
+        !errorMessage.includes('fetch') &&
+        !errorMessage.includes('network') &&
+        !errorMessage.includes('refused')
+      ) {
+        console.error("Erreur lors du chargement des notifications:", error);
+      }
+      // En cas d'erreur de connexion, on garde les données existantes
+      // et on ne bloque pas l'interface utilisateur
     } finally {
       setLoading(false);
     }
-  };
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    loadNotifications();
+    // Ne charger que si l'utilisateur est authentifié
+    if (status === "loading") {
+      return; // Attendre que la session soit chargée
+    }
+
+    if (!isAuthenticated) {
+      setNotifications([]);
+      setUnreadCount(0);
+      return;
+    }
+
+    // Attendre un peu avant de charger pour laisser le temps au serveur de démarrer
+    const initialTimeout = setTimeout(() => {
+      loadNotifications();
+    }, 1000);
+
     // Recharger toutes les 30 secondes
-    const interval = setInterval(loadNotifications, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    const interval = setInterval(() => {
+      loadNotifications();
+    }, 30000);
+
+    return () => {
+      clearTimeout(initialTimeout);
+      clearInterval(interval);
+    };
+  }, [isAuthenticated, status, loadNotifications]);
 
   const handleMarkAsRead = async (notificationId: string) => {
     const result = await markNotificationAsRead(notificationId);

@@ -1,3 +1,5 @@
+"use client";
+
 import { Navbar } from "@/components/home/Navbar";
 import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -5,8 +7,11 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Calendar, MapPin, Clock, Users, Vote, Award, CheckCircle, Trophy } from "lucide-react";
 import Link from "next/link";
+import { useSession } from "next-auth/react";
 
 export default function EvenementsPage() {
+  const { data: session, status } = useSession();
+  const isAuthenticated = status === "authenticated" && !!session?.user;
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-100 dark:from-slate-800 dark:to-slate-700">
       <Navbar />
@@ -299,32 +304,34 @@ export default function EvenementsPage() {
 
             {/* Sidebar */}
             <div className="space-y-6">
-              {/* Carte d'action rapide - ÉLECTIONS */}
-              <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
-                <CardHeader>
-                  <CardTitle className="text-xl text-green-800 dark:text-green-200">
-                    Participez !
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <Link href="/candidatures" className="block">
-                    <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
-                      <Users className="h-4 w-4 mr-2" />
-                      Devenir Candidat
+              {/* Carte d'action rapide - ÉLECTIONS - Visible uniquement pour les utilisateurs connectés */}
+              {isAuthenticated && (
+                <Card className="bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/20 dark:to-emerald-900/20 border-green-200 dark:border-green-800">
+                  <CardHeader>
+                    <CardTitle className="text-xl text-green-800 dark:text-green-200">
+                      Participez !
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    <Link href="/candidatures" className="block">
+                      <Button className="w-full bg-green-600 hover:bg-green-700 text-white">
+                        <Users className="h-4 w-4 mr-2" />
+                        Devenir Candidat
+                      </Button>
+                    </Link>
+                    <Link href="/candidats" className="block">
+                      <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
+                        <Award className="h-4 w-4 mr-2" />
+                        Voir les Candidats
+                      </Button>
+                    </Link>
+                    <Button variant="outline" className="w-full border-green-600 text-green-600 hover:bg-green-50">
+                      <Vote className="h-4 w-4 mr-2" />
+                      Voter
                     </Button>
-                  </Link>
-                  <Link href="/candidats" className="block">
-                    <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
-                      <Award className="h-4 w-4 mr-2" />
-                      Voir les Candidats
-                    </Button>
-                  </Link>
-                  <Button variant="outline" className="w-full border-green-600 text-green-600 hover:bg-green-50">
-                    <Vote className="h-4 w-4 mr-2" />
-                    Voter
-                  </Button>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              )}
 
               {/* Informations importantes */}
               <Card>

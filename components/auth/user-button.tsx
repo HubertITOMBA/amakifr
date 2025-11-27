@@ -1,4 +1,5 @@
 "use client"
+import { useEffect } from "react";
 import { FaUser } from "react-icons/fa"
 import { ExitIcon } from "@radix-ui/react-icons";
 import { 
@@ -25,7 +26,7 @@ import { Lock } from "lucide-react";
 
 
 export const UserButton = () => {
-    const { data: session, status } = useSession();
+    const { data: session, status, update } = useSession();
     const { forceUpdate } = useSessionUpdate();
     const { userProfile } = useUserProfile();
     const user = session?.user;
@@ -44,6 +45,20 @@ export const UserButton = () => {
         console.log("UserButton - UserProfile:", userProfile);
         console.log("UserButton - UserImage:", userImage);
     }
+    
+    // Forcer la mise à jour de la session si on est sur une page après connexion
+    // et que la session n'est pas encore chargée
+    useEffect(() => {
+        if (status === "loading" && typeof window !== "undefined") {
+            // Attendre un peu puis forcer la mise à jour si nécessaire
+            const timer = setTimeout(async () => {
+                if (status === "loading") {
+                    await update();
+                }
+            }, 500);
+            return () => clearTimeout(timer);
+        }
+    }, [status, update]);
 
     // Gestion des états de chargement
     if (status === "loading") {
@@ -59,13 +74,13 @@ export const UserButton = () => {
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
             <div className='flex items-center cursor-pointer'>
-                <Avatar className="w-10 h-10 border-2 border-harpOrange">
+                <Avatar className="w-10 h-10 border-2 border-slate-600 dark:border-slate-400 shadow-md">
                     <AvatarImage 
                         src={userImage || undefined} 
                         alt={user?.name || "Utilisateur"}
                         className="object-cover"
                     />
-                    <AvatarFallback className="bg-harpOrange text-white font-semibold">
+                    <AvatarFallback className="bg-slate-600 dark:bg-slate-400 text-white font-semibold shadow-sm">
                         {firstInitial}
                     </AvatarFallback>  
                 </Avatar>

@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useState, useCallback } from "react";
+import { useEffect, useMemo, useState, useCallback, useRef } from "react";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -17,7 +19,8 @@ import {
   Plus,
   Mail,
   Award,
-  Briefcase
+  Briefcase,
+  Loader2
 } from "lucide-react";
 import { UserRole, UserStatus } from "@prisma/client";
 import { 
@@ -135,6 +138,8 @@ const getStatusLabel = (status: UserStatus) => {
 };
 
 export default function AdminUsersPage() {
+  const { data: session, status: sessionStatus } = useSession();
+  const router = useRouter();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -146,6 +151,7 @@ export default function AdminUsersPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [postes, setPostes] = useState<Array<{ id: string; libelle: string; code: string }>>([]);
+  const abortControllerRef = useRef<AbortController | null>(null);
   
   // Visibilité des colonnes - charger depuis localStorage
   // Sur mobile, masquer certaines colonnes par défaut pour améliorer la lisibilité
@@ -181,6 +187,31 @@ export default function AdminUsersPage() {
   }, [searchTerm]);
 
   const loadAll = useCallback(async () => {
+    // Vérifier la session avant de charger les données
+    if (sessionStatus === "unauthenticated") {
+      router.push("/auth/sign-in");
+      return;
+    }
+
+    if (sessionStatus === "loading" || !session?.user) {
+      return; // Attendre que la session soit chargée
+    }
+
+    // Vérifier que l'utilisateur est admin
+    if (session.user.role !== "Admin") {
+      toast.error("Accès refusé. Vous devez être administrateur.");
+      router.push("/");
+      return;
+    }
+
+    // Annuler la requête précédente si elle existe
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+
+    // Créer un nouveau AbortController pour cette requête
+    abortControllerRef.current = new AbortController();
+
     try {
       setLoading(true);
       const [usersRes, postesRes] = await Promise.all([
@@ -188,26 +219,73 @@ export default function AdminUsersPage() {
         getAllPostesTemplates(true) // Seulement les postes actifs
       ]);
       
+      // Vérifier si la requête a été annulée
+      if (abortControllerRef.current?.signal.aborted) {
+        return;
+      }
+      
       if (usersRes.success && usersRes.users) {
         setUsers(usersRes.users as UserData[]);
       } else {
-        toast.error(usersRes.error || "Erreur lors du chargement");
+        // Ne pas afficher d'erreur si c'est une erreur d'authentification (le middleware gère la redirection)
+        if (usersRes.error && !usersRes.error.includes("Non autorisé") && !usersRes.error.includes("Admin requis")) {
+          toast.error(usersRes.error || "Erreur lors du chargement");
+        } else if (usersRes.error?.includes("Non autorisé")) {
+          // Session expirée, le middleware redirigera automatiquement
+          return;
+        }
       }
       
       if (postesRes.success && postesRes.data) {
         setPostes(postesRes.data.map((p: any) => ({ id: p.id, libelle: p.libelle, code: p.code })));
       }
-    } catch (error) {
+    } catch (error: any) {
+      // Ignorer les erreurs d'annulation
+      if (error?.name === "AbortError" || abortControllerRef.current?.signal.aborted) {
+        return;
+      }
+      
       console.error("Erreur:", error);
-      toast.error("Erreur lors du chargement des adhérents");
+      
+      // Ne pas afficher d'erreur si c'est une erreur de frame (déjà gérée par le middleware)
+      if (!error?.message?.includes("Frame with ID") && !error?.message?.includes("removed")) {
+        toast.error("Erreur lors du chargement des adhérents");
+      }
     } finally {
-      setLoading(false);
+      // Ne pas mettre à jour le loading si la requête a été annulée
+      if (!abortControllerRef.current?.signal.aborted) {
+        setLoading(false);
+      }
     }
-  }, []);
+  }, [sessionStatus, session, router]);
 
   useEffect(() => {
     loadAll();
+    
+    // Nettoyer lors du démontage du composant
+    return () => {
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
   }, [loadAll]);
+
+  // Afficher un loader pendant le chargement de la session
+  if (sessionStatus === "loading") {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+          <p className="text-sm text-gray-600 dark:text-gray-400">Chargement de la session...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Rediriger si non authentifié (le middleware devrait le faire, mais on le fait aussi côté client)
+  if (sessionStatus === "unauthenticated") {
+    return null; // Le middleware redirigera
+  }
 
   // Filtrer les adhérents
   const filteredUsers = useMemo(() => {
@@ -228,34 +306,112 @@ export default function AdminUsersPage() {
 
   // Actions
   const handleRoleChange = useCallback(async (userId: string, role: UserRole) => {
+    // Mise à jour optimiste de l'interface
+    setUsers(prevUsers => 
+      prevUsers.map(user => 
+        user.id === userId ? { ...user, role } : user
+      )
+    );
+
     const res = await adminUpdateUserRole(userId, role);
     if (res.success) {
       toast.success("Rôle mis à jour");
-      await loadAll();
+      // Optionnel : recharger en arrière-plan pour s'assurer de la cohérence
+      // mais sans bloquer l'interface
+      loadAll().catch(console.error);
     } else {
+      // Annuler la mise à jour optimiste en cas d'erreur
+      setUsers(prevUsers => 
+        prevUsers.map(user => 
+          user.id === userId ? { ...user, role: prevUsers.find(u => u.id === userId)?.role || role } : user
+        )
+      );
       toast.error(res.error || "Erreur lors de la mise à jour du rôle");
     }
   }, [loadAll]);
 
   const handleStatusChange = useCallback(async (userId: string, status: UserStatus) => {
-    const res = await adminUpdateUserStatus(userId, status);
-    if (res.success) {
-      toast.success("Statut mis à jour. Un email de notification a été envoyé à l'adhérent.");
-      await loadAll();
-    } else {
-      toast.error(res.error || "Erreur lors de la mise à jour du statut");
+    // Vérifier la session avant l'action
+    if (sessionStatus !== "authenticated" || !session?.user) {
+      toast.error("Session expirée. Veuillez vous reconnecter.");
+      router.push("/auth/sign-in");
+      return;
     }
-  }, [loadAll]);
+
+    // Mise à jour optimiste de l'interface
+    const previousStatus = users.find(u => u.id === userId)?.status;
+    setUsers(prevUsers => 
+      prevUsers.map(user => 
+        user.id === userId ? { ...user, status } : user
+      )
+    );
+
+    try {
+      const res = await adminUpdateUserStatus(userId, status);
+      if (res.success) {
+        toast.success("Statut mis à jour. Un email de notification a été envoyé à l'adhérent.");
+        // Optionnel : recharger en arrière-plan pour s'assurer de la cohérence
+        // mais sans bloquer l'interface
+        loadAll().catch(console.error);
+      } else {
+        // Annuler la mise à jour optimiste en cas d'erreur
+        if (previousStatus) {
+          setUsers(prevUsers => 
+            prevUsers.map(user => 
+              user.id === userId ? { ...user, status: previousStatus } : user
+            )
+          );
+        }
+        // Ne pas afficher d'erreur si c'est une erreur d'authentification
+        if (res.error && !res.error.includes("Non autorisé")) {
+          toast.error(res.error || "Erreur lors de la mise à jour du statut");
+        }
+      }
+    } catch (error: any) {
+      // Annuler la mise à jour optimiste en cas d'erreur
+      if (previousStatus) {
+        setUsers(prevUsers => 
+          prevUsers.map(user => 
+            user.id === userId ? { ...user, status: previousStatus } : user
+          )
+        );
+      }
+      if (!error?.message?.includes("Frame with ID")) {
+        toast.error("Erreur lors de la mise à jour du statut");
+      }
+    }
+  }, [loadAll, sessionStatus, session, router, users]);
 
   const handlePosteChange = useCallback(async (adherentId: string, posteTemplateId: string | null) => {
-    const res = await adminUpdateAdherentPoste(adherentId, posteTemplateId);
-    if (res.success) {
-      toast.success(res.message || "Poste mis à jour");
-      await loadAll();
-    } else {
-      toast.error(res.error || "Erreur lors de la mise à jour du poste");
+    // Vérifier la session avant l'action
+    if (sessionStatus !== "authenticated" || !session?.user) {
+      toast.error("Session expirée. Veuillez vous reconnecter.");
+      router.push("/auth/sign-in");
+      return;
     }
-  }, [loadAll]);
+
+    try {
+      const res = await adminUpdateAdherentPoste(adherentId, posteTemplateId);
+      if (res.success) {
+        toast.success(res.message || "Poste mis à jour");
+        await loadAll();
+      } else {
+        // Ne pas afficher d'erreur si c'est une erreur d'authentification
+        if (res.error && !res.error.includes("Non autorisé")) {
+          toast.error(res.error || "Erreur lors de la mise à jour du poste");
+        }
+      }
+    } catch (error: any) {
+      if (!error?.message?.includes("Frame with ID")) {
+        toast.error("Erreur lors de la mise à jour du poste");
+      }
+    }
+  }, [loadAll, sessionStatus, session, router]);
+
+  const handleSendEmailToUser = useCallback((userId: string) => {
+    setSelectedUserIds([userId]);
+    setIsEmailModalOpen(true);
+  }, []);
 
   // Colonnes du tableau
   const columns = useMemo(() => [
@@ -306,28 +462,6 @@ export default function AdminUsersPage() {
           {row.original.email || "—"}
         </div>
       ),
-    }),
-    columnHelper.accessor("role", {
-      header: "Rôle",
-      cell: ({ row }) => {
-        const role = row.getValue("role") as UserRole;
-        return (
-          <Badge className={getRoleColor(role)}>
-            {getRoleLabel(role)}
-          </Badge>
-        );
-      },
-    }),
-    columnHelper.accessor("status", {
-      header: "Statut",
-      cell: ({ row }) => {
-        const status = row.getValue("status") as UserStatus;
-        return (
-          <Badge className={getStatusColor(status)}>
-            {getStatusLabel(status)}
-          </Badge>
-        );
-      },
     }),
     columnHelper.display({
       id: "badges",
@@ -452,48 +586,107 @@ export default function AdminUsersPage() {
       meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
       cell: ({ row }) => {
         const user = row.original;
+        const role = user.role;
+        const status = user.status;
+        
+        // Déterminer le prochain statut pour le toggle
+        const getNextStatus = (currentStatus: UserStatus): UserStatus => {
+          return currentStatus === UserStatus.Actif ? UserStatus.Inactif : UserStatus.Actif;
+        };
+
+        // Couleurs pour les boutons
+        const getRoleButtonColor = (r: UserRole) => {
+          if (r === UserRole.Admin) return "bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-200 border-red-300 dark:border-red-700";
+          if (r === UserRole.Membre) return "bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700";
+          return "bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700";
+        };
+
+        const getStatusButtonColor = (s: UserStatus) => {
+          if (s === UserStatus.Actif) return "bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-200 border-green-300 dark:border-green-700";
+          return "bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700";
+        };
+
         return (
-          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
+          <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
             <Link href={`/admin/users/${user.id}/consultation`}>
-              <Button size="sm" variant="outline" title="Voir" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                title="Voir les détails" 
+                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/30"
+              >
                 <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
             </Link>
             <Link href={`/admin/users/${user.id}/edition`}>
-              <Button size="sm" variant="outline" title="Éditer" className="h-7 w-7 sm:h-8 sm:w-8 p-0">
+              <Button 
+                size="sm" 
+                variant="outline" 
+                title="Éditer" 
+                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/30"
+              >
                 <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
               </Button>
             </Link>
+            {/* Select Rôle compact */}
             <Select 
-              value={user.role} 
+              value={role} 
               onValueChange={(value) => handleRoleChange(user.id, value as UserRole)}
             >
-              <SelectTrigger className="w-24 sm:w-28 h-7 sm:h-8 text-xs">
-                <SelectValue />
+              <SelectTrigger 
+                className={`h-7 w-7 sm:h-8 sm:w-8 p-0 text-xs font-bold ${getRoleButtonColor(role)} border`}
+                title={`Rôle: ${getRoleLabel(role)}. Cliquer pour changer`}
+              >
+                <SelectValue>
+                  {role === UserRole.Admin ? "A" : role === UserRole.Membre ? "M" : "I"}
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value={UserRole.Admin}>Admin</SelectItem>
-                <SelectItem value={UserRole.Membre}>Membre</SelectItem>
-                <SelectItem value={UserRole.Invite}>Invité</SelectItem>
+                <SelectItem value={UserRole.Admin}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-red-600 font-bold">A</span>
+                    <span>Admin</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value={UserRole.Membre}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-blue-600 font-bold">M</span>
+                    <span>Membre</span>
+                  </div>
+                </SelectItem>
+                <SelectItem value={UserRole.Invite}>
+                  <div className="flex items-center gap-2">
+                    <span className="text-gray-600 font-bold">I</span>
+                    <span>Invité</span>
+                  </div>
+                </SelectItem>
               </SelectContent>
             </Select>
-            <Select 
-              value={user.status} 
-              onValueChange={(value) => handleStatusChange(user.id, value as UserStatus)}
+            {/* Bouton Statut compact */}
+            <Button
+              size="sm"
+              variant="outline"
+              title={`Statut: ${getStatusLabel(status)}. Cliquer pour changer en ${getStatusLabel(getNextStatus(status))}`}
+              onClick={() => handleStatusChange(user.id, getNextStatus(status))}
+              className={`h-7 w-7 sm:h-8 sm:w-8 p-0 text-xs font-bold ${getStatusButtonColor(status)}`}
             >
-              <SelectTrigger className="w-20 sm:w-28 h-7 sm:h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UserStatus.Actif}>Actif</SelectItem>
-                <SelectItem value={UserStatus.Inactif}>Inactif</SelectItem>
-              </SelectContent>
-            </Select>
+              {status === UserStatus.Actif ? "A" : "I"}
+            </Button>
+            {/* Bouton Envoyer un email */}
+            <Button
+              size="sm"
+              variant="outline"
+              title="Envoyer un email à cet adhérent"
+              onClick={() => handleSendEmailToUser(user.id)}
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/30"
+            >
+              <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            </Button>
           </div>
         );
       },
     }),
-  ], [handleRoleChange, handleStatusChange, handlePosteChange, postes, filteredUsers]);
+  ], [handleRoleChange, handleStatusChange, handlePosteChange, handleSendEmailToUser, postes, filteredUsers]);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
@@ -553,16 +746,18 @@ export default function AdminUsersPage() {
           </p>
         </div>
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
-          {selectedUserIds.length > 0 && (
-            <Button 
-              variant="default" 
-              className="w-full sm:w-auto flex items-center justify-center space-x-2"
-              onClick={() => setIsEmailModalOpen(true)}
-            >
-              <Mail className="h-4 w-4" />
-              <span>Envoyer un email ({selectedUserIds.length})</span>
-            </Button>
-          )}
+          <Button 
+            variant={selectedUserIds.length > 0 ? "default" : "outline"}
+            className="w-full sm:w-auto flex items-center justify-center space-x-2 bg-blue-600 hover:bg-blue-700 text-white border-blue-600"
+            onClick={() => setIsEmailModalOpen(true)}
+          >
+            <Mail className="h-4 w-4" />
+            <span>
+              {selectedUserIds.length > 0 
+                ? `Envoyer un email (${selectedUserIds.length})`
+                : "Envoyer un email"}
+            </span>
+          </Button>
           <Link href="/admin/users/gestion" className="w-full sm:w-auto">
             <Button className="w-full sm:w-auto flex items-center justify-center space-x-2">
               <Plus className="h-4 w-4" />
@@ -708,6 +903,17 @@ export default function AdminUsersPage() {
         }}
         selectedUserIds={selectedUserIds}
         selectedUsersCount={selectedUserIds.length}
+        users={users.map(u => ({
+          id: u.id,
+          name: u.name,
+          email: u.email,
+          status: u.status,
+          role: u.role,
+          adherent: u.adherent ? {
+            firstname: u.adherent.firstname,
+            lastname: u.adherent.lastname,
+          } : null,
+        }))}
       />
     </div>
   );

@@ -76,6 +76,10 @@ Application web pour la gestion de l'association AMAKI France.
 # Installer les dépendances
 npm install
 
+# Note : Le projet utilise nodemailer@7 qui peut créer des conflits de peer dependencies
+# avec next-auth. Un fichier .npmrc est configuré avec legacy-peer-deps=true pour
+# résoudre automatiquement ces conflits.
+
 # Configurer les variables d'environnement
 cp .env.example .env
 # Éditer .env avec vos configurations

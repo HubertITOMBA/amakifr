@@ -31,7 +31,7 @@ export function Hero() {
               <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
                 Bienvenue à 
                 <span className="block bg-gradient-to-r from-amber-300 via-yellow-300 to-orange-300 dark:from-amber-400/80 dark:via-yellow-400/80 dark:to-orange-400/80 text-transparent bg-clip-text">
-                  AMAKI France
+                  AMA<span className="text-red-700">K</span>I France
                 </span>
               </h1>
               
@@ -44,12 +44,12 @@ export function Hero() {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <RegisterButton mode="modal" asChild>
+              <Link href="/inscription">
                 <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-8 py-4 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1">
                   Rejoindre AMAKI
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
-              </RegisterButton>
+              </Link>
               
               <Link href="/evenements">
                 <Button 

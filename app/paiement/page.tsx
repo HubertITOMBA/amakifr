@@ -15,20 +15,25 @@ import {
   Lock,
   AlertCircle
 } from "lucide-react";
-import { createStripeCheckoutSession } from "@/actions/paiements/stripe";
+import { createPaymentSession } from "@/actions/paiements/create-payment-session";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { Navbar } from "@/components/home/Navbar";
 import { Footer } from "@/components/home/Footer";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 
 export default function PaymentPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
-  const { data: session, status } = useSession();
+  const { data: session, status, update: updateSession } = useSession();
   const [loading, setLoading] = useState(false);
+  const [customAmount, setCustomAmount] = useState<string>("");
+  const [useCustomAmount, setUseCustomAmount] = useState(false);
   const [paymentInfo, setPaymentInfo] = useState<{
     montant: number;
+    montantMax?: number;
     type: string;
     itemId?: string;
     description?: string;
@@ -48,7 +53,8 @@ export default function PaymentPage() {
     }
 
     // Charger les informations de paiement selon le type
-    if (type && id && adherentId && montant) {
+    // Pour les paiements "general", l'id n'est pas requis
+    if (type && adherentId && montant && (type === "general" || id)) {
       loadPaymentInfo();
     } else {
       toast.error("Paramètres de paiement manquants");
@@ -59,12 +65,15 @@ export default function PaymentPage() {
   const loadPaymentInfo = async () => {
     // Cette fonction chargera les détails selon le type
     // Pour l'instant, on utilise les paramètres de l'URL
+    const montantInitial = parseFloat(montant || "0");
     setPaymentInfo({
-      montant: parseFloat(montant || "0"),
+      montant: montantInitial,
+      montantMax: montantInitial, // Le montant maximum est le montant initial (reste à payer)
       type: type || "",
       itemId: id || undefined,
       description: getPaymentDescription(type || "", id || ""),
     });
+    setCustomAmount(montantInitial.toFixed(2));
   };
 
   const getPaymentDescription = (type: string, itemId: string): string => {
@@ -79,6 +88,8 @@ export default function PaymentPage() {
         return "Obligation de cotisation";
       case "adhesion":
         return "Frais d'adhésion";
+      case "general":
+        return "Paiement général - Total des cotisations du mois";
       default:
         return "Paiement";
     }
@@ -90,10 +101,26 @@ export default function PaymentPage() {
       return;
     }
 
+    // Déterminer le montant à payer (personnalisé ou prévu)
+    const montantAPayer = useCustomAmount 
+      ? parseFloat(customAmount.replace(",", "."))
+      : paymentInfo.montant;
+
+    // Valider le montant
+    if (isNaN(montantAPayer) || montantAPayer <= 0) {
+      toast.error("Le montant doit être supérieur à 0");
+      return;
+    }
+
+    if (paymentInfo.montantMax && montantAPayer > paymentInfo.montantMax) {
+      toast.error(`Le montant ne peut pas dépasser ${paymentInfo.montantMax.toFixed(2)} €`);
+      return;
+    }
+
     setLoading(true);
     try {
-      const result = await createStripeCheckoutSession({
-        montant: paymentInfo.montant,
+      const result = await createPaymentSession({
+        montant: montantAPayer,
         adherentId: adherentId,
         type: paymentInfo.type as any,
         itemId: paymentInfo.itemId,
@@ -151,14 +178,89 @@ export default function PaymentPage() {
                   {paymentInfo.type.replace("-", " ")}
                 </Badge>
               </div>
-              <div className="flex items-center justify-between mt-3">
-                <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
-                  Montant à payer
-                </span>
-                <span className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
-                  <Euro className="h-5 w-5 sm:h-6 sm:w-6" />
-                  {paymentInfo.montant.toFixed(2)}
-                </span>
+              <div className="space-y-3 mt-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm sm:text-base font-semibold text-gray-900 dark:text-white">
+                    Montant à payer
+                  </span>
+                  <span className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 flex items-center gap-1">
+                    <Euro className="h-5 w-5 sm:h-6 sm:w-6" />
+                    {useCustomAmount 
+                      ? parseFloat(customAmount.replace(",", ".") || "0").toFixed(2)
+                      : paymentInfo.montant.toFixed(2)
+                    }
+                  </span>
+                </div>
+                
+                {/* Option pour payer un montant personnalisé */}
+                <div className="space-y-2 pt-2 border-t border-blue-200 dark:border-blue-800">
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="useCustomAmount"
+                      checked={useCustomAmount}
+                      onChange={(e) => {
+                        setUseCustomAmount(e.target.checked);
+                        if (!e.target.checked) {
+                          setCustomAmount(paymentInfo.montant.toFixed(2));
+                        }
+                      }}
+                      className="h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <Label 
+                      htmlFor="useCustomAmount" 
+                      className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer"
+                    >
+                      Payer un montant personnalisé (paiement en plusieurs fois)
+                    </Label>
+                  </div>
+                  
+                  {useCustomAmount && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Label htmlFor="customAmount" className="text-xs sm:text-sm text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          Montant :
+                        </Label>
+                        <div className="flex items-center gap-1 flex-1">
+                          <Euro className="h-4 w-4 text-gray-500 dark:text-gray-400" />
+                          <Input
+                            id="customAmount"
+                            type="number"
+                            step="0.01"
+                            min="0.01"
+                            max={paymentInfo.montantMax || paymentInfo.montant}
+                            value={customAmount}
+                            onChange={(e) => {
+                              const value = e.target.value;
+                              // Permettre la saisie avec virgule ou point
+                              const normalizedValue = value.replace(",", ".");
+                              setCustomAmount(value);
+                            }}
+                            onBlur={(e) => {
+                              const value = parseFloat(e.target.value.replace(",", "."));
+                              if (isNaN(value) || value <= 0) {
+                                setCustomAmount(paymentInfo.montant.toFixed(2));
+                                toast.error("Montant invalide");
+                              } else if (paymentInfo.montantMax && value > paymentInfo.montantMax) {
+                                setCustomAmount(paymentInfo.montantMax.toFixed(2));
+                                toast.error(`Le montant maximum est ${paymentInfo.montantMax.toFixed(2)} €`);
+                              } else {
+                                setCustomAmount(value.toFixed(2));
+                              }
+                            }}
+                            placeholder={paymentInfo.montant.toFixed(2)}
+                            className="h-8 sm:h-9 text-sm"
+                          />
+                        </div>
+                      </div>
+                      {paymentInfo.montantMax && (
+                        <p className="text-xs text-gray-500 dark:text-gray-400">
+                          Montant maximum : {paymentInfo.montantMax.toFixed(2)} €
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -188,6 +290,11 @@ export default function PaymentPage() {
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0">Google Pay</Badge>
                           <Badge variant="outline" className="text-[10px] px-1.5 py-0">Apple Pay</Badge>
                         </div>
+                        {useCustomAmount && (
+                          <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
+                            Montant : {parseFloat(customAmount.replace(",", ".") || "0").toFixed(2)} €
+                          </p>
+                        )}
                       </div>
                     </div>
                     <Button 
@@ -204,7 +311,10 @@ export default function PaymentPage() {
                           <span className="hidden sm:inline">Chargement...</span>
                         </>
                       ) : (
-                        "Payer"
+                        <>
+                          <Euro className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                          Payer
+                        </>
                       )}
                     </Button>
                   </div>
@@ -278,12 +388,22 @@ export default function PaymentPage() {
 
             {/* Bouton retour */}
             <div className="pt-3 border-t">
-              <Link href="/user/profile">
-                <Button variant="outline" className="w-full h-8 sm:h-9 text-xs sm:text-sm">
-                  <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5" />
-                  Retour au profil
-                </Button>
-              </Link>
+              <Button 
+                variant="outline" 
+                className="w-full h-8 sm:h-9 text-xs sm:text-sm"
+                onClick={async () => {
+                  // Mettre à jour la session avant la navigation pour éviter les problèmes de reconnexion
+                  await updateSession();
+                  // Attendre un peu pour que la session soit propagée
+                  await new Promise(resolve => setTimeout(resolve, 200));
+                  // Naviguer vers la page avec revalidation
+                  router.push("/user/profile?section=cotisations");
+                  router.refresh();
+                }}
+              >
+                <ArrowLeft className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5" />
+                Retour à Mes cotisations
+              </Button>
             </div>
           </CardContent>
         </Card>

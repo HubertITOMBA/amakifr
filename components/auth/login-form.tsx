@@ -2,7 +2,7 @@
 
 import { useForm } from 'react-hook-form'
 import { useState, useTransition } from "react";
-import { redirect, useSearchParams, useRouter } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import * as z from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { LoginSchema } from '@/schemas';
@@ -21,6 +21,7 @@ import { CardWrapper } from "@/components/auth/card-wrapper"
 import { FormError } from '@/components/global/form-error';
 import { FormSuccess } from '@/components/global/form-success';
 import { login } from '@/actions/auth/login';
+import { useSession } from "next-auth/react";
 
 
 const LoginForm = () => {
@@ -32,6 +33,7 @@ const LoginForm = () => {
 
     const searchParams = useSearchParams();
     const router = useRouter();
+    const { update: updateSession } = useSession();
     const callbackUrl = searchParams.get('callbackUrl')
     const urlError = searchParams.get("error") === "OAuthAccountNotLinked"
     ? "E-mail déjà utilisé avec un autre fournisseur !"
@@ -56,13 +58,30 @@ const LoginForm = () => {
             setError(result.error);
             form.reset();
           } else if (result?.success) {
-            setSuccess(result.success);
             // Si twoFactor est activé, rediriger vers la page de vérification
             if (result.twoFactor) {
+              setSuccess(result.success);
               setShowTwoFactor(true);
             } else {
-              // Connexion réussie - redirection automatique
-              window.location.href = callbackUrl || "/";
+              // Connexion réussie - forcer la mise à jour de la session plusieurs fois
+              // pour s'assurer qu'elle est disponible avant la redirection
+              // Ne pas afficher le message de succès car on redirige immédiatement
+              setSuccess(undefined); // S'assurer que le message de succès est effacé
+              await updateSession();
+              await new Promise(resolve => setTimeout(resolve, 200));
+              await updateSession();
+              await new Promise(resolve => setTimeout(resolve, 200));
+              await updateSession();
+              
+              // Rafraîchir le routeur pour mettre à jour les données serveur
+              router.refresh();
+              
+              // Attendre encore un peu pour que la session soit propagée
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+              // Utiliser router.push au lieu de window.location.href pour une navigation
+              // plus fluide qui préserve l'état de la session
+              router.push(callbackUrl || "/");
             }
           }
         } catch (error) {
@@ -73,13 +92,11 @@ const LoginForm = () => {
     }
 
     if(showTwoFactor){
-      return redirect('/auth/new-verification')
+      router.push('/auth/new-verification');
+      return null;
   }
-// <div className="p-0 inset-0 w-auto bg-transparent p-4">
+  
   return (
-
-    // <div className="inset-0 w-auto bg-transparent p-4"> 
-   <div className="fixed inset-0 bg-gray-50 dark:bg-gray-950 flex items-center justify-center p-4"> 
         <CardWrapper
             labelBox= "Connexion"
             headerLabel="Content de vous revoir !"
@@ -176,7 +193,6 @@ const LoginForm = () => {
               </form>
             </Form>
           </CardWrapper>
-    </div>
   )
 }
 export default LoginForm 

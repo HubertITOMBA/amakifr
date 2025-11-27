@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { safeFindMany } from "@/lib/prisma-helpers";
 import { revalidatePath } from "next/cache";
 import { TypeDocument } from "@prisma/client";
 import { z } from "zod";
@@ -122,6 +123,28 @@ export async function uploadDocument(formData: FormData) {
     // Sauvegarder le fichier
     const bytes = await file.arrayBuffer();
     const buffer = Buffer.from(bytes);
+    
+    // Validation de sécurité : vérifier le contenu réel du fichier (magic bytes)
+    const { validateFileContent, validateFileSize } = await import('@/lib/file-validation');
+    const fileValidation = await validateFileContent(buffer, file.type, file.name);
+    
+    if (!fileValidation.valid) {
+      return {
+        success: false,
+        error: fileValidation.error || 'Le fichier est invalide ou potentiellement malveillant',
+      };
+    }
+    
+    // Validation de la taille
+    const sizeValidation = validateFileSize(file.size, maxSize, 'document');
+    
+    if (!sizeValidation.valid) {
+      return {
+        success: false,
+        error: sizeValidation.error || 'Fichier trop volumineux',
+      };
+    }
+    
     await writeFileAsync(chemin, buffer);
 
     // Construire le chemin relatif pour l'URL publique

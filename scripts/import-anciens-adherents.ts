@@ -1,11 +1,11 @@
-import { PrismaClient, TypeAdhesion, Civilities, UserRole, UserStatus, TypeNotification } from '@prisma/client';
+import { PrismaClient, TypeAdhesion, Civilities, UserRole, UserStatus, TypeNotification, TypeTelephone } from '@prisma/client';
 import bcrypt from 'bcryptjs';
 import { readFileSync } from 'fs';
 import { join } from 'path';
-import { Resend } from 'resend';
+import { getEmailProvider } from '../lib/email/providers';
+import type { EmailOptions } from '../lib/email/providers/types';
 
 const prisma = new PrismaClient();
-const resend = new Resend(process.env.RESEND_API_KEY);
 const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://amaki.fr';
 
 // Fonction pour générer un mot de passe aléatoire sécurisé
@@ -168,16 +168,17 @@ async function sendWelcomeEmail(
   `;
 
   try {
-    const { error } = await resend.emails.send({
+    const emailProvider = await getEmailProvider();
+    const result = await emailProvider.send({
       from: 'noreply@amaki.fr',
       to: email,
       subject: 'Bienvenue sur le portail AMAKI France - Vos identifiants de connexion',
       html: wrapEmailContent(content)
     });
 
-    if (error) {
-      console.error(`❌ Erreur lors de l'envoi de l'email à ${email}:`, error);
-      throw error;
+    if (!result.success) {
+      console.error(`❌ Erreur lors de l'envoi de l'email à ${email}:`, result.error);
+      throw result.error;
     }
     console.log(`✅ Email de bienvenue envoyé à ${email}`);
   } catch (error) {
@@ -236,6 +237,19 @@ async function importAnciensAdherents() {
         civility: Civilities;
         firstname: string;
         lastname: string;
+        adresse?: {
+          streetnum?: string;
+          street1?: string;
+          street2?: string;
+          codepost?: string;
+          city?: string;
+          country?: string;
+        };
+        telephone?: {
+          numero?: string;
+          type?: TypeTelephone;
+          estPrincipal?: boolean;
+        };
       };
     }> = [];
 
@@ -250,6 +264,19 @@ async function importAnciensAdherents() {
     const civilityPattern = /civility:\s*['"]([^'"]+)['"]/g;
     const firstnamePattern = /firstname:\s*['"]([^'"]+)['"]/g;
     const lastnamePattern = /lastname:\s*['"]([^'"]+)['"]/g;
+    
+    // Patterns pour l'adresse
+    const streetnumPattern = /streetnum:\s*['"]([^'"]*)['"]/g;
+    const street1Pattern = /street1:\s*['"]([^'"]*)['"]/g;
+    const street2Pattern = /street2:\s*['"]([^'"]*)['"]/g;
+    const codepostPattern = /codepost:\s*['"]([^'"]*)['"]/g;
+    const cityPattern = /city:\s*['"]([^'"]*)['"]/g;
+    const countryPattern = /country:\s*['"]([^'"]*)['"]/g;
+    
+    // Patterns pour le téléphone
+    const telephoneNumeroPattern = /numero:\s*['"]([^'"]*)['"]/g;
+    const telephoneTypePattern = /type:\s*['"]([^'"]+)['"]/g;
+    const estPrincipalPattern = /estPrincipal:\s*(true|false)/g;
 
     // Extraire toutes les valeurs
     const emails: string[] = [];
@@ -257,6 +284,15 @@ async function importAnciensAdherents() {
     const civilities: string[] = [];
     const firstnames: string[] = [];
     const lastnames: string[] = [];
+    const streetnums: string[] = [];
+    const street1s: string[] = [];
+    const street2s: string[] = [];
+    const codeposts: string[] = [];
+    const cities: string[] = [];
+    const countries: string[] = [];
+    const telephoneNumeros: string[] = [];
+    const telephoneTypes: string[] = [];
+    const estPrincipals: boolean[] = [];
 
     let match;
     while ((match = emailPattern.exec(content)) !== null) {
@@ -274,9 +310,44 @@ async function importAnciensAdherents() {
     while ((match = lastnamePattern.exec(content)) !== null) {
       lastnames.push(match[1].trim());
     }
+    
+    // Extraire les adresses
+    while ((match = streetnumPattern.exec(content)) !== null) {
+      streetnums.push(match[1].trim());
+    }
+    while ((match = street1Pattern.exec(content)) !== null) {
+      street1s.push(match[1].trim());
+    }
+    while ((match = street2Pattern.exec(content)) !== null) {
+      street2s.push(match[1].trim());
+    }
+    while ((match = codepostPattern.exec(content)) !== null) {
+      codeposts.push(match[1].trim());
+    }
+    while ((match = cityPattern.exec(content)) !== null) {
+      cities.push(match[1].trim());
+    }
+    while ((match = countryPattern.exec(content)) !== null) {
+      countries.push(match[1].trim());
+    }
+    
+    // Extraire les téléphones
+    while ((match = telephoneNumeroPattern.exec(content)) !== null) {
+      telephoneNumeros.push(match[1].trim());
+    }
+    while ((match = telephoneTypePattern.exec(content)) !== null) {
+      telephoneTypes.push(match[1].trim());
+    }
+    while ((match = estPrincipalPattern.exec(content)) !== null) {
+      estPrincipals.push(match[1] === 'true');
+    }
 
     // Vérifier que tous les tableaux ont la même longueur
-    const maxLength = Math.max(emails.length, names.length, civilities.length, firstnames.length, lastnames.length);
+    const maxLength = Math.max(
+      emails.length, names.length, civilities.length, firstnames.length, lastnames.length,
+      streetnums.length, street1s.length, street2s.length, codeposts.length, cities.length, countries.length,
+      telephoneNumeros.length, telephoneTypes.length, estPrincipals.length
+    );
     
     if (emails.length !== maxLength || names.length !== maxLength || civilities.length !== maxLength || 
         firstnames.length !== maxLength || lastnames.length !== maxLength) {
@@ -291,6 +362,12 @@ async function importAnciensAdherents() {
           ? civility 
           : 'Monsieur';
 
+        // Parser le type de téléphone
+        const telType = telephoneTypes[i] || 'Mobile';
+        const validTelType = ['Mobile', 'Fixe', 'Professionnel'].includes(telType)
+          ? (telType as TypeTelephone)
+          : TypeTelephone.Mobile;
+
         usersData.push({
           email: emails[i],
           name: names[i],
@@ -300,6 +377,19 @@ async function importAnciensAdherents() {
             civility: validCivility as Civilities,
             firstname: firstnames[i],
             lastname: lastnames[i],
+            adresse: {
+              streetnum: streetnums[i] || undefined,
+              street1: street1s[i] || undefined,
+              street2: street2s[i] || undefined,
+              codepost: codeposts[i] || undefined,
+              city: cities[i] || undefined,
+              country: countries[i] || 'France',
+            },
+            telephone: {
+              numero: telephoneNumeros[i] || undefined,
+              type: validTelType,
+              estPrincipal: estPrincipals[i] !== undefined ? estPrincipals[i] : true,
+            },
           },
         });
       }
@@ -366,8 +456,9 @@ async function importAnciensAdherents() {
           userId = existingUser.id;
 
           // Mettre à jour ou créer l'adhérent
+          let adherentId: string;
           if (existingUser.adherent) {
-            await prisma.adherent.update({
+            const updatedAdherent = await prisma.adherent.update({
               where: { id: existingUser.adherent.id },
               data: {
                 civility: userData.adherent.civility,
@@ -378,9 +469,10 @@ async function importAnciensAdherents() {
                 posteTemplateId: posteMembre.id,
               },
             });
+            adherentId = updatedAdherent.id;
             console.log(`   ✅ Adhérent mis à jour`);
           } else {
-            await prisma.adherent.create({
+            const newAdherent = await prisma.adherent.create({
               data: {
                 userId: existingUser.id,
                 civility: userData.adherent.civility,
@@ -391,7 +483,90 @@ async function importAnciensAdherents() {
                 posteTemplateId: posteMembre.id,
               },
             });
+            adherentId = newAdherent.id;
             console.log(`   ✅ Adhérent créé`);
+          }
+
+          // Gérer l'adresse (upsert)
+          if (userData.adherent.adresse) {
+            const existingAdresse = await prisma.adresse.findFirst({
+              where: { adherentId },
+            });
+
+            if (existingAdresse) {
+              await prisma.adresse.update({
+                where: { id: existingAdresse.id },
+                data: {
+                  streetnum: userData.adherent.adresse.streetnum || null,
+                  street1: userData.adherent.adresse.street1 || null,
+                  street2: userData.adherent.adresse.street2 || null,
+                  codepost: userData.adherent.adresse.codepost || null,
+                  city: userData.adherent.adresse.city || null,
+                  country: userData.adherent.adresse.country || null,
+                },
+              });
+              console.log(`   ✅ Adresse mise à jour`);
+            } else {
+              await prisma.adresse.create({
+                data: {
+                  adherentId,
+                  streetnum: userData.adherent.adresse.streetnum || null,
+                  street1: userData.adherent.adresse.street1 || null,
+                  street2: userData.adherent.adresse.street2 || null,
+                  codepost: userData.adherent.adresse.codepost || null,
+                  city: userData.adherent.adresse.city || null,
+                  country: userData.adherent.adresse.country || null,
+                },
+              });
+              console.log(`   ✅ Adresse créée`);
+            }
+          }
+
+          // Gérer le téléphone principal (upsert)
+          if (userData.adherent.telephone && userData.adherent.telephone.numero) {
+            // D'abord, désactiver tous les autres téléphones principaux si celui-ci est principal
+            if (userData.adherent.telephone.estPrincipal) {
+              await prisma.telephone.updateMany({
+                where: { 
+                  adherentId,
+                  estPrincipal: true,
+                },
+                data: { estPrincipal: false },
+              });
+            }
+
+            // Chercher un téléphone existant avec le même numéro
+            const existingTelephone = await prisma.telephone.findFirst({
+              where: { 
+                adherentId,
+                numero: userData.adherent.telephone.numero,
+              },
+            });
+
+            if (existingTelephone) {
+              await prisma.telephone.update({
+                where: { id: existingTelephone.id },
+                data: {
+                  type: userData.adherent.telephone.type || TypeTelephone.Mobile,
+                  estPrincipal: userData.adherent.telephone.estPrincipal !== undefined 
+                    ? userData.adherent.telephone.estPrincipal 
+                    : true,
+                },
+              });
+              console.log(`   ✅ Téléphone mis à jour`);
+            } else {
+              await prisma.telephone.create({
+                data: {
+                  adherentId,
+                  numero: userData.adherent.telephone.numero,
+                  type: userData.adherent.telephone.type || TypeTelephone.Mobile,
+                  estPrincipal: userData.adherent.telephone.estPrincipal !== undefined 
+                    ? userData.adherent.telephone.estPrincipal 
+                    : true,
+                },
+              });
+              console.log(`   ✅ Téléphone créé`);
+            }
           }
 
           updated++;
@@ -418,16 +593,52 @@ async function importAnciensAdherents() {
                 },
               },
             },
+            include: {
+              adherent: true,
+            },
           });
 
           userId = newUser.id;
+          const adherentId = newUser.adherent!.id;
           isNewUser = true;
           created++;
           console.log(`   ✅ Utilisateur et adhérent créés`);
+
+          // Créer l'adresse si fournie
+          if (userData.adherent.adresse) {
+            await prisma.adresse.create({
+              data: {
+                adherentId,
+                streetnum: userData.adherent.adresse.streetnum || null,
+                street1: userData.adherent.adresse.street1 || null,
+                street2: userData.adherent.adresse.street2 || null,
+                codepost: userData.adherent.adresse.codepost || null,
+                city: userData.adherent.adresse.city || null,
+                country: userData.adherent.adresse.country || null,
+              },
+            });
+            console.log(`   ✅ Adresse créée`);
+          }
+
+          // Créer le téléphone si fourni
+          if (userData.adherent.telephone && userData.adherent.telephone.numero) {
+            await prisma.telephone.create({
+              data: {
+                adherentId,
+                numero: userData.adherent.telephone.numero,
+                type: userData.adherent.telephone.type || TypeTelephone.Mobile,
+                estPrincipal: userData.adherent.telephone.estPrincipal !== undefined 
+                  ? userData.adherent.telephone.estPrincipal 
+                  : true,
+              },
+            });
+            console.log(`   ✅ Téléphone créé`);
+          }
         }
 
-        // Envoyer l'email de bienvenue (seulement pour les nouveaux utilisateurs ou si demandé)
-        if (isNewUser || process.env.FORCE_SEND_EMAIL === 'true') {
+        // Envoyer l'email de bienvenue UNIQUEMENT pour les nouveaux utilisateurs
+        // Ne pas envoyer lors de la modification d'un utilisateur existant
+        if (isNewUser) {
           try {
             await sendWelcomeEmail(
               userData.email,
@@ -440,7 +651,7 @@ async function importAnciensAdherents() {
             console.error(`   ⚠️  Erreur lors de l'envoi de l'email (continuation...)`);
           }
         } else {
-          console.log(`   ℹ️  Email non envoyé (utilisateur existant, utilisez FORCE_SEND_EMAIL=true pour forcer)`);
+          console.log(`   ℹ️  Email non envoyé (utilisateur existant - modification uniquement)`);
         }
 
         // Créer une notification
