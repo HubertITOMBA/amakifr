@@ -12,6 +12,9 @@ export const {
 	signOut,
 } = NextAuth({
 	trustHost: true, // Permettre l'accès depuis différentes URLs en développement
+	// Utiliser AUTH_URL si disponible, sinon NEXT_PUBLIC_APP_URL
+	// Cela garantit que les URLs de callback OAuth sont correctes
+	...(process.env.AUTH_URL && { baseUrl: process.env.AUTH_URL }),
 	pages: {
 		signIn: "/auth/sign-in",
 		error: "/auth/error",
@@ -116,6 +119,7 @@ export const {
 		maxAge: 30 * 60,
 	},
 	// Configuration des cookies pour permettre l'accès depuis localhost et l'adresse réseau
+	// NextAuth.js gère automatiquement les cookies PKCE, donc on ne les configure pas manuellement
 	cookies: {
 		sessionToken: {
 			name: process.env.NODE_ENV === 'production' 

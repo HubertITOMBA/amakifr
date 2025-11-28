@@ -22,3 +22,22 @@ export function normalizeString(str: string): string {
     .replace(/[\u0300-\u036f]/g, "") // Supprime les diacritiques
     .toLowerCase();
 }
+
+/**
+ * Nettoie une URL en supprimant les guillemets, points-virgules et espaces
+ * Utile pour nettoyer les variables d'environnement qui pourraient contenir des caractères indésirables
+ * 
+ * @param url - L'URL à nettoyer
+ * @returns L'URL nettoyée ou undefined si l'URL est vide
+ * 
+ * @example
+ * cleanUrl('"https://www.amaki.fr";') // "https://www.amaki.fr"
+ * cleanUrl('  https://amaki.fr  ') // "https://amaki.fr"
+ */
+export function cleanUrl(url: string | undefined | null): string | undefined {
+  if (!url || url === '') return undefined;
+  return url.trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/;+$/, '')
+    .trim();
+}

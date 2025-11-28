@@ -15,11 +15,19 @@ export default auth((req: NextRequest) => {
     const isApiAuthRoute = nextUrl.pathname.startsWith(apiAuthPrefix);
     
     // Ne pas interférer avec les routes API d'authentification
-    // Laisser NextAuth gérer ces routes directement
+    // Laisser NextAuth gérer ces routes directement (y compris les cookies PKCE)
+    // IMPORTANT: Ne jamais modifier les cookies sur ces routes car cela peut corrompre le flux OAuth
     if (isApiAuthRoute) {
         const response = NextResponse.next();
         return addSecurityHeaders(response, req);
     }
+    
+    // Ne pas supprimer les cookies sur les routes d'authentification (y compris pendant le flux OAuth)
+    // Cela inclut les routes /auth/* qui sont utilisées pour les callbacks OAuth
+    const isAuthCallbackRoute = nextUrl.pathname.startsWith('/auth/') && 
+                                (nextUrl.pathname.includes('callback') || 
+                                 nextUrl.searchParams.has('code') || 
+                                 nextUrl.searchParams.has('state'));
     
     // Vérifier les routes d'authentification AVANT de vérifier l'état de connexion
     // pour éviter les boucles de redirection
@@ -54,8 +62,9 @@ export default auth((req: NextRequest) => {
     // Si des cookies existent mais req.auth n'est pas valide, les supprimer
     // MAIS seulement si on n'est pas sur une route d'authentification (pour éviter de supprimer les cookies pendant la connexion)
     // Et seulement si on n'est pas sur une route publique (pour éviter de supprimer les cookies sur les pages publiques)
+    // Et seulement si on n'est pas sur une route de callback OAuth (pour éviter de supprimer les cookies PKCE pendant le flux OAuth)
     // Ne supprimer les cookies que si on est sûr qu'ils sont invalides (pas de req.auth du tout)
-        if (hasAuthCookies && !req.auth && !isAuthRoute && !isPublicRouteCheck) {
+        if (hasAuthCookies && !req.auth && !isAuthRoute && !isPublicRouteCheck && !isAuthCallbackRoute) {
             const response = NextResponse.next();
             response.cookies.set('next-auth.session-token', '', { expires: new Date(0), path: '/' });
             response.cookies.set('__Secure-next-auth.session-token', '', { expires: new Date(0), path: '/' });
@@ -108,8 +117,16 @@ export default auth((req: NextRequest) => {
         
         if (hasValidSession) {
             // L'utilisateur est vraiment connecté, rediriger vers la page d'accueil
-            const response = Response.redirect(new URL(DEFAULT_LOGIN_REDIRECT, nextUrl));
-            return addSecurityHeaders(response as NextResponse, req);
+            try {
+                const redirectUrl = new URL(DEFAULT_LOGIN_REDIRECT, nextUrl);
+                const response = Response.redirect(redirectUrl);
+                return addSecurityHeaders(response as NextResponse, req);
+            } catch (error) {
+                console.error('[Middleware] Erreur lors de la redirection:', error);
+                // En cas d'erreur, laisser passer pour éviter une boucle
+                const response = NextResponse.next();
+                return addSecurityHeaders(response, req);
+            }
         }
         
         // Sinon, laisser passer pour permettre l'accès à la page de connexion
@@ -124,21 +141,39 @@ export default auth((req: NextRequest) => {
         const userRole = req.auth?.user?.role;
         if (userRole !== 'Admin') {
             // L'utilisateur est connecté mais n'est pas admin, rediriger vers la page d'accueil
-            const response = Response.redirect(new URL('/', nextUrl));
-            return addSecurityHeaders(response as NextResponse, req);
+            try {
+                const redirectUrl = new URL('/', nextUrl);
+                const response = Response.redirect(redirectUrl);
+                return addSecurityHeaders(response as NextResponse, req);
+            } catch (error) {
+                console.error('[Middleware] Erreur lors de la redirection admin:', error);
+                // En cas d'erreur, laisser passer pour éviter une boucle
+                const response = NextResponse.next();
+                return addSecurityHeaders(response, req);
+            }
         }
     }
 
     if (!isLoggedIn && !isPublicRouteCheck) {
-        let callbackUrl = nextUrl.pathname;
-        if (nextUrl.search) {
-            callbackUrl += nextUrl.search;
-        }
+        try {
+            let callbackUrl = nextUrl.pathname;
+            if (nextUrl.search) {
+                callbackUrl += nextUrl.search;
+            }
 
-        const encodedCallbackUrl = encodeURIComponent(callbackUrl);
-        const response = Response.redirect(new URL(
-            `/auth/sign-in?callbackUrl=${encodedCallbackUrl}`, nextUrl));
-        return addSecurityHeaders(response as NextResponse, req);
+            const encodedCallbackUrl = encodeURIComponent(callbackUrl);
+            const redirectUrl = new URL(
+                `/auth/sign-in?callbackUrl=${encodedCallbackUrl}`, 
+                nextUrl
+            );
+            const response = Response.redirect(redirectUrl);
+            return addSecurityHeaders(response as NextResponse, req);
+        } catch (error) {
+            console.error('[Middleware] Erreur lors de la redirection vers sign-in:', error);
+            // En cas d'erreur, laisser passer pour éviter une boucle
+            const response = NextResponse.next();
+            return addSecurityHeaders(response, req);
+        }
     }
 
     const response = NextResponse.next();

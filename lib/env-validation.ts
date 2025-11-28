@@ -4,12 +4,14 @@
  */
 
 import { z } from 'zod';
+import { cleanUrl } from './utils';
 
 // Fonction helper pour transformer les chaînes vides en undefined
 const emptyStringToUndefined = z.preprocess(
   (val) => (val === '' ? undefined : val),
   z.string().optional()
 );
+
 
 // Fonction helper pour valider une URL optionnelle
 // Si la valeur est vide ou undefined, retourner undefined
@@ -19,7 +21,7 @@ const optionalUrl = z.preprocess(
     if (val === '' || val === undefined || val === null) {
       return undefined;
     }
-    return val;
+    return cleanUrl(val);
   },
   z.union([
     z.string().url(),
@@ -66,7 +68,13 @@ const baseEnvSchema = z.object({
   SENDGRID_FROM: z.string().optional(),
   
   // Application
-  NEXT_PUBLIC_APP_URL: z.string().url('NEXT_PUBLIC_APP_URL doit être une URL valide'),
+  NEXT_PUBLIC_APP_URL: z.preprocess(
+    (val) => {
+      if (!val || val === '') return val;
+      return cleanUrl(val);
+    },
+    z.string().url('NEXT_PUBLIC_APP_URL doit être une URL valide')
+  ),
   NEXT_PUBLIC_APP_NAME: z.string().min(1).optional(),
   NEXT_PUBLIC_APP_DESCRIPTION: z.string().optional(),
   // NEXT_PUBLIC_SERVER_URL est vraiment optionnel
@@ -117,11 +125,19 @@ export type Env = z.infer<typeof baseEnvSchema>;
  */
 function validateEnv(): Env {
   // Préprocesser les valeurs pour convertir les chaînes vides en undefined
+  // et nettoyer les URLs qui pourraient contenir des guillemets ou points-virgules
   const processedEnv = Object.fromEntries(
-    Object.entries(process.env).map(([key, value]) => [
-      key,
-      value === '' ? undefined : value,
-    ])
+    Object.entries(process.env).map(([key, value]) => {
+      if (value === '') {
+        return [key, undefined];
+      }
+      // Nettoyer spécifiquement les variables d'URL
+      if (key === 'NEXT_PUBLIC_APP_URL' || key === 'AUTH_URL' || key === 'NEXT_PUBLIC_SERVER_URL') {
+        const cleaned = cleanUrl(value);
+        return [key, cleaned || value];
+      }
+      return [key, value];
+    })
   );
   
   const isDevelopment = process.env.NODE_ENV === 'development';

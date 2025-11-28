@@ -3,9 +3,10 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Camera, Upload, X, Loader2 } from "lucide-react";
+import { Camera, Upload, X, Loader2, Image as ImageIcon } from "lucide-react";
 import { toast } from "sonner";
 import { uploadFile } from "@/actions/user";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 
 interface PhotoUploadProps {
   currentImage?: string;
@@ -26,7 +27,9 @@ export function PhotoUpload({
 }: PhotoUploadProps) {
   const [preview, setPreview] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [popoverOpen, setPopoverOpen] = useState(false);
+  const cameraInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const sizeClasses = {
     sm: "h-16 w-16",
@@ -40,8 +43,7 @@ export function PhotoUpload({
     lg: "h-5 w-5"
   };
 
-  const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+  const handleFileSelect = async (file: File | null, inputRef: React.RefObject<HTMLInputElement>) => {
     if (!file) return;
 
     // Validation du fichier
@@ -55,6 +57,9 @@ export function PhotoUpload({
       toast.error(`L'image ne doit pas dépasser ${maxSize}MB`);
       return;
     }
+
+    // Fermer le popover
+    setPopoverOpen(false);
 
     // Créer un aperçu local
     const reader = new FileReader();
@@ -90,17 +95,30 @@ export function PhotoUpload({
     } finally {
       setUploading(false);
       // Réinitialiser l'input pour permettre de sélectionner le même fichier
-      if (fileInputRef.current) {
-        fileInputRef.current.value = "";
+      if (inputRef.current) {
+        inputRef.current.value = "";
       }
     }
+  };
+
+  const handleCameraInput = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    await handleFileSelect(file, cameraInputRef);
+  };
+
+  const handleGalleryInput = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    await handleFileSelect(file, galleryInputRef);
   };
 
   const handleRemoveImage = () => {
     setPreview(null);
     onImageChange("");
-    if (fileInputRef.current) {
-      fileInputRef.current.value = "";
+    if (cameraInputRef.current) {
+      cameraInputRef.current.value = "";
+    }
+    if (galleryInputRef.current) {
+      galleryInputRef.current.value = "";
     }
   };
 
@@ -118,19 +136,52 @@ export function PhotoUpload({
       
       {!disabled && (
         <>
-          <button
-            onClick={() => fileInputRef.current?.click()}
-            disabled={uploading}
-            className="absolute bottom-2 right-2 bg-white text-gray-800 rounded-full p-2 hover:bg-gray-100 transition-colors disabled:opacity-50 shadow-lg"
-            title="Changer la photo (caméra ou galerie)"
-            type="button"
-          >
-            {uploading ? (
-              <Loader2 className={`${iconSizes[size]} animate-spin`} />
-            ) : (
-              <Camera className={iconSizes[size]} />
-            )}
-          </button>
+          <Popover open={popoverOpen} onOpenChange={setPopoverOpen}>
+            <PopoverTrigger asChild>
+              <button
+                disabled={uploading}
+                className="absolute bottom-2 right-2 bg-white text-gray-800 rounded-full p-2 hover:bg-gray-100 transition-colors disabled:opacity-50 shadow-lg"
+                title="Changer la photo"
+                type="button"
+              >
+                {uploading ? (
+                  <Loader2 className={`${iconSizes[size]} animate-spin`} />
+                ) : (
+                  <Camera className={iconSizes[size]} />
+                )}
+              </button>
+            </PopoverTrigger>
+            <PopoverContent 
+              className="w-56 p-2"
+              align="end"
+              side="top"
+            >
+              <div className="space-y-1">
+                <button
+                  onClick={() => {
+                    cameraInputRef.current?.click();
+                  }}
+                  disabled={uploading}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  type="button"
+                >
+                  <Camera className="h-4 w-4 text-blue-600" />
+                  <span>Prendre une photo</span>
+                </button>
+                <button
+                  onClick={() => {
+                    galleryInputRef.current?.click();
+                  }}
+                  disabled={uploading}
+                  className="w-full flex items-center gap-3 px-3 py-2 text-sm rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  type="button"
+                >
+                  <ImageIcon className="h-4 w-4 text-green-600" />
+                  <span>Choisir depuis la galerie</span>
+                </button>
+              </div>
+            </PopoverContent>
+          </Popover>
           
           {displayImage && (
             <button
@@ -146,15 +197,27 @@ export function PhotoUpload({
         </>
       )}
 
+      {/* Input pour la caméra */}
       <input
-        ref={fileInputRef}
+        ref={cameraInputRef}
         type="file"
         accept="image/*"
         capture="environment"
-        onChange={handleFileSelect}
+        onChange={handleCameraInput}
         className="hidden"
         disabled={uploading}
-        title={`Format: JPG, PNG, GIF, WEBP • Taille max: ${maxSize}MB • Sur mobile: permet d'utiliser la caméra`}
+        title="Prendre une photo avec la caméra"
+      />
+
+      {/* Input pour la galerie */}
+      <input
+        ref={galleryInputRef}
+        type="file"
+        accept="image/*"
+        onChange={handleGalleryInput}
+        className="hidden"
+        disabled={uploading}
+        title="Choisir une photo depuis la galerie"
       />
     </div>
   );

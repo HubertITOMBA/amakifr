@@ -1,5 +1,17 @@
 import type { NextConfig } from "next";
 
+/**
+ * Nettoie une URL en supprimant les guillemets, points-virgules et espaces
+ * (Copie locale pour éviter les dépendances circulaires)
+ */
+function cleanUrl(url: string | undefined | null): string | undefined {
+  if (!url || url === '') return undefined;
+  return url.trim()
+    .replace(/^["']|["']$/g, '')
+    .replace(/;+$/, '')
+    .trim();
+}
+
 // Configuration PWA
 const withPWA = require('next-pwa')({
   dest: 'public',
@@ -120,7 +132,7 @@ const nextConfig: NextConfig = {
       bodySizeLimit: '5gb',
       // Améliorer la stabilité des Server Actions en production
       allowedOrigins: process.env.NODE_ENV === 'production' 
-        ? [process.env.NEXT_PUBLIC_APP_URL || 'https://amaki.fr'].filter(Boolean)
+        ? [cleanUrl(process.env.NEXT_PUBLIC_APP_URL) || 'https://amaki.fr'].filter(Boolean)
         : undefined,
     },
   },

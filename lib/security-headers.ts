@@ -47,6 +47,17 @@ export function addSecurityHeaders(
   response: NextResponse,
   request?: NextRequest | null
 ): NextResponse {
+  // Vérifier si la réponse a déjà été envoyée (headers immutables)
+  // Si les headers sont déjà verrouillés, retourner la réponse telle quelle
+  try {
+    // Tester si on peut lire les headers (si la réponse est déjà envoyée, cela échouera)
+    response.headers.get('content-type');
+  } catch (error) {
+    // Si on ne peut pas accéder aux headers, la réponse est déjà envoyée
+    // Retourner la réponse telle quelle sans modification
+    return response;
+  }
+  
   // Créer un nouvel objet Headers à partir des headers existants
   const headers = new Headers(response.headers);
   
@@ -109,13 +120,20 @@ export function addSecurityHeaders(
   // Créer une nouvelle réponse avec les headers modifiés
   // Pour NextResponse.next(), le body peut être null, donc on utilise response.body ?? null
   // Pour les redirections, on préserve le body s'il existe
-  const newResponse = new NextResponse(response.body ?? null, {
-    status: response.status,
-    statusText: response.statusText,
-    headers: headers,
-  });
-  
-  return newResponse;
+  try {
+    const newResponse = new NextResponse(response.body ?? null, {
+      status: response.status,
+      statusText: response.statusText,
+      headers: headers,
+    });
+    
+    return newResponse;
+  } catch (error) {
+    // Si une erreur se produit lors de la création de la réponse
+    // (par exemple, si les headers sont déjà envoyés), retourner la réponse originale
+    console.error('Erreur lors de l\'ajout des headers de sécurité:', error);
+    return response;
+  }
 }
 
 /**
