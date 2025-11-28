@@ -21,7 +21,8 @@ export const {
 	},
 	events: {
 		async linkAccount({ user }) {
-			await db.user.update({
+			// Mettre à jour l'utilisateur pour marquer l'email comme vérifié
+			const updatedUser = await db.user.update({
 				where: {
 					id: user.id,
 				},
@@ -30,15 +31,35 @@ export const {
 				},
 			});
 
-			await db.adherent.create({
-				data: {
-					User: {
-						connect: {
-							id: user.id,
-						},
-					},
+			// Vérifier si l'utilisateur a déjà un adhérent
+			const existingAdherent = await db.adherent.findUnique({
+				where: {
+					userId: user.id,
 				},
 			});
+
+			// Si l'adhérent n'existe pas, le créer
+			if (!existingAdherent) {
+				// Extraire le prénom et nom depuis le champ name de l'utilisateur
+				// Si name n'est pas disponible, utiliser l'email comme fallback
+				const fullName = updatedUser.name || updatedUser.email || 'Utilisateur';
+				const firstname = fullName.split(' ')[0] || fullName;
+				const lastname = fullName.split(' ').slice(1).join(' ') || fullName;
+
+				// Créer l'adhérent avec les champs requis
+				try {
+					await db.adherent.create({
+						data: {
+							userId: user.id,
+							firstname: firstname,
+							lastname: lastname,
+						},
+					});
+				} catch (error) {
+					console.error("[auth] Erreur lors de la création de l'adhérent:", error);
+					// Ne pas bloquer le processus d'authentification si la création échoue
+				}
+			}
 		},
 		async signIn({ user }) {
 			await db.user.update({
