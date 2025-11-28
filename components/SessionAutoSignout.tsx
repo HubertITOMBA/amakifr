@@ -5,6 +5,17 @@ import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
 
+/**
+ * Composant de déconnexion automatique pour inactivité
+ * 
+ * Fonctionnalités :
+ * - Déconnexion automatique après une période d'inactivité (15 minutes par défaut)
+ * - Avertissement 1 minute avant la déconnexion
+ * - Détection d'activité : clics, touches, mouvements de souris, scroll, focus
+ * - Configuration via variables d'environnement :
+ *   - NEXT_PUBLIC_SESSION_INACTIVITY_MS : Temps d'inactivité en millisecondes (défaut: 900000 = 15 min)
+ *   - NEXT_PUBLIC_SESSION_SIGNOUT_DELAY_MS : Délai avant déconnexion lors de fermeture d'onglet (défaut: 1000 = 1 sec)
+ */
 export default function SessionAutoSignout() {
   const router = useRouter();
   const [warningShown, setWarningShown] = useState(false);
@@ -13,11 +24,13 @@ export default function SessionAutoSignout() {
   useEffect(() => {
     const SIGNOUT_URL = "/api/auth/signout-quick";
 
-    const DEFAULT_DELAY_MS = 1000; // couverture fermetures rapides
-    const DEFAULT_INACTIVITY_MS = 15 * 60 * 1000; // 15 minutes
-    const WARNING_TIME_MS = 1 * 60 * 1000; // 1 minute avant la déconnexion
+    // Configuration par défaut
+    const DEFAULT_DELAY_MS = 1000; // Délai avant déconnexion lors de fermeture d'onglet (1 seconde)
+    const DEFAULT_INACTIVITY_MS = 15 * 60 * 1000; // Temps d'inactivité avant déconnexion (15 minutes)
+    const WARNING_TIME_MS = 1 * 60 * 1000; // Avertissement 1 minute avant la déconnexion
     const ACTIVITY_DEBOUNCE_MS = 500; // Debounce de 500ms pour éviter trop de réinitialisations tout en restant réactif
 
+    // Récupérer les valeurs depuis les variables d'environnement (si définies)
     const envDelay = Number(process.env.NEXT_PUBLIC_SESSION_SIGNOUT_DELAY_MS);
     const envInactivity = Number(process.env.NEXT_PUBLIC_SESSION_INACTIVITY_MS);
 

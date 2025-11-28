@@ -62,6 +62,12 @@ Application web pour la gestion de l'association AMAKI France.
 - Cotisations
 - Dépenses
 
+### Sécurité et sessions
+- **Déconnexion automatique pour inactivité** : 15 minutes par défaut (configurable)
+- **Durée de vie de la session** : 30 minutes
+- **Avertissement avant déconnexion** : 1 minute avant expiration
+- **Détection d'activité** : clics, touches, mouvements de souris, scroll
+
 ## Technologies utilisées
 
 - **Framework** : Next.js 14+ (App Router)
@@ -83,6 +89,10 @@ npm install
 # Configurer les variables d'environnement
 cp .env.example .env
 # Éditer .env avec vos configurations
+
+# Variables importantes pour la sécurité des sessions :
+# - NEXT_PUBLIC_SESSION_INACTIVITY_MS : Temps d'inactivité avant déconnexion (défaut: 15 minutes)
+# - NEXT_PUBLIC_SESSION_SIGNOUT_DELAY_MS : Délai avant déconnexion lors de fermeture d'onglet (défaut: 1 seconde)
 
 # Initialiser la base de données
 npx prisma migrate dev

@@ -312,14 +312,11 @@ export function Footer() {
               viewport={{ once: true }}
               className="flex flex-wrap justify-center md:justify-end gap-6"
             >
-              <Link href="/privacy" className="text-gray-400 hover:text-white text-sm transition-colors duration-300 hover:underline">
+              <Link href="/confidentialite" className="text-gray-400 hover:text-white text-sm transition-colors duration-300 hover:underline">
                 Politique de Confidentialité
               </Link>
-              <Link href="/terms" className="text-gray-400 hover:text-white text-sm transition-colors duration-300 hover:underline">
-                Conditions d'Utilisation
-              </Link>
-              <Link href="/cookies" className="text-gray-400 hover:text-white text-sm transition-colors duration-300 hover:underline">
-                Cookies
+              <Link href="/suppression-donnees" className="text-gray-400 hover:text-white text-sm transition-colors duration-300 hover:underline">
+                Suppression des Données
               </Link>
             </motion.div>
           </div>
