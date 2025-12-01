@@ -249,7 +249,7 @@ async function resetPasswordsExceptSimon() {
 
         console.log(`   ✅ Mot de passe réinitialisé`);
 
-        // Envoyer l'email de bienvenue
+        // Envoyer l'email de bienvenue avec délai de 20 secondes pour éviter le rate limit
         try {
           await sendWelcomeEmail(
             user.email || '',
@@ -259,9 +259,22 @@ async function resetPasswordsExceptSimon() {
             user.adherent.lastname || ''
           );
           emailSuccessCount++;
+          console.log(`   ✅ Email envoyé avec succès`);
+          
+          // Attendre 20 secondes avant d'envoyer le prochain email (sauf pour le dernier)
+          if (users.indexOf(user) < users.length - 1) {
+            console.log(`   ⏳ Attente de 20 secondes avant l'envoi du prochain email...`);
+            await new Promise(resolve => setTimeout(resolve, 20000));
+          }
         } catch (emailError: any) {
           emailErrorCount++;
           console.error(`   ⚠️  Erreur lors de l'envoi de l'email (continuation...):`, emailError.message);
+          
+          // Attendre quand même 20 secondes même en cas d'erreur pour éviter le rate limit
+          if (users.indexOf(user) < users.length - 1) {
+            console.log(`   ⏳ Attente de 20 secondes avant de continuer...`);
+            await new Promise(resolve => setTimeout(resolve, 20000));
+          }
         }
 
         successCount++;
@@ -291,18 +304,161 @@ async function resetPasswordsExceptSimon() {
   }
 }
 
-// Exécuter le script
-if (require.main === module) {
-  resetPasswordsExceptSimon()
-    .then(() => {
-      console.log('🎉 Réinitialisation terminée avec succès !');
-      process.exit(0);
-    })
-    .catch((error) => {
-      console.error('💥 Erreur fatale:', error);
-      process.exit(1);
-    });
+/**
+ * Fonction pour réinitialiser les mots de passe et envoyer les emails
+ * aux utilisateurs spécifiques qui n'ont pas reçu leur email
+ */
+async function resetPasswordsForSpecificUsers() {
+  console.log('🚀 Démarrage de la réinitialisation des mots de passe pour les utilisateurs spécifiques...\n');
+
+  // Liste des emails des utilisateurs qui n'ont pas reçu leur email
+  const targetEmails = [
+    'francoisenzumba43@gmail.com',
+    'darlettenkula@yahoo.com',
+    'alexisnsokimondengele@gmail.com',
+    'seraphinkisadibeba@gmail.com',
+    'maya.thethe@gmail.com',
+    'malela@free.fr',
+    'mariemuilu243@gmail.com'
+  ];
+
+  try {
+    let successCount = 0;
+    let errorCount = 0;
+    let emailSuccessCount = 0;
+    let emailErrorCount = 0;
+
+    // Traiter chaque utilisateur
+    for (let i = 0; i < targetEmails.length; i++) {
+      const email = targetEmails[i];
+      
+      try {
+        console.log(`\n📧 Traitement de ${email} (${i + 1}/${targetEmails.length})...`);
+
+        // Récupérer l'utilisateur par email
+        const user = await prisma.user.findUnique({
+          where: { email },
+          include: {
+            adherent: true,
+          },
+        });
+
+        if (!user) {
+          console.log(`   ⚠️  Utilisateur non trouvé pour l'email ${email}`);
+          errorCount++;
+          continue;
+        }
+
+        if (!user.adherent) {
+          console.log(`   ⚠️  Utilisateur sans adhérent pour l'email ${email}`);
+          errorCount++;
+          continue;
+        }
+
+        // Générer un nouveau mot de passe
+        const plainPassword = generatePassword(12);
+        const hashedPassword = await bcrypt.hash(plainPassword, 10);
+
+        // Mettre à jour le mot de passe dans la base de données
+        await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            password: hashedPassword,
+            emailVerified: new Date(),
+          },
+        });
+
+        console.log(`   ✅ Mot de passe réinitialisé`);
+
+        // Envoyer l'email de bienvenue avec délai de 20 secondes
+        try {
+          await sendWelcomeEmail(
+            user.email || '',
+            user.name || '',
+            plainPassword,
+            user.adherent.firstname || '',
+            user.adherent.lastname || ''
+          );
+          emailSuccessCount++;
+          console.log(`   ✅ Email envoyé avec succès`);
+          
+          // Attendre 20 secondes avant d'envoyer le prochain email (sauf pour le dernier)
+          if (i < targetEmails.length - 1) {
+            console.log(`   ⏳ Attente de 20 secondes avant l'envoi du prochain email...`);
+            await new Promise(resolve => setTimeout(resolve, 20000));
+          }
+        } catch (emailError: any) {
+          emailErrorCount++;
+          console.error(`   ⚠️  Erreur lors de l'envoi de l'email:`, emailError.message);
+          
+          // Attendre quand même 20 secondes même en cas d'erreur pour éviter le rate limit
+          if (i < targetEmails.length - 1) {
+            console.log(`   ⏳ Attente de 20 secondes avant de continuer...`);
+            await new Promise(resolve => setTimeout(resolve, 20000));
+          }
+        }
+
+        successCount++;
+        console.log(`   ✅ ${email} traité avec succès`);
+      } catch (error: any) {
+        errorCount++;
+        console.error(`   ❌ Erreur lors du traitement de ${email}:`, error.message);
+        
+        // Attendre 20 secondes même en cas d'erreur pour éviter le rate limit
+        if (i < targetEmails.length - 1) {
+          console.log(`   ⏳ Attente de 20 secondes avant de continuer...`);
+          await new Promise(resolve => setTimeout(resolve, 20000));
+        }
+      }
+    }
+
+    // Résumé
+    console.log('\n' + '='.repeat(60));
+    console.log('📊 RÉSUMÉ DE LA RÉINITIALISATION');
+    console.log('='.repeat(60));
+    console.log(`✅ Mots de passe réinitialisés : ${successCount}`);
+    console.log(`❌ Erreurs de réinitialisation : ${errorCount}`);
+    console.log(`📧 Emails envoyés avec succès : ${emailSuccessCount}`);
+    console.log(`⚠️  Erreurs d'envoi d'email : ${emailErrorCount}`);
+    console.log(`📋 Total traité : ${successCount + errorCount}`);
+    console.log('='.repeat(60) + '\n');
+
+  } catch (error: any) {
+    console.error('❌ Erreur fatale lors de la réinitialisation:', error);
+    throw error;
+  } finally {
+    await prisma.$disconnect();
+  }
 }
 
-export { resetPasswordsExceptSimon };
+// Exécuter le script
+if (require.main === module) {
+  // Vérifier si on doit exécuter la fonction pour les utilisateurs spécifiques
+  const args = process.argv.slice(2);
+  const isSpecificUsers = args.includes('--specific-users') || args.includes('-s');
+  
+  if (isSpecificUsers) {
+    resetPasswordsForSpecificUsers()
+      .then(() => {
+        console.log('🎉 Réinitialisation terminée avec succès !');
+        process.exit(0);
+      })
+      .catch((error) => {
+        console.error('💥 Erreur fatale:', error);
+        process.exit(1);
+      });
+  } else {
+    resetPasswordsExceptSimon()
+      .then(() => {
+        console.log('🎉 Réinitialisation terminée avec succès !');
+        process.exit(0);
+      })
+      .catch((error) => {
+        console.error('💥 Erreur fatale:', error);
+        process.exit(1);
+      });
+  }
+}
+
+export { resetPasswordsExceptSimon, resetPasswordsForSpecificUsers };
 

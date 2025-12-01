@@ -32,6 +32,7 @@
     "db:create-admin": "tsx scripts/create-admin-user.ts",
     "db:delete-adherents-except-simon-hubert": "tsx scripts/delete-adherents-except-simon-hubert.ts",
     "db:reset-passwords-except-simon": "tsx scripts/reset-passwords-except-simon.ts",
+    "db:reset-passwords-specific-users": "tsx scripts/reset-passwords-except-simon.ts --specific-users",
     "db:import-geonames": "tsx scripts/import-geonames-cities.ts",
     "db:import-geonames-countries": "tsx scripts/import-geonames-countries.ts",
     "db:import-carto-countries": "tsx scripts/import-carto-countries.ts",
