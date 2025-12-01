@@ -22,6 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { 
   Users, 
+  User,
   Euro, 
   AlertTriangle, 
   CheckCircle2, 
@@ -36,7 +37,13 @@ import {
   Phone,
   Calendar,
   Info,
-  Settings
+  Settings,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
+  FileText,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAdherentsWithCotisations, createManualCotisation, updateCotisation } from "@/actions/cotisations";
@@ -727,250 +734,419 @@ export default function AdminCotisationManagement() {
           </div>
 
           {/* Pagination */}
-          <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
-            <div className="flex-1 text-xs sm:text-sm text-muted-foreground dark:text-gray-400 text-center sm:text-left">
-              {table.getFilteredRowModel().rows.length} adhérent(s) au total
+          <div className="bg-white dark:bg-gray-800 mt-5 flex flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4 sm:gap-0">
+            <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+              {table.getFilteredRowModel().rows.length} ligne(s) au total
             </div>
-            <div className="flex items-center space-x-2 w-full sm:w-auto justify-center sm:justify-end">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 sm:h-8 text-xs border-gray-300 dark:border-gray-600 flex-1 sm:flex-initial"
-                onClick={() => table.previousPage()}
-                disabled={!table.getCanPreviousPage()}
-              >
-                Précédent
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-9 sm:h-8 text-xs border-gray-300 dark:border-gray-600 flex-1 sm:flex-initial"
-                onClick={() => table.nextPage()}
-                disabled={!table.getCanNextPage()}
-              >
-                Suivant
-              </Button>
+
+            <div className="flex items-center space-x-6 lg:space-x-8">
+              <div className="flex items-center space-x-2">
+                <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+                <Select
+                  value={`${table.getState().pagination.pageSize}`}
+                  onValueChange={(value) => {
+                    table.setPageSize(Number(value));
+                  }}
+                >
+                  <SelectTrigger className="h-8 w-[70px]">
+                    <SelectValue placeholder={table.getState().pagination.pageSize} />
+                  </SelectTrigger>
+                  <SelectContent side="top">
+                    {[10, 20, 30, 40, 50].map((pageSize) => (
+                      <SelectItem key={pageSize} value={`${pageSize}`}>
+                        {pageSize}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}
+              </div>
+              <div className="flex items-center space-x-2">
+                <Button
+                  variant="outline"
+                  className="hidden h-8 w-8 p-0 lg:flex"
+                  onClick={() => table.setPageIndex(0)}
+                  disabled={!table.getCanPreviousPage()}
+                >
+                  <span className="sr-only">Aller à la première page</span>
+                  <ChevronsLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-8 w-8 p-0"
+                  onClick={() => table.previousPage()}
+                  disabled={!table.getCanPreviousPage()}
+                >
+                  <span className="sr-only">Page précédente</span>
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="h-8 w-8 p-0"
+                  onClick={() => table.nextPage()}
+                  disabled={!table.getCanNextPage()}
+                >
+                  <span className="sr-only">Page suivante</span>
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant="outline"
+                  className="hidden h-8 w-8 p-0 lg:flex"
+                  onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                  disabled={!table.getCanNextPage()}
+                >
+                  <span className="sr-only">Aller à la dernière page</span>
+                  <ChevronsRight className="h-4 w-4" />
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Modal de saisie manuelle */}
+      {/* Dialog de saisie manuelle */}
       {showManualForm && selectedAdherent && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <Card className="!py-0 w-full max-w-md">
-            <CardHeader>
-              <CardTitle>Saisir une Cotisation</CardTitle>
-              <CardDescription>
+        <Dialog open={showManualForm} onOpenChange={setShowManualForm}>
+          <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader className="pb-4 border-b border-slate-200 dark:border-slate-700">
+              <DialogTitle className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <Edit className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                </div>
+                Saisir une Cotisation
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-2">
                 Pour {selectedAdherent.civility} {selectedAdherent.firstname} {selectedAdherent.lastname}
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleManualCotisation} className="space-y-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Type</label>
-                  <Select
-                    value={manualFormData.type}
-                    onValueChange={(value) => setManualFormData({ ...manualFormData, type: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Forfait">Forfait</SelectItem>
-                      <SelectItem value="Assistance">Assistance</SelectItem>
-                      <SelectItem value="Anniversaire">Anniversaire</SelectItem>
-                      <SelectItem value="Adhesion">Adhésion</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              </DialogDescription>
+            </DialogHeader>
+            <form onSubmit={handleManualCotisation} className="space-y-4 mt-6">
+              <div className="space-y-1">
+                <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                  <Euro className="h-3 w-3" />
+                  Type de cotisation
+                </Label>
+                <Select
+                  value={manualFormData.type}
+                  onValueChange={(value) => setManualFormData({ ...manualFormData, type: value })}
+                >
+                  <SelectTrigger className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm h-9 sm:h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Forfait">Forfait</SelectItem>
+                    <SelectItem value="Assistance">Assistance</SelectItem>
+                    <SelectItem value="Anniversaire">Anniversaire</SelectItem>
+                    <SelectItem value="Adhesion">Adhésion</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Montant</label>
-                  <Input
-                    type="number"
-                    step="0.01"
-                    value={manualFormData.montant}
-                    onChange={(e) => setManualFormData({ ...manualFormData, montant: parseFloat(e.target.value) })}
-                  />
-                </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                  <Euro className="h-3 w-3" />
+                  Montant (€)
+                </Label>
+                <Input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={manualFormData.montant}
+                  onChange={(e) => setManualFormData({ ...manualFormData, montant: parseFloat(e.target.value) || 0 })}
+                  className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm h-9 sm:h-10"
+                  placeholder="0.00"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Moyen de Paiement</label>
-                  <Select
-                    value={manualFormData.moyenPaiement}
-                    onValueChange={(value) => setManualFormData({ ...manualFormData, moyenPaiement: value })}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Especes">Espèces</SelectItem>
-                      <SelectItem value="Cheque">Chèque</SelectItem>
-                      <SelectItem value="Virement">Virement</SelectItem>
-                      <SelectItem value="CarteBancaire">Carte Bancaire</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                  <CreditCard className="h-3 w-3" />
+                  Moyen de paiement
+                </Label>
+                <Select
+                  value={manualFormData.moyenPaiement}
+                  onValueChange={(value) => setManualFormData({ ...manualFormData, moyenPaiement: value })}
+                >
+                  <SelectTrigger className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm h-9 sm:h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Especes">Espèces</SelectItem>
+                    <SelectItem value="Cheque">Chèque</SelectItem>
+                    <SelectItem value="Virement">Virement</SelectItem>
+                    <SelectItem value="CarteBancaire">Carte Bancaire</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Description</label>
-                  <Input
-                    value={manualFormData.description}
-                    onChange={(e) => setManualFormData({ ...manualFormData, description: e.target.value })}
-                    placeholder="Description optionnelle"
-                  />
-                </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                  <FileText className="h-3 w-3" />
+                  Description
+                </Label>
+                <Input
+                  value={manualFormData.description}
+                  onChange={(e) => setManualFormData({ ...manualFormData, description: e.target.value })}
+                  placeholder="Description optionnelle"
+                  className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm h-9 sm:h-10"
+                />
+              </div>
 
-                <div className="space-y-2">
-                  <label className="text-sm font-medium">Référence</label>
-                  <Input
-                    value={manualFormData.reference}
-                    onChange={(e) => setManualFormData({ ...manualFormData, reference: e.target.value })}
-                    placeholder="Référence optionnelle"
-                  />
-                </div>
+              <div className="space-y-1">
+                <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                  <Info className="h-3 w-3" />
+                  Référence
+                </Label>
+                <Input
+                  value={manualFormData.reference}
+                  onChange={(e) => setManualFormData({ ...manualFormData, reference: e.target.value })}
+                  placeholder="Référence optionnelle (N° chèque, virement, etc.)"
+                  className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 shadow-sm h-9 sm:h-10"
+                />
+              </div>
 
-                <div className="flex justify-end space-x-2">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => setShowManualForm(false)}
-                  >
-                    Annuler
-                  </Button>
-                  <Button type="submit" className="bg-blue-600 hover:bg-blue-700 text-white">
-                    Saisir
-                  </Button>
-                </div>
-              </form>
-            </CardContent>
-          </Card>
-        </div>
+              <div className="flex justify-end gap-2 pt-4 border-t border-slate-200 dark:border-slate-700">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setShowManualForm(false);
+                    setSelectedAdherent(null);
+                  }}
+                  className="bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-700 hover:text-slate-900 text-xs sm:text-sm shadow-sm"
+                >
+                  Annuler
+                </Button>
+                <Button 
+                  type="submit" 
+                  className="bg-blue-600 hover:bg-blue-700 text-white text-xs sm:text-sm shadow-sm"
+                >
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Saisir la cotisation
+                </Button>
+              </div>
+            </form>
+          </DialogContent>
+        </Dialog>
       )}
 
-      {/* Modal de consultation */}
+      {/* Dialog de consultation */}
       {showViewModal && (
-        <Modal 
-          title="Détails de l'adhérent" 
-          confirmOnClose={false}
-          showClose={true}
-          onCancel={() => {
+        <Dialog open={showViewModal} onOpenChange={(open) => {
+          if (!open) {
             setShowViewModal(false);
             setAdherentDetails(null);
-          }}
-        >
-          {loadingDetails ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
-            </div>
-          ) : adherentDetails ? (
-            <div className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <Label>Nom complet</Label>
-                  <div className="text-sm mt-1">
-                    {adherentDetails.civility} {adherentDetails.firstname} {adherentDetails.lastname}
-                  </div>
+          }
+        }}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader className="pb-4 border-b border-slate-200 dark:border-slate-700">
+              <DialogTitle className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
+                  <Eye className="h-5 w-5 text-blue-600 dark:text-blue-400" />
                 </div>
-                <div>
-                  <Label>Email</Label>
-                  <div className="text-sm mt-1">{adherentDetails.User.email}</div>
-                </div>
-                <div>
-                  <Label>Statut</Label>
-                  <div className="text-sm mt-1">
-                    <Badge 
-                      className={
-                        adherentDetails.User.status === "Actif" 
-                          ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
-                          : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
-                      }
-                    >
-                      {adherentDetails.User.status}
-                    </Badge>
-                  </div>
-                </div>
-                <div>
-                  <Label>Dette totale</Label>
-                  <div className={`text-sm mt-1 font-bold ${adherentDetails.totalDette > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                    {adherentDetails.totalDette.toFixed(2).replace('.', ',')} €
-                  </div>
-                </div>
-                <div>
-                  <Label>Mois de retard</Label>
-                  <div className="text-sm mt-1">
-                    {adherentDetails.moisDeRetard > 0 ? (
-                      <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                        {adherentDetails.moisDeRetard} mois
-                      </Badge>
-                    ) : (
-                      <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
-                        À jour
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-                <div>
-                  <Label>Montant forfait</Label>
-                  <div className="text-sm mt-1">
-                    {adherentDetails.montantForfait.toFixed(2).replace('.', ',')} €
-                  </div>
-                </div>
-                <div>
-                  <Label>Montant occasionnel</Label>
-                  <div className="text-sm mt-1">
-                    {adherentDetails.montantOccasionnel.toFixed(2).replace('.', ',')} €
-                  </div>
-                </div>
-                <div>
-                  <Label>Nombre de cotisations</Label>
-                  <div className="text-sm mt-1">
-                    {adherentDetails._count.Cotisations}
-                  </div>
+                Détails de l'adhérent
+              </DialogTitle>
+              <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-2">
+                Informations complètes sur l'adhérent et ses cotisations
+              </DialogDescription>
+            </DialogHeader>
+            {loadingDetails ? (
+              <div className="flex items-center justify-center py-12">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
+                  <p className="text-sm text-gray-500 dark:text-gray-400">Chargement des détails...</p>
                 </div>
               </div>
-              
-              {adherentDetails.Cotisations && adherentDetails.Cotisations.length > 0 && (
-                <div className="mt-6">
-                  <Label className="text-base font-semibold">Dernières cotisations</Label>
-                  <div className="mt-2 space-y-2 max-h-60 overflow-y-auto">
-                    {adherentDetails.Cotisations.map((cotisation: any, index: number) => (
-                      <Card key={index} className="p-3">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <div className="font-medium">{cotisation.type}</div>
-                            <div className="text-sm text-gray-500">
-                              {new Date(cotisation.dateCotisation).toLocaleDateString('fr-FR')}
-                            </div>
-                          </div>
-                          <div className="text-right">
-                            <div className="font-bold">{Number(cotisation.montant).toFixed(2).replace('.', ',')} €</div>
-                            <Badge 
-                              className={
-                                cotisation.statut === 'Valide' 
-                                  ? 'bg-green-100 text-green-800' 
-                                  : cotisation.statut === 'EnAttente'
-                                  ? 'bg-yellow-100 text-yellow-800'
-                                  : 'bg-red-100 text-red-800'
-                              }
-                            >
-                              {cotisation.statut}
-                            </Badge>
-                          </div>
+            ) : adherentDetails ? (
+              <div className="space-y-4 mt-6">
+                {/* Informations principales */}
+                <Card className="shadow-sm border-slate-200 dark:border-slate-700 !py-0">
+                  <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-slate-200 dark:border-slate-700 pb-2 pt-3 px-4">
+                    <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                      <Users className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                      Informations personnelles
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-3 px-4 pb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                          <User className="h-3 w-3" />
+                          Nom complet
+                        </Label>
+                        <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
+                          {adherentDetails.civility} {adherentDetails.firstname} {adherentDetails.lastname}
                         </div>
-                      </Card>
-                    ))}
-                  </div>
-                </div>
-              )}
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                          <Mail className="h-3 w-3" />
+                          Email
+                        </Label>
+                        <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
+                          {adherentDetails.User?.email || "—"}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                          <CheckCircle2 className="h-3 w-3" />
+                          Statut
+                        </Label>
+                        <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 shadow-sm">
+                          <Badge 
+                            className={
+                              adherentDetails.User?.status === "Actif" 
+                                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200" 
+                                : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200"
+                            }
+                          >
+                            {adherentDetails.User?.status || "—"}
+                          </Badge>
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                          <Euro className="h-3 w-3" />
+                          Dette totale
+                        </Label>
+                        <div className={`p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-bold font-mono shadow-sm ${adherentDetails.totalDette > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                          {adherentDetails.totalDette.toFixed(2).replace('.', ',')} €
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Informations financières */}
+                <Card className="shadow-sm border-slate-200 dark:border-slate-700 !py-0">
+                  <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-slate-200 dark:border-slate-700 pb-2 pt-3 px-4">
+                    <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                      <Euro className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      Informations financières
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="pt-3 px-4 pb-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div className="space-y-1">
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                          <Clock className="h-3 w-3" />
+                          Mois de retard
+                        </Label>
+                        <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 shadow-sm">
+                          {adherentDetails.moisDeRetard > 0 ? (
+                            <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                              {adherentDetails.moisDeRetard} mois
+                            </Badge>
+                          ) : (
+                            <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200">
+                              À jour
+                            </Badge>
+                          )}
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                          <Euro className="h-3 w-3" />
+                          Montant forfait
+                        </Label>
+                        <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
+                          {adherentDetails.montantForfait.toFixed(2).replace('.', ',')} €
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                          <Euro className="h-3 w-3" />
+                          Montant occasionnel
+                        </Label>
+                        <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
+                          {adherentDetails.montantOccasionnel.toFixed(2).replace('.', ',')} €
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">
+                          <FileText className="h-3 w-3" />
+                          Nombre de cotisations
+                        </Label>
+                        <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
+                          {adherentDetails._count?.Cotisations || 0}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              
+                {/* Liste des cotisations */}
+                {adherentDetails.Cotisations && adherentDetails.Cotisations.length > 0 && (
+                  <Card className="shadow-sm border-slate-200 dark:border-slate-700 !py-0">
+                    <CardHeader className="bg-gradient-to-r from-slate-50 to-gray-50 dark:from-slate-800 dark:to-gray-800 border-b border-slate-200 dark:border-slate-700 pb-2 pt-3 px-4">
+                      <CardTitle className="flex items-center gap-2 text-sm sm:text-base">
+                        <Calendar className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                        Dernières cotisations
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent className="pt-3 px-4 pb-4">
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {adherentDetails.Cotisations.map((cotisation: any, index: number) => (
+                          <Card key={index} className="p-3 border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow">
+                            <div className="flex justify-between items-center">
+                              <div className="flex-1">
+                                <div className="font-medium text-sm text-gray-900 dark:text-white">{cotisation.type}</div>
+                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />
+                                  {new Date(cotisation.dateCotisation).toLocaleDateString('fr-FR', { 
+                                    day: '2-digit', 
+                                    month: '2-digit', 
+                                    year: 'numeric' 
+                                  })}
+                                </div>
+                              </div>
+                              <div className="text-right ml-4">
+                                <div className="font-bold text-sm text-gray-900 dark:text-white mb-1">
+                                  {Number(cotisation.montant).toFixed(2).replace('.', ',')} €
+                                </div>
+                                <Badge 
+                                  className={
+                                    cotisation.statut === 'Valide' 
+                                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' 
+                                      : cotisation.statut === 'EnAttente'
+                                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                  }
+                                >
+                                  {cotisation.statut}
+                                </Badge>
+                              </div>
+                            </div>
+                          </Card>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <AlertTriangle className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                <p className="text-sm text-gray-500 dark:text-gray-400">Aucune donnée disponible</p>
+              </div>
+            )}
+            <div className="flex justify-end pt-4 border-t border-slate-200 dark:border-slate-700 mt-6">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setShowViewModal(false);
+                  setAdherentDetails(null);
+                }}
+                className="bg-slate-50 hover:bg-slate-100 border-slate-300 text-slate-700 hover:text-slate-900 text-xs sm:text-sm shadow-sm"
+              >
+                <X className="h-4 w-4 mr-2" />
+                Fermer
+              </Button>
             </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              Aucune donnée disponible
-            </div>
-          )}
-        </Modal>
+          </DialogContent>
+        </Dialog>
       )}
 
       {/* Dialog d'encaissement */}

@@ -20,6 +20,10 @@ import {
   X,
   Send,
   Users,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -92,6 +96,8 @@ export default function AdminNotificationsPage() {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterStatus, setFilterStatus] = useState<string>("all");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   // Formulaire de création
   const [formData, setFormData] = useState({
@@ -495,8 +501,13 @@ export default function AdminNotificationsPage() {
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {filteredNotifications.map((notification) => (
-                        <TableRow key={notification.id}>
+                      {(() => {
+                        const startIndex = (currentPage - 1) * pageSize;
+                        const endIndex = startIndex + pageSize;
+                        const paginatedNotifications = filteredNotifications.slice(startIndex, endIndex);
+                        
+                        return paginatedNotifications.map((notification) => (
+                          <TableRow key={notification.id}>
                           <TableCell className="text-center">
                             <div className="flex items-center justify-center">
                               <span className="text-xl">
@@ -559,9 +570,88 @@ export default function AdminNotificationsPage() {
                             </Button>
                           </TableCell>
                         </TableRow>
-                      ))}
+                      ));
+                      })()}
                     </TableBody>
                   </Table>
+                  
+                  {/* Pagination */}
+                  {filteredNotifications.length > 0 && (() => {
+                    const totalPages = Math.ceil(filteredNotifications.length / pageSize);
+                    return (
+                      <div className="bg-white dark:bg-gray-800 mt-5 flex flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4 sm:gap-0 px-4 sm:px-6">
+                        <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+                          {filteredNotifications.length} ligne(s) au total
+                        </div>
+
+                        <div className="flex items-center space-x-6 lg:space-x-8">
+                          <div className="flex items-center space-x-2">
+                            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+                            <Select
+                              value={`${pageSize}`}
+                              onValueChange={(value) => {
+                                setPageSize(Number(value));
+                                setCurrentPage(1);
+                              }}
+                            >
+                              <SelectTrigger className="h-8 w-[70px]">
+                                <SelectValue placeholder={pageSize} />
+                              </SelectTrigger>
+                              <SelectContent side="top">
+                                {[10, 20, 30, 40, 50].map((size) => (
+                                  <SelectItem key={size} value={`${size}`}>
+                                    {size}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+
+                          <div className="flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                            Page {currentPage} sur {totalPages}
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Button
+                              variant="outline"
+                              className="hidden h-8 w-8 p-0 lg:flex"
+                              onClick={() => setCurrentPage(1)}
+                              disabled={currentPage === 1}
+                            >
+                              <span className="sr-only">Aller à la première page</span>
+                              <ChevronsLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="h-8 w-8 p-0"
+                              onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                              disabled={currentPage === 1}
+                            >
+                              <span className="sr-only">Page précédente</span>
+                              <ChevronLeft className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="h-8 w-8 p-0"
+                              onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                              disabled={currentPage === totalPages}
+                            >
+                              <span className="sr-only">Page suivante</span>
+                              <ChevronRight className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              variant="outline"
+                              className="hidden h-8 w-8 p-0 lg:flex"
+                              onClick={() => setCurrentPage(totalPages)}
+                              disabled={currentPage === totalPages}
+                            >
+                              <span className="sr-only">Aller à la dernière page</span>
+                              <ChevronsRight className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
                 </div>
               )}
             </CardContent>

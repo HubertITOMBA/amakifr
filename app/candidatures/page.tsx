@@ -31,6 +31,7 @@ import {
 import { getUserData } from "@/actions/user";
 import { POSTES_LABELS } from "@/lib/elections-constants";
 import { ElectionStatus, PositionType, CandidacyStatus } from "@prisma/client";
+import { toast } from "sonner";
 
 interface Election {
   id: string;
@@ -133,25 +134,57 @@ export default function CandidaturesPage() {
       if (result && result.success && result.elections && Array.isArray(result.elections)) {
         console.log("Toutes les élections:", result.elections);
         
+        // Filtrer les élections ouvertes et valider leurs données
+        const validElections = result.elections
+          .filter((election: any) => {
+            // Vérifier que l'élection existe et a les propriétés nécessaires
+            if (!election || !election.id || !election.titre) return false;
+            if (election.status !== ElectionStatus.Ouverte) return false;
+            
+            // S'assurer que positions existe et est un tableau
+            if (!election.positions || !Array.isArray(election.positions)) {
+              console.warn(`Élection ${election.id} n'a pas de positions valides`);
+              return false;
+            }
+            
+            return true;
+          })
+          .map((election: any) => ({
+            ...election,
+            positions: Array.isArray(election.positions) ? election.positions : []
+          }));
+        
         // Filtrer seulement les élections où l'utilisateur a des candidatures
-        const electionsWithUserCandidacies = result.elections.filter((election: Election) => {
-          if (!election || election.status !== ElectionStatus.Ouverte) return false;
-          
+        const electionsWithUserCandidacies = validElections.filter((election: Election) => {
           // Si userCandidacies est null ou vide, ne pas filtrer (afficher toutes les élections ouvertes)
           if (!userCandidacies || userCandidacies.length === 0) {
             return true;
           }
           
           // Vérifier si l'utilisateur a des candidatures dans cette élection
-          return election.positions.some(position => 
-            position.candidacies && position.candidacies.some(candidacy => 
-              userCandidacies.some(uc => uc.position.election.id === election.id)
-            )
-          );
+          if (!election.positions || !Array.isArray(election.positions)) {
+            return false;
+          }
+          
+          return election.positions.some(position => {
+            if (!position || !position.candidacies || !Array.isArray(position.candidacies)) {
+              return false;
+            }
+            return position.candidacies.some(candidacy => 
+              userCandidacies.some(uc => uc?.position?.election?.id === election.id)
+            );
+          });
         });
         
         console.log("Élections avec candidatures utilisateur:", electionsWithUserCandidacies);
         setElections(electionsWithUserCandidacies || []);
+        
+        // Réinitialiser la sélection si l'élection sélectionnée n'est plus disponible
+        if (selectedElection && !electionsWithUserCandidacies.find(e => e.id === selectedElection)) {
+          console.log("L'élection sélectionnée n'est plus disponible, réinitialisation...");
+          setSelectedElection("");
+          setSelectedPositions([]);
+        }
         
         // Si aucune élection avec candidatures utilisateur, afficher un message
         if (electionsWithUserCandidacies && electionsWithUserCandidacies.length === 0) {
@@ -160,10 +193,16 @@ export default function CandidaturesPage() {
       } else {
         console.error("Erreur lors du chargement:", result?.error || "Données invalides");
         setElections([]);
+        // Réinitialiser la sélection en cas d'erreur
+        setSelectedElection("");
+        setSelectedPositions([]);
       }
     } catch (error) {
       console.error("Erreur lors du chargement des élections:", error);
       setElections([]);
+      // Réinitialiser la sélection en cas d'erreur
+      setSelectedElection("");
+      setSelectedPositions([]);
     } finally {
       setLoading(false);
     }
@@ -172,18 +211,32 @@ export default function CandidaturesPage() {
   const handleSubmitCandidacy = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!selectedElection || selectedPositions.length === 0) {
-      alert("Veuillez sélectionner une élection et au moins un poste");
+    // Validation sécurisée
+    if (!selectedElection) {
+      toast.error("Veuillez sélectionner une élection");
+      return;
+    }
+    
+    if (!selectedPositions || !Array.isArray(selectedPositions) || selectedPositions.length === 0) {
+      toast.error("Veuillez sélectionner au moins un poste");
       return;
     }
 
-    if (!candidacyForm.motivation.trim()) {
-      alert("Veuillez remplir votre motivation");
+    if (!candidacyForm.motivation || !candidacyForm.motivation.trim()) {
+      toast.error("Veuillez remplir votre motivation");
       return;
     }
 
-    if (!candidacyForm.programme.trim()) {
-      alert("Veuillez remplir votre programme");
+    if (!candidacyForm.programme || !candidacyForm.programme.trim()) {
+      toast.error("Veuillez remplir votre programme");
+      return;
+    }
+    
+    // Vérifier que l'élection sélectionnée est toujours valide
+    if (!selectedElectionData) {
+      toast.error("L'élection sélectionnée n'est plus disponible. Veuillez en sélectionner une autre.");
+      setSelectedElection("");
+      setSelectedPositions([]);
       return;
     }
 
@@ -205,18 +258,19 @@ export default function CandidaturesPage() {
       console.log("Résultat de la candidature:", result);
 
       if (result.success) {
-        alert(`Candidature soumise avec succès pour ${selectedPositions.length} poste(s) !`);
+        toast.success(`Candidature soumise avec succès pour ${selectedPositions.length} poste(s) !`);
         setCandidacyForm({ motivation: "", programme: "" });
         setSelectedElection("");
         setSelectedPositions([]);
         setShowCandidacyForm(false);
         await loadElections();
+        await loadUserCandidacies();
       } else {
-        alert(`Erreur: ${result.error}`);
+        toast.error(result.error || "Erreur lors de la soumission de la candidature");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur lors de la soumission:", error);
-      alert("Erreur lors de la soumission de la candidature");
+      toast.error(error?.message || "Erreur lors de la soumission de la candidature");
     }
   };
 
@@ -250,13 +304,32 @@ export default function CandidaturesPage() {
     }
   };
 
-  const selectedElectionData = elections?.find(e => e && e.id === selectedElection);
-  const availablePositions = selectedElectionData?.positions || [];
+  // Validation sécurisée de l'élection sélectionnée
+  const selectedElectionData = selectedElection && elections && Array.isArray(elections)
+    ? elections.find(e => e && e.id === selectedElection)
+    : undefined;
   
-  console.log("Élection sélectionnée:", selectedElection);
-  console.log("Données de l'élection sélectionnée:", selectedElectionData);
-  console.log("Postes disponibles:", availablePositions);
-  console.log("Postes sélectionnés:", selectedPositions);
+  // Validation sécurisée des positions disponibles
+  const availablePositions = selectedElectionData?.positions && Array.isArray(selectedElectionData.positions)
+    ? selectedElectionData.positions
+    : [];
+  
+  // Logs uniquement en développement
+  if (process.env.NODE_ENV === 'development') {
+    console.log("Élection sélectionnée:", selectedElection);
+    console.log("Données de l'élection sélectionnée:", selectedElectionData);
+    console.log("Postes disponibles:", availablePositions);
+    console.log("Postes sélectionnés:", selectedPositions);
+  }
+  
+  // Réinitialiser la sélection si l'élection n'est plus valide
+  useEffect(() => {
+    if (selectedElection && !selectedElectionData) {
+      console.warn("L'élection sélectionnée n'est plus valide, réinitialisation...");
+      setSelectedElection("");
+      setSelectedPositions([]);
+    }
+  }, [selectedElection, selectedElectionData]);
 
   // Fonctions pour gérer la sélection multiple de postes
   const togglePosition = (positionId: string) => {
@@ -284,7 +357,7 @@ export default function CandidaturesPage() {
     // Vérifier que les données nécessaires sont disponibles
     if (!candidacy || !candidacy.position || !candidacy.position.election) {
       console.error("Données de candidature incomplètes:", candidacy);
-      alert("Erreur: Données de candidature incomplètes");
+      toast.error("Erreur: Données de candidature incomplètes");
       return;
     }
 
@@ -308,18 +381,18 @@ export default function CandidaturesPage() {
   };
 
   const handleUpdateCandidacy = async (candidacyId: string) => {
-    if (!editForm.motivation.trim()) {
-      alert("Veuillez remplir votre motivation");
+    if (!editForm.motivation || !editForm.motivation.trim()) {
+      toast.error("Veuillez remplir votre motivation");
       return;
     }
 
-    if (!editForm.programme.trim()) {
-      alert("Veuillez remplir votre programme");
+    if (!editForm.programme || !editForm.programme.trim()) {
+      toast.error("Veuillez remplir votre programme");
       return;
     }
 
-    if (editForm.selectedPositionIds.length === 0) {
-      alert("Veuillez sélectionner au moins un poste");
+    if (!editForm.selectedPositionIds || !Array.isArray(editForm.selectedPositionIds) || editForm.selectedPositionIds.length === 0) {
+      toast.error("Veuillez sélectionner au moins un poste");
       return;
     }
 
@@ -332,16 +405,17 @@ export default function CandidaturesPage() {
       );
 
       if (result.success) {
-        alert(`Candidature mise à jour avec succès pour ${editForm.selectedPositionIds.length} poste(s) !`);
+        toast.success(`Candidature mise à jour avec succès pour ${editForm.selectedPositionIds.length} poste(s) !`);
         setEditingCandidacy(null);
         setEditForm({ motivation: "", programme: "", selectedPositionIds: [] });
         await loadUserCandidacies();
+        await loadElections();
       } else {
-        alert(`Erreur: ${result.error}`);
+        toast.error(result.error || "Erreur lors de la mise à jour de la candidature");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Erreur lors de la mise à jour:", error);
-      alert("Erreur lors de la mise à jour de la candidature");
+      toast.error(error?.message || "Erreur lors de la mise à jour de la candidature");
     }
   };
 

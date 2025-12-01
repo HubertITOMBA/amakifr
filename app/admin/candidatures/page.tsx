@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, CheckCircle, XCircle, Plus, Eye, Edit, Search, Upload, Loader2 } from "lucide-react";
+import { Users, CheckCircle, XCircle, Plus, Eye, Edit, Search, Upload, Loader2, MoreHorizontal, Mail, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { CandidacyStatus } from "@prisma/client";
 import { 
   createColumnHelper,
@@ -15,6 +15,7 @@ import {
   getSortedRowModel,
   SortingState,
   getFilteredRowModel,
+  getPaginationRowModel,
   ColumnFiltersState,
   VisibilityState,
 } from "@tanstack/react-table";
@@ -28,6 +29,14 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type CandidacyData = {
   id: string;
@@ -257,42 +266,99 @@ export default function AdminCandidaturesPage() {
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
-      meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
+      header: () => <div className="text-center w-full">Actions</div>,
+      meta: { forceVisible: true },
+      enableResizing: false,
       cell: ({ row }) => {
         const c = row.original as any;
+        const canValidateOrReject = c.status === CandidacyStatus.EnAttente;
+        const userEmail = c.adherent?.User?.email;
+        
         return (
-          <div className="flex items-center space-x-2">
-            <Link href={`/admin/candidatures/${c.id}/consultation`}>
-              <Button size="sm" variant="outline" title="Voir">
-                <Eye className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href={`/admin/candidatures/${c.id}/edition`}>
-              <Button size="sm" variant="outline" title="Éditer">
-                <Edit className="h-4 w-4" />
-              </Button>
-            </Link>
-            {c.status === CandidacyStatus.EnAttente && (
-              <>
-                <Button size="sm" variant="outline" className="text-emerald-600 dark:text-emerald-400 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20" onClick={() => handleCandidacyStatusChange(c.id, CandidacyStatus.Validee)} title="Valider">
-                  <CheckCircle className="h-4 w-4" />
+          <div className="flex items-center justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Actions"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Ouvrir le menu</span>
                 </Button>
-                <Button size="sm" variant="outline" className="text-rose-600 dark:text-rose-400 border-rose-300 dark:border-rose-700 hover:bg-rose-50 dark:hover:bg-rose-900/20" onClick={() => handleCandidacyStatusChange(c.id, CandidacyStatus.Rejetee)} title="Rejeter">
-                  <XCircle className="h-4 w-4" />
-                </Button>
-              </>
-            )}
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link 
+                    href={`/admin/candidatures/${c.id}/consultation`}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>Voir les détails</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link 
+                    href={`/admin/candidatures/${c.id}/edition`}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Edit className="h-4 w-4" />
+                    <span>Éditer</span>
+                  </Link>
+                </DropdownMenuItem>
+                {canValidateOrReject && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => handleCandidacyStatusChange(c.id, CandidacyStatus.Validee)}
+                      className="flex items-center gap-2 cursor-pointer text-emerald-600 dark:text-emerald-400 focus:text-emerald-600 dark:focus:text-emerald-400"
+                    >
+                      <CheckCircle className="h-4 w-4" />
+                      <span>Valider</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleCandidacyStatusChange(c.id, CandidacyStatus.Rejetee)}
+                      className="flex items-center gap-2 cursor-pointer text-rose-600 dark:text-rose-400 focus:text-rose-600 dark:focus:text-rose-400"
+                    >
+                      <XCircle className="h-4 w-4" />
+                      <span>Rejeter</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                {userEmail && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => {
+                        // TODO: Implémenter l'envoi d'email au candidat
+                        toast.info("Fonctionnalité d'envoi d'email à venir");
+                      }}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
+                      <Mail className="h-4 w-4" />
+                      <span>Envoyer un email</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
     }),
-  ], []);
+  ], [handleCandidacyStatusChange]);
 
   const table = useReactTable({
     data: filteredCandidacies,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
@@ -306,6 +372,11 @@ export default function AdminCandidaturesPage() {
       } catch (error) {
         console.error("Erreur lors de la sauvegarde des préférences:", error);
       }
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
     },
     state: { sorting, columnFilters, globalFilter, columnVisibility },
   });
@@ -398,7 +469,79 @@ export default function AdminCandidaturesPage() {
               <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
                 {filteredCandidacies.length} candidature(s) trouvée(s)
               </div>
-              <DataTable table={table} emptyMessage="Aucune candidature trouvée" />
+              <DataTable table={table} emptyMessage="Aucune candidature trouvée" compact={true} />
+              
+              {/* Pagination */}
+              <div className="bg-white dark:bg-gray-800 mt-5 flex flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4 sm:gap-0">
+                <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+                  {table.getFilteredRowModel().rows.length} ligne(s) au total
+                </div>
+
+                <div className="flex items-center space-x-6 lg:space-x-8">
+                  <div className="flex items-center space-x-2">
+                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+                    <Select
+                      value={`${table.getState().pagination.pageSize}`}
+                      onValueChange={(value) => {
+                        table.setPageSize(Number(value));
+                      }}
+                    >
+                      <SelectTrigger className="h-8 w-[70px]">
+                        <SelectValue placeholder={table.getState().pagination.pageSize} />
+                      </SelectTrigger>
+                      <SelectContent side="top">
+                        {[10, 20, 30, 40, 50].map((pageSize) => (
+                          <SelectItem key={pageSize} value={`${pageSize}`}>
+                            {pageSize}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      className="hidden h-8 w-8 p-0 lg:flex"
+                      onClick={() => table.setPageIndex(0)}
+                      disabled={!table.getCanPreviousPage()}
+                    >
+                      <span className="sr-only">Aller à la première page</span>
+                      <ChevronsLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                      onClick={() => table.previousPage()}
+                      disabled={!table.getCanPreviousPage()}
+                    >
+                      <span className="sr-only">Page précédente</span>
+                      <ChevronLeft className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="h-8 w-8 p-0"
+                      onClick={() => table.nextPage()}
+                      disabled={!table.getCanNextPage()}
+                    >
+                      <span className="sr-only">Page suivante</span>
+                      <ChevronRight className="h-4 w-4" />
+                    </Button>
+                    <Button
+                      variant="outline"
+                      className="hidden h-8 w-8 p-0 lg:flex"
+                      onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                      disabled={!table.getCanNextPage()}
+                    >
+                      <span className="sr-only">Aller à la dernière page</span>
+                      <ChevronsRight className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
+              </div>
             </>
           )}
         </CardContent>

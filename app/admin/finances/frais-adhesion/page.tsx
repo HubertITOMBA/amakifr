@@ -779,8 +779,7 @@ export default function FraisAdhesionPage() {
                       </div>
 
                       <div className="flex items-center justify-center text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                        Page {table.getState().pagination.pageIndex + 1} sur{" "}
-                        {table.getPageCount()}
+                        Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}
                       </div>
                       <div className="flex items-center space-x-1 sm:space-x-2">
                         <Button

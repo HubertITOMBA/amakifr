@@ -582,9 +582,8 @@ export default function AdminAssistancesPage() {
                     </Select>
                   </div>
 
-                  <div className="flex w-[100px] items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Page {table.getState().pagination.pageIndex + 1} sur{" "}
-                    {table.getPageCount()}
+                  <div className="flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                    Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}
                   </div>
                   <div className="flex items-center space-x-2">
                     <Button

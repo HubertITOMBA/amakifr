@@ -4,13 +4,21 @@ import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Award, Eye, Edit, Trash2, CheckCircle2, XCircle, DoorOpen, Plus } from "lucide-react";
+import { Award, Eye, Edit, Trash2, CheckCircle2, XCircle, DoorOpen, Plus, MoreHorizontal, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import Link from "next/link";
 import { getAllVotesForAdmin, adminDeleteVote, adminUpdateVoteStatus, getElectionsLightForAdmin, updateElectionStatus } from "@/actions/elections";
 import { ElectionStatus } from "@prisma/client";
 import { toast } from "sonner";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface VoteRow {
   id: string;
@@ -53,6 +61,8 @@ export default function AdminVotesPage() {
   const [loading, setLoading] = useState(true);
   const [electionsOptions, setElectionsOptions] = useState<Array<{ id: string; label: string }>>([]);
   const [selectedElectionId, setSelectedElectionId] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
+  const [pageSize, setPageSize] = useState(10);
 
   const loadAll = async () => {
     const res = await getAllVotesForAdmin();
@@ -181,18 +191,26 @@ export default function AdminVotesPage() {
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Adhérent</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Choix</th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Statut</th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                    <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
-                  {votes.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
-                        Aucun vote enregistré
-                      </td>
-                    </tr>
-                  ) : (
-                    votes.map((v) => (
+                  {(() => {
+                    const startIndex = (currentPage - 1) * pageSize;
+                    const endIndex = startIndex + pageSize;
+                    const paginatedVotes = votes.slice(startIndex, endIndex);
+                    
+                    if (votes.length === 0) {
+                      return (
+                        <tr>
+                          <td colSpan={6} className="px-6 py-8 text-center text-gray-500">
+                            Aucun vote enregistré
+                          </td>
+                        </tr>
+                      );
+                    }
+                    
+                    return paginatedVotes.map((v) => (
                       <tr key={v.id} className="hover:bg-gray-50 dark:hover:bg-gray-800">
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-gray-100">
                           {v.election?.titre}
@@ -212,33 +230,157 @@ export default function AdminVotesPage() {
                           </Badge>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
-                          <div className="flex space-x-2">
-                            <Link href={`/admin/votes/${v.id}/consultation`}>
-                              <Button size="sm" variant="outline">
-                                <Eye className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            <Link href={`/admin/votes/${v.id}/edition`}>
-                              <Button size="sm" variant="outline">
-                                <Edit className="h-4 w-4" />
-                              </Button>
-                            </Link>
-                            <Button size="sm" variant="outline" onClick={() => handleDelete(v)}>
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                            <Button size="sm" variant="outline" className="text-green-600 border-green-600 hover:bg-green-50" onClick={() => handleVoteStatusChange(v.id, "Valide")}>
-                              <CheckCircle2 className="h-4 w-4 mr-1" /> Valider
-                            </Button>
-                            <Button size="sm" variant="outline" className="text-red-600 border-red-600 hover:bg-red-50" onClick={() => handleVoteStatusChange(v.id, "Annule")}>
-                              <XCircle className="h-4 w-4 mr-1" /> Annuler
-                            </Button>
+                          <div className="flex items-center justify-center">
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                                  title="Actions"
+                                >
+                                  <MoreHorizontal className="h-4 w-4" />
+                                  <span className="sr-only">Ouvrir le menu</span>
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end" className="w-56">
+                                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem asChild>
+                                  <Link 
+                                    href={`/admin/votes/${v.id}/consultation`}
+                                    className="flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Eye className="h-4 w-4" />
+                                    <span>Voir les détails</span>
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem asChild>
+                                  <Link 
+                                    href={`/admin/votes/${v.id}/edition`}
+                                    className="flex items-center gap-2 cursor-pointer"
+                                  >
+                                    <Edit className="h-4 w-4" />
+                                    <span>Éditer</span>
+                                  </Link>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleVoteStatusChange(v.id, "Valide")}
+                                  className="flex items-center gap-2 cursor-pointer text-green-600 dark:text-green-400 focus:text-green-600 dark:focus:text-green-400"
+                                >
+                                  <CheckCircle2 className="h-4 w-4" />
+                                  <span>Valider</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleVoteStatusChange(v.id, "Blanc")}
+                                  className="flex items-center gap-2 cursor-pointer text-gray-600 dark:text-gray-400 focus:text-gray-600 dark:focus:text-gray-400"
+                                >
+                                  <span className="h-4 w-4 flex items-center justify-center">○</span>
+                                  <span>Mettre en blanc</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleVoteStatusChange(v.id, "Annule")}
+                                  className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                                >
+                                  <XCircle className="h-4 w-4" />
+                                  <span>Annuler</span>
+                                </DropdownMenuItem>
+                                <DropdownMenuSeparator />
+                                <DropdownMenuItem 
+                                  onClick={() => handleDelete(v)}
+                                  className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                  <span>Supprimer</span>
+                                </DropdownMenuItem>
+                              </DropdownMenuContent>
+                            </DropdownMenu>
                           </div>
                         </td>
                       </tr>
-                    ))
-                  )}
+                    ));
+                  })()}
                 </tbody>
               </table>
+              
+              {/* Pagination */}
+              {votes.length > 0 && (() => {
+                const totalPages = Math.ceil(votes.length / pageSize);
+                return (
+                  <div className="bg-white dark:bg-gray-800 mt-5 flex flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4 sm:gap-0">
+                    <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+                      {votes.length} ligne(s) au total
+                    </div>
+
+                    <div className="flex items-center space-x-6 lg:space-x-8">
+                      <div className="flex items-center space-x-2">
+                        <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+                        <Select
+                          value={`${pageSize}`}
+                          onValueChange={(value) => {
+                            setPageSize(Number(value));
+                            setCurrentPage(1);
+                          }}
+                        >
+                          <SelectTrigger className="h-8 w-[70px]">
+                            <SelectValue placeholder={pageSize} />
+                          </SelectTrigger>
+                          <SelectContent side="top">
+                            {[10, 20, 30, 40, 50].map((size) => (
+                              <SelectItem key={size} value={`${size}`}>
+                                {size}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      <div className="flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                        Page {currentPage} sur {totalPages}
+                      </div>
+                      <div className="flex items-center space-x-2">
+                        <Button
+                          variant="outline"
+                          className="hidden h-8 w-8 p-0 lg:flex"
+                          onClick={() => setCurrentPage(1)}
+                          disabled={currentPage === 1}
+                        >
+                          <span className="sr-only">Aller à la première page</span>
+                          <ChevronsLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="h-8 w-8 p-0"
+                          onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                          disabled={currentPage === 1}
+                        >
+                          <span className="sr-only">Page précédente</span>
+                          <ChevronLeft className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="h-8 w-8 p-0"
+                          onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                          disabled={currentPage === totalPages}
+                        >
+                          <span className="sr-only">Page suivante</span>
+                          <ChevronRight className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          className="hidden h-8 w-8 p-0 lg:flex"
+                          onClick={() => setCurrentPage(totalPages)}
+                          disabled={currentPage === totalPages}
+                        >
+                          <span className="sr-only">Aller à la dernière page</span>
+                          <ChevronsRight className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
           )}
         </CardContent>

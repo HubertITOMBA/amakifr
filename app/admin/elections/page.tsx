@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import { useEffect, useState, useMemo, useCallback } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -15,7 +15,12 @@ import {
   Search,
   Award,
   Users,
-  X
+  X,
+  MoreHorizontal,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight
 } from "lucide-react";
 import Link from "next/link";
 import { 
@@ -33,10 +38,19 @@ import {
   getSortedRowModel,
   SortingState,
   getFilteredRowModel,
+  getPaginationRowModel,
   VisibilityState,
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 type ElectionData = {
   id: string;
@@ -161,7 +175,7 @@ export default function AdminElectionsPage() {
   }, [elections, searchTerm, statusFilter]);
 
   // Actions
-  const handleValidate = async (electionId: string) => {
+  const handleValidate = useCallback(async (electionId: string) => {
     const res = await updateElectionStatus(electionId, ElectionStatus.Ouverte);
     if (res.success) {
       toast.success("Élection validée (ouverte)");
@@ -172,9 +186,9 @@ export default function AdminElectionsPage() {
     } else {
       toast.error(res.error || "Erreur lors de la validation");
     }
-  };
+  }, [selectedElectionId]);
 
-  const handleDelete = async (electionId: string) => {
+  const handleDelete = useCallback(async (electionId: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette élection ? Cette action est irréversible.")) {
       return;
     }
@@ -190,28 +204,14 @@ export default function AdminElectionsPage() {
     } else {
       toast.error(res.error || "Erreur lors de la suppression");
     }
-  };
+  }, [selectedElectionId]);
 
-  const handleSelectElection = (electionId: string) => {
+  const handleSelectElection = useCallback((electionId: string) => {
     setSelectedElectionId(electionId);
-  };
+  }, []);
 
   // Colonnes du tableau
   const columns = useMemo(() => [
-    columnHelper.display({
-      id: "select",
-      header: "",
-      meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
-      cell: ({ row }) => (
-        <Button
-          size="sm"
-          variant={selectedElectionId === row.original.id ? "default" : "outline"}
-          onClick={() => handleSelectElection(row.original.id)}
-        >
-          {selectedElectionId === row.original.id ? "Sélectionné" : "Sélectionner"}
-        </Button>
-      ),
-    }),
     columnHelper.accessor("titre", {
       header: "Titre",
       cell: ({ row }) => (
@@ -272,47 +272,86 @@ export default function AdminElectionsPage() {
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
-      meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
+      header: () => <div className="text-center w-full">Actions</div>,
+      meta: { forceVisible: true },
+      enableResizing: false,
       cell: ({ row }) => {
         const election = row.original;
+        const isSelected = selectedElectionId === election.id;
+        
         return (
-          <div className="flex items-center space-x-2">
-            <Link href={`/admin/elections/${election.id}/consultation`}>
-              <Button size="sm" variant="outline" title="Consultation">
-                <Eye className="h-4 w-4" />
-              </Button>
-            </Link>
-            <Link href={`/admin/elections/${election.id}/edition`}>
-              <Button size="sm" variant="outline" title="Édition">
-                <Edit className="h-4 w-4" />
-              </Button>
-            </Link>
-            {election.status !== ElectionStatus.Ouverte && (
-              <Button 
-                size="sm" 
-                variant="outline" 
-                className="text-green-600 border-green-600 hover:bg-green-50" 
-                onClick={() => handleValidate(election.id)}
-                title="Valider (Ouvrir)"
-              >
-                <CheckCircle2 className="h-4 w-4" />
-              </Button>
-            )}
-            <Button 
-              size="sm" 
-              variant="outline" 
-              className="text-red-600 border-red-600 hover:bg-red-50" 
-              onClick={() => handleDelete(election.id)}
-              title="Supprimer"
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Actions"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Ouvrir le menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => handleSelectElection(election.id)}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span>{isSelected ? "Détails (sélectionné)" : "Voir les détails"}</span>
+                  {isSelected && <span className="ml-auto text-xs text-green-600">✓</span>}
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link 
+                    href={`/admin/elections/${election.id}/consultation`}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>Page de consultation</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link 
+                    href={`/admin/elections/${election.id}/edition`}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Edit className="h-4 w-4" />
+                    <span>Éditer</span>
+                  </Link>
+                </DropdownMenuItem>
+                {election.status !== ElectionStatus.Ouverte && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => handleValidate(election.id)}
+                      className="flex items-center gap-2 cursor-pointer text-green-600 dark:text-green-400 focus:text-green-600 dark:focus:text-green-400"
+                    >
+                      <CheckCircle2 className="h-4 w-4" />
+                      <span>Valider (Ouvrir)</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => handleDelete(election.id)}
+                  className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Supprimer</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
     }),
-  ], [selectedElectionId]);
+  ], [selectedElectionId, handleSelectElection, handleValidate, handleDelete]);
 
   const table = useReactTable({
     data: filteredElections,
@@ -333,8 +372,14 @@ export default function AdminElectionsPage() {
       }
     },
     getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
   });
 
   // Récupérer les postes et candidats de l'élection sélectionnée
@@ -407,7 +452,79 @@ export default function AdminElectionsPage() {
                 <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
                   {filteredElections.length} élection(s) trouvée(s)
                 </div>
-                <DataTable table={table} emptyMessage="Aucune élection trouvée" />
+                <DataTable table={table} emptyMessage="Aucune élection trouvée" compact={true} />
+                
+                {/* Pagination */}
+                <div className="bg-white dark:bg-gray-800 mt-5 flex flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4 sm:gap-0">
+                  <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+                    {table.getFilteredRowModel().rows.length} ligne(s) au total
+                  </div>
+
+                  <div className="flex items-center space-x-6 lg:space-x-8">
+                    <div className="flex items-center space-x-2">
+                      <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+                      <Select
+                        value={`${table.getState().pagination.pageSize}`}
+                        onValueChange={(value) => {
+                          table.setPageSize(Number(value));
+                        }}
+                      >
+                        <SelectTrigger className="h-8 w-[70px]">
+                          <SelectValue placeholder={table.getState().pagination.pageSize} />
+                        </SelectTrigger>
+                        <SelectContent side="top">
+                          {[10, 20, 30, 40, 50].map((pageSize) => (
+                            <SelectItem key={pageSize} value={`${pageSize}`}>
+                              {pageSize}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                      Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        className="hidden h-8 w-8 p-0 lg:flex"
+                        onClick={() => table.setPageIndex(0)}
+                        disabled={!table.getCanPreviousPage()}
+                      >
+                        <span className="sr-only">Aller à la première page</span>
+                        <ChevronsLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => table.previousPage()}
+                        disabled={!table.getCanPreviousPage()}
+                      >
+                        <span className="sr-only">Page précédente</span>
+                        <ChevronLeft className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="h-8 w-8 p-0"
+                        onClick={() => table.nextPage()}
+                        disabled={!table.getCanNextPage()}
+                      >
+                        <span className="sr-only">Page suivante</span>
+                        <ChevronRight className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        variant="outline"
+                        className="hidden h-8 w-8 p-0 lg:flex"
+                        onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                        disabled={!table.getCanNextPage()}
+                      >
+                        <span className="sr-only">Aller à la dernière page</span>
+                        <ChevronsRight className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                </div>
               </>
             )}
           </CardContent>
