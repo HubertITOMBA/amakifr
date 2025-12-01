@@ -9,6 +9,14 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Settings, 
@@ -30,7 +38,8 @@ import {
   Eye,
   X,
   Info,
-  FileText
+  FileText,
+  MoreHorizontal
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { 
@@ -54,6 +63,64 @@ import {
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 import { ViewDialog } from "./ViewDialog";
+
+// Composant pour la cellule d'actions avec état local
+function TypeActionsCell({ 
+  type, 
+  onEdit, 
+  onDelete 
+}: { 
+  type: TypeCotisationMensuelle; 
+  onEdit: (type: TypeCotisationMensuelle) => void; 
+  onDelete: (id: string) => void;
+}) {
+  const [viewOpen, setViewOpen] = useState(false);
+
+  return (
+    <div className="flex items-center justify-center">
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+            title="Actions"
+          >
+            <MoreHorizontal className="h-4 w-4" />
+            <span className="sr-only">Ouvrir le menu</span>
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuLabel>Actions</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem 
+            onClick={() => setViewOpen(true)}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <Eye className="h-4 w-4" />
+            <span>Voir les détails</span>
+          </DropdownMenuItem>
+          <DropdownMenuItem 
+            onClick={() => onEdit(type)}
+            className="flex items-center gap-2 cursor-pointer"
+          >
+            <Edit className="h-4 w-4" />
+            <span>Éditer</span>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem 
+            onClick={() => onDelete(type.id)}
+            className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+          >
+            <Trash2 className="h-4 w-4" />
+            <span>Supprimer</span>
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <ViewDialog type={type} open={viewOpen} onOpenChange={setViewOpen} />
+    </div>
+  );
+}
 
 interface TypeCotisationMensuelle {
   id: string;
@@ -272,38 +339,16 @@ export default function AdminTypesCotisationMensuelle() {
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
+      header: () => <div className="text-center w-full">Actions</div>,
       meta: { forceVisible: true },
       enableResizing: false,
       cell: ({ row }) => {
         const type = row.original;
-        return (
-          <div className="flex items-center gap-1 sm:gap-2">
-            <ViewDialog type={type} />
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
-              onClick={() => handleEdit(type)}
-              title="Éditer"
-            >
-              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-red-300 hover:bg-red-50"
-              onClick={() => handleDelete(type.id)}
-              title="Supprimer"
-            >
-              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
-          </div>
-        );
+        return <TypeActionsCell type={type} onEdit={handleEdit} onDelete={handleDelete} />;
       },
-      size: 150,
-      minSize: 120,
-      maxSize: 180,
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
     }),
   ], []);
 

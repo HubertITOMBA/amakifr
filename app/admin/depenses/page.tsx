@@ -42,9 +42,18 @@ import {
   XCircle,
   Clock,
   Image,
-  File
+  File,
+  MoreHorizontal
 } from "lucide-react";
 import Link from "next/link";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { getAllDepenses, deleteDepense, getDepenseStats, validateDepense, rejectDepense, suspendDepense, getDepenseById } from "@/actions/depenses";
 import { getAllTypesDepense } from "@/actions/depenses/types";
 import { toast } from "sonner";
@@ -469,82 +478,92 @@ export default function AdminDepensesPage() {
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
+      header: () => <div className="text-center w-full">Actions</div>,
       meta: { forceVisible: true },
       enableResizing: false,
       cell: ({ row }) => {
         const depense = row.original;
         return (
-          <div className="flex items-center gap-1 sm:gap-2 flex-wrap">
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => handleViewDetails(depense)}
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/20"
-              title="Voir les détails"
-            >
-              <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
-            <Link href={`/admin/depenses/${depense.id}/edition`}>
-              <Button
-                size="sm"
-                variant="outline"
-                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/20"
-                title={depense.statut === "Valide" || depense.statut === "Rejete" ? "Consulter (lecture seule)" : "Éditer"}
-              >
-                <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-            </Link>
-            {depense.statut !== "Valide" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleValidate(depense.id)}
-                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-green-300 hover:bg-green-50 dark:border-green-700 dark:hover:bg-green-900/20"
-                title="Valider"
-              >
-                <CheckCircle className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 dark:text-green-400" />
-              </Button>
-            )}
-            {depense.statut !== "Rejete" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleReject(depense.id)}
-                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-red-300 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-900/20"
-                title="Rejeter"
-              >
-                <XCircle className="h-3 w-3 sm:h-4 sm:w-4 text-red-600 dark:text-red-400" />
-              </Button>
-            )}
-            {depense.statut !== "EnAttente" && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleSuspend(depense.id)}
-                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-yellow-300 hover:bg-yellow-50 dark:border-yellow-700 dark:hover:bg-yellow-900/20"
-                title="Remettre en attente"
-              >
-                <Clock className="h-3 w-3 sm:h-4 sm:w-4 text-yellow-600 dark:text-yellow-400" />
-              </Button>
-            )}
-            {(depense.statut !== "Valide" && depense.statut !== "Rejete") && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => handleDelete(depense.id)}
-                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-red-300 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-900/20"
-                title="Supprimer"
-              >
-                <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-              </Button>
-            )}
+          <div className="flex items-center justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Actions"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Ouvrir le menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => handleViewDetails(depense)}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span>Voir les détails</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link 
+                    href={`/admin/depenses/${depense.id}/edition`}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Edit className="h-4 w-4" />
+                    <span>{depense.statut === "Valide" || depense.statut === "Rejete" ? "Consulter (lecture seule)" : "Éditer"}</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                {depense.statut !== "Valide" && (
+                  <DropdownMenuItem 
+                    onClick={() => handleValidate(depense.id)}
+                    className="flex items-center gap-2 cursor-pointer text-green-600 dark:text-green-400 focus:text-green-600 dark:focus:text-green-400"
+                  >
+                    <CheckCircle className="h-4 w-4" />
+                    <span>Valider</span>
+                  </DropdownMenuItem>
+                )}
+                {depense.statut !== "Rejete" && (
+                  <DropdownMenuItem 
+                    onClick={() => handleReject(depense.id)}
+                    className="flex items-center gap-2 cursor-pointer text-orange-600 dark:text-orange-400 focus:text-orange-600 dark:focus:text-orange-400"
+                  >
+                    <XCircle className="h-4 w-4" />
+                    <span>Rejeter</span>
+                  </DropdownMenuItem>
+                )}
+                {depense.statut !== "EnAttente" && (
+                  <DropdownMenuItem 
+                    onClick={() => handleSuspend(depense.id)}
+                    className="flex items-center gap-2 cursor-pointer text-yellow-600 dark:text-yellow-400 focus:text-yellow-600 dark:focus:text-yellow-400"
+                  >
+                    <Clock className="h-4 w-4" />
+                    <span>Remettre en attente</span>
+                  </DropdownMenuItem>
+                )}
+                {(depense.statut !== "Valide" && depense.statut !== "Rejete") && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => handleDelete(depense.id)}
+                      className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                    >
+                      <Trash2 className="h-4 w-4" />
+                      <span>Supprimer</span>
+                    </DropdownMenuItem>
+                  </>
+                )}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
-      size: 250,
-      minSize: 200,
-      maxSize: 300,
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
     }),
   ], []);
 

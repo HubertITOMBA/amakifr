@@ -11,6 +11,7 @@ import { AlertCircle } from "lucide-react";
 import { getAllPostesTemplates } from "@/actions/postes";
 import { createElection, getElectionById, updateElection, addPositionsToElection, createCustomPosition, updatePosition, deletePosition } from "@/actions/elections";
 import { PositionType } from "@prisma/client";
+import { toast } from "sonner";
 
 interface PosteTemplate {
   id: string;
@@ -21,7 +22,17 @@ interface PosteTemplate {
   actif: boolean;
 }
 
-export default function ElectionForm({ electionId, hideActions, onDirtyChange }: { electionId?: string; hideActions?: boolean; onDirtyChange?: (dirty: boolean) => void; }) {
+export default function ElectionForm({ 
+  electionId, 
+  hideActions, 
+  onDirtyChange,
+  onSuccess 
+}: { 
+  electionId?: string; 
+  hideActions?: boolean; 
+  onDirtyChange?: (dirty: boolean) => void;
+  onSuccess?: () => void;
+}) {
   const isEdit = !!electionId;
   const [postesTemplates, setPostesTemplates] = useState<PosteTemplate[]>([]);
   const [selectedPostes, setSelectedPostes] = useState<string[]>([]);
@@ -144,12 +155,12 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
           initialForm.quorumRequis === electionForm.quorumRequis &&
           initialForm.majoriteRequis === electionForm.majoriteRequis
         ) {
-          alert("Aucune modification détectée");
+          toast.info("Aucune modification détectée");
           return;
         }
         // Validation côté client des dates
         if (!electionForm.dateClotureCandidature) {
-          alert("La date de clôture des candidatures est obligatoire");
+          toast.error("La date de clôture des candidatures est obligatoire");
           return;
         }
 
@@ -159,17 +170,17 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
         const dateCloture = new Date(electionForm.dateCloture);
 
         if (dateOuverture >= dateClotureCandidature) {
-          alert("La date d'ouverture doit être antérieure à la date de clôture des candidatures");
+          toast.error("La date d'ouverture doit être antérieure à la date de clôture des candidatures");
           return;
         }
 
         if (dateClotureCandidature >= dateScrutin) {
-          alert("La date de clôture des candidatures doit être antérieure à la date du scrutin");
+          toast.error("La date de clôture des candidatures doit être antérieure à la date du scrutin");
           return;
         }
 
         if (dateCloture <= dateScrutin) {
-          alert("La date de clôture doit être postérieure à la date du scrutin");
+          toast.error("La date de clôture doit être postérieure à la date du scrutin");
           return;
         }
 
@@ -185,19 +196,19 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
           majoriteRequis: electionForm.majoriteRequis,
         });
         if (!res.success) {
-          alert(res.error || "Erreur lors de la mise à jour de l'élection");
+          toast.error(res.error || "Erreur lors de la mise à jour de l'élection");
           return;
         }
-        alert("Élection mise à jour avec succès !");
+        toast.success("Élection mise à jour avec succès !");
       } else {
         if (selectedPostes.length === 0) {
-          alert("Veuillez sélectionner au moins un poste pour créer l'élection");
+          toast.error("Veuillez sélectionner au moins un poste pour créer l'élection");
           return;
         }
 
         // Validation côté client des dates
         if (!electionForm.dateClotureCandidature) {
-          alert("La date de clôture des candidatures est obligatoire");
+          toast.error("La date de clôture des candidatures est obligatoire");
           return;
         }
 
@@ -207,17 +218,17 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
         const dateCloture = new Date(electionForm.dateCloture);
 
         if (dateOuverture >= dateClotureCandidature) {
-          alert("La date d'ouverture doit être antérieure à la date de clôture des candidatures");
+          toast.error("La date d'ouverture doit être antérieure à la date de clôture des candidatures");
           return;
         }
 
         if (dateClotureCandidature >= dateScrutin) {
-          alert("La date de clôture des candidatures doit être antérieure à la date du scrutin");
+          toast.error("La date de clôture des candidatures doit être antérieure à la date du scrutin");
           return;
         }
 
         if (dateCloture <= dateScrutin) {
-          alert("La date de clôture doit être postérieure à la date du scrutin");
+          toast.error("La date de clôture doit être postérieure à la date du scrutin");
           return;
         }
 
@@ -236,14 +247,19 @@ export default function ElectionForm({ electionId, hideActions, onDirtyChange }:
           selectedPostes
         );
         if (!res.success) {
-          alert(res.error || "Erreur lors de la création de l'élection");
+          toast.error(res.error || "Erreur lors de la création de l'élection");
           return;
         }
-        alert("Élection créée avec succès !");
+        toast.success("Élection créée avec succès !");
+        
+        // Appeler le callback de succès si fourni (pour fermer le dialog et rediriger)
+        if (onSuccess) {
+          onSuccess();
+        }
       }
     } catch (err) {
       console.error(err);
-      alert(isEdit ? "Erreur lors de la mise à jour de l'élection" : "Erreur lors de la création de l'élection");
+      toast.error(isEdit ? "Erreur lors de la mise à jour de l'élection" : "Erreur lors de la création de l'élection");
     } finally {
       setLoading(false);
     }

@@ -9,6 +9,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Award, 
   Search, 
@@ -22,7 +30,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  MoreHorizontal
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -433,46 +442,58 @@ export default function AdminBadgesPage() {
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
+      header: () => <div className="text-center w-full">Actions</div>,
       meta: { forceVisible: true },
       enableResizing: false,
       cell: ({ row }) => {
         const badge = row.original;
         return (
-          <div className="flex items-center gap-1 sm:gap-2">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openEditDialog(badge)}
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/20"
-              title="Éditer"
-            >
-              <Edit className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => openAttribuerDialog(badge)}
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-green-300 hover:bg-green-50 dark:border-green-700 dark:hover:bg-green-900/20"
-              title="Attribuer"
-            >
-              <UserPlus className="h-3 w-3 sm:h-4 sm:w-4 text-green-600 dark:text-green-400" />
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDelete(badge.id)}
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-red-300 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-900/20"
-              title="Supprimer"
-            >
-              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4 text-red-600 dark:text-red-400" />
-            </Button>
+          <div className="flex items-center justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Actions"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Ouvrir le menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => openEditDialog(badge)}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Edit className="h-4 w-4" />
+                  <span>Éditer</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => openAttribuerDialog(badge)}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  <span>Attribuer</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => handleDelete(badge.id)}
+                  className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Supprimer</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
-      size: 200,
-      minSize: 180,
-      maxSize: 250,
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
     }),
   ], []);
 

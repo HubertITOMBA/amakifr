@@ -8,6 +8,17 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuSub,
+  DropdownMenuSubContent,
+  DropdownMenuSubTrigger,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   Users, 
   Search, 
@@ -20,7 +31,8 @@ import {
   Mail,
   Award,
   Briefcase,
-  Loader2
+  Loader2,
+  MoreHorizontal
 } from "lucide-react";
 import { UserRole, UserStatus } from "@prisma/client";
 import { 
@@ -582,8 +594,9 @@ export default function AdminUsersPage() {
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
+      header: () => <div className="text-center w-full">Actions</div>,
       meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
+      enableResizing: false,
       cell: ({ row }) => {
         const user = row.original;
         const role = user.role;
@@ -594,97 +607,106 @@ export default function AdminUsersPage() {
           return currentStatus === UserStatus.Actif ? UserStatus.Inactif : UserStatus.Actif;
         };
 
-        // Couleurs pour les boutons
-        const getRoleButtonColor = (r: UserRole) => {
-          if (r === UserRole.Admin) return "bg-red-100 hover:bg-red-200 text-red-800 dark:bg-red-900 dark:hover:bg-red-800 dark:text-red-200 border-red-300 dark:border-red-700";
-          if (r === UserRole.Membre) return "bg-blue-100 hover:bg-blue-200 text-blue-800 dark:bg-blue-900 dark:hover:bg-blue-800 dark:text-blue-200 border-blue-300 dark:border-blue-700";
-          return "bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700";
-        };
-
-        const getStatusButtonColor = (s: UserStatus) => {
-          if (s === UserStatus.Actif) return "bg-green-100 hover:bg-green-200 text-green-800 dark:bg-green-900 dark:hover:bg-green-800 dark:text-green-200 border-green-300 dark:border-green-700";
-          return "bg-gray-100 hover:bg-gray-200 text-gray-800 dark:bg-gray-900 dark:hover:bg-gray-800 dark:text-gray-200 border-gray-300 dark:border-gray-700";
-        };
-
         return (
-          <div className="flex items-center gap-1 sm:gap-1.5 flex-wrap">
-            <Link href={`/admin/users/${user.id}/consultation`}>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                title="Voir les détails" 
-                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/30"
-              >
-                <Eye className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              </Button>
-            </Link>
-            <Link href={`/admin/users/${user.id}/edition`}>
-              <Button 
-                size="sm" 
-                variant="outline" 
-                title="Éditer" 
-                className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/30"
-              >
-                <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-              </Button>
-            </Link>
-            {/* Select Rôle compact */}
-            <Select 
-              value={role} 
-              onValueChange={(value) => handleRoleChange(user.id, value as UserRole)}
-            >
-              <SelectTrigger 
-                className={`h-7 w-7 sm:h-8 sm:w-8 p-0 text-xs font-bold ${getRoleButtonColor(role)} border`}
-                title={`Rôle: ${getRoleLabel(role)}. Cliquer pour changer`}
-              >
-                <SelectValue>
-                  {role === UserRole.Admin ? "A" : role === UserRole.Membre ? "M" : "I"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={UserRole.Admin}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-red-600 font-bold">A</span>
-                    <span>Admin</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value={UserRole.Membre}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-blue-600 font-bold">M</span>
-                    <span>Membre</span>
-                  </div>
-                </SelectItem>
-                <SelectItem value={UserRole.Invite}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-gray-600 font-bold">I</span>
-                    <span>Invité</span>
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-            {/* Bouton Statut compact */}
-            <Button
-              size="sm"
-              variant="outline"
-              title={`Statut: ${getStatusLabel(status)}. Cliquer pour changer en ${getStatusLabel(getNextStatus(status))}`}
-              onClick={() => handleStatusChange(user.id, getNextStatus(status))}
-              className={`h-7 w-7 sm:h-8 sm:w-8 p-0 text-xs font-bold ${getStatusButtonColor(status)}`}
-            >
-              {status === UserStatus.Actif ? "A" : "I"}
-            </Button>
-            {/* Bouton Envoyer un email */}
-            <Button
-              size="sm"
-              variant="outline"
-              title="Envoyer un email à cet adhérent"
-              onClick={() => handleSendEmailToUser(user.id)}
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/30"
-            >
-              <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-            </Button>
+          <div className="flex items-center justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Actions"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Ouvrir le menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href={`/admin/users/${user.id}/consultation`} className="flex items-center gap-2 cursor-pointer">
+                    <Eye className="h-4 w-4" />
+                    <span>Voir les détails</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <Link href={`/admin/users/${user.id}/edition`} className="flex items-center gap-2 cursor-pointer">
+                    <Edit className="h-4 w-4" />
+                    <span>Éditer</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuSub>
+                  <DropdownMenuSubTrigger className="flex items-center gap-2">
+                    <Shield className="h-4 w-4" />
+                    <span>Changer le rôle</span>
+                  </DropdownMenuSubTrigger>
+                  <DropdownMenuSubContent>
+                    <DropdownMenuItem 
+                      onClick={() => handleRoleChange(user.id, UserRole.Admin)}
+                      className={role === UserRole.Admin ? "bg-red-50 dark:bg-red-900/20" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-red-600 dark:text-red-400 font-bold">A</span>
+                        <span>Admin</span>
+                        {role === UserRole.Admin && <span className="ml-auto text-xs">✓</span>}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleRoleChange(user.id, UserRole.Membre)}
+                      className={role === UserRole.Membre ? "bg-blue-50 dark:bg-blue-900/20" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-blue-600 dark:text-blue-400 font-bold">M</span>
+                        <span>Membre</span>
+                        {role === UserRole.Membre && <span className="ml-auto text-xs">✓</span>}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleRoleChange(user.id, UserRole.Invite)}
+                      className={role === UserRole.Invite ? "bg-gray-50 dark:bg-gray-900/20" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-gray-600 dark:text-gray-400 font-bold">I</span>
+                        <span>Invité</span>
+                        {role === UserRole.Invite && <span className="ml-auto text-xs">✓</span>}
+                      </div>
+                    </DropdownMenuItem>
+                  </DropdownMenuSubContent>
+                </DropdownMenuSub>
+                <DropdownMenuItem 
+                  onClick={() => handleStatusChange(user.id, getNextStatus(status))}
+                  className="flex items-center gap-2"
+                >
+                  {status === UserStatus.Actif ? (
+                    <>
+                      <UserX className="h-4 w-4 text-orange-600 dark:text-orange-400" />
+                      <span>Désactiver</span>
+                    </>
+                  ) : (
+                    <>
+                      <UserCheck className="h-4 w-4 text-green-600 dark:text-green-400" />
+                      <span>Activer</span>
+                    </>
+                  )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => handleSendEmailToUser(user.id)}
+                  className="flex items-center gap-2"
+                >
+                  <Mail className="h-4 w-4" />
+                  <span>Envoyer un email</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
     }),
   ], [handleRoleChange, handleStatusChange, handlePosteChange, handleSendEmailToUser, postes, filteredUsers]);
 

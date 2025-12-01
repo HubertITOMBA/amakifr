@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Calendar, Plus, Eye, Edit, Trash2, Search, Filter, Mail } from "lucide-react";
+import { Calendar, Plus, Eye, Edit, Trash2, Search, Filter, Mail, MoreHorizontal } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { getAllEvenements, deleteEvenement } from "@/actions/evenements";
 import { toast } from "sonner";
@@ -14,6 +14,14 @@ import { createColumnHelper, flexRender, getCoreRowModel, getFilteredRowModel, g
 import type { EvenementData } from "@/actions/evenements";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 import { EventInvitationModal } from "@/components/admin/EventInvitationModal";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 const columnHelper = createColumnHelper<EvenementData>();
 
@@ -122,47 +130,71 @@ export default function AdminEvenementsPage() {
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
-      meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
+      header: () => <div className="text-center w-full">Actions</div>,
+      meta: { forceVisible: true },
+      enableResizing: false,
       cell: ({ row }) => {
         const e = row.original;
         return (
-          <div className="flex space-x-2">
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => router.push(`/admin/evenements/${e.id}/consultation`)}
-            >
-              <Eye className="h-4 w-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => {
-                // Stocker la page actuelle pour pouvoir y revenir après annulation
-                if (typeof window !== "undefined") {
-                  sessionStorage.setItem("previousEventPage", window.location.pathname);
-                }
-                router.push(`/admin/evenements/${e.id}/edition`);
-                router.refresh();
-              }}
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => setSelectedEvenementForInvitation({ id: e.id, titre: e.titre })}
-              title="Envoyer des invitations"
-            >
-              <Mail className="h-4 w-4" />
-            </Button>
-            <Button size="sm" variant="outline" onClick={() => handleDelete(e.id)}>
-              <Trash2 className="h-4 w-4" />
-            </Button>
+          <div className="flex items-center justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Actions"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Ouvrir le menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => router.push(`/admin/evenements/${e.id}/consultation`)}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span>Voir les détails</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      sessionStorage.setItem("previousEventPage", window.location.pathname);
+                    }
+                    router.push(`/admin/evenements/${e.id}/edition`);
+                    router.refresh();
+                  }}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Edit className="h-4 w-4" />
+                  <span>Éditer</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => setSelectedEvenementForInvitation({ id: e.id, titre: e.titre })}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Mail className="h-4 w-4" />
+                  <span>Envoyer des invitations</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => handleDelete(e.id)}
+                  className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                >
+                  <Trash2 className="h-4 w-4" />
+                  <span>Supprimer</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
     }),
   ], []);
 

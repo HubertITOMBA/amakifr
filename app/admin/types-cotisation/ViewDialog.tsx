@@ -42,27 +42,39 @@ interface TypeCotisationMensuelle {
 
 interface ViewDialogProps {
   type: TypeCotisationMensuelle;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  triggerButton?: React.ReactNode;
 }
 
 /**
  * Composant Dialog pour afficher les détails d'un type de cotisation
  * 
  * @param type - Le type de cotisation à afficher
+ * @param open - État contrôlé d'ouverture (optionnel)
+ * @param onOpenChange - Callback pour changer l'état d'ouverture (optionnel)
+ * @param triggerButton - Bouton personnalisé pour déclencher l'ouverture (optionnel)
  */
-export function ViewDialog({ type }: ViewDialogProps) {
-  const [open, setOpen] = useState(false);
+export function ViewDialog({ type, open: controlledOpen, onOpenChange, triggerButton }: ViewDialogProps) {
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
 
   return (
     <>
-      <Button
-        variant="outline"
-        size="sm"
-        className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
-        onClick={() => setOpen(true)}
-        title="Voir les détails"
-      >
-        <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
-      </Button>
+      {triggerButton ? (
+        <div onClick={() => setOpen(true)}>{triggerButton}</div>
+      ) : (
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
+          onClick={() => setOpen(true)}
+          title="Voir les détails"
+        >
+          <Eye className="h-3 w-3 sm:h-4 sm:w-4" />
+        </Button>
+      )}
 
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="sm:max-w-3xl max-h-[95vh] overflow-y-auto p-0 gap-0">
