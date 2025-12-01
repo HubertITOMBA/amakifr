@@ -47,14 +47,22 @@ export default auth((req: NextRequest) => {
     
     // Debug en développement
     if (process.env.NODE_ENV === 'development') {
-        if (nextUrl.pathname === '/auth/sign-in' || nextUrl.pathname.startsWith('/admin')) {
-            console.log('[Middleware]', nextUrl.pathname, '- isAuthRoute:', isAuthRoute, 'isPublicRoute:', isPublicRouteCheck, 'isLoggedIn:', isLoggedIn, 'req.auth:', !!req.auth, 'req.auth?.user:', !!req.auth?.user, 'user.id:', req.auth?.user?.id, 'user.email:', req.auth?.user?.email, 'user.role:', req.auth?.user?.role);
+        if (nextUrl.pathname === '/auth/sign-in' || nextUrl.pathname.startsWith('/admin') || nextUrl.pathname === '/') {
+            const host = req.headers.get('host') || 'unknown';
+            console.log('[Middleware]', nextUrl.pathname, '- Host:', host, '- isAuthRoute:', isAuthRoute, 'isPublicRoute:', isPublicRouteCheck, 'isLoggedIn:', isLoggedIn, 'req.auth:', !!req.auth, 'req.auth?.user:', !!req.auth?.user, 'user.id:', req.auth?.user?.id, 'user.email:', req.auth?.user?.email, 'user.role:', req.auth?.user?.role);
             if (hasAuthCookies && !req.auth) {
                 console.log('[Middleware] ⚠️ Cookies présents mais req.auth est undefined - cookies:', {
                     'next-auth.session-token': req.cookies.has('next-auth.session-token'),
                     '__Secure-next-auth.session-token': req.cookies.has('__Secure-next-auth.session-token'),
                     'authjs.session-token': req.cookies.has('authjs.session-token'),
+                    'next-auth.csrf-token': req.cookies.has('next-auth.csrf-token'),
                 });
+            }
+            // Afficher tous les cookies pour le débogage
+            const allCookies = req.cookies.getAll();
+            const authCookiesList = allCookies.filter(c => c.name.includes('auth') || c.name.includes('session'));
+            if (authCookiesList.length > 0) {
+                console.log('[Middleware] Cookies d\'authentification trouvés:', authCookiesList.map(c => c.name));
             }
         }
     }
@@ -64,15 +72,24 @@ export default auth((req: NextRequest) => {
     // Et seulement si on n'est pas sur une route publique (pour éviter de supprimer les cookies sur les pages publiques)
     // Et seulement si on n'est pas sur une route de callback OAuth (pour éviter de supprimer les cookies PKCE pendant le flux OAuth)
     // Ne supprimer les cookies que si on est sûr qu'ils sont invalides (pas de req.auth du tout)
-        if (hasAuthCookies && !req.auth && !isAuthRoute && !isPublicRouteCheck && !isAuthCallbackRoute) {
-            const response = NextResponse.next();
-            response.cookies.set('next-auth.session-token', '', { expires: new Date(0), path: '/' });
-            response.cookies.set('__Secure-next-auth.session-token', '', { expires: new Date(0), path: '/' });
-            response.cookies.set('next-auth.csrf-token', '', { expires: new Date(0), path: '/' });
-            response.cookies.set('authjs.session-token', '', { expires: new Date(0), path: '/' });
-            response.cookies.set('authjs.csrf-token', '', { expires: new Date(0), path: '/' });
-            return addSecurityHeaders(response, req);
-        }
+    // ET seulement après un délai pour permettre à la session de s'établir après la connexion
+    // Ne pas supprimer les cookies sur la page d'accueil "/" même si elle est publique, car c'est la destination après connexion
+    // Ne pas supprimer les cookies si on vient juste de se connecter (détecter via un header ou un paramètre)
+    // Ou si on est sur la page d'accueil avec le paramètre loggedIn
+    const isJustLoggedIn = req.headers.get('x-just-logged-in') === 'true' || 
+                           nextUrl.searchParams.get('loggedIn') === 'true' ||
+                           (nextUrl.pathname === '/' && nextUrl.searchParams.has('loggedIn'));
+    
+    if (hasAuthCookies && !req.auth && !isAuthRoute && !isPublicRouteCheck && !isAuthCallbackRoute && 
+        nextUrl.pathname !== '/' && !isJustLoggedIn) {
+        const response = NextResponse.next();
+        response.cookies.set('next-auth.session-token', '', { expires: new Date(0), path: '/' });
+        response.cookies.set('__Secure-next-auth.session-token', '', { expires: new Date(0), path: '/' });
+        response.cookies.set('next-auth.csrf-token', '', { expires: new Date(0), path: '/' });
+        response.cookies.set('authjs.session-token', '', { expires: new Date(0), path: '/' });
+        response.cookies.set('authjs.csrf-token', '', { expires: new Date(0), path: '/' });
+        return addSecurityHeaders(response, req);
+    }
     
     // Rate limiting pour les routes API critiques
     if (nextUrl.pathname.startsWith('/api/')) {

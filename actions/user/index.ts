@@ -468,6 +468,18 @@ export async function updateUserData(
       return { success: false, message: "Non autorisé" };
     }
 
+    // Vérifier l'unicité du nom si le nom est modifié
+    if (userData.name) {
+      const existingUserByName = await prisma.user.findUnique({
+        where: { name: userData.name }
+      });
+      
+      // Si un utilisateur avec ce nom existe et que ce n'est pas l'utilisateur actuel
+      if (existingUserByName && existingUserByName.id !== session.user.id) {
+        return { success: false, message: "Ce nom est déjà utilisé par un autre utilisateur !" };
+      }
+    }
+
     // Mise à jour des données utilisateur
     const updatedUser = await prisma.user.update({
       where: { id: session.user.id },
@@ -704,8 +716,18 @@ export async function updateUserData(
       adresse
     };
 
-  } catch (error) {
+  } catch (error: any) {
     console.error("Erreur lors de la mise à jour:", error);
+    
+    // Gérer l'erreur de contrainte unique sur le nom
+    if (error?.code === 'P2002' && error?.meta?.target?.includes('name')) {
+      return { success: false, message: "Ce nom est déjà utilisé par un autre utilisateur !" };
+    }
+    // Gérer l'erreur de contrainte unique sur l'email
+    if (error?.code === 'P2002' && error?.meta?.target?.includes('email')) {
+      return { success: false, message: "Cet email est déjà utilisé !" };
+    }
+    
     return { success: false, message: "Erreur lors de la mise à jour" };
   }
 }
@@ -1333,6 +1355,18 @@ export async function adminUpdateUser(userId: string, data: { name?: string; ema
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
 
+    // Vérifier l'unicité du nom si le nom est modifié
+    if (data.name !== undefined && data.name) {
+      const existingUserByName = await prisma.user.findUnique({
+        where: { name: data.name }
+      });
+      
+      // Si un utilisateur avec ce nom existe et que ce n'est pas l'utilisateur actuel
+      if (existingUserByName && existingUserByName.id !== userId) {
+        return { success: false, error: "Ce nom est déjà utilisé par un autre utilisateur !" };
+      }
+    }
+
     const updated = await prisma.user.update({
       where: { id: userId },
       data: {
@@ -1351,8 +1385,18 @@ export async function adminUpdateUser(userId: string, data: { name?: string; ema
     });
 
     return { success: true, user: updated };
-  } catch (e) {
+  } catch (e: any) {
     console.error("Erreur adminUpdateUser:", e);
+    
+    // Gérer l'erreur de contrainte unique sur le nom
+    if (e?.code === 'P2002' && e?.meta?.target?.includes('name')) {
+      return { success: false, error: "Ce nom est déjà utilisé par un autre utilisateur !" };
+    }
+    // Gérer l'erreur de contrainte unique sur l'email
+    if (e?.code === 'P2002' && e?.meta?.target?.includes('email')) {
+      return { success: false, error: "Cet email est déjà utilisé !" };
+    }
+    
     return { success: false, error: "Erreur lors de la mise à jour de l'utilisateur" };
   }
 }

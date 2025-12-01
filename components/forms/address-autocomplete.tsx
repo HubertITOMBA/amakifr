@@ -52,20 +52,32 @@ export function AddressAutocomplete({
       const prevValue = prevValueRef.current;
       prevValueRef.current = value;
       
-      // Ne mettre à jour que si la valeur est vraiment différente
-      // et qu'elle ne correspond pas à l'adresse actuellement sélectionnée
-      const shouldUpdate = value !== searchTerm && 
-                          (!selectedAddress || (selectedAddress.street !== value && selectedAddress.label !== value));
+      // Si la valeur correspond à l'adresse sélectionnée (par street, label ou ID), ne rien faire
+      if (selectedAddress) {
+        const addressStreet = selectedAddress.street || "";
+        const addressLabel = selectedAddress.label || "";
+        const addressId = selectedAddress.id || "";
+        const currentSearchTerm = searchTerm || "";
+        
+        // Si la valeur correspond à une propriété de l'adresse sélectionnée, ne pas réinitialiser
+        // Cela évite de réinitialiser quand le parent met à jour street1 avec la valeur extraite
+        if (value === addressStreet || value === addressLabel || value === addressId || value === currentSearchTerm) {
+          return;
+        }
+      }
       
-      if (shouldUpdate) {
+      // Sinon, mettre à jour searchTerm et réinitialiser selectedAddress
+      // Si value est vide, réinitialiser tout
+      if (!value || value.trim().length === 0) {
+        setSearchTerm("");
+        setSelectedAddress(null);
+      } else {
+        // Si la valeur ne correspond pas à l'adresse sélectionnée, mettre à jour
         setSearchTerm(value);
-        // Si la valeur ne correspond ni au nom de la rue ni au label de l'adresse sélectionnée, réinitialiser
-        if (!selectedAddress || (selectedAddress.street !== value && selectedAddress.label !== value)) {
+        // Ne réinitialiser selectedAddress que si la valeur ne correspond pas à l'ID de l'adresse
+        if (!selectedAddress || selectedAddress.id !== value) {
           setSelectedAddress(null);
         }
-      } else {
-        // Si on ne met pas à jour, restaurer la ref précédente
-        prevValueRef.current = prevValue;
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -112,38 +124,69 @@ export function AddressAutocomplete({
     setSelectedAddress(address);
     // Afficher le nom de la rue (street) plutôt que l'adresse complète (label)
     // pour correspondre à ce qui est stocké dans street1
-    const displayValue = address.street || address.label.split(",")[0].replace(/^\d+\s*/, "").trim();
+    const displayValue = address.street || address.label.split(",")[0].replace(/^\d+(\s+(bis|ter|quater))?\s*/, "").trim();
     setSearchTerm(displayValue);
-    prevValueRef.current = displayValue; // Mettre à jour la ref pour éviter la resynchronisation
+    prevValueRef.current = address.id; // Utiliser l'ID pour la correspondance avec option.value
+    
+    // Notifier le parent immédiatement avec l'adresse complète
+    // Cela déclenchera handleAddressChange qui mettra à jour street1, codepost, city, etc.
     if (onValueChange) {
       onValueChange(address);
     }
   }, [onValueChange]);
 
   // Formater les options pour l'Autocomplete
+  // Utiliser l'ID comme value pour permettre la correspondance exacte
   const options = addresses.map((address) => ({
-    value: address.id,
-    label: address.label,
-    code: `${address.postcode} ${address.city}`,
+    value: address.id, // ID unique pour la correspondance
+    label: address.label, // Label affiché
+    code: `${address.postcode} ${address.city}`, // Code postal et ville en sous-titre
   }));
 
   // Gérer la sélection depuis l'Autocomplete
   const handleValueChange = useCallback((selectedValue: string) => {
-    // Trouver l'adresse correspondante AVANT de mettre à jour searchTerm
-    const address = addresses.find((a) => a.id === selectedValue || a.label === selectedValue);
+    if (!selectedValue || selectedValue.trim().length === 0) {
+      // Valeur vide
+      isInternalUpdateRef.current = true;
+      setSearchTerm("");
+      setSelectedAddress(null);
+      prevValueRef.current = "";
+      if (onValueChange) {
+        onValueChange(null);
+      }
+      return;
+    }
+
+    // Trouver l'adresse correspondante
+    // selectedValue est normalement l'ID de l'adresse (option.value) quand on sélectionne depuis la liste
+    // ou une chaîne de texte quand c'est une saisie libre
+    const address = addresses.find((a) => a.id === selectedValue);
     
     if (address) {
-      // Si une adresse est trouvée, l'utiliser
+      // Si une adresse est trouvée dans la liste, l'utiliser
+      // Cela mettra à jour selectedAddress et appellera onValueChange avec l'adresse complète
       handleSelect(address);
+    } else if (selectedValue.startsWith("free-text-")) {
+      // C'est une saisie libre déjà formatée, ne rien faire (déjà géré)
+      return;
     } else {
-      // Sinon, mettre à jour le terme de recherche (saisie manuelle)
+      // Sinon, c'est une saisie libre - mettre à jour directement
+      isInternalUpdateRef.current = true;
       setSearchTerm(selectedValue);
-      // Si la valeur est vide, réinitialiser
-      if (!selectedValue) {
-        setSelectedAddress(null);
-        if (onValueChange) {
-          onValueChange(null);
-        }
+      setSelectedAddress(null);
+      prevValueRef.current = selectedValue;
+      
+      // Notifier le parent avec un objet AddressResult minimal pour la saisie libre
+      if (onValueChange) {
+        const freeTextAddress: AddressResult = {
+          id: `free-text-${Date.now()}`,
+          label: selectedValue,
+          street: selectedValue,
+          postcode: "",
+          city: "",
+          housenumber: "",
+        };
+        onValueChange(freeTextAddress);
       }
     }
   }, [addresses, handleSelect, onValueChange]);
@@ -151,14 +194,14 @@ export function AddressAutocomplete({
   return (
     <div className={className}>
       <Autocomplete
-        value={selectedAddress?.street || selectedAddress?.label || searchTerm || ""}
+        value={selectedAddress?.id || ""}
         onValueChange={handleValueChange}
         onSearchChange={(newSearch) => {
           isInternalUpdateRef.current = true; // Marquer comme mise à jour interne
           setSearchTerm(newSearch);
           // Si l'utilisateur tape, réinitialiser l'adresse sélectionnée
           const currentStreet = selectedAddress?.street || selectedAddress?.label;
-          if (newSearch !== currentStreet) {
+          if (newSearch !== currentStreet && newSearch !== selectedAddress?.id) {
             setSelectedAddress(null);
           }
           prevValueRef.current = newSearch; // Mettre à jour la ref
@@ -167,6 +210,7 @@ export function AddressAutocomplete({
         placeholder={placeholder}
         disabled={disabled}
         loading={loading}
+        allowFreeText={true}
         emptyMessage={
           loading ? (
             <div className="flex items-center justify-center gap-2 py-4">

@@ -23,7 +23,7 @@ const navigation = [
   { name: 'Galerie', href: '/galerie' },
   // { name: 'Upload', href: '/upload' },
   { name: 'Contact', href: '/contact' },
- // { name: 'Résultats', href: '/resultats' },
+  { name: 'Résultats', href: '/resultats' },
   // { name: 'Elections', href: '/elections' },
   // { name: 'Candidatures', href: '/candidatures' },
   // { name: 'Vote', href: '/vote' },

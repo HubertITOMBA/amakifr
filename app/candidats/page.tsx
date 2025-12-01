@@ -18,7 +18,7 @@ import { exportCandidatsToPDF, exportCandidatsToWord } from "@/lib/export-candid
 import { PositionType } from "@prisma/client";
 import { POSTES_LABELS } from "@/lib/elections-constants";
 
-// Données statiques des candidats (seront remplacées par les données de la base plus tard)
+// Données statiques des candidats (seront importées dans la base par l'admin)
 const STATIC_CANDIDATES = [
   {
     position: PositionType.President,

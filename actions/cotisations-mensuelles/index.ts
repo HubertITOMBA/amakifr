@@ -15,6 +15,7 @@ const CreateTypeCotisationSchema = z.object({
   obligatoire: z.boolean().default(true),
   actif: z.boolean().default(true),
   ordre: z.number().int().min(0).default(0),
+  aBeneficiaire: z.boolean().default(false), // Si ce type nécessite un adhérent bénéficiaire
 });
 
 const UpdateTypeCotisationSchema = z.object({
@@ -25,6 +26,7 @@ const UpdateTypeCotisationSchema = z.object({
   obligatoire: z.boolean().optional(),
   actif: z.boolean().optional(),
   ordre: z.number().int().min(0).optional(),
+  aBeneficiaire: z.boolean().optional(), // Si ce type nécessite un adhérent bénéficiaire
 });
 
 const CreateCotisationMensuelleSchema = z.object({
@@ -61,14 +63,36 @@ export async function createTypeCotisationMensuelle(data: z.infer<typeof CreateT
         obligatoire: validatedData.obligatoire,
         actif: validatedData.actif,
         ordre: validatedData.ordre,
+        aBeneficiaire: validatedData.aBeneficiaire,
         createdBy: session.user.id,
       },
+      include: {
+        CreatedBy: {
+          select: {
+            id: true,
+            email: true,
+          }
+        }
+      }
     });
 
-    // Convertir les Decimal en Number
+    // Sérialisation complète pour éviter les erreurs de passage aux composants clients
     const typeCotisationConverted = {
-      ...typeCotisation,
-      montant: Number(typeCotisation.montant)
+      id: typeCotisation.id,
+      nom: typeCotisation.nom,
+      description: typeCotisation.description,
+      montant: Number(typeCotisation.montant),
+      obligatoire: typeCotisation.obligatoire,
+      actif: typeCotisation.actif,
+      ordre: typeCotisation.ordre,
+      aBeneficiaire: typeCotisation.aBeneficiaire || false,
+      createdBy: typeCotisation.createdBy,
+      createdAt: typeCotisation.createdAt,
+      updatedAt: typeCotisation.updatedAt,
+      CreatedBy: typeCotisation.CreatedBy ? {
+        id: typeCotisation.CreatedBy.id,
+        email: typeCotisation.CreatedBy.email,
+      } : null,
     };
 
     return { success: true, data: typeCotisationConverted };
@@ -107,10 +131,26 @@ export async function getAllTypesCotisationMensuelle() {
       ]
     });
 
-    // Conversion des Decimal en nombres
+    // Conversion des Decimal en nombres (sérialisation complète pour éviter les erreurs de passage aux composants clients)
     const typesCotisationConverted = typesCotisation.map((type: any) => ({
-      ...type,
-      montant: Number(type.montant)
+      id: type.id,
+      nom: type.nom,
+      description: type.description,
+      montant: Number(type.montant),
+      obligatoire: type.obligatoire,
+      actif: type.actif,
+      ordre: type.ordre,
+      aBeneficiaire: type.aBeneficiaire || false,
+      createdBy: type.createdBy,
+      createdAt: type.createdAt,
+      updatedAt: type.updatedAt,
+      CreatedBy: type.CreatedBy ? {
+        id: type.CreatedBy.id,
+        email: type.CreatedBy.email,
+      } : null,
+      _count: type._count ? {
+        CotisationsMensuelles: type._count.CotisationsMensuelles,
+      } : null,
     }));
 
     return { success: true, data: typesCotisationConverted };
@@ -131,16 +171,18 @@ export async function updateTypeCotisationMensuelle(data: z.infer<typeof UpdateT
 
     const validatedData = UpdateTypeCotisationSchema.parse(data);
 
+    const updateData: any = {};
+    if (validatedData.nom !== undefined) updateData.nom = validatedData.nom;
+    if (validatedData.description !== undefined) updateData.description = validatedData.description;
+    if (validatedData.montant !== undefined) updateData.montant = validatedData.montant;
+    if (validatedData.obligatoire !== undefined) updateData.obligatoire = validatedData.obligatoire;
+    if (validatedData.actif !== undefined) updateData.actif = validatedData.actif;
+    if (validatedData.ordre !== undefined) updateData.ordre = validatedData.ordre;
+    if (validatedData.aBeneficiaire !== undefined) updateData.aBeneficiaire = validatedData.aBeneficiaire;
+
     const typeCotisation = await prisma.typeCotisationMensuelle.update({
       where: { id: validatedData.id },
-      data: {
-        nom: validatedData.nom,
-        description: validatedData.description,
-        montant: validatedData.montant,
-        obligatoire: validatedData.obligatoire,
-        actif: validatedData.actif,
-        ordre: validatedData.ordre,
-      },
+      data: updateData,
       include: {
         CreatedBy: {
           select: {
@@ -151,10 +193,23 @@ export async function updateTypeCotisationMensuelle(data: z.infer<typeof UpdateT
       }
     });
 
-    // Convertir les Decimal en Number
+    // Sérialisation complète pour éviter les erreurs de passage aux composants clients
     const typeCotisationConverted = {
-      ...typeCotisation,
-      montant: Number(typeCotisation.montant)
+      id: typeCotisation.id,
+      nom: typeCotisation.nom,
+      description: typeCotisation.description,
+      montant: Number(typeCotisation.montant),
+      obligatoire: typeCotisation.obligatoire,
+      actif: typeCotisation.actif,
+      ordre: typeCotisation.ordre,
+      aBeneficiaire: typeCotisation.aBeneficiaire || false,
+      createdBy: typeCotisation.createdBy,
+      createdAt: typeCotisation.createdAt,
+      updatedAt: typeCotisation.updatedAt,
+      CreatedBy: typeCotisation.CreatedBy ? {
+        id: typeCotisation.CreatedBy.id,
+        email: typeCotisation.CreatedBy.email,
+      } : null,
     };
 
     return { success: true, data: typeCotisationConverted };
@@ -241,104 +296,133 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
       return { success: false, error: "Aucun adhérent actif trouvé (hors administrateur)" };
     }
 
-    // Trouver le type "Forfait Mensuel" (obligatoire)
-    const typeForfait = await prisma.typeCotisationMensuelle.findFirst({
+    // Récupérer toutes les cotisations du mois pour cette période
+    const cotisationsDuMois = await prisma.cotisationDuMois.findMany({
       where: {
-        nom: { contains: "Forfait", mode: "insensitive" },
-        obligatoire: true,
-        actif: true
-      },
-      orderBy: {
-        ordre: "asc"
-      }
-    });
-
-    if (!typeForfait) {
-      return { success: false, error: "Type de cotisation 'Forfait Mensuel' non trouvé. Veuillez créer ce type de cotisation." };
-    }
-
-    // Dates pour filtrer les assistances du mois
-    const startOfMonth = new Date(validatedData.annee, validatedData.mois - 1, 1);
-    const endOfMonth = new Date(validatedData.annee, validatedData.mois, 0, 23, 59, 59);
-
-    // Récupérer TOUTES les assistances du mois (pour tous les adhérents)
-    const toutesAssistancesDuMois = await prisma.assistance.findMany({
-      where: {
-        dateEvenement: {
-          gte: startOfMonth,
-          lte: endOfMonth
-        },
-        statut: { not: "Annule" } // Exclure les assistances annulées
+        periode,
+        statut: { not: "Annule" } // Exclure les cotisations annulées
       },
       include: {
-        Adherent: {
+        TypeCotisation: {
+          select: {
+            id: true,
+            nom: true,
+            montant: true,
+            obligatoire: true,
+          }
+        },
+        AdherentBeneficiaire: {
           select: {
             id: true,
             firstname: true,
-            lastname: true
+            lastname: true,
           }
         }
-      }
+      },
+      orderBy: [
+        { TypeCotisation: { ordre: 'asc' } }
+      ]
     });
 
-    // Créer un Set des IDs des adhérents qui bénéficient d'une assistance (ils ne paient que le forfait)
+    if (cotisationsDuMois.length === 0) {
+      return { 
+        success: false, 
+        error: `Aucune cotisation du mois trouvée pour la période ${periode}. Veuillez d'abord créer les cotisations du mois.` 
+      };
+    }
+
+    // Séparer le forfait mensuel des assistances
+    const cotisationForfait = cotisationsDuMois.find(cdm => 
+      cdm.TypeCotisation.nom.toLowerCase().includes("forfait") && cdm.TypeCotisation.obligatoire
+    );
+    const cotisationsAssistances = cotisationsDuMois.filter(cdm => 
+      !cdm.TypeCotisation.nom.toLowerCase().includes("forfait") || !cdm.TypeCotisation.obligatoire
+    );
+
+    if (!cotisationForfait) {
+      return { 
+        success: false, 
+        error: `Cotisation forfaitaire mensuelle non trouvée pour la période ${periode}. Veuillez créer une cotisation du mois de type "Forfait Mensuel".` 
+      };
+    }
+
+    // Créer un Set des IDs des adhérents bénéficiaires (ils ne paient pas les assistances)
     const adherentsBeneficiairesIds = new Set(
-      toutesAssistancesDuMois.map(ass => ass.adherentId)
+      cotisationsAssistances
+        .filter(cdm => cdm.adherentBeneficiaireId)
+        .map(cdm => cdm.adherentBeneficiaireId!)
     );
 
     const cotisationsCreated = [] as any[];
     const bulkData = [] as any[];
 
-    const montantForfait = Number(typeForfait.montant);
+    const montantForfait = Number(cotisationForfait.montantBase);
 
     // Pour chaque adhérent, créer une cotisation mensuelle
     for (const adherent of adherents) {
       let montantTotal = montantForfait;
-      let description = `Cotisation ${periode} : Forfait ${montantForfait.toFixed(2)}€`;
+      let description = `Cotisation ${periode} : ${cotisationForfait.TypeCotisation.nom} ${montantForfait.toFixed(2)}€`;
 
-      // Si l'adhérent bénéficie d'une assistance, il ne paie QUE le forfait
+      // Calculer le montant des assistances à payer
+      let montantAssistances = 0;
+      const assistancesDetails: string[] = [];
+
+      // Si l'adhérent est bénéficiaire d'une assistance, il ne paie pas cette assistance
       if (adherentsBeneficiairesIds.has(adherent.id)) {
         // Trouver les assistances dont cet adhérent bénéficie
-        const assistancesBeneficiaires = toutesAssistancesDuMois.filter(
-          ass => ass.adherentId === adherent.id
+        const assistancesBeneficiaires = cotisationsAssistances.filter(
+          cdm => cdm.adherentBeneficiaireId === adherent.id
         );
         
         if (assistancesBeneficiaires.length > 0) {
-          const assistancesDetails = assistancesBeneficiaires.map(ass => 
-            `${ass.type} (bénéficiaire)`
+          const beneficiaireDetails = assistancesBeneficiaires.map(cdm => 
+            `${cdm.TypeCotisation.nom} (bénéficiaire)`
           ).join(", ");
-          description += ` - Bénéficiaire de: ${assistancesDetails} (ne paie pas l'assistance)`;
+          description += ` - Bénéficiaire de: ${beneficiaireDetails} (ne paie pas)`;
         }
-        // montantTotal reste = montantForfait seulement
-      } else {
-        // L'adhérent paie le forfait + toutes les assistances du mois (pour les autres adhérents)
-        const montantAssistances = toutesAssistancesDuMois.reduce((sum, ass) => {
-          return sum + Number(ass.montantRestant > 0 ? ass.montantRestant : ass.montant);
-        }, 0);
-        montantTotal = montantForfait + montantAssistances;
 
-        if (toutesAssistancesDuMois.length > 0) {
-          const assistancesDetails = toutesAssistancesDuMois.map(ass => 
-            `${ass.type} pour ${ass.Adherent?.firstname || ''} ${ass.Adherent?.lastname || ''} (${Number(ass.montantRestant > 0 ? ass.montantRestant : ass.montant).toFixed(2)}€)`
-          ).join(", ");
-          description += ` + Assistances: ${assistancesDetails}`;
+        // Calculer le montant des assistances pour les autres (pas celles dont il bénéficie)
+        for (const cdm of cotisationsAssistances) {
+          if (cdm.adherentBeneficiaireId !== adherent.id) {
+            const montant = Number(cdm.montantBase);
+            montantAssistances += montant;
+            assistancesDetails.push(
+              `${cdm.TypeCotisation.nom}${cdm.AdherentBeneficiaire ? ` pour ${cdm.AdherentBeneficiaire.firstname} ${cdm.AdherentBeneficiaire.lastname}` : ''} (${montant.toFixed(2)}€)`
+            );
+          }
         }
-        description += ` = Total: ${montantTotal.toFixed(2)}€`;
+      } else {
+        // L'adhérent paie toutes les assistances
+        for (const cdm of cotisationsAssistances) {
+          const montant = Number(cdm.montantBase);
+          montantAssistances += montant;
+          assistancesDetails.push(
+            `${cdm.TypeCotisation.nom}${cdm.AdherentBeneficiaire ? ` pour ${cdm.AdherentBeneficiaire.firstname} ${cdm.AdherentBeneficiaire.lastname}` : ''} (${montant.toFixed(2)}€)`
+          );
+        }
       }
+
+      montantTotal = montantForfait + montantAssistances;
+
+      if (assistancesDetails.length > 0) {
+        description += ` + ${assistancesDetails.join(", ")}`;
+      }
+      description += ` = Total: ${montantTotal.toFixed(2)}€`;
 
       // Créer une seule cotisation mensuelle par adhérent
       bulkData.push({
         periode,
         annee: validatedData.annee,
         mois: validatedData.mois,
-        typeCotisationId: typeForfait.id, // Utiliser le type Forfait
+        typeCotisationId: cotisationForfait.TypeCotisation.id, // Utiliser le type Forfait
         adherentId: adherent.id,
         montantAttendu: montantTotal,
         montantPaye: 0,
         montantRestant: montantTotal,
-        dateEcheance: new Date(validatedData.annee, validatedData.mois - 1, 15),
+        dateEcheance: cotisationForfait.dateEcheance,
         statut: "EnAttente",
         description: description,
+        cotisationDuMoisId: cotisationForfait.id, // Lier à la cotisation du mois
         createdBy: session.user.id,
       });
     }
@@ -759,6 +843,81 @@ export async function getCotisationsMensuellesByPeriode(periode: string) {
 
   } catch (error) {
     console.error("Erreur lors de la récupération des cotisations mensuelles:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+/**
+ * Récupère toutes les cotisations mensuelles pour l'admin
+ * 
+ * @returns Un objet avec success (boolean), data (array de cotisations) en cas de succès, 
+ *          ou error (string) en cas d'échec
+ */
+export async function getAllCotisationsMensuelles() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const cotisationsMensuelles = await prisma.cotisationMensuelle.findMany({
+      include: {
+        TypeCotisation: {
+          select: {
+            id: true,
+            nom: true,
+            description: true,
+            montant: true,
+            obligatoire: true,
+          }
+        },
+        Adherent: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            User: {
+              select: {
+                email: true
+              }
+            }
+          }
+        },
+        CreatedBy: {
+          select: {
+            name: true,
+            email: true
+          }
+        },
+        _count: {
+          select: {
+            Paiements: true
+          }
+        }
+      },
+      orderBy: [
+        { periode: 'desc' },
+        { TypeCotisation: { ordre: 'asc' } },
+        { Adherent: { User: { email: 'asc' } } }
+      ]
+    });
+
+    // Conversion des Decimal en nombres
+    const cotisationsConverted = cotisationsMensuelles.map((cotisation: any) => ({
+      ...cotisation,
+      montantAttendu: Number(cotisation.montantAttendu),
+      montantPaye: Number(cotisation.montantPaye),
+      montantRestant: Number(cotisation.montantRestant),
+      TypeCotisation: {
+        ...cotisation.TypeCotisation,
+        montant: Number(cotisation.TypeCotisation.montant)
+      }
+    }));
+
+    return { success: true, data: cotisationsConverted };
+
+  } catch (error) {
+    console.error("Erreur lors de la récupération de toutes les cotisations mensuelles:", error);
     return { success: false, error: "Erreur interne du serveur" };
   }
 }

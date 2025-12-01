@@ -10,7 +10,7 @@ import { getUserByEmail } from "@/actions/auth/index";
 
 export default {
 	secret: process.env.AUTH_SECRET,
-	trustHost: true, // Permettre l'accès depuis différentes URLs en développement
+	// trustHost est défini dans auth.ts, ne pas le redéfinir ici
 	providers: [
 		Google({
 			clientId: process.env.GOOGLE_CLIENT_ID,
@@ -28,22 +28,40 @@ export default {
 		}),
 		Credentials({
 			async authorize(credentials) {
-				const validatedFields = LoginSchema.safeParse(credentials);
+				try {
+					const validatedFields = LoginSchema.safeParse(credentials);
 
-				if (validatedFields.success) {
+					if (!validatedFields.success) {
+						console.error("[auth] Validation des champs échouée:", validatedFields.error);
+						return null;
+					}
+
 					const { email, password } = validatedFields.data;
 					const user = await getUserByEmail(email);
 
-					if (!user || !user.password) {
+					if (!user) {
+						console.error("[auth] Utilisateur non trouvé:", email);
+						return null;
+					}
+
+					if (!user.password) {
+						console.error("[auth] Utilisateur sans mot de passe:", email);
 						return null;
 					}
 
 					const passwordsMatch = await bcrypt.compare(password, user.password);
 
-					if (passwordsMatch) return user;
-				}
+					if (!passwordsMatch) {
+						console.error("[auth] Mot de passe incorrect pour:", email);
+						return null;
+					}
 
-				return null;
+					// Retourner l'utilisateur si tout est correct
+					return user;
+				} catch (error) {
+					console.error("[auth] Erreur lors de l'autorisation:", error);
+					return null;
+				}
 			},
 		}),
 	],

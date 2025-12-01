@@ -8,11 +8,11 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, Euro, Users, AlertTriangle, CheckCircle2, Clock, Eye, Edit, Settings } from "lucide-react";
+import { Calendar, Euro, Users, AlertTriangle, CheckCircle2, Clock, Eye, Edit, Settings, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, List } from "lucide-react";
 import { toast } from "react-toastify";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
-import { createCotisationsMensuelles, getCotisationsMensuellesStats, getCotisationsMensuellesByPeriode, updateCotisationMensuelle } from "@/actions/cotisations-mensuelles";
+import { createCotisationsMensuelles, getCotisationsMensuellesStats, getCotisationsMensuellesByPeriode, updateCotisationMensuelle, getAllCotisationsMensuelles } from "@/actions/cotisations-mensuelles";
 import { getAllTypesCotisationMensuelle } from "@/actions/cotisations-mensuelles";
 import { useRouter } from "next/navigation";
 import { ViewDialog } from "@/app/admin/types-cotisation/ViewDialog";
@@ -21,9 +21,14 @@ import {
   getCoreRowModel,
   useReactTable,
   getSortedRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
   SortingState,
+  ColumnFiltersState,
+  VisibilityState,
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/admin/DataTable";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 
 interface CotisationStats {
   totalTypesCotisation: number;
@@ -61,6 +66,7 @@ interface CotisationMensuelle {
   montantRestant: number;
   statut: string;
   dateEcheance: Date | string;
+  description?: string | null;
   TypeCotisation: {
     id: string;
     nom: string;
@@ -85,14 +91,466 @@ interface CotisationMensuelle {
   };
 }
 
+const cotisationColumnHelper = createColumnHelper<CotisationMensuelle>();
+
+interface CotisationsListTableProps {
+  cotisations: CotisationMensuelle[];
+  typesCotisation: TypeCotisationMensuelle[];
+  loading: boolean;
+  onEdit: (cotisation: CotisationMensuelle) => void;
+}
+
+function CotisationsListTable({ cotisations, typesCotisation, loading, onEdit }: CotisationsListTableProps) {
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [moisFilter, setMoisFilter] = useState<string>("all");
+  const [anneeFilter, setAnneeFilter] = useState<string>("all");
+  const [statutFilter, setStatutFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-cotisations-column-visibility");
+        if (saved) return JSON.parse(saved);
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences:", error);
+      }
+    }
+    return {};
+  });
+
+  // Debounce pour la recherche
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setGlobalFilter(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Obtenir les mois et années uniques
+  const moisOptions = useMemo(() => {
+    const moisSet = new Set<string>();
+    cotisations.forEach(c => {
+      const [annee, mois] = c.periode.split('-');
+      moisSet.add(`${annee}-${mois}`);
+    });
+    return Array.from(moisSet).sort().reverse();
+  }, [cotisations]);
+
+  const anneeOptions = useMemo(() => {
+    const anneeSet = new Set<number>();
+    cotisations.forEach(c => {
+      anneeSet.add(c.annee);
+    });
+    return Array.from(anneeSet).sort((a, b) => b - a);
+  }, [cotisations]);
+
+  // Fonction pour vérifier si une cotisation peut être modifiée
+  const canEdit = (cotisation: CotisationMensuelle): boolean => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const currentMonth = now.getMonth() + 1;
+    const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+    const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+    
+    return (
+      (cotisation.annee === currentYear && cotisation.mois === currentMonth) ||
+      (cotisation.annee === nextYear && cotisation.mois === nextMonth)
+    );
+  };
+
+  // Filtrer les données
+  const filteredData = useMemo(() => {
+    return cotisations.filter(item => {
+      // Filtre global (recherche)
+      if (globalFilter.trim()) {
+        const q = globalFilter.trim().toLowerCase();
+        const searchText = [
+          item.TypeCotisation.nom || "",
+          item.Adherent.firstname || "",
+          item.Adherent.lastname || "",
+          item.Adherent.User.email || "",
+          item.statut || "",
+          item.description || "",
+        ].join(" ").toLowerCase();
+        if (!searchText.includes(q)) return false;
+      }
+      
+      // Filtre par mois/année
+      if (moisFilter !== "all") {
+        const [annee, mois] = moisFilter.split('-');
+        if (item.annee !== parseInt(annee) || item.mois !== parseInt(mois)) {
+          return false;
+        }
+      }
+      
+      // Filtre par année
+      if (anneeFilter !== "all" && item.annee !== parseInt(anneeFilter)) {
+        return false;
+      }
+      
+      // Filtre par statut
+      if (statutFilter !== "all" && item.statut !== statutFilter) {
+        return false;
+      }
+      
+      // Filtre par type
+      if (typeFilter !== "all" && item.TypeCotisation.id !== typeFilter) {
+        return false;
+      }
+      
+      return true;
+    });
+  }, [cotisations, globalFilter, moisFilter, anneeFilter, statutFilter, typeFilter]);
+
+  const columns = useMemo(() => [
+    cotisationColumnHelper.accessor("periode", {
+      header: "Période",
+      cell: ({ row }) => {
+        const mois = new Date(2000, row.original.mois - 1, 1).toLocaleDateString('fr-FR', { month: 'long' });
+        return (
+          <span className="text-sm text-gray-900 dark:text-gray-100 font-medium capitalize">
+            {mois} {row.original.annee}
+          </span>
+        );
+      },
+      size: 150,
+      minSize: 120,
+      maxSize: 200,
+      enableResizing: true,
+    }),
+    cotisationColumnHelper.accessor("TypeCotisation.nom", {
+      header: "Type",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-900 dark:text-gray-100">
+          {row.original.TypeCotisation.nom}
+        </span>
+      ),
+      size: 200,
+      minSize: 150,
+      maxSize: 300,
+      enableResizing: true,
+    }),
+    cotisationColumnHelper.accessor("Adherent", {
+      header: "Adhérent",
+      cell: ({ row }) => (
+        <div className="flex flex-col">
+          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+            {row.original.Adherent.firstname} {row.original.Adherent.lastname}
+          </span>
+          <span className="text-xs text-gray-500 dark:text-gray-400">
+            {row.original.Adherent.User.email}
+          </span>
+        </div>
+      ),
+      size: 250,
+      minSize: 200,
+      maxSize: 350,
+      enableResizing: true,
+    }),
+    cotisationColumnHelper.accessor("montantAttendu", {
+      header: "Montant",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Euro className="h-3 w-3 text-gray-500" />
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {row.original.montantAttendu.toFixed(2).replace(".", ",")} €
+          </span>
+        </div>
+      ),
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+      enableResizing: true,
+    }),
+    cotisationColumnHelper.accessor("statut", {
+      header: "Statut",
+      cell: ({ row }) => {
+        const statut = row.original.statut;
+        const badges = {
+          Paye: <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs"><CheckCircle2 className="h-3 w-3 mr-1" />Payé</Badge>,
+          EnAttente: <Badge className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200 text-xs"><Clock className="h-3 w-3 mr-1" />En attente</Badge>,
+          EnRetard: <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs"><AlertTriangle className="h-3 w-3 mr-1" />En retard</Badge>,
+          PartiellementPaye: <Badge className="bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200 text-xs">Partiellement payé</Badge>,
+        };
+        return badges[statut as keyof typeof badges] || <Badge>{statut}</Badge>;
+      },
+      size: 150,
+      minSize: 120,
+      maxSize: 180,
+      enableResizing: true,
+    }),
+    cotisationColumnHelper.accessor("dateEcheance", {
+      header: "Échéance",
+      cell: ({ row }) => (
+        <span className="text-sm text-gray-900 dark:text-gray-100">
+          {new Date(row.original.dateEcheance).toLocaleDateString('fr-FR')}
+        </span>
+      ),
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+      enableResizing: true,
+    }),
+    cotisationColumnHelper.display({
+      id: "actions",
+      header: "Actions",
+      meta: { forceVisible: true },
+      enableResizing: false,
+      cell: ({ row }) => {
+        const item = row.original;
+        const editable = canEdit(item);
+        return (
+          <div className="flex items-center space-x-2">
+            <Button
+              variant={editable ? "default" : "outline"}
+              size="sm"
+              className={`h-8 w-8 p-0 ${
+                editable
+                  ? 'bg-blue-600 hover:bg-blue-700 text-white'
+                  : 'border-gray-300 dark:border-gray-600 opacity-50 cursor-not-allowed'
+              }`}
+              onClick={() => editable && onEdit(item)}
+              disabled={!editable}
+              title={editable ? "Modifier" : "Modification uniquement pour le mois en cours ou le mois suivant"}
+            >
+              <Edit className="h-4 w-4" />
+            </Button>
+          </div>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+    }),
+  ], [onEdit]);
+
+  const table = useReactTable({
+    data: filteredData,
+    columns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setSorting,
+    onColumnFiltersChange: setColumnFilters,
+    onGlobalFilterChange: setGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(newVisibility);
+      try {
+        localStorage.setItem("admin-cotisations-column-visibility", JSON.stringify(newVisibility));
+      } catch (error) {
+        console.error("Erreur lors de la sauvegarde des préférences:", error);
+      }
+    },
+    initialState: {
+      pagination: {
+        pageSize: 10,
+      },
+    },
+    state: { sorting, columnFilters, globalFilter, columnVisibility },
+    defaultColumn: {
+      minSize: 50,
+      maxSize: 800,
+    },
+  });
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12">
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      {/* Filtres et recherche */}
+      <div className="flex flex-col sm:flex-row gap-4 items-end">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <Input
+            placeholder="Rechercher par type, adhérent, email, statut..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="pl-10"
+          />
+        </div>
+        <ColumnVisibilityToggle 
+          table={table} 
+          storageKey="admin-cotisations-column-visibility"
+        />
+        <Select value={moisFilter} onValueChange={setMoisFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Tous les mois" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les mois</SelectItem>
+            {moisOptions.map(mois => {
+              const [annee, moisNum] = mois.split('-');
+              const moisNom = new Date(2000, parseInt(moisNum) - 1, 1).toLocaleDateString('fr-FR', { month: 'long' });
+              return (
+                <SelectItem key={mois} value={mois}>
+                  {moisNom.charAt(0).toUpperCase() + moisNom.slice(1)} {annee}
+                </SelectItem>
+              );
+            })}
+          </SelectContent>
+        </Select>
+        <Select value={anneeFilter} onValueChange={setAnneeFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Toutes les années" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Toutes les années</SelectItem>
+            {anneeOptions.map(annee => (
+              <SelectItem key={annee} value={annee.toString()}>
+                {annee}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+        <Select value={statutFilter} onValueChange={setStatutFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Tous les statuts" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les statuts</SelectItem>
+            <SelectItem value="EnAttente">En attente</SelectItem>
+            <SelectItem value="PartiellementPaye">Partiellement payé</SelectItem>
+            <SelectItem value="Paye">Payé</SelectItem>
+            <SelectItem value="EnRetard">En retard</SelectItem>
+          </SelectContent>
+        </Select>
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-full sm:w-48">
+            <SelectValue placeholder="Tous les types" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Tous les types</SelectItem>
+            {typesCotisation.map(type => (
+              <SelectItem key={type.id} value={type.id}>
+                {type.nom}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+
+      <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+        {filteredData.length} cotisation(s) trouvée(s) sur {cotisations.length}
+      </div>
+
+      <DataTable table={table} emptyMessage="Aucune cotisation trouvée" compact={true} />
+      
+      {/* Pagination */}
+      <div className="bg-white dark:bg-gray-800 mt-5 flex items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
+        <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+          {table.getFilteredRowModel().rows.length} ligne(s) au total
+        </div>
+
+        <div className="flex items-center space-x-6 lg:space-x-8">
+          <div className="flex items-center space-x-2">
+            <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+            <Select
+              value={`${table.getState().pagination.pageSize}`}
+              onValueChange={(value) => {
+                table.setPageSize(Number(value));
+              }}
+            >
+              <SelectTrigger className="h-8 w-[70px]">
+                <SelectValue placeholder={table.getState().pagination.pageSize} />
+              </SelectTrigger>
+              <SelectContent side="top">
+                {[10, 20, 30, 40, 50].map((pageSize) => (
+                  <SelectItem key={pageSize} value={`${pageSize}`}>
+                    {pageSize}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          <div className="flex w-[100px] items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300">
+            Page {table.getState().pagination.pageIndex + 1} sur{" "}
+            {table.getPageCount()}
+          </div>
+          <div className="flex items-center space-x-2">
+            <Button
+              variant="outline"
+              className="hidden h-8 w-8 p-0 lg:flex"
+              onClick={() => table.setPageIndex(0)}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <span className="sr-only">Aller à la première page</span>
+              <ChevronsLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={() => table.previousPage()}
+              disabled={!table.getCanPreviousPage()}
+            >
+              <span className="sr-only">Page précédente</span>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              className="h-8 w-8 p-0"
+              onClick={() => table.nextPage()}
+              disabled={!table.getCanNextPage()}
+            >
+              <span className="sr-only">Page suivante</span>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="outline"
+              className="hidden h-8 w-8 p-0 lg:flex"
+              onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+              disabled={!table.getCanNextPage()}
+            >
+              <span className="sr-only">Aller à la dernière page</span>
+              <ChevronsRight className="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 export default function AdminCotisationCreation() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
   const [loadingCotisations, setLoadingCotisations] = useState(false);
+  const [loadingAllCotisations, setLoadingAllCotisations] = useState(false);
   const [stats, setStats] = useState<CotisationStats | null>(null);
   const [typesCotisation, setTypesCotisation] = useState<TypeCotisationMensuelle[]>([]);
   const [cotisationsMois, setCotisationsMois] = useState<CotisationMensuelle[]>([]);
+  const [allCotisations, setAllCotisations] = useState<CotisationMensuelle[]>([]);
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [sortingList, setSortingList] = useState<SortingState>([]);
+  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [globalFilter, setGlobalFilter] = useState("");
+  const [searchTerm, setSearchTerm] = useState("");
+  const [moisFilter, setMoisFilter] = useState<string>("all");
+  const [anneeFilter, setAnneeFilter] = useState<string>("all");
+  const [statutFilter, setStatutFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-cotisations-column-visibility");
+        if (saved) return JSON.parse(saved);
+      } catch (error) {
+        console.error("Erreur lors du chargement des préférences:", error);
+      }
+    }
+    return {};
+  });
   const [editingCotisation, setEditingCotisation] = useState<CotisationMensuelle | null>(null);
   const [editFormData, setEditFormData] = useState({
     montantAttendu: 0,
@@ -123,12 +581,21 @@ export default function AdminCotisationCreation() {
 
   useEffect(() => {
     loadData();
+    loadAllCotisations();
   }, []);
 
   // Charger les cotisations du mois sélectionné
   useEffect(() => {
     loadCotisationsMois();
   }, [formData.mois, formData.annee]);
+
+  // Debounce pour la recherche
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setGlobalFilter(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   const loadData = async () => {
     try {
@@ -166,6 +633,23 @@ export default function AdminCotisationCreation() {
       console.error("Erreur lors du chargement des cotisations du mois:", error);
     } finally {
       setLoadingCotisations(false);
+    }
+  };
+
+  const loadAllCotisations = async () => {
+    try {
+      setLoadingAllCotisations(true);
+      const result = await getAllCotisationsMensuelles();
+      if (result.success && result.data) {
+        setAllCotisations(result.data);
+      } else {
+        toast.error(result.error || "Erreur lors du chargement des cotisations");
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement de toutes les cotisations:", error);
+      toast.error("Erreur lors du chargement des cotisations");
+    } finally {
+      setLoadingAllCotisations(false);
     }
   };
 
@@ -511,9 +995,17 @@ export default function AdminCotisationCreation() {
             )}
           </CardTitle>
           <CardDescription>
-            Liste des cotisations mensuelles créées pour la période sélectionnée. 
-            Vous pouvez modifier uniquement les cotisations du mois en cours ou du mois suivant.
+            Liste des cotisations mensuelles créées pour la période sélectionnée.
           </CardDescription>
+          <Alert className="mt-4 border-blue-200 bg-blue-50 dark:bg-blue-900/20">
+            <Edit className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 dark:text-blue-200">
+              <strong>Modification des cotisations :</strong> Vous pouvez modifier uniquement les cotisations du 
+              <strong className="mx-1">mois en cours ({new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })})</strong>
+              ou du <strong className="mx-1">mois suivant</strong>. 
+              Les cotisations modifiables sont marquées avec un badge vert "Modifiable" et un bouton d'édition actif.
+            </AlertDescription>
+          </Alert>
         </CardHeader>
         <CardContent>
           {loadingCotisations ? (
@@ -703,10 +1195,58 @@ export default function AdminCotisationCreation() {
                 <li>• La date d'échéance sera fixée au 15 du mois sélectionné</li>
                 <li>• Les adhérents recevront une notification de leur obligation</li>
                 <li>• Un système de relance automatique sera activé pour les retards</li>
-                <li>• Les montants peuvent être modifiés avant la création</li>
+                <li>• <strong>Les cotisations du mois en cours ou du mois suivant peuvent être modifiées</strong> après création (montant, date d'échéance, statut, description)</li>
+                <li>• Utilisez le bouton d'édition (icône crayon) sur les cotisations modifiables pour les modifier</li>
               </ul>
             </div>
           </div>
+        </CardContent>
+      </Card>
+
+      {/* Liste complète des cotisations avec TanStack Table */}
+      <Card className="shadow-lg border-blue-200">
+        <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+          <div className="flex items-center justify-between">
+            <CardTitle className="flex items-center gap-2">
+              <List className="h-5 w-5" />
+              Liste des Cotisations ({allCotisations.length})
+            </CardTitle>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={loadAllCotisations}
+                disabled={loadingAllCotisations}
+                className="bg-white/10 hover:bg-white/20 border-white/30 text-white"
+              >
+                {loadingAllCotisations ? (
+                  <Clock className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Calendar className="h-4 w-4 mr-2" />
+                )}
+                Actualiser
+              </Button>
+            </div>
+          </div>
+          <CardDescription className="text-blue-100">
+            Liste complète de toutes les cotisations mensuelles avec recherche et filtres avancés
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <CotisationsListTable 
+            cotisations={allCotisations}
+            typesCotisation={typesCotisation}
+            loading={loadingAllCotisations}
+            onEdit={(cotisation) => {
+              setEditingCotisation(cotisation);
+              setEditFormData({
+                montantAttendu: cotisation.montantAttendu,
+                dateEcheance: new Date(cotisation.dateEcheance).toISOString().split('T')[0],
+                description: cotisation.description || "",
+                statut: cotisation.statut as "EnAttente" | "PartiellementPaye" | "Paye" | "EnRetard",
+              });
+            }}
+          />
         </CardContent>
       </Card>
     </div>
@@ -1175,9 +1715,26 @@ function CotisationsMoisTable({
             // Calculer le total pour ce mois
             const totalMois = cotisationsMois.reduce((sum, c) => sum + c.montantAttendu, 0);
             
+            // Vérifier si ce mois est modifiable (mois en cours ou mois suivant)
+            const now = new Date();
+            const currentYear = now.getFullYear();
+            const currentMonth = now.getMonth() + 1;
+            const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+            const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+            
+            const isCurrentMonth = anneeNum === currentYear && moisNum === currentMonth;
+            const isNextMonth = anneeNum === nextYear && moisNum === nextMonth;
+            const isEditableMonth = isCurrentMonth || isNextMonth;
+            
             return (
-              <Card key={moisKey} className="border-gray-200 dark:border-gray-700">
-                <CardHeader className="bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20 pb-3">
+              <Card key={moisKey} className={`border-gray-200 dark:border-gray-700 ${
+                isEditableMonth ? 'ring-2 ring-blue-300 dark:ring-blue-700' : ''
+              }`}>
+                <CardHeader className={`pb-3 ${
+                  isEditableMonth
+                    ? 'bg-gradient-to-r from-green-50 to-blue-50 dark:from-green-900/20 dark:to-blue-900/20'
+                    : 'bg-gradient-to-r from-blue-50 to-blue-100 dark:from-blue-900/20 dark:to-blue-800/20'
+                }`}>
                   <CardTitle className="text-base">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-3">
@@ -1185,6 +1742,12 @@ function CotisationsMoisTable({
                         <span className="font-semibold text-gray-900 dark:text-gray-100 capitalize">
                           {moisNom} {anneeNum}
                         </span>
+                        {isEditableMonth && (
+                          <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs border border-green-300 dark:border-green-700">
+                            <Edit className="h-3 w-3 mr-1" />
+                            Modifiable
+                          </Badge>
+                        )}
                       </div>
                       <div className="flex items-center gap-2">
                         <Euro className="h-4 w-4 text-gray-600" />
@@ -1204,11 +1767,17 @@ function CotisationsMoisTable({
                       return (
                         <div
                           key={cotisation.id}
-                          className={`flex items-center justify-between p-3 rounded-md border ${
+                          className={`flex items-center justify-between p-3 rounded-md border transition-all ${
                             isForfait
-                              ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
-                              : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
-                          } ${index < cotisationsMois.length - 1 ? 'mb-2' : ''}`}
+                              ? editable
+                                ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-300 dark:border-blue-700 shadow-sm'
+                                : 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-800'
+                              : editable
+                                ? 'bg-gray-50 dark:bg-gray-800/50 border-gray-300 dark:border-gray-600 shadow-sm'
+                                : 'bg-gray-50 dark:bg-gray-800/50 border-gray-200 dark:border-gray-700'
+                          } ${index < cotisationsMois.length - 1 ? 'mb-2' : ''} ${
+                            editable ? 'hover:shadow-md' : ''
+                          }`}
                         >
                           <div className="flex-1 flex items-center gap-4">
                             <div className="flex-1">
@@ -1225,7 +1794,18 @@ function CotisationsMoisTable({
                                     Assistance
                                   </Badge>
                                 )}
+                                {editable && (
+                                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs border border-green-300 dark:border-green-700">
+                                    <Edit className="h-3 w-3 mr-1" />
+                                    Modifiable
+                                  </Badge>
+                                )}
                               </div>
+                              {!editable && (
+                                <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                  Modification uniquement pour le mois en cours ou le mois suivant
+                                </p>
+                              )}
                             </div>
                             <div className="flex items-center gap-1">
                               <Euro className="h-4 w-4 text-gray-500" />
@@ -1256,14 +1836,22 @@ function CotisationsMoisTable({
                               )}
                             </div>
                             <Button
-                              variant="outline"
+                              variant={editable ? "default" : "outline"}
                               size="sm"
-                              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
-                              onClick={() => onEdit(cotisation)}
+                              className={`h-8 w-8 sm:h-9 sm:w-9 p-0 ${
+                                editable
+                                  ? 'bg-blue-600 hover:bg-blue-700 text-white border-blue-600 shadow-sm'
+                                  : 'border-gray-300 dark:border-gray-600 opacity-50 cursor-not-allowed'
+                              }`}
+                              onClick={() => editable && onEdit(cotisation)}
                               disabled={!editable}
-                              title={editable ? "Modifier la cotisation" : "Modification uniquement pour le mois en cours ou le mois suivant"}
+                              title={
+                                editable 
+                                  ? "Cliquez pour modifier la cotisation" 
+                                  : `Modification uniquement pour le mois en cours (${new Date().toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}) ou le mois suivant`
+                              }
                             >
-                              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
+                              <Edit className={`h-4 w-4 ${editable ? 'text-white' : 'text-gray-400'}`} />
                             </Button>
                           </div>
                         </div>

@@ -25,7 +25,8 @@ async function createDefaultTypesCotisationMensuelle() {
         montant: 15.00,
         obligatoire: true,
         actif: true,
-        ordre: 1
+        ordre: 1,
+        aBeneficiaire: false
       },
       {
         nom: "Assistance anniversaire en salle",
@@ -33,7 +34,8 @@ async function createDefaultTypesCotisationMensuelle() {
         montant: 50.00,
         obligatoire: true,
         actif: true,
-        ordre: 2
+        ordre: 2,
+        aBeneficiaire: true // Nécessite un adhérent bénéficiaire
       },
       {
         nom: "Assistance mariage",
@@ -41,7 +43,8 @@ async function createDefaultTypesCotisationMensuelle() {
         montant: 50.00,
         obligatoire: true,
         actif: true,
-        ordre: 3
+        ordre: 3,
+        aBeneficiaire: true // Nécessite un adhérent bénéficiaire
       },
       {
         nom: "Assistance décès",
@@ -49,7 +52,8 @@ async function createDefaultTypesCotisationMensuelle() {
         montant: 50.00,
         obligatoire: true,
         actif: true,
-        ordre: 4
+        ordre: 4,
+        aBeneficiaire: true // Nécessite un adhérent bénéficiaire
       },
       {
         nom: "Formation",
@@ -57,7 +61,8 @@ async function createDefaultTypesCotisationMensuelle() {
         montant: 25.00,
         obligatoire: false,
         actif: true,
-        ordre: 5
+        ordre: 5,
+        aBeneficiaire: false
       },
       {
         nom: "Matériel",
@@ -65,7 +70,8 @@ async function createDefaultTypesCotisationMensuelle() {
         montant: 10.00,
         obligatoire: false,
         actif: true,
-        ordre: 6
+        ordre: 6,
+        aBeneficiaire: false
       }
     ];
 

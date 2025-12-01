@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Users, CheckCircle, XCircle, Plus, Eye, Edit, Search } from "lucide-react";
+import { Users, CheckCircle, XCircle, Plus, Eye, Edit, Search, Upload, Loader2 } from "lucide-react";
 import { CandidacyStatus } from "@prisma/client";
 import { 
   createColumnHelper,
@@ -20,7 +20,8 @@ import {
 } from "@tanstack/react-table";
 import { 
   getAllCandidaciesForAdmin, 
-  updateCandidacyStatus
+  updateCandidacyStatus,
+  importStaticCandidates
 } from "@/actions/elections";
 import { POSTES_LABELS } from "@/lib/elections-constants";
 import Link from "next/link";
@@ -88,6 +89,7 @@ export default function AdminCandidaturesPage() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [electionFilter, setElectionFilter] = useState<string>("all");
   const [searchTerm, setSearchTerm] = useState("");
+  const [importing, setImporting] = useState(false);
   
   // Visibilité des colonnes - charger depuis localStorage
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
@@ -136,6 +138,40 @@ export default function AdminCandidaturesPage() {
       await loadAll();
     } else {
       toast.error(result.error || "Erreur lors de la mise à jour");
+    }
+  };
+
+  const handleImportStaticCandidates = async () => {
+    if (!confirm("Voulez-vous importer les candidats statiques de la page /candidats dans la base de données pour l'élection du 29/11/2025 ?")) {
+      return;
+    }
+
+    try {
+      setImporting(true);
+      const result = await importStaticCandidates();
+      
+      if (result.success) {
+        toast.success(result.message || "Import réussi");
+        if (result.details) {
+          const created = result.details.filter(d => d.status === 'created').length;
+          const exists = result.details.filter(d => d.status === 'exists').length;
+          const notFound = result.details.filter(d => d.status === 'not_found').length;
+          const errors = result.details.filter(d => d.status === 'error').length;
+          
+          if (notFound > 0 || errors > 0) {
+            console.warn("Détails de l'import:", result.details);
+            toast.warning(`${created} créée(s), ${exists} existante(s), ${notFound} non trouvé(s), ${errors} erreur(s)`);
+          }
+        }
+        await loadAll();
+      } else {
+        toast.error(result.error || "Erreur lors de l'import");
+      }
+    } catch (error: any) {
+      console.error("Erreur lors de l'import:", error);
+      toast.error(error.message || "Erreur lors de l'import");
+    } finally {
+      setImporting(false);
     }
   };
 
@@ -288,6 +324,24 @@ export default function AdminCandidaturesPage() {
                 table={table} 
                 storageKey="admin-candidatures-column-visibility"
               />
+              <Button 
+                onClick={handleImportStaticCandidates}
+                disabled={importing}
+                variant="outline"
+                className="w-full sm:w-auto border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/30"
+              >
+                {importing ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Import en cours...
+                  </>
+                ) : (
+                  <>
+                    <Upload className="h-4 w-4 mr-2" />
+                    Importer candidats statiques
+                  </>
+                )}
+              </Button>
               <Link href="/admin/candidatures/gestion" className="w-full sm:w-auto">
                 <Button className="w-full sm:w-auto">
                   <Plus className="h-4 w-4 mr-2" />

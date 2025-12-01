@@ -62,24 +62,32 @@ const LoginForm = () => {
               setSuccess(result.success);
               setShowTwoFactor(true);
             } else {
-              // Connexion réussie - forcer la mise à jour de la session plusieurs fois
-              // pour s'assurer qu'elle est disponible avant la redirection
+              // Connexion réussie - forcer la mise à jour de la session
               // Ne pas afficher le message de succès car on redirige immédiatement
-              setSuccess(undefined); // S'assurer que le message de succès est effacé
-              await updateSession();
-              await new Promise(resolve => setTimeout(resolve, 200));
-              await updateSession();
-              await new Promise(resolve => setTimeout(resolve, 200));
-              await updateSession();
+              setSuccess(undefined);
+              
+              // Attendre un peu pour que la session soit créée côté serveur
+              await new Promise(resolve => setTimeout(resolve, 500));
+              
+              try {
+                // Mettre à jour la session une seule fois
+                await updateSession();
+              } catch (sessionError) {
+                // Ignorer les erreurs de session, continuer quand même
+                console.warn("[login-form] Erreur lors de la mise à jour de la session:", sessionError);
+              }
               
               // Rafraîchir le routeur pour mettre à jour les données serveur
               router.refresh();
               
-              // Attendre encore un peu pour que la session soit propagée
-              await new Promise(resolve => setTimeout(resolve, 300));
+              // Attendre un peu pour que la session soit propagée
+              await new Promise(resolve => setTimeout(resolve, 200));
               
-              // Toujours rediriger vers la page d'accueil après la connexion
-              router.push("/");
+              // Rediriger vers la page d'accueil après la connexion
+              // Utiliser window.location.href pour forcer un rechargement complet de la page
+              // Cela garantit que la session est correctement chargée et que le middleware
+              // peut correctement détecter l'utilisateur connecté
+              window.location.href = "/?loggedIn=true";
             }
           }
         } catch (error) {

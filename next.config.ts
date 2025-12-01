@@ -131,9 +131,10 @@ const nextConfig: NextConfig = {
     serverActions: {
       bodySizeLimit: '5gb',
       // Améliorer la stabilité des Server Actions en production
+      // En développement, permettre toutes les origines pour faciliter l'accès réseau
       allowedOrigins: process.env.NODE_ENV === 'production' 
         ? [cleanUrl(process.env.NEXT_PUBLIC_APP_URL) || 'https://amaki.fr'].filter(Boolean)
-        : undefined,
+        : ['*'], // Permettre toutes les origines en développement pour l'accès réseau
     },
   },
 

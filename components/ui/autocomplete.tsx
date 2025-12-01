@@ -36,6 +36,7 @@ interface AutocompleteProps {
   className?: string;
   onSearchChange?: (search: string) => void; // Callback pour la recherche dynamique
   popoverZIndex?: number; // Z-index personnalisé pour le popover
+  allowFreeText?: boolean; // Permettre la saisie libre si la valeur n'est pas dans la liste
 }
 
 export function Autocomplete({
@@ -50,11 +51,18 @@ export function Autocomplete({
   className,
   onSearchChange,
   popoverZIndex = 100,
+  allowFreeText = false,
 }: AutocompleteProps) {
   const [open, setOpen] = React.useState(false);
   const [search, setSearch] = React.useState("");
 
   const selectedOption = options.find((option) => option.value === value);
+  const isValueInOptions = selectedOption !== undefined;
+  // Si allowFreeText est activé et que la valeur n'est pas dans les options, afficher la valeur telle quelle
+  // Sinon, afficher le label de l'option sélectionnée ou la valeur si elle existe (pour la saisie libre)
+  const displayValue = allowFreeText && value && !isValueInOptions 
+    ? value 
+    : (selectedOption?.label || "");
 
   // Notifier le parent des changements de recherche
   React.useEffect(() => {
@@ -87,7 +95,7 @@ export function Autocomplete({
             !value && "text-gray-400 dark:text-gray-500",
             value && "text-gray-900 dark:text-gray-100"
           )}>
-            {selectedOption ? selectedOption.label : placeholder}
+            {displayValue || placeholder}
           </span>
           <ChevronsUpDown className={cn(
             "ml-2 h-4 w-4 shrink-0",
@@ -128,14 +136,35 @@ export function Autocomplete({
             )}
             {!loading && (
               <>
-                <CommandEmpty>{emptyMessage}</CommandEmpty>
+                <CommandEmpty>
+                  {allowFreeText && search.trim().length > 0 ? (
+                    <div className="py-2">
+                      <div className="text-sm text-gray-500 mb-2">{emptyMessage}</div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          onValueChange(search.trim());
+                          setOpen(false);
+                          setSearch("");
+                        }}
+                        className="text-sm text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                      >
+                        Utiliser "{search.trim()}"
+                      </button>
+                    </div>
+                  ) : (
+                    emptyMessage
+                  )}
+                </CommandEmpty>
                 <CommandGroup>
                   {options.map((option) => (
                     <CommandItem
                       key={option.value}
                       value={option.label}
                       onSelect={() => {
-                        onValueChange(option.value === value ? "" : option.value);
+                        // Toujours passer option.value (l'ID ou la valeur réelle) à onValueChange
+                        const newValue = option.value === value ? "" : option.value;
+                        onValueChange(newValue);
                         setOpen(false);
                         setSearch(""); // Réinitialiser la recherche après sélection
                       }}
@@ -147,6 +176,9 @@ export function Autocomplete({
                         )}
                       />
                       {option.label}
+                      {option.code && (
+                        <span className="ml-auto text-xs text-gray-500">{option.code}</span>
+                      )}
                     </CommandItem>
                   ))}
                 </CommandGroup>

@@ -40,23 +40,31 @@ export const login = async (
     }
 
     try {
-        // signIn peut lancer une NEXT_REDIRECT qui est normale dans Next.js
-        // On essaie de capturer cette erreur spéciale
+        // Utiliser redirect: false pour éviter les problèmes de redirection
+        // La redirection sera gérée côté client après la mise à jour de la session
         const result = await signIn(
             "credentials",
             {
                 email,
                 password,
-                redirectTo: DEFAULT_LOGIN_REDIRECT // Toujours rediriger vers la page d'accueil
+                redirect: false, // Ne pas rediriger automatiquement
             }
         )
-        // Si signIn retourne sans erreur, la connexion a réussi
-        // La redirection sera gérée automatiquement par NextAuth
+        
+        // Si on arrive ici, la connexion a réussi
+        // Vérifier que result n'est pas une erreur
+        if (result?.error) {
+            return { error: result.error };
+        }
+        
         return { success: "Connexion réussie !" }
     } catch (error: any) {
         // NextAuth peut lancer une NEXT_REDIRECT qui est une erreur spéciale
         // que Next.js gère automatiquement. Si c'est le cas, la connexion a réussi
-        if (error?.digest?.startsWith('NEXT_REDIRECT') || error?.message?.includes('NEXT_REDIRECT')) {
+        if (error?.digest?.startsWith('NEXT_REDIRECT') || 
+            error?.message?.includes('NEXT_REDIRECT') ||
+            error?.code === 'NEXT_REDIRECT' ||
+            error?.name === 'NEXT_REDIRECT') {
             // La redirection est en cours, la connexion a réussi
             return { success: "Connexion réussie !" }
         }
@@ -70,7 +78,9 @@ export const login = async (
             }
         }
 
-        throw error
+        // Logger l'erreur pour le débogage
+        console.error("[login] Erreur inattendue:", error);
+        return { error: "Une erreur s'est produite lors de la connexion!" }
     }
 
 }

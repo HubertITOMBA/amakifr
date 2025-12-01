@@ -118,33 +118,73 @@ export default function UpdateUserPage() {
   
   const handleAddressChange = useCallback((address: AddressResult | null) => {
     if (address) {
-      // Extraire le nom de la rue depuis le label (format: "10 rue de la Paix, 75001 Paris")
-      const labelParts = address.label.split(",");
-      const streetPart = labelParts[0] || "";
-      // Enlever le numéro de rue si présent au début
-      const streetName = streetPart.replace(/^\d+\s*/, "").trim();
+      // Vérifier si c'est une saisie libre (pas d'ID valide ou ID commence par "free-text-")
+      const isFreeText = !address.id || address.id.startsWith("free-text-");
       
-      // Utiliser address.street si disponible, sinon extraire depuis le label
-      const finalStreetName = address.street || streetName;
-      
-      // Détecter si c'est un code postal français (5 chiffres)
-      const isFrenchPostcode = address.postcode && /^\d{5}$/.test(address.postcode);
-      
-      // Mettre à jour le code pays si c'est la France
-      if (isFrenchPostcode) {
-        setCountryCode("FR");
+      if (isFreeText) {
+        // Saisie libre : utiliser directement la valeur de street
+        setAdresseData(prev => ({
+          ...prev,
+          street1: address.street || address.label || "",
+          // Ne pas remplir automatiquement les autres champs pour la saisie libre
+        }));
+      } else {
+        // Adresse sélectionnée depuis l'API : remplir automatiquement
+        // Extraire le nom de la rue depuis le label (format: "10 rue de la Paix, 75001 Paris")
+        let finalStreetName = "";
+        
+        // Priorité 1 : Utiliser address.street si disponible
+        if (address.street && address.street.trim().length > 0) {
+          finalStreetName = address.street.trim();
+        } else {
+          // Priorité 2 : Extraire depuis le label
+          // Le label peut être au format: "10 rue de la Paix, 75001 Paris" ou "rue de la Paix, 75001 Paris"
+          const labelParts = address.label.split(",");
+          let streetPart = labelParts[0] || "";
+          
+          // Enlever le numéro de rue si présent au début (format: "10 rue de la Paix" ou "10 bis rue de la Paix")
+          // Utiliser une regex plus robuste pour gérer les cas comme "10 bis rue..."
+          finalStreetName = streetPart.replace(/^\d+(\s+(bis|ter|quater))?\s+/, "").trim();
+          
+          // Si après extraction on n'a rien ou que c'est juste un numéro, utiliser le label complet sans numéro
+          if (!finalStreetName || finalStreetName.length === 0 || /^\d+(\s+(bis|ter|quater))?$/.test(finalStreetName)) {
+            // Essayer d'extraire juste le nom de la rue sans numéro
+            finalStreetName = streetPart.replace(/^\d+(\s+(bis|ter|quater))?\s*/, "").trim();
+            
+            // Si toujours vide, utiliser la partie avant la virgule telle quelle
+            if (!finalStreetName || finalStreetName.length === 0) {
+              finalStreetName = streetPart.trim();
+            }
+          }
+        }
+        
+        // S'assurer qu'on a bien un nom de rue (dernier fallback)
+        if (!finalStreetName || finalStreetName.length === 0) {
+          // Utiliser la première partie du label (avant la virgule) sans numéro
+          const labelParts = address.label.split(",");
+          const firstPart = labelParts[0]?.trim() || "";
+          finalStreetName = firstPart.replace(/^\d+(\s+(bis|ter|quater))?\s*/, "").trim() || firstPart;
+        }
+        
+        // Détecter si c'est un code postal français (5 chiffres)
+        const isFrenchPostcode = address.postcode && /^\d{5}$/.test(address.postcode);
+        
+        // Mettre à jour le code pays si c'est la France
+        if (isFrenchPostcode) {
+          setCountryCode("FR");
+        }
+        
+        // Mettre à jour toutes les données d'adresse, y compris la ville
+        setAdresseData(prev => ({
+          ...prev,
+          streetnum: address.housenumber || "",
+          street1: finalStreetName, // Nom de la rue (sans numéro, sans code postal, sans ville)
+          codepost: address.postcode || "",
+          city: address.city || "", // La ville est maintenant correctement remplie
+          // Si c'est un code postal français, mettre "France"
+          country: isFrenchPostcode ? "France" : prev.country,
+        }));
       }
-      
-      // Mettre à jour toutes les données d'adresse, y compris la ville
-      setAdresseData(prev => ({
-        ...prev,
-        streetnum: address.housenumber || "",
-        street1: finalStreetName, // Nom de la rue (sans numéro, sans code postal, sans ville)
-        codepost: address.postcode || "",
-        city: address.city || "", // La ville est maintenant correctement remplie
-        // Si c'est un code postal français, mettre "France"
-        country: isFrenchPostcode ? "France" : prev.country,
-      }));
     } else {
       // Si l'adresse est null, réinitialiser
       setAdresseData(prev => ({
@@ -773,7 +813,7 @@ export default function UpdateUserPage() {
                     disabled={saving}
                   />
                   <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                    La sélection remplira automatiquement le code postal, la ville et le pays
+                    Recherchez une rue ou saisissez-la manuellement si elle n'existe pas dans la liste
                   </p>
                 </div>
                 <div>
@@ -799,11 +839,10 @@ export default function UpdateUserPage() {
                     placeholder="75001"
                     className="mt-1 border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100"
                     disabled={saving}
-                    readOnly={!!adresseData.codepost && /^\d{5}$/.test(adresseData.codepost)}
                   />
                   {adresseData.codepost && /^\d{5}$/.test(adresseData.codepost) && (
                     <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                      Rempli automatiquement depuis la rue
+                      Peut être rempli automatiquement depuis la rue, mais modifiable manuellement
                     </p>
                   )}
                 </div>

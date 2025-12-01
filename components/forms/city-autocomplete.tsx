@@ -37,6 +37,7 @@ export function CityAutocomplete({
       }
 
       // Pour la France, charger la liste de base si pas de recherche ou recherche trop courte
+      // Mais permettre la recherche dès 2 caractères
       if (countryCode === "FR" && (!debouncedSearch || debouncedSearch.length < 2)) {
         setCities(FRENCH_MAJOR_CITIES);
         setLoading(false);
@@ -44,8 +45,14 @@ export function CityAutocomplete({
       }
 
       // Pour les autres pays ou recherche active, charger depuis l'API
+      // Permettre la recherche dès 2 caractères
       if (!debouncedSearch || debouncedSearch.length < 2) {
-        setCities([]);
+        // Si c'est la France et qu'on a moins de 2 caractères, garder la liste de base
+        if (countryCode === "FR") {
+          setCities(FRENCH_MAJOR_CITIES);
+        } else {
+          setCities([]);
+        }
         setLoading(false);
         return;
       }
@@ -103,12 +110,13 @@ export function CityAutocomplete({
       value={value}
       onValueChange={onValueChange}
       placeholder={placeholder}
-      searchPlaceholder={countryCode ? "Rechercher une ville (min. 2 caractères)..." : "Sélectionnez d'abord un pays"}
-      emptyMessage={countryCode ? "Aucune ville trouvée. Tapez au moins 2 caractères." : "Sélectionnez d'abord un pays"}
+      searchPlaceholder={countryCode ? "Rechercher ou saisir une ville..." : "Sélectionnez d'abord un pays"}
+      emptyMessage={countryCode ? "Aucune ville trouvée. Vous pouvez saisir librement." : "Sélectionnez d'abord un pays"}
       disabled={disabled || !countryCode}
       loading={loading}
       onSearchChange={setSearchTerm}
       popoverZIndex={110}
+      allowFreeText={true}
     />
   );
 }

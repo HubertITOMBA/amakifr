@@ -481,9 +481,9 @@ export async function createMultipleCandidacies(
     }
 
     // Créer toutes les candidatures en une transaction
-    const candidacies = await db.$transaction(
+    const candidacies = await prisma.$transaction(
       positionIds.map(positionId => 
-        db.candidacy.create({
+        prisma.candidacy.create({
           data: {
             electionId,
             positionId,
@@ -588,7 +588,7 @@ export async function updateCandidacy(
     }
 
     // Récupérer la candidature avec l'élection associée
-    const candidacy = await db.candidacy.findFirst({
+    const candidacy = await prisma.candidacy.findFirst({
       where: {
         id: candidacyId,
         adherentId: adherent.id
@@ -613,7 +613,7 @@ export async function updateCandidacy(
 
     // Si changement de poste, vérifier que le nouveau poste existe et appartient à la même élection
     if (newPositionId && newPositionId !== candidacy.positionId) {
-      const newPosition = await db.position.findFirst({
+      const newPosition = await prisma.position.findFirst({
         where: {
           id: newPositionId,
           electionId: candidacy.position.electionId
@@ -625,7 +625,7 @@ export async function updateCandidacy(
       }
 
       // Vérifier qu'il n'y a pas déjà une candidature pour ce nouveau poste
-      const existingCandidacyForNewPosition = await db.candidacy.findFirst({
+      const existingCandidacyForNewPosition = await prisma.candidacy.findFirst({
         where: {
           adherentId: adherent.id,
           electionId: candidacy.position.electionId,
@@ -651,7 +651,7 @@ export async function updateCandidacy(
     }
 
     // Mettre à jour la candidature
-    const updatedCandidacy = await db.candidacy.update({
+    const updatedCandidacy = await prisma.candidacy.update({
       where: {
         id: candidacyId
       },
@@ -730,7 +730,7 @@ export async function updateCandidacyPositions(
     }
 
     // Vérifier que tous les postes sélectionnés existent et appartiennent à cette élection
-    const validPositions = await db.position.findMany({
+    const validPositions = await prisma.position.findMany({
       where: {
         id: { in: selectedPositionIds },
         electionId: existingCandidacy.position.electionId
@@ -756,7 +756,7 @@ export async function updateCandidacyPositions(
 
     // Vérifier qu'il n'y a pas de conflits pour les nouveaux postes
     for (const positionId of positionsToAdd) {
-      const existingCandidacyForPosition = await db.candidacy.findFirst({
+      const existingCandidacyForPosition = await prisma.candidacy.findFirst({
         where: {
           adherentId: adherent.id,
           electionId: existingCandidacy.position.electionId,
@@ -770,7 +770,7 @@ export async function updateCandidacyPositions(
     }
 
     // Effectuer les modifications en transaction
-    const results = await db.$transaction(async (tx) => {
+    const results = await prisma.$transaction(async (tx) => {
       const updatedCandidacies = [];
 
       // Supprimer les candidatures pour les postes non sélectionnés
@@ -1501,7 +1501,7 @@ export async function validateCandidacy(
     }
 
     // Mettre à jour la candidature
-    const candidacy = await db.candidacy.update({
+    const candidacy = await prisma.candidacy.update({
       where: { id: candidacyId },
       data: {
         status,
@@ -1549,7 +1549,7 @@ export async function updateElectionStatus(
     }
 
     // Mettre à jour l'élection
-    const election = await db.election.update({
+    const election = await prisma.election.update({
       where: { id: electionId },
       data: { status },
       include: {
@@ -1587,7 +1587,14 @@ export async function getElectionResults(electionId: string): Promise<{ success:
               include: {
                 adherent: {
                   include: {
-                    User: true
+                    User: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                        image: true
+                      }
+                    }
                   }
                 },
                 votes: true
@@ -2290,5 +2297,497 @@ export async function getElectionWithDetails(electionId: string): Promise<{ succ
   } catch (e) {
     console.error("Erreur getElectionWithDetails:", e);
     return { success: false, error: "Erreur lors de la récupération de l'élection" };
+  }
+}
+
+/**
+ * Récupère les candidats de l'élection du 29/11/2025 organisés par poste
+ * 
+ * @returns Un objet avec success (boolean), candidatesByPosition (array) en cas de succès, 
+ *          ou error (string) en cas d'échec
+ */
+export async function getCandidatesForElection2025(): Promise<{ 
+  success: boolean; 
+  candidatesByPosition?: Array<{
+    position: PositionType;
+    candidates: Array<{
+      civility: string | null;
+      firstname: string | null;
+      lastname: string | null;
+    }>;
+  }>;
+  election?: any;
+  error?: string;
+}> {
+  try {
+    // Trouver l'élection du 29/11/2025
+    const electionDate = new Date("2025-11-29T00:00:00.000Z");
+    const election = await prisma.election.findFirst({
+      where: {
+        dateScrutin: {
+          gte: new Date("2025-11-29T00:00:00.000Z"),
+          lt: new Date("2025-11-30T00:00:00.000Z")
+        }
+      },
+      include: {
+        positions: {
+          include: {
+            candidacies: {
+              where: {
+                status: { in: ["Validee", "EnAttente"] }
+              },
+              include: {
+                adherent: {
+                  select: {
+                    id: true,
+                    firstname: true,
+                    lastname: true,
+                    civility: true
+                  }
+                }
+              },
+              orderBy: {
+                createdAt: 'asc'
+              }
+            }
+          },
+          orderBy: {
+            titre: 'asc'
+          }
+        }
+      }
+    });
+
+    if (!election) {
+      return { 
+        success: false, 
+        error: "Élection du 29/11/2025 non trouvée" 
+      };
+    }
+
+    // Organiser les candidats par PositionType
+    const candidatesByPosition: Array<{
+      position: PositionType;
+      candidates: Array<{
+        civility: string | null;
+        firstname: string | null;
+        lastname: string | null;
+      }>;
+    }> = [];
+
+    // Tous les PositionType possibles
+    const allPositionTypes = [
+      PositionType.President,
+      PositionType.VicePresident,
+      PositionType.Secretaire,
+      PositionType.ViceSecretaire,
+      PositionType.Tresorier,
+      PositionType.ViceTresorier,
+      PositionType.CommissaireComptes,
+      PositionType.MembreComiteDirecteur
+    ];
+
+    for (const positionType of allPositionTypes) {
+      const position = election.positions.find(p => p.type === positionType);
+      
+      candidatesByPosition.push({
+        position: positionType,
+        candidates: position?.candidacies.map(c => ({
+          civility: c.adherent.civility,
+          firstname: c.adherent.firstname,
+          lastname: c.adherent.lastname
+        })) || []
+      });
+    }
+
+    return {
+      success: true,
+      candidatesByPosition,
+      election: {
+        id: election.id,
+        titre: election.titre,
+        dateScrutin: election.dateScrutin,
+        dateClotureCandidature: election.dateClotureCandidature
+      }
+    };
+  } catch (error: any) {
+    console.error("Erreur lors de la récupération des candidats:", error);
+    return { 
+      success: false, 
+      error: error.message || "Erreur lors de la récupération des candidats" 
+    };
+  }
+}
+
+/**
+ * Importe les candidats statiques de la page /candidats dans la base de données
+ * pour l'élection du 29/11/2025
+ * 
+ * ⚠️ IMPORTANT : Cette fonction N'ENVOIE AUCUN EMAIL aux candidats lors de l'import.
+ * Les candidatures sont créées avec le statut "EnAttente" sans notification par email.
+ * 
+ * @returns Un objet avec success (boolean), message (string) en cas de succès,
+ *          ou error (string) en cas d'échec, et details (array) avec les résultats
+ */
+export async function importStaticCandidates(): Promise<{ 
+  success: boolean; 
+  message?: string; 
+  error?: string;
+  details?: Array<{ candidate: string; position: string; status: 'created' | 'exists' | 'not_found' | 'error'; error?: string }>;
+}> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const user = await prisma.user.findUnique({ where: { id: session.user.id } });
+    if (!user || user.role !== "Admin") {
+      return { success: false, error: "Seuls les administrateurs peuvent importer les candidats" };
+    }
+
+    // Données statiques des candidats avec informations complémentaires depuis ancien_adherents.md
+    const STATIC_CANDIDATES = [
+      {
+        position: PositionType.President,
+        candidates: [
+          { 
+            civility: "Monsieur", 
+            firstname: "Simon", 
+            lastname: "BAVUEZA TONGI",
+            email: "f3sbtevry@gmail.com",
+            phone: "+33661197784"
+          }
+        ]
+      },
+      {
+        position: PositionType.VicePresident,
+        candidates: [
+          { 
+            civility: "Madame", 
+            firstname: "Thaty", 
+            lastname: "BISUBULA",
+            email: "bisubula.sidonie@gmail.com",
+            phone: "+33628730747",
+            alternateFirstname: "Sidonie" // Le prénom dans la base est "Sidonie" selon ancien_adherents.md
+          },
+          { 
+            civility: "Monsieur", 
+            firstname: "Simon", 
+            lastname: "BAVUEZA TONGI",
+            email: "f3sbtevry@gmail.com",
+            phone: "+33661197784"
+          }
+        ]
+      },
+      {
+        position: PositionType.Secretaire,
+        candidates: [
+          { 
+            civility: "Monsieur", 
+            firstname: "Hubert", 
+            lastname: "ITOMBA",
+            email: "hubert.itomba@orange.fr",
+            phone: "+33607034364"
+          }
+        ]
+      },
+      {
+        position: PositionType.ViceSecretaire,
+        candidates: [] // Aucun candidat
+      },
+      {
+        position: PositionType.Tresorier,
+        candidates: [
+          { 
+            civility: "Monsieur", 
+            firstname: "Jimmy", 
+            lastname: "DIMONEKENE",
+            email: "dimonekene2017@hotmail.com",
+            phone: "+33783919977"
+          },
+          { 
+            civility: "Monsieur", 
+            firstname: "Saintho", 
+            lastname: "MANKENDA",
+            email: "sainthoservices@outlook.fr",
+            phone: "+33769504591",
+            alternateFirstname: "Thomas" // Le prénom dans la base peut être "Thomas"
+          }
+        ]
+      },
+      {
+        position: PositionType.ViceTresorier,
+        candidates: [
+          { 
+            civility: "Monsieur", 
+            firstname: "Saintho", 
+            lastname: "MANKENDA",
+            email: "sainthoservices@outlook.fr",
+            phone: "+33769504591",
+            alternateFirstname: "Thomas"
+          },
+          { 
+            civility: "Monsieur", 
+            firstname: "Dominique", 
+            lastname: "BENGA",
+            email: "gabrielbenga@yahoo.com",
+            phone: "+33663160865"
+          }
+        ]
+      },
+      {
+        position: PositionType.CommissaireComptes,
+        candidates: [
+          { 
+            civility: "Monsieur", 
+            firstname: "Hubert", 
+            lastname: "ITOMBA",
+            email: "hubert.itomba@orange.fr",
+            phone: "+33607034364"
+          },
+          { 
+            civility: "Monsieur", 
+            firstname: "Saintho", 
+            lastname: "MANKENDA",
+            email: "sainthoservices@outlook.fr",
+            phone: "+33769504591",
+            alternateFirstname: "Thomas"
+          }
+        ]
+      },
+      {
+        position: PositionType.MembreComiteDirecteur,
+        candidates: [
+          { 
+            civility: "Monsieur", 
+            firstname: "Hubert", 
+            lastname: "ITOMBA",
+            email: "hubert.itomba@orange.fr",
+            phone: "+33607034364"
+          },
+          { 
+            civility: "Monsieur", 
+            firstname: "Simon", 
+            lastname: "BAVUEZA TONGI",
+            email: "f3sbtevry@gmail.com",
+            phone: "+33661197784"
+          },
+          { 
+            civility: "Madame", 
+            firstname: "Marie", 
+            lastname: "MUILU",
+            email: "mariemuilu243@gmail.com",
+            phone: "+33634310747"
+          },
+          { 
+            civility: "Monsieur", 
+            firstname: "Jimmy", 
+            lastname: "DIMONEKENE",
+            email: "dimonekene2017@hotmail.com",
+            phone: "+33783919977"
+          }
+        ]
+      }
+    ];
+
+    // Trouver l'élection du 29/11/2025
+    const electionDate = new Date("2025-11-29T00:00:00.000Z");
+    const election = await prisma.election.findFirst({
+      where: {
+        dateScrutin: {
+          gte: new Date("2025-11-29T00:00:00.000Z"),
+          lt: new Date("2025-11-30T00:00:00.000Z")
+        }
+      },
+      include: {
+        positions: true
+      }
+    });
+
+    if (!election) {
+      return { 
+        success: false, 
+        error: "Élection du 29/11/2025 non trouvée. Veuillez d'abord créer l'élection." 
+      };
+    }
+
+    const details: Array<{ candidate: string; position: string; status: 'created' | 'exists' | 'not_found' | 'error'; error?: string }> = [];
+    let createdCount = 0;
+    let existsCount = 0;
+    let notFoundCount = 0;
+    let errorCount = 0;
+
+    // Traiter chaque groupe de candidats
+    for (const group of STATIC_CANDIDATES) {
+      // Trouver la position correspondante dans l'élection
+      const position = election.positions.find(p => p.type === group.position);
+      
+      if (!position) {
+        console.warn(`Position ${group.position} non trouvée dans l'élection ${election.id}`);
+        continue;
+      }
+
+      // Traiter chaque candidat
+      for (const candidate of group.candidates) {
+        const candidateName = `${candidate.firstname} ${candidate.lastname}`;
+        const positionLabel = POSTES_LABELS[group.position] || group.position;
+
+        try {
+          // Rechercher l'adhérent avec plusieurs critères (nom, email, téléphone)
+          let adherent = null;
+          
+          // 1. Recherche par email si disponible
+          if (candidate.email) {
+            const userByEmail = await prisma.user.findFirst({
+              where: {
+                email: { equals: candidate.email, mode: 'insensitive' }
+              },
+              include: {
+                adherent: true
+              }
+            });
+            if (userByEmail?.adherent) {
+              adherent = userByEmail.adherent;
+              // Ajouter la référence User à l'adhérent pour compatibilité
+              (adherent as any).User = userByEmail;
+            }
+          }
+          
+          // 2. Si pas trouvé par email, recherche par nom et prénom
+          if (!adherent) {
+            const searchConditions: any[] = [
+              { lastname: { equals: candidate.lastname, mode: 'insensitive' } }
+            ];
+            
+            // Chercher avec le prénom principal ou alternatif
+            const firstnamesToSearch = [candidate.firstname];
+            if ((candidate as any).alternateFirstname) {
+              firstnamesToSearch.push((candidate as any).alternateFirstname);
+            }
+            
+            searchConditions.push({
+              OR: firstnamesToSearch.map(fn => ({
+                firstname: { equals: fn, mode: 'insensitive' }
+              }))
+            });
+            
+            const foundAdherent = await prisma.adherent.findFirst({
+              where: {
+                AND: searchConditions
+              },
+              include: {
+                User: true
+              }
+            });
+            
+            if (foundAdherent) {
+              adherent = foundAdherent;
+            }
+          }
+          
+          // 3. Si pas trouvé, recherche par téléphone si disponible
+          if (!adherent && candidate.phone) {
+            const phoneNumber = candidate.phone.replace(/\s+/g, ''); // Enlever les espaces
+            const adherentByPhone = await prisma.adherent.findFirst({
+              where: {
+                Telephones: {
+                  some: {
+                    numero: {
+                      contains: phoneNumber,
+                      mode: 'insensitive'
+                    }
+                  }
+                }
+              },
+              include: {
+                User: true,
+                Telephones: true
+              }
+            });
+            
+            if (adherentByPhone) {
+              adherent = adherentByPhone;
+            }
+          }
+
+          if (!adherent) {
+            details.push({
+              candidate: candidateName,
+              position: positionLabel,
+              status: 'not_found',
+              error: `Adhérent non trouvé: ${candidateName}`
+            });
+            notFoundCount++;
+            continue;
+          }
+
+          // Vérifier si la candidature existe déjà
+          const existingCandidacy = await prisma.candidacy.findFirst({
+            where: {
+              electionId: election.id,
+              positionId: position.id,
+              adherentId: adherent.id
+            }
+          });
+
+          if (existingCandidacy) {
+            details.push({
+              candidate: candidateName,
+              position: positionLabel,
+              status: 'exists',
+              error: 'Candidature déjà existante'
+            });
+            existsCount++;
+            continue;
+          }
+
+          // Créer la candidature
+          // ⚠️ IMPORTANT : Aucun email n'est envoyé lors de la création de la candidature
+          await prisma.candidacy.create({
+            data: {
+              electionId: election.id,
+              positionId: position.id,
+              adherentId: adherent.id,
+              status: CandidacyStatus.EnAttente,
+              motivation: "",
+              programme: ""
+            }
+          });
+
+          details.push({
+            candidate: candidateName,
+            position: positionLabel,
+            status: 'created'
+          });
+          createdCount++;
+
+        } catch (error: any) {
+          console.error(`Erreur lors de la création de la candidature pour ${candidateName}:`, error);
+          details.push({
+            candidate: candidateName,
+            position: positionLabel,
+            status: 'error',
+            error: error.message || "Erreur inconnue"
+          });
+          errorCount++;
+        }
+      }
+    }
+
+    const message = `Import terminé: ${createdCount} créée(s), ${existsCount} existante(s), ${notFoundCount} non trouvé(s), ${errorCount} erreur(s)`;
+
+    return {
+      success: true,
+      message,
+      details
+    };
+
+  } catch (error: any) {
+    console.error("Erreur lors de l'import des candidats statiques:", error);
+    return { 
+      success: false, 
+      error: error.message || "Erreur lors de l'import des candidats statiques" 
+    };
   }
 }

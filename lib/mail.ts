@@ -10,26 +10,41 @@ const domain = process.env.NEXT_PUBLIC_APP_URL
  */
 async function sendEmail(options: EmailOptions): Promise<void> {
   try {
+    console.log("[sendEmail] Début de l'envoi d'email à:", options.to);
+    console.log("[sendEmail] Sujet:", options.subject);
+    
     const provider = await getEmailProvider();
+    console.log("[sendEmail] Provider obtenu avec succès");
+    
     const result = await provider.send(options);
+    console.log("[sendEmail] Résultat de l'envoi:", { success: result.success, error: result.error });
     
     if (!result.success) {
       const errorMessage = result.error?.message || result.error || "Erreur inconnue lors de l'envoi de l'email";
-      console.error("EMAIL_ERROR", result.error);
+      console.error("[sendEmail] Erreur lors de l'envoi:", {
+        error: result.error,
+        errorMessage,
+        to: options.to,
+        subject: options.subject,
+      });
       
       // Si c'est une erreur d'authentification (401), logger plus d'informations
       if (result.error && typeof result.error === 'object' && 'code' in result.error && result.error.code === 401) {
-        console.error("EMAIL_AUTH_ERROR: Les credentials du provider email sont invalides. Vérifiez les variables d'environnement.");
+        console.error("[sendEmail] EMAIL_AUTH_ERROR: Les credentials du provider email sont invalides. Vérifiez les variables d'environnement.");
       }
       
       throw new Error(errorMessage);
     }
+    
+    console.log("[sendEmail] Email envoyé avec succès à:", options.to);
   } catch (error: any) {
     // Logger l'erreur complète pour le débogage
-    console.error("EMAIL_ERROR", {
-      message: error.message,
+    console.error("[sendEmail] Exception lors de l'envoi d'email:", {
+      message: error?.message,
       error: error,
-      stack: error.stack
+      stack: error?.stack,
+      to: options.to,
+      subject: options.subject,
     });
     throw error;
   }
@@ -1029,4 +1044,84 @@ export const sendPasseportEmail = async(
       },
     ],
   });
+}
+
+/**
+ * Envoie un email à un utilisateur avec son nouveau mot de passe réinitialisé par un administrateur
+ * 
+ * @param email - L'email de l'utilisateur
+ * @param userName - Le nom de l'utilisateur
+ * @param newPassword - Le nouveau mot de passe en clair à envoyer
+ */
+export const sendAdminPasswordResetEmail = async(
+  email: string,
+  userName: string,
+  newPassword: string
+) => {
+  console.log(`[sendAdminPasswordResetEmail] Préparation de l'email pour ${email}`);
+  
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Réinitialisation de votre mot de passe</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${userName},</p>
+      <p style="margin: 10px 0; color: #666;">Un administrateur a réinitialisé votre mot de passe sur le portail AMAKI France.</p>
+    </div>
+    
+    <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+      <h2 style="color: #333; margin-top: 0;">Votre nouveau mot de passe</h2>
+      <p style="color: #666; margin: 10px 0;"><strong>Email :</strong> ${email}</p>
+      <p style="color: #666; margin: 10px 0;"><strong>Nouveau mot de passe :</strong> <code style="background-color: #fff; padding: 4px 8px; border-radius: 3px; font-family: monospace; font-size: 14px; color: #d63384; font-weight: bold;">${newPassword}</code></p>
+      <p style="color: #856404; margin: 10px 0; font-size: 14px;"><strong>⚠️ Important :</strong> Pour des raisons de sécurité, nous vous recommandons fortement de changer ce mot de passe après votre première connexion.</p>
+    </div>
+    
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <h3 style="color: #333; margin-top: 0; font-size: 18px;">📋 Prochaines étapes</h3>
+      <ol style="color: #666; padding-left: 20px;">
+        <li style="margin: 10px 0;">Connectez-vous à votre espace membre avec vos identifiants</li>
+        <li style="margin: 10px 0;">Changez votre mot de passe dans les paramètres de votre profil</li>
+        <li style="margin: 10px 0;">Assurez-vous que vos informations sont à jour</li>
+      </ol>
+    </div>
+    
+    <div style="margin-bottom: 20px; text-align: center;">
+      <a 
+        href="${domain}/auth/sign-in" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 10px;">
+        Se connecter maintenant
+      </a>
+    </div>
+    
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+      <p style="margin: 0; color: #856404;"><strong>🔒 Sécurité :</strong> Ne partagez jamais votre mot de passe avec qui que ce soit. L'équipe AMAKI France ne vous demandera jamais votre mot de passe par email ou téléphone.</p>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Pour toute question, n'hésitez pas à nous contacter à <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>.
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  try {
+    console.log(`[sendAdminPasswordResetEmail] Envoi de l'email à ${email}`);
+    await sendEmail({
+      from: 'noreply@amaki.fr',
+      to: email,
+      subject: 'Réinitialisation de votre mot de passe - Portail AMAKI France',
+      html: wrapEmailContent(content)
+    });
+    console.log(`[sendAdminPasswordResetEmail] Email envoyé avec succès à ${email}`);
+  } catch (error: any) {
+    console.error(`[sendAdminPasswordResetEmail] Erreur lors de l'envoi de l'email à ${email}:`, {
+      error,
+      message: error?.message,
+      stack: error?.stack,
+    });
+    throw error; // Re-lancer l'erreur pour qu'elle soit catchée dans la Server Action
+  }
 }

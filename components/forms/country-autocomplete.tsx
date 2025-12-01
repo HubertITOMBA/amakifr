@@ -56,11 +56,12 @@ export function CountryAutocomplete({
       value={value}
       onValueChange={onValueChange}
       placeholder={placeholder}
-      searchPlaceholder="Rechercher un pays..."
-      emptyMessage="Aucun pays trouvé."
+      searchPlaceholder="Rechercher ou saisir un pays..."
+      emptyMessage="Aucun pays trouvé. Vous pouvez saisir librement."
       disabled={disabled}
       loading={loading}
       popoverZIndex={100}
+      allowFreeText={true}
     />
   );
 }

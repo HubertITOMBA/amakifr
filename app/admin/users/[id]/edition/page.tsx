@@ -12,11 +12,13 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useState, useEffect } from "react";
 import { getUserByIdForAdmin, adminUpdateUser, adminUpdateUserRole, adminUpdateUserStatus } from "@/actions/user";
 import { adminUpdateAdherent } from "@/actions/user/admin-update-adherent";
+import { adminResetUserPassword } from "@/actions/user/admin-reset-password";
 import { getAllPostesTemplates } from "@/actions/postes";
 import { UserRole, UserStatus } from "@prisma/client";
 import { toast } from "react-toastify";
-import { User, Mail, Calendar, Briefcase, Shield, MapPin, Phone, Image as ImageIcon } from "lucide-react";
+import { User, Mail, Calendar, Briefcase, Shield, MapPin, Phone, Image as ImageIcon, KeyRound, Loader2 } from "lucide-react";
 import { ImageUpload } from "@/components/ui/image-upload";
+import { Button } from "@/components/ui/button";
 
 const formatDate = (date: string | Date | null | undefined) => {
   if (!date) return "";
@@ -35,6 +37,7 @@ export default function EditionUserPage() {
   const [user, setUser] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [postes, setPostes] = useState<any[]>([]);
+  const [resettingPassword, setResettingPassword] = useState(false);
   
   const [userForm, setUserForm] = useState<{ name: string; email: string; role: UserRole; status: UserStatus; image: string }>({
     name: "",
@@ -211,6 +214,34 @@ export default function EditionUserPage() {
     }
   };
 
+  const handleResetPassword = async () => {
+    if (!user || !user.id) return;
+    
+    // Confirmation avant de réinitialiser
+    if (!confirm("Êtes-vous sûr de vouloir réinitialiser le mot de passe de cet utilisateur ? Un nouveau mot de passe sera généré et envoyé par email.")) {
+      return;
+    }
+
+    setResettingPassword(true);
+    try {
+      console.log("[handleResetPassword] Début de la réinitialisation du mot de passe pour l'utilisateur:", user.id);
+      const result = await adminResetUserPassword(user.id);
+      console.log("[handleResetPassword] Résultat:", result);
+      
+      if (result.success) {
+        toast.success(result.message || "Le mot de passe a été réinitialisé et envoyé par email");
+      } else {
+        console.error("[handleResetPassword] Erreur retournée:", result.error);
+        toast.error(result.error || "Erreur lors de la réinitialisation du mot de passe");
+      }
+    } catch (error: any) {
+      console.error("[handleResetPassword] Exception lors de la réinitialisation du mot de passe:", error);
+      toast.error(`Une erreur s'est produite lors de la réinitialisation du mot de passe: ${error?.message || "Erreur inconnue"}`);
+    } finally {
+      setResettingPassword(false);
+    }
+  };
+
   if (loading) {
     return (
       <Modal title="Éditer l'utilisateur" confirmOnClose={false}>
@@ -372,6 +403,32 @@ export default function EditionUserPage() {
                   </div>
                 </div>
               )}
+            </div>
+            
+            {/* Bouton de réinitialisation du mot de passe */}
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <Button
+                type="button"
+                onClick={handleResetPassword}
+                disabled={resettingPassword}
+                variant="outline"
+                className="w-full sm:w-auto border-orange-300 hover:bg-orange-50 dark:hover:bg-orange-900/20 text-orange-700 dark:text-orange-400"
+              >
+                {resettingPassword ? (
+                  <>
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    Réinitialisation...
+                  </>
+                ) : (
+                  <>
+                    <KeyRound className="h-4 w-4 mr-2" />
+                    Réinitialiser le mot de passe
+                  </>
+                )}
+              </Button>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Un nouveau mot de passe sécurisé sera généré et envoyé par email à l'utilisateur.
+              </p>
             </div>
           </CardContent>
         </Card>

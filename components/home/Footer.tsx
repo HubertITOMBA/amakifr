@@ -20,6 +20,7 @@ import {
   Shield
 } from "lucide-react";
 import { motion } from "framer-motion";
+import { QRCodeShare } from "@/components/shared/QRCodeShare";
 
 // Composant pour mettre en évidence une lettre dans le texte
 function HighlightedText({ text, highlightIndex }: { text: string; highlightIndex: number }) {
@@ -140,6 +141,12 @@ export function Footer() {
                       </div>
                     </motion.div>
                   ))}
+                </div>
+
+                {/* QR Code et Partage */}
+                <div className="mb-8">
+                  <p className="text-sm font-medium text-gray-300 mb-3">Partager l'application</p>
+                  <QRCodeShare />
                 </div>
 
                 {/* Réseaux sociaux */}

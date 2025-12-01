@@ -546,12 +546,18 @@ export async function createAssistance(data: z.infer<typeof CreateAssistanceSche
 
     const validatedData = CreateAssistanceSchema.parse(data);
 
+    const dateEvenement = new Date(validatedData.dateEvenement);
+    const annee = dateEvenement.getFullYear();
+    const mois = dateEvenement.getMonth() + 1;
+    const periode = `${annee}-${mois.toString().padStart(2, '0')}`;
+
+    // Créer l'assistance
     const assistance = await prisma.assistance.create({
       data: {
         adherentId: validatedData.adherentId,
         type: validatedData.type as TypeEvenementFamilial,
         montant: new Decimal(validatedData.montant),
-        dateEvenement: new Date(validatedData.dateEvenement),
+        dateEvenement: dateEvenement,
         montantPaye: new Decimal(0),
         montantRestant: new Decimal(validatedData.montant),
         description: validatedData.description,
@@ -566,6 +572,117 @@ export async function createAssistance(data: z.infer<typeof CreateAssistanceSche
       },
     });
 
+    // Créer automatiquement une entrée dans cotisation_du_mois si elle n'existe pas
+    try {
+      console.log(`[createAssistance] Début de la création de cotisation_du_mois pour assistance type: ${validatedData.type}, date: ${dateEvenement.toISOString()}, periode: ${periode}`);
+      
+      // Mapper le type d'assistance au nom du type de cotisation
+      // Les types de cotisation sont : "Décès", "Naissance", "Anniversaire en salle", "Mariage"
+      const typeCotisationMap: Record<string, string> = {
+        "AnniversaireSalle": "Anniversaire en salle",
+        "MariageEnfant": "Mariage",
+        "DecesFamille": "Décès",
+        "Naissance": "Naissance",
+        "Autre": "Décès", // Utiliser "Décès" comme type générique pour autre
+      };
+
+      const nomTypeCotisation = typeCotisationMap[validatedData.type] || "Assistance décès";
+      console.log(`[createAssistance] Recherche du type de cotisation: "${nomTypeCotisation}"`);
+
+      // Récupérer tous les types actifs pour recherche manuelle
+      const allTypes = await prisma.typeCotisationMensuelle.findMany({
+        where: { actif: true },
+        select: { id: true, nom: true, montant: true },
+      });
+      console.log(`[createAssistance] Types de cotisation actifs disponibles:`, JSON.stringify(allTypes, null, 2));
+
+      // Recherche manuelle dans tous les types (plus fiable que contains avec Prisma)
+      let typeCotisation = allTypes.find(t => 
+        t.nom.toLowerCase().trim() === nomTypeCotisation.toLowerCase().trim()
+      );
+
+      // Si pas trouvé, recherche partielle (contient le nom recherché)
+      if (!typeCotisation) {
+        console.log(`[createAssistance] Type non trouvé avec recherche exacte, essai recherche partielle...`);
+        typeCotisation = allTypes.find(t => 
+          t.nom.toLowerCase().includes(nomTypeCotisation.toLowerCase()) ||
+          nomTypeCotisation.toLowerCase().includes(t.nom.toLowerCase())
+        );
+      }
+
+      // Si toujours pas trouvé, chercher par mots-clés : décès, naissance, anniversaire, mariage avec montant 50€
+      if (!typeCotisation) {
+        console.log(`[createAssistance] Type non trouvé avec "${nomTypeCotisation}", recherche par mots-clés avec montant 50€...`);
+        const keywords = ["décès", "naissance", "anniversaire", "mariage"];
+        const searchKeyword = nomTypeCotisation.toLowerCase();
+        const matchingKeyword = keywords.find(kw => searchKeyword.includes(kw));
+        
+        if (matchingKeyword) {
+          typeCotisation = allTypes.find(t => 
+            t.nom.toLowerCase().includes(matchingKeyword) && 
+            Number(t.montant) === 50
+          );
+        }
+      }
+
+      // Si trouvé, récupérer l'objet complet depuis la base
+      if (typeCotisation) {
+        const fullType = await prisma.typeCotisationMensuelle.findUnique({
+          where: { id: typeCotisation.id },
+        });
+        typeCotisation = fullType;
+      }
+
+      if (typeCotisation) {
+        console.log(`[createAssistance] Type de cotisation trouvé: ${typeCotisation.id} - ${typeCotisation.nom}`);
+        
+        // Vérifier si une cotisation du mois existe déjà pour cette période et ce type
+        const existingCotisationDuMois = await prisma.cotisationDuMois.findUnique({
+          where: {
+            periode_typeCotisationId: {
+              periode,
+              typeCotisationId: typeCotisation.id,
+            },
+          },
+        });
+
+        if (!existingCotisationDuMois) {
+          // Créer la cotisation du mois
+          // Date d'échéance : 15 du mois de l'événement
+          const dateEcheance = new Date(annee, mois - 1, 15);
+
+          const cotisationDuMois = await prisma.cotisationDuMois.create({
+            data: {
+              periode,
+              annee,
+              mois,
+              typeCotisationId: typeCotisation.id,
+              montantBase: new Decimal(validatedData.montant),
+              dateEcheance: dateEcheance,
+              description: validatedData.description || `Cotisation du mois pour ${nomTypeCotisation} - ${periode}`,
+              adherentBeneficiaireId: validatedData.adherentId, // L'adhérent bénéficiaire de l'assistance
+              statut: "Planifie",
+              createdBy: session.user.id,
+            },
+          });
+
+          console.log(`[createAssistance] ✅ Cotisation du mois créée avec succès: ${cotisationDuMois.id} pour ${periode} - ${nomTypeCotisation}`);
+        } else {
+          console.log(`[createAssistance] ⚠️ Cotisation du mois existe déjà pour ${periode} - ${nomTypeCotisation} (ID: ${existingCotisationDuMois.id})`);
+        }
+      } else {
+        console.error(`[createAssistance] ❌ Type de cotisation "${nomTypeCotisation}" non trouvé pour l'assistance de type "${validatedData.type}"`);
+        console.error(`[createAssistance] Les types disponibles ont été listés ci-dessus.`);
+      }
+    } catch (error) {
+      // Ne pas faire échouer la création de l'assistance si la création de cotisation_du_mois échoue
+      console.error("[createAssistance] ❌ Erreur lors de la création de la cotisation du mois:", error);
+      if (error instanceof Error) {
+        console.error("[createAssistance] Message d'erreur:", error.message);
+        console.error("[createAssistance] Stack:", error.stack);
+      }
+    }
+
     // Revalider les pages des adhérents et de gestion
     // Lors de la création d'une assistance, tous les profils d'adhérents sont mis à jour
     // (sauf celui de l'admin qui n'a pas de cotisations)
@@ -573,6 +690,7 @@ export async function createAssistance(data: z.infer<typeof CreateAssistanceSche
     revalidatePath("/admin/finances/assistances");
     revalidatePath("/admin/cotisations");
     revalidatePath("/admin/cotisations/gestion");
+    revalidatePath("/admin/cotisations-du-mois");
 
     return {
       success: true,

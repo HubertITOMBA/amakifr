@@ -2261,11 +2261,11 @@ function UserProfilePageContent() {
         const uniqueVoteElections = getUniqueElectionsFromVotes();
         const votesCount = getFilteredAndSortedVotes().length;
         return (
-          <div className="space-y-6">
+          <div className="space-y-3">
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mes Votes</h2>
-                <p className="text-gray-600 dark:text-gray-300">{votesCount} vote{votesCount > 1 ? 's' : ''} trouvé{votesCount > 1 ? 's' : ''}</p>
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Mes Votes</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-300">{votesCount} vote{votesCount > 1 ? 's' : ''} trouvé{votesCount > 1 ? 's' : ''}</p>
               </div>
               <div className="flex gap-2">
                 <Link href="/vote">
@@ -2366,16 +2366,16 @@ function UserProfilePageContent() {
                 </CardContent>
               </Card>
             ) : Object.keys(groupedVotes).length > 0 ? (
-              <div className="space-y-6">
+              <div className="space-y-3">
                 {Object.entries(groupedVotes).map(([electionTitle, votesInElection]) => {
                   const votesList = votesInElection as any[];
                   return (
                     <div key={electionTitle}>
                       {votesGroupByElection && (
-                        <div className="flex items-center gap-3 mb-4">
+                        <div className="flex items-center gap-2 mb-2">
                           <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{electionTitle}</h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">{votesList.length} vote{votesList.length > 1 ? 's' : ''}</p>
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">{electionTitle}</h3>
+                            <p className="text-xs text-gray-600 dark:text-gray-300">{votesList.length} vote{votesList.length > 1 ? 's' : ''}</p>
                           </div>
                           <Badge className={getElectionStatusColor(votesList[0]?.election.status)}>
                             {votesList[0]?.election.status === 'Ouverte' ? 'Ouverte' : votesList[0]?.election.status === 'Cloturee' ? 'Clôturée' : 'En préparation'}
@@ -2383,47 +2383,47 @@ function UserProfilePageContent() {
                         </div>
                       )}
 
-                      <div className="space-y-4">
+                      <div className="space-y-2">
                         {votesList.map((vote: any) => (
-                          <Card key={vote.id} className="hover:shadow-lg transition-shadow">
-                            <CardContent className="p-6">
-                              <div className="flex justify-between items-start mb-4">
+                          <Card key={vote.id} className="hover:shadow-md transition-shadow py-0!">
+                            <CardContent className="p-3">
+                              <div className="flex justify-between items-start mb-2">
                                 <div>
-                                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white">{vote.position.titre}</h3>
+                                  <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{vote.position.titre}</h3>
                                   {!votesGroupByElection && (
-                                    <p className="text-sm text-gray-600 dark:text-gray-300">{vote.election.titre}</p>
+                                    <p className="text-xs text-gray-600 dark:text-gray-300">{vote.election.titre}</p>
                                   )}
                                 </div>
-                                <Badge className={getElectionStatusColor(vote.election.status)}>
+                                <Badge className={`text-xs ${getElectionStatusColor(vote.election.status)}`}>
                                   {vote.election.status === 'Ouverte' ? 'Ouverte' : vote.election.status === 'Cloturee' ? 'Clôturée' : 'En préparation'}
                                 </Badge>
                               </div>
 
-                              <div className="flex items-center gap-4 mb-4">
-                                <Avatar className="w-12 h-12">
-                                  <AvatarImage src={vote.candidacy.adherent.User.image || undefined} alt={`${vote.candidacy.adherent.firstname} ${vote.candidacy.adherent.lastname}`} />
-                                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-sm">
-                                    {vote.candidacy.adherent.firstname?.[0]}{vote.candidacy.adherent.lastname?.[0]}
+                              <div className="flex items-center gap-3 mb-2">
+                                <Avatar className="w-10 h-10 flex-shrink-0">
+                                  <AvatarImage src={vote.candidacy?.adherent?.User?.image || undefined} alt={`${vote.candidacy?.adherent?.firstname || ''} ${vote.candidacy?.adherent?.lastname || ''}`} />
+                                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-xs">
+                                    {vote.candidacy?.adherent?.firstname?.[0] || ''}{vote.candidacy?.adherent?.lastname?.[0] || ''}
                                   </AvatarFallback>
                                 </Avatar>
-                                <div>
-                                  <p className="font-semibold text-gray-900 dark:text-white">{vote.candidacy.adherent.firstname} {vote.candidacy.adherent.lastname}</p>
-                                  <p className="text-sm text-gray-600 dark:text-gray-300">{vote.candidacy.adherent.civility}</p>
+                                <div className="flex-1 min-w-0">
+                                  <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{vote.candidacy?.adherent?.firstname || ''} {vote.candidacy?.adherent?.lastname || ''}</p>
+                                  <p className="text-xs text-gray-600 dark:text-gray-300">{vote.candidacy?.adherent?.civility || ''}</p>
                                 </div>
                               </div>
 
-                              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-xs">
                                 <div>
-                                  <span className="text-gray-600 dark:text-gray-300">Date du vote:</span>
-                                  <span className="ml-2 font-medium">{new Date(vote.createdAt).toLocaleDateString('fr-FR')}</span>
+                                  <span className="text-gray-600 dark:text-gray-300">Date:</span>
+                                  <span className="ml-1 font-medium">{new Date(vote.createdAt).toLocaleDateString('fr-FR')}</span>
                                 </div>
                                 <div>
                                   <span className="text-gray-600 dark:text-gray-300">Heure:</span>
-                                  <span className="ml-2 font-medium">{new Date(vote.createdAt).toLocaleTimeString('fr-FR')}</span>
+                                  <span className="ml-1 font-medium">{new Date(vote.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}</span>
                                 </div>
                                 <div>
                                   <span className="text-gray-600 dark:text-gray-300">Candidat:</span>
-                                  <span className="ml-2 font-medium">{vote.candidacy.adherent.firstname} {vote.candidacy.adherent.lastname}</span>
+                                  <span className="ml-1 font-medium truncate">{vote.candidacy?.adherent?.firstname || ''} {vote.candidacy?.adherent?.lastname || ''}</span>
                                 </div>
                               </div>
                             </CardContent>
@@ -2435,13 +2435,13 @@ function UserProfilePageContent() {
                 })}
               </div>
             ) : (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <Vote className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">Aucun vote</h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4">Vous n'avez pas encore voté dans une élection.</p>
+              <Card className="py-0!">
+                <CardContent className="p-4 text-center">
+                  <Vote className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">Aucun vote</h3>
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">Vous n'avez pas encore voté dans une élection.</p>
                   <Link href="/vote">
-                    <Button>
+                    <Button size="sm">
                       <Vote className="h-4 w-4 mr-2" />
                       Voter maintenant
                     </Button>
@@ -2458,12 +2458,12 @@ function UserProfilePageContent() {
         const filteredCount = getFilteredAndSortedCandidates().length;
 
         return (
-          <div className="space-y-6">
+          <div className="space-y-3">
             {/* En-tête avec titre et statistiques */}
             <div className="flex justify-between items-center">
               <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Liste des Candidats</h2>
-                <p className="text-gray-600 dark:text-gray-300">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Liste des Candidats</h2>
+                <p className="text-sm text-gray-600 dark:text-gray-300">
                   {filteredCount} candidat{filteredCount > 1 ? 's' : ''} trouvé{filteredCount > 1 ? 's' : ''}
                   {searchTerm && ` pour "${searchTerm}"`}
                 </p>
@@ -2556,19 +2556,19 @@ function UserProfilePageContent() {
                 </CardContent>
               </Card>
             ) : Object.keys(groupedCandidates).length > 0 ? (
-              <div className="space-y-6">
+              <div className="space-y-3">
                 {Object.entries(groupedCandidates).map(([electionTitle, candidatesInElection]) => {
                   const candidates = candidatesInElection as any[];
                   return (
                     <div key={electionTitle}>
                       {/* En-tête de groupe */}
                       {groupByElection && (
-                        <div className="flex items-center gap-3 mb-4">
+                        <div className="flex items-center gap-2 mb-2">
                           <div className="flex-1">
-                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                            <h3 className="text-base font-semibold text-gray-900 dark:text-white">
                               {electionTitle}
                             </h3>
-                            <p className="text-sm text-gray-600 dark:text-gray-300">
+                            <p className="text-xs text-gray-600 dark:text-gray-300">
                               {candidates.length} candidat{candidates.length > 1 ? 's' : ''}
                             </p>
                           </div>
@@ -2580,33 +2580,33 @@ function UserProfilePageContent() {
                       )}
 
                       {/* Liste des candidats */}
-                      <div className="space-y-4">
+                      <div className="space-y-2">
                         {candidates.map((candidate: any) => (
-                        <Card key={candidate.id} className="hover:shadow-lg transition-shadow">
-                          <CardContent className="p-6">
-                            <div className="flex items-center gap-4 mb-4">
-                              <Avatar className="w-16 h-16">
+                        <Card key={candidate.id} className="hover:shadow-md transition-shadow py-0!">
+                          <CardContent className="p-3">
+                            <div className="flex items-center gap-3 mb-2">
+                              <Avatar className="w-12 h-12 flex-shrink-0">
                                 <AvatarImage
-                                  src={candidate.adherent.User.image || undefined}
-                                  alt={`${candidate.adherent.firstname} ${candidate.adherent.lastname}`}
+                                  src={candidate.adherent?.User?.image || undefined}
+                                  alt={`${candidate.adherent?.firstname || ''} ${candidate.adherent?.lastname || ''}`}
                                 />
-                                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-lg">
-                                  {candidate.adherent.firstname?.[0]}{candidate.adherent.lastname?.[0]}
+                                <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-600 text-white font-bold text-sm">
+                                  {candidate.adherent?.firstname?.[0] || ''}{candidate.adherent?.lastname?.[0] || ''}
                                 </AvatarFallback>
                               </Avatar>
-                              <div className="flex-1">
-                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-                                  {candidate.adherent.firstname} {candidate.adherent.lastname}
+                              <div className="flex-1 min-w-0">
+                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
+                                  {candidate.adherent?.firstname || ''} {candidate.adherent?.lastname || ''}
                                 </h3>
-                                <p className="text-sm text-gray-600 dark:text-gray-300">
-                                  {candidate.adherent.civility}
+                                <p className="text-xs text-gray-600 dark:text-gray-300">
+                                  {candidate.adherent?.civility || ''}
                                 </p>
-                                <p className="text-sm text-gray-500">
-                                  {candidate.adherent.User.email}
+                                <p className="text-xs text-gray-500 truncate">
+                                  {candidate.adherent?.User?.email || ''}
                                 </p>
                               </div>
-                              <div className="text-right space-y-2">
-                                <Badge className={getCandidacyStatusColor(candidate.status)}>
+                              <div className="text-right space-y-1 flex-shrink-0">
+                                <Badge className={`text-xs ${getCandidacyStatusColor(candidate.status)}`}>
                                   {candidate.status === 'Validee' ? 'Validée' : 
                                    candidate.status === 'EnAttente' ? 'En attente' : 'Rejetée'}
                                 </Badge>
@@ -2619,35 +2619,35 @@ function UserProfilePageContent() {
                               </div>
                             </div>
                             
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-2 text-xs">
                               <div>
                                 <span className="text-gray-600 dark:text-gray-300">Poste:</span>
-                                <span className="ml-2 font-medium">{candidate.position.titre}</span>
+                                <span className="ml-1 font-medium">{candidate.position?.titre || ''}</span>
                               </div>
                               {!groupByElection && (
                                 <div>
                                   <span className="text-gray-600 dark:text-gray-300">Élection:</span>
-                                  <span className="ml-2 font-medium">{candidate.election.titre}</span>
+                                  <span className="ml-1 font-medium truncate">{candidate.election?.titre || ''}</span>
                                 </div>
                               )}
                               <div>
-                                <span className="text-gray-600 dark:text-gray-300">Date de candidature:</span>
-                                <span className="ml-2 font-medium">
+                                <span className="text-gray-600 dark:text-gray-300">Date:</span>
+                                <span className="ml-1 font-medium">
                                   {new Date(candidate.createdAt).toLocaleDateString('fr-FR')}
                                 </span>
                               </div>
                               <div>
                                 <span className="text-gray-600 dark:text-gray-300">Heure:</span>
-                                <span className="ml-2 font-medium">
-                                  {new Date(candidate.createdAt).toLocaleTimeString('fr-FR')}
+                                <span className="ml-1 font-medium">
+                                  {new Date(candidate.createdAt).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
                                 </span>
                               </div>
                             </div>
 
                             {candidate.motivation && (
-                              <div className="mt-4">
-                                <p className="text-sm text-gray-600 dark:text-gray-300 mb-2">Motivation:</p>
-                                <p className="text-sm bg-gray-50 dark:bg-gray-800 p-3 rounded-lg">
+                              <div className="mt-2">
+                                <p className="text-xs text-gray-600 dark:text-gray-300 mb-1">Motivation:</p>
+                                <p className="text-xs bg-gray-50 dark:bg-gray-800 p-2 rounded-lg line-clamp-2">
                                   {candidate.motivation}
                                 </p>
                               </div>
@@ -2661,15 +2661,15 @@ function UserProfilePageContent() {
                 })}
               </div>
             ) : (
-              <Card>
-                <CardContent className="p-6 text-center">
-                  <Users className="h-12 w-12 text-gray-400 mx-auto mb-4" />
-                  <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              <Card className="py-0!">
+                <CardContent className="p-4 text-center">
+                  <Users className="h-10 w-10 text-gray-400 mx-auto mb-3" />
+                  <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-1">
                     {searchTerm || selectedElection !== 'all' || selectedStatus !== 'all' 
                       ? 'Aucun résultat' 
                       : 'Aucun candidat'}
                   </h3>
-                  <p className="text-gray-600 dark:text-gray-300 mb-4">
+                  <p className="text-sm text-gray-600 dark:text-gray-300 mb-3">
                     {searchTerm || selectedElection !== 'all' || selectedStatus !== 'all'
                       ? 'Aucun candidat ne correspond à vos critères de recherche.'
                       : 'Aucune candidature n\'a été soumise pour le moment.'}

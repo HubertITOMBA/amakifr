@@ -18,6 +18,30 @@ export const getUserByEmail = async (email: string) => {
     }
 }
 
+/**
+ * Récupère un utilisateur par son nom
+ * 
+ * @param name - Le nom de l'utilisateur
+ * @returns L'utilisateur trouvé ou null
+ */
+export const getUserByName = async (name: string | null | undefined) => {
+    try {
+        if (!name) {
+            return null;
+        }
+        
+        const user = await db.user.findUnique({
+            where: {
+                name
+            }
+        })
+
+        return user
+    } catch (error) {
+        return null
+    }
+}
+
 
 export const getUserById = async(id: string) => {
     try {

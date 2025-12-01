@@ -47,12 +47,26 @@ export default function SessionAutoSignout() {
       try {
         // Si c'est une déconnexion pour inactivité, utiliser signOut avec redirection
         if (isInactivity) {
-          await signOut({
-            redirect: true,
-            callbackUrl: "/?inactivity=true"
-          });
+          try {
+            await signOut({
+              redirect: true,
+              callbackUrl: "/?inactivity=true"
+            });
+          } catch (signOutError: any) {
+            // Ignorer les erreurs CSRF qui peuvent survenir en développement
+            // Ces erreurs sont généralement non bloquantes
+            if (signOutError?.message?.includes('CSRF') || 
+                signOutError?.message?.includes('MissingCSRF') ||
+                signOutError?.type === 'MissingCSRF') {
+              // En cas d'erreur CSRF, utiliser la redirection manuelle
+              window.location.href = "/?inactivity=true";
+            } else {
+              throw signOutError;
+            }
+          }
         } else {
           // Pour les autres cas (fermeture de page), utiliser l'API rapide
+          // qui ne nécessite pas de token CSRF
           if (navigator.sendBeacon) {
             const blob = new Blob([""], { type: "text/plain" });
             navigator.sendBeacon(SIGNOUT_URL, blob);
@@ -60,7 +74,17 @@ export default function SessionAutoSignout() {
             fetch(SIGNOUT_URL, { method: "POST", keepalive: true, headers: { "Content-Type": "text/plain" }, body: "" }).catch(() => {});
           }
         }
-      } catch (error) {
+      } catch (error: any) {
+        // Ignorer les erreurs CSRF qui sont généralement non bloquantes
+        if (error?.message?.includes('CSRF') || 
+            error?.message?.includes('MissingCSRF') ||
+            error?.type === 'MissingCSRF') {
+          // En cas d'erreur CSRF, utiliser la redirection manuelle
+          if (isInactivity) {
+            window.location.href = "/?inactivity=true";
+          }
+          return;
+        }
         console.error("Erreur lors de la déconnexion:", error);
         // En cas d'erreur, rediriger quand même vers l'accueil
         if (isInactivity) {

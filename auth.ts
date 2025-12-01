@@ -12,9 +12,14 @@ export const {
 	signOut,
 } = NextAuth({
 	trustHost: true, // Permettre l'accès depuis différentes URLs en développement
-	// Utiliser AUTH_URL si disponible, sinon NEXT_PUBLIC_APP_URL
-	// Cela garantit que les URLs de callback OAuth sont correctes
-	...(process.env.AUTH_URL && { baseUrl: process.env.AUTH_URL }),
+	// En développement, ne pas définir baseUrl pour permettre l'accès depuis localhost et l'IP réseau
+	// NextAuth détectera automatiquement l'URL depuis la requête
+	// En production, utiliser AUTH_URL si disponible
+	...(process.env.NODE_ENV === 'production' && process.env.AUTH_URL && { baseUrl: process.env.AUTH_URL }),
+	// Configuration pour gérer les erreurs CSRF en développement
+	// En développement, on peut être plus permissif avec les erreurs CSRF
+	// mais on ne peut pas complètement désactiver la vérification pour des raisons de sécurité
+	debug: process.env.NODE_ENV === 'development',
 	pages: {
 		signIn: "/auth/sign-in",
 		error: "/auth/error",
@@ -48,13 +53,15 @@ export const {
 
 				// Créer l'adhérent avec les champs requis
 				try {
-					await db.adherent.create({
-						data: {
-							userId: user.id,
-							firstname: firstname,
-							lastname: lastname,
-						},
-					});
+					if (user.id) {
+						await db.adherent.create({
+							data: {
+								userId: user.id,
+								firstname: firstname,
+								lastname: lastname,
+							},
+						});
+					}
 				} catch (error) {
 					console.error("[auth] Erreur lors de la création de l'adhérent:", error);
 					// Ne pas bloquer le processus d'authentification si la création échoue
@@ -134,12 +141,21 @@ export const {
 			return token;
 		},
 	},
+	// Utiliser l'adapter Prisma uniquement pour les comptes OAuth (Account, VerificationToken)
+	// Avec la stratégie JWT, les sessions ne sont pas stockées en base de données
+	// L'adapter est nécessaire pour les comptes OAuth mais peut causer des problèmes avec JWT
+	// On le garde pour OAuth mais on s'assure que les sessions JWT ne l'utilisent pas
 	adapter: PrismaAdapter(db),
 	session: {
 		strategy: "jwt",
-		maxAge: 30 * 60,
+		maxAge: 30 * 60, // 30 minutes
+		updateAge: 24 * 60 * 60, // Mettre à jour la session toutes les 24 heures
 	},
+	// Configuration de sécurité
+	// En développement, désactiver useSecureCookies pour permettre l'accès HTTP depuis l'adresse réseau
+	useSecureCookies: process.env.NODE_ENV === 'production',
 	// Configuration des cookies pour permettre l'accès depuis localhost et l'adresse réseau
+	// En développement, ne pas utiliser les préfixes __Host- et __Secure- car ils nécessitent HTTPS
 	// NextAuth.js gère automatiquement les cookies PKCE, donc on ne les configure pas manuellement
 	cookies: {
 		sessionToken: {
@@ -148,9 +164,38 @@ export const {
 				: 'next-auth.session-token',
 			options: {
 				httpOnly: true,
-				sameSite: 'lax',
+				sameSite: 'lax' as const,
 				path: '/',
 				secure: process.env.NODE_ENV === 'production',
+				// Ne pas définir le domaine pour permettre l'accès depuis différentes URLs (localhost, IP réseau, etc.)
+				// Cela permet aux cookies d'être accessibles depuis n'importe quelle URL
+			},
+		},
+		csrfToken: {
+			// En développement, ne pas utiliser __Host- car il nécessite HTTPS et ne fonctionne pas avec HTTP
+			name: process.env.NODE_ENV === 'production'
+				? '__Host-next-auth.csrf-token'
+				: 'next-auth.csrf-token',
+			options: {
+				httpOnly: true, // Le token CSRF doit rester httpOnly pour la sécurité
+				sameSite: 'lax' as const,
+				path: '/',
+				secure: process.env.NODE_ENV === 'production',
+				// Ne pas définir le domaine pour permettre l'accès depuis différentes URLs
+			},
+		},
+		pkceCodeVerifier: {
+			// En développement, ne pas utiliser __Secure- car il nécessite HTTPS
+			name: process.env.NODE_ENV === 'production'
+				? '__Secure-next-auth.pkce.code_verifier'
+				: 'next-auth.pkce.code_verifier',
+			options: {
+				httpOnly: true,
+				sameSite: 'lax' as const,
+				path: '/',
+				secure: process.env.NODE_ENV === 'production',
+				maxAge: 60 * 15, // 15 minutes
+				// Ne pas définir le domaine pour permettre l'accès depuis différentes URLs
 			},
 		},
 	},

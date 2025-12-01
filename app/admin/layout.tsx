@@ -58,6 +58,12 @@ const adminMenuItems = [
     description: "Gestion des cotisations"
   },
   {
+    title: "Cotisations du Mois",
+    href: "/admin/cotisations-du-mois",
+    icon: Calendar,
+    description: "Planification des cotisations par mois"
+  },
+  {
     title: "Depenses",
     href: "/admin/depenses",
     icon: Euro,
