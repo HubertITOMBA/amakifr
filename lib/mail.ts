@@ -6,6 +6,29 @@ import type { EmailOptions } from "./email/providers/types"
 const domain = process.env.NEXT_PUBLIC_APP_URL
 
 /**
+ * Nettoie une URL en retirant les ports non standard et en s'assurant du bon protocole
+ * @param url - L'URL à nettoyer
+ * @returns L'URL nettoyée
+ */
+function cleanUrl(url: string | undefined | null): string | undefined {
+  if (!url) return url;
+  
+  // Retirer le port 9050 si présent (non standard pour HTTPS)
+  let cleaned = url.replace(':9050', '');
+  
+  // S'assurer que c'est HTTPS en production si l'URL commence par http://
+  if (cleaned.startsWith('http://') && process.env.NODE_ENV === 'production') {
+    cleaned = cleaned.replace('http://', 'https://');
+  }
+  
+  // Retirer les ports standards (80 pour HTTP, 443 pour HTTPS)
+  cleaned = cleaned.replace(':80', '');
+  cleaned = cleaned.replace(':443', '');
+  
+  return cleaned;
+}
+
+/**
  * Fonction helper pour envoyer un email via le provider configuré
  */
 async function sendEmail(options: EmailOptions): Promise<void> {
@@ -168,8 +191,12 @@ export const sendPasswordResetToken = async(
   token: string,
   baseUrl?: string
 ) => {
-  // Utiliser l'URL fournie, ou utiliser la variable d'environnement en fallback
-  const appUrl = baseUrl || domain || 'http://localhost:9050';
+  // Prioriser baseUrl, puis domain (NEXT_PUBLIC_APP_URL), puis localhost en dernier recours
+  let appUrl = baseUrl || domain || 'http://localhost:9050';
+  
+  // Nettoyer l'URL
+  appUrl = cleanUrl(appUrl) || appUrl;
+  
   const resetLink = `${appUrl}/auth/new-password?token=${token}`
 
   const content = `
@@ -1099,7 +1126,7 @@ export const sendAdminPasswordResetEmail = async(
     
     <div style="margin-bottom: 20px; text-align: center;">
       <a 
-        href="${domain}/?openLogin=true" 
+        href="${cleanUrl(domain) || domain || 'https://amaki.fr'}/?openLogin=true" 
         target="_blank" 
         rel="noopener noreferrer"
         style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 10px;">

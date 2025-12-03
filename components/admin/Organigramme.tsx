@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Users, Crown, Shield, FileText, Euro, Vote, AlertTriangle } from "lucide-react";
-import { format } from "date-fns";
+import { format, isBefore } from "date-fns";
 import { fr } from "date-fns/locale";
 
 interface MembreBureau {
