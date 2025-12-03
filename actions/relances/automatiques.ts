@@ -171,8 +171,12 @@ export async function executeRelancesAutomatiques() {
     });
 
     const relancesEnvoyees = [];
+    let emailsEnvoyes = 0;
+    const totalObligations = obligations.length;
 
-    for (const obligation of obligations) {
+    for (let i = 0; i < obligations.length; i++) {
+      const obligation = obligations[i];
+      
       // Exclure les adhérents à jour si configuré
       if (config.exclusionAdherentsAJour && obligation.statut === "Paye") {
         continue;
@@ -275,9 +279,38 @@ L'équipe AMAKI France`,
             montant: totalDette,
             joursRetard,
           });
+          
+          emailsEnvoyes++;
+          
+          // Attendre 5 secondes avant d'envoyer le prochain email (sauf pour le dernier)
+          // Pour éviter l'erreur 429 (rate limit: 2 requêtes par seconde)
+          // 5 secondes = 0.2 requête/seconde, bien en dessous de la limite
+          // Vérifier s'il reste des obligations à traiter qui pourraient envoyer un email
+          const resteObligations = obligations.slice(i + 1);
+          const resteAvecEmail = resteObligations.some(obl => 
+            obl.Adherent.User?.email && 
+            obl.Adherent.User.status === "Actif" &&
+            !(config.exclusionAdherentsAJour && obl.statut === "Paye")
+          );
+          
+          if (resteAvecEmail) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
         } catch (error) {
           console.error(`Erreur lors de l'envoi de l'email à ${obligation.Adherent.User.email}:`, error);
           // La relance reste en "EnAttente"
+          
+          // Attendre quand même 5 secondes même en cas d'erreur pour éviter le rate limit
+          const resteObligations = obligations.slice(i + 1);
+          const resteAvecEmail = resteObligations.some(obl => 
+            obl.Adherent.User?.email && 
+            obl.Adherent.User.status === "Actif" &&
+            !(config.exclusionAdherentsAJour && obl.statut === "Paye")
+          );
+          
+          if (resteAvecEmail) {
+            await new Promise(resolve => setTimeout(resolve, 5000));
+          }
         }
       }
     }

@@ -57,6 +57,11 @@ export const login = async (
             return { error: result.error };
         }
         
+        // Vérifier si result est undefined ou null (peut arriver avec redirect: false)
+        if (!result || result.error) {
+            return { error: "Identifiants non valides!" };
+        }
+        
         return { success: "Connexion réussie !" }
     } catch (error: any) {
         // NextAuth peut lancer une NEXT_REDIRECT qui est une erreur spéciale

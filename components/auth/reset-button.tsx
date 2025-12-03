@@ -7,28 +7,28 @@ import {
     DialogContent,
     DialogTitle,
     DialogTrigger } from "@/components/ui/dialog"
-import LoginForm from "@/components/auth/login-form";
+import { ResetForm } from "@/components/auth/reset-form";
 
 
-interface LoginButtonProps {
+interface ResetButtonProps {
     children: React.ReactNode;
     mode?: "modal" | "redirect",
     asChild?: boolean;
 };
 
 
-export const LoginButton = ({
+export const ResetButton = ({
         children,
         mode = "redirect",
         asChild
-    } : LoginButtonProps) => {
+    } : ResetButtonProps) => {
 
+        const router = useRouter();
         const pathname = usePathname();
 
         // Utiliser Link au lieu de router.push pour éviter les problèmes de navigation
         const getHref = () => {
-            const callbackUrl = encodeURIComponent(pathname || "/");
-            return `/auth/sign-in?callbackUrl=${callbackUrl}`;
+            return `/auth/reset`;
         }
 
          if (mode === "modal") {
@@ -38,9 +38,9 @@ export const LoginButton = ({
                         {children}
                     </DialogTrigger>
                     <DialogContent className="p-0 w-auto bg-transparent border-none max-w-md backdrop-blur-none">
-                        <DialogTitle className="sr-only">Connexion</DialogTitle>
+                        <DialogTitle className="sr-only">Réinitialisation du mot de passe</DialogTitle>
                         <div className="bg-transparent">
-                            <LoginForm />
+                            <ResetForm />
                         </div>
                     </DialogContent>
                 </Dialog>
@@ -53,5 +53,5 @@ export const LoginButton = ({
         </Link>
     )
    
-
 }
+

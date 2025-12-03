@@ -146,6 +146,8 @@ export default function AdminNotificationsPage() {
 
     try {
       setCreating(true);
+      console.log("[Notifications] Début de la création pour", formData.userIds.length, "adhérent(s)");
+      
       const result = await createNotifications({
         userIds: formData.userIds,
         type: formData.type,
@@ -153,6 +155,8 @@ export default function AdminNotificationsPage() {
         message: formData.message,
         lien: formData.lien || undefined,
       });
+
+      console.log("[Notifications] Résultat:", result);
 
       if (result.success) {
         toast.success(result.message || `${result.count} notification(s) créée(s) avec succès`);
@@ -166,11 +170,14 @@ export default function AdminNotificationsPage() {
         });
         loadData();
       } else {
-        toast.error(result.error || "Erreur lors de la création");
+        const errorMessage = result.error || "Erreur lors de la création des notifications";
+        console.error("[Notifications] Erreur:", errorMessage);
+        toast.error(errorMessage);
       }
-    } catch (error) {
-      console.error("Erreur:", error);
-      toast.error("Erreur lors de la création des notifications");
+    } catch (error: any) {
+      console.error("[Notifications] Exception:", error);
+      const errorMessage = error?.message || error?.toString() || "Erreur lors de la création des notifications";
+      toast.error(`Erreur: ${errorMessage}`);
     } finally {
       setCreating(false);
     }

@@ -5,8 +5,10 @@ import { useState, useTransition } from "react";
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { RegisterSchema } from "@/schemas";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { CardWrapper } from "./card-wrapper"
 import {
     Form,
@@ -21,16 +23,17 @@ import { Button } from "@/components/ui/button";
 import { FormError } from '@/components/global/form-error';
 import { FormSuccess } from '@/components/global/form-success';
 import { register } from "@/actions/auth/register";
-import { redirect } from 'next/navigation'
 import { Conditions } from "@/components/conditions";
 import { StatuAmaki } from "@/components/statuamaki";
 import { CheckCircle, FileText, Shield, Info } from "lucide-react";
 import { Checkbox } from "@/components/ui/checkbox";
 import { CountryAutocomplete } from "@/components/forms/country-autocomplete";
 import { CityAutocomplete } from "@/components/forms/city-autocomplete";
+import { LoginButton } from "@/components/auth/login-button";
 
 
 export const RegisterForm = () => {
+    const router = useRouter();
     const [error, setError] = useState<string | undefined>("");
     const [success, setSuccess] = useState<string | undefined>("");
     const [isPending, startTransition] = useTransition();
@@ -61,52 +64,83 @@ export const RegisterForm = () => {
         console.log(data);
         setError("");
         setSuccess("");
-        startTransition(() => {
-            register(data)
-                .then((response) => {
-                    if (response.error) {
-                        form.reset()
-                        setError(response.error)
-                    }
-
-                    if(response.twoFactor) {
-                        setShowTwoFactor(true)
-                    }
-                })
-                .catch((error) => {
-                    setError("Une erreur s'est produite lors de l'inscription")
-                })
+        startTransition(async () => {
+            try {
+                const response = await register(data);
+                
+                if (response?.error) {
+                    form.reset();
+                    setError(response.error);
+                } else if (response?.twoFactor) {
+                    setShowTwoFactor(true);
+                } else if (response?.success) {
+                    setSuccess(response.success || "Inscription réussie !");
+                    // Fermer le modal après un court délai si on est dans un modal
+                    setTimeout(() => {
+                        router.refresh();
+                        // Si on est dans un modal, on peut fermer la page ou rediriger
+                        if (typeof window !== 'undefined' && window.location.pathname !== '/inscription') {
+                            window.location.href = '/auth/new-verification';
+                        }
+                    }, 1500);
+                }
+            } catch (error: any) {
+                // Gérer les erreurs de manière plus robuste
+                console.error("Erreur lors de l'inscription:", error);
+                
+                // Vérifier si c'est une erreur de redirection Next.js (qui est normale)
+                if (error?.digest?.startsWith('NEXT_REDIRECT') || 
+                    error?.message?.includes('NEXT_REDIRECT') ||
+                    error?.code === 'NEXT_REDIRECT' ||
+                    error?.name === 'NEXT_REDIRECT') {
+                    // C'est une redirection normale, ne pas afficher d'erreur
+                    setSuccess("Inscription réussie !");
+                    return;
+                }
+                
+                setError(error?.message || "Une erreur s'est produite lors de l'inscription");
+            }
         })
      };
 
      if (showTwoFactor) {
-        return redirect('/auth/new-verification');
+        router.push('/auth/new-verification');
+        return null;
     }
 
     return (
-       <div className="min-h-screen bg-gradient-to-br from-blue-50/30 via-white/20 to-blue-50/30 backdrop-blur-sm flex items-center justify-center p-4 relative">
-            {/* Effet de flou d'arrière-plan pour renforcer l'effet de flottement */}
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-100/20 via-transparent to-blue-100/20 pointer-events-none"></div>
+       <div className="w-full flex items-center justify-center p-2 sm:p-4 relative">
             <div className="relative z-10 w-full">
                 <CardWrapper
                 labelBox="Inscription"
                 headerLabel="Créez votre compte"
                 backButtonLabel="Vous avez déjà un compte ?"
-                backButtonHref="/auth/sign-in"
-                showSocial
+                backButtonComponent={
+                    <LoginButton mode="modal">
+                        <Button
+                            variant="link"
+                            size="sm"
+                            type="button"
+                            className="w-full text-gray-800 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100 font-normal"
+                        >
+                            Vous avez déjà un compte ?
+                        </Button>
+                    </LoginButton>
+                }
+                showSocial={false}
             >
                 <Form {...form}>
                     <form 
                         onSubmit={form.handleSubmit(onSubmit)}
-                        className="space-y-5"
+                        className="space-y-3"
                     >
-                        <div className="space-y-4">
+                        <div className="space-y-3">
                             <FormField 
                                 control={form.control}
                                 name="name"
                                 render={({ field }) => (
                                     <FormItem>
-                                         <FormLabel className="text-sm font-semibold text-gray-700 dark:text-gray-300">Nom complet *</FormLabel>
+                                         <FormLabel className="text-sm font-semibold text-gray-900 dark:text-gray-100">Nom complet *</FormLabel>
                                          <FormControl>
                                             <Input 
                                                 {...field}
@@ -124,7 +158,7 @@ export const RegisterForm = () => {
                                 name="email"
                                 render={({ field }) => (
                                     <FormItem>
-                                         <FormLabel className="text-sm font-semibold text-gray-700 dark:text-gray-300">Adresse e-mail *</FormLabel>
+                                         <FormLabel className="text-sm font-semibold text-gray-900 dark:text-gray-100">Adresse e-mail *</FormLabel>
                                          <FormControl>
                                             <Input 
                                                 {...field}
@@ -143,13 +177,12 @@ export const RegisterForm = () => {
                                 name="password"
                                 render={({ field }) => (
                                     <FormItem>
-                                         <FormLabel className="text-sm font-semibold text-gray-700 dark:text-gray-300">Mot de passe *</FormLabel>
+                                         <FormLabel className="text-sm font-semibold text-gray-900 dark:text-gray-100">Mot de passe *</FormLabel>
                                          <FormControl>
-                                            <Input 
+                                            <PasswordInput 
                                                 {...field}
                                                 disabled={isPending}
                                                 placeholder="Minimum 6 caractères"
-                                                type="password"
                                                 className="placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100"
                                             />
                                          </FormControl>
@@ -161,83 +194,90 @@ export const RegisterForm = () => {
                                 )}
                             />
                             
-                            {/* Champs optionnels */}
+                            {/* Champs optionnels - masqués par défaut */}
                             <div className="pt-2 border-t border-gray-200 dark:border-gray-700">
-                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
-                                    Informations optionnelles (recommandées)
-                                </p>
-                                
-                                <FormField 
-                                    control={form.control}
-                                    name="anneePromotion"
-                                    render={({ field }) => (
-                                        <FormItem>
-                                             <FormLabel className="text-sm font-semibold text-gray-700 dark:text-gray-300">Année de promotion</FormLabel>
-                                             <FormControl>
-                                                <Input 
-                                                    {...field}
-                                                    disabled={isPending}
-                                                    placeholder="2010 ou 'Je ne suis pas ancien élève'"
-                                                    className="placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100"
-                                                />
-                                             </FormControl>
-                                             <FormDescription className="text-xs text-gray-500 dark:text-gray-400">
-                                                Si vous êtes ancien élève de Kipaku, indiquez votre année de promotion
-                                             </FormDescription>
-                                             <FormMessage />
-                                        </FormItem>                                
-                                    )}
-                                />
-                                
-                                <div className="space-y-3">
-                                    <FormField 
-                                        control={form.control}
-                                        name="pays"
-                                        render={({ field }) => (
-                                            <FormItem className="relative z-[5]">
-                                                 <FormLabel className="text-sm font-semibold text-gray-700 dark:text-gray-300">Pays</FormLabel>
-                                                 <FormControl>
-                                                    <div className="relative z-[5]">
-                                                        <CountryAutocomplete
-                                                            value={field.value}
-                                                            onValueChange={field.onChange}
-                                                            onCountryCodeChange={setCountryCode}
+                                <details className="group">
+                                    <summary className="text-xs text-gray-500 dark:text-gray-400 cursor-pointer hover:text-gray-700 dark:hover:text-gray-300 list-none">
+                                        <span className="flex items-center gap-1">
+                                            <span>Informations optionnelles</span>
+                                            <span className="text-gray-400 group-open:hidden">▼</span>
+                                            <span className="text-gray-400 hidden group-open:inline">▲</span>
+                                        </span>
+                                    </summary>
+                                    <div className="mt-3 space-y-3">
+                                        <FormField 
+                                            control={form.control}
+                                            name="anneePromotion"
+                                            render={({ field }) => (
+                                                <FormItem>
+                                                     <FormLabel className="text-sm font-semibold text-gray-700 dark:text-gray-300">Année de promotion</FormLabel>
+                                                     <FormControl>
+                                                        <Input 
+                                                            {...field}
                                                             disabled={isPending}
-                                                            placeholder="Sélectionner un pays..."
+                                                            placeholder="2010 ou 'Je ne suis pas ancien élève'"
+                                                            className="placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100"
                                                         />
-                                                    </div>
-                                                 </FormControl>
-                                                 <FormMessage />
-                                            </FormItem>                                
-                                        )}
-                                    />
-                                    <FormField 
-                                        control={form.control}
-                                        name="ville"
-                                        render={({ field }) => (
-                                            <FormItem className="relative z-[10]">
-                                                 <FormLabel className="text-sm font-semibold text-gray-700 dark:text-gray-300">Ville</FormLabel>
-                                                 <FormControl>
-                                                    <div className="relative z-[10]">
-                                                        <CityAutocomplete
-                                                            value={field.value}
-                                                            onValueChange={field.onChange}
-                                                            countryCode={countryCode}
-                                                            disabled={isPending}
-                                                            placeholder="Sélectionner une ville..."
-                                                        />
-                                                    </div>
-                                                 </FormControl>
-                                                 <FormMessage />
-                                            </FormItem>                                
-                                        )}
-                                    />
-                                </div>
+                                                     </FormControl>
+                                                     <FormDescription className="text-xs text-gray-500 dark:text-gray-400">
+                                                        Si vous êtes ancien élève de Kipaku, indiquez votre année de promotion
+                                                     </FormDescription>
+                                                     <FormMessage />
+                                                </FormItem>                                
+                                            )}
+                                        />
+                                        
+                                        <div className="space-y-3">
+                                            <FormField 
+                                                control={form.control}
+                                                name="pays"
+                                                render={({ field }) => (
+                                                    <FormItem className="relative z-[5]">
+                                                         <FormLabel className="text-sm font-semibold text-gray-700 dark:text-gray-300">Pays</FormLabel>
+                                                         <FormControl>
+                                                            <div className="relative z-[5]">
+                                                                <CountryAutocomplete
+                                                                    value={field.value}
+                                                                    onValueChange={field.onChange}
+                                                                    onCountryCodeChange={setCountryCode}
+                                                                    disabled={isPending}
+                                                                    placeholder="Sélectionner un pays..."
+                                                                />
+                                                            </div>
+                                                         </FormControl>
+                                                         <FormMessage />
+                                                    </FormItem>                                
+                                                )}
+                                            />
+                                            <FormField 
+                                                control={form.control}
+                                                name="ville"
+                                                render={({ field }) => (
+                                                    <FormItem className="relative z-[10]">
+                                                         <FormLabel className="text-sm font-semibold text-gray-700 dark:text-gray-300">Ville</FormLabel>
+                                                         <FormControl>
+                                                            <div className="relative z-[10]">
+                                                                <CityAutocomplete
+                                                                    value={field.value}
+                                                                    onValueChange={field.onChange}
+                                                                    countryCode={countryCode}
+                                                                    disabled={isPending}
+                                                                    placeholder="Sélectionner une ville..."
+                                                                />
+                                                            </div>
+                                                         </FormControl>
+                                                         <FormMessage />
+                                                    </FormItem>                                
+                                                )}
+                                            />
+                                        </div>
+                                    </div>
+                                </details>
                             </div>
                         </div>
 
                         {/* Conditions légales */}
-                        <div className="space-y-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <div className="space-y-2 pt-3 border-t-2 border-gray-200 dark:border-gray-700">
                             <div className="flex items-start gap-2">
                                 <Checkbox
                                     id="accept-conditions"
@@ -247,25 +287,33 @@ export const RegisterForm = () => {
                                 />
                                 <label 
                                     htmlFor="accept-conditions"
-                                    className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed cursor-pointer"
+                                    className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed cursor-pointer"
                                 >
-                                    En créant un compte, vous acceptez nos{" "}
+                                    En créant un compte, vous acceptez les{" "}
                                     <button
                                         type="button"
                                         onClick={() => setShowConditions(true)}
                                         className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
                                     >
-                                        Conditions d'utilisation
+                                        conditions d'adhésion et d'utilisation d'Amaki France
                                     </button>
-                                    {" "}et notre{" "}
+                                    . Consultez notre{" "}
                                     <button
                                         type="button"
                                         onClick={() => setShowStatut(true)}
                                         className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
                                     >
-                                        Statut juridique
+                                        statut juridique
                                     </button>
-                                    . Vos données sont protégées et ne seront jamais partagées sans votre accord.
+                                    {" "}et notre{" "}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowConditions(true)}
+                                        className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
+                                    >
+                                        déclaration de confidentialité
+                                    </button>
+                                    .
                                 </label>
                             </div>
                         </div>
@@ -284,8 +332,8 @@ export const RegisterForm = () => {
                 </Form>
 
                 {/* Message de réassurance */}
-                <div className="mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
-                    <div className="space-y-2 text-xs text-gray-600 dark:text-gray-400">
+                <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                    <div className="space-y-1.5 text-xs text-gray-600 dark:text-gray-400">
                         <div className="flex items-center gap-2">
                             <CheckCircle className="h-4 w-4 text-green-500" />
                             <span>Gratuit et sans engagement</span>

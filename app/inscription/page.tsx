@@ -20,6 +20,7 @@ import {
 } from "lucide-react";
 import { Conditions } from "@/components/conditions";
 import { StatuAmaki } from "@/components/statuamaki";
+import { RegisterFormEmbedded } from "@/components/auth/register-form-embedded";
 import { motion } from "framer-motion";
 
 export default function InscriptionPage() {
@@ -215,47 +216,56 @@ export default function InscriptionPage() {
         </div>
       </section>
 
-      {/* CTA Section */}
+      {/* Formulaire d'inscription */}
       <section className="py-20 px-4 sm:px-6 lg:px-8">
-        <div className="max-w-4xl mx-auto text-center">
+        <div className="max-w-5xl mx-auto">
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6, delay: 0.5 }}
-            className="space-y-6"
+            className="space-y-8"
           >
-            <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
-              Prêt à nous rejoindre ?
-            </h2>
-            <p className="text-lg text-gray-600 dark:text-gray-400">
-              Créez votre compte dès aujourd'hui et accédez à tous nos services
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <Link href="/auth/sign-up">
-                <Button size="lg" className="text-lg px-8 py-6 bg-blue-600 hover:bg-blue-700">
-                  Créer un compte
-                  <ArrowRight className="h-5 w-5 ml-2" />
-                </Button>
-              </Link>
-              <Link href="/auth/sign-in">
-                <Button variant="outline" size="lg" className="text-lg px-8 py-6">
-                  Déjà membre ? Se connecter
-                </Button>
-              </Link>
+            <div className="text-center space-y-4">
+              <h2 className="text-3xl sm:text-4xl font-bold text-gray-900 dark:text-white">
+                Créez votre compte maintenant
+              </h2>
+              <p className="text-lg text-gray-600 dark:text-gray-400">
+                Remplissez le formulaire ci-dessous pour rejoindre notre communauté
+              </p>
+              <div className="flex flex-wrap justify-center gap-6 pt-4 text-sm text-gray-500 dark:text-gray-400">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  Gratuit et sans engagement
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  Modifiable à tout moment
+                </div>
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  Communauté bienveillante
+                </div>
+              </div>
             </div>
-            <div className="flex flex-wrap justify-center gap-6 pt-8 text-sm text-gray-500 dark:text-gray-400">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                Gratuit et sans engagement
+
+            {/* Formulaire d'inscription intégré */}
+            <div className="flex justify-center">
+              <div className="w-full max-w-[600px]">
+                <RegisterFormEmbedded />
               </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                Modifiable à tout moment
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                Communauté bienveillante
-              </div>
+            </div>
+
+            {/* Lien vers la connexion */}
+            <div className="text-center pt-6 border-t border-gray-200 dark:border-gray-700">
+              <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                Vous avez déjà un compte ?
+              </p>
+              <Link href="/auth/sign-in">
+                <Button variant="outline" size="lg" className="text-base px-6 py-3">
+                  Se connecter
+                  <ArrowRight className="h-4 w-4 ml-2" />
+                </Button>
+              </Link>
             </div>
           </motion.div>
         </div>

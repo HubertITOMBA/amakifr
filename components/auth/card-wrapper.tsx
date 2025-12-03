@@ -11,7 +11,8 @@ interface CardWrapperProps {
     headerLabel: string;
     labelBox: string;
     backButtonLabel: string;
-    backButtonHref: string;
+    backButtonHref?: string;
+    backButtonComponent?: React.ReactNode;
     showSocial?: boolean;
 };
 
@@ -22,27 +23,32 @@ export const CardWrapper = ({
     labelBox,
     backButtonLabel,
     backButtonHref,
+    backButtonComponent,
     showSocial
     }: CardWrapperProps ) => {
 
 return (
-    <Card className="w-full max-w-[400px] shadow-2xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border border-white/20 dark:border-gray-700/50 rounded-xl animate-in fade-in-0 zoom-in-95 duration-300">
-        <CardHeader className="pb-6">
+    <Card className="w-full max-w-[400px] shadow-2xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 rounded-xl animate-in fade-in-0 zoom-in-95 duration-300">
+        <CardHeader className="pb-3">
             <Header  label={headerLabel} labelBox={labelBox}/>
         </CardHeader>
-        <CardContent className="space-y-4 [&_label]:text-gray-900 [&_label]:dark:text-gray-100 [&_label]:font-semibold [&_label]:text-sm [&_input]:bg-white [&_input]:dark:bg-gray-800 [&_input]:border-gray-300 [&_input]:dark:border-gray-700 [&_input]:text-gray-900 [&_input]:dark:text-gray-100 [&_input]:placeholder:text-gray-400 [&_input]:dark:placeholder:text-gray-500 [&_input]:focus:border-gray-400 [&_input]:dark:focus:border-gray-600 [&_p]:text-gray-700 [&_p]:dark:text-gray-300">
+        <CardContent className="space-y-3 [&_label]:text-gray-900 [&_label]:dark:text-gray-100 [&_label]:font-semibold [&_label]:text-sm [&_input]:bg-white dark:[&_input]:bg-gray-800 [&_input]:backdrop-blur-sm [&_input]:border-2 [&_input]:border-gray-300 dark:[&_input]:border-gray-600 [&_input]:text-gray-900 [&_input]:dark:text-gray-100 [&_input]:placeholder:text-gray-500 dark:[&_input]:placeholder:text-gray-400 [&_input]:focus:border-blue-500 dark:[&_input]:focus:border-blue-400 [&_p]:text-gray-800 dark:[&_p]:text-gray-200">
             { children}
         </CardContent>
             {showSocial && (
-                <CardFooter className="pt-4 border-t border-gray-200 dark:border-gray-800">
+                <CardFooter className="pt-2 border-t-2 border-gray-200 dark:border-gray-700">
                     <Social />
                 </CardFooter>
             )}
-            <CardFooter className="pt-4 border-t border-gray-200 dark:border-gray-800">
-                <BackButton 
-                    label={backButtonLabel}
-                    href={backButtonHref}
-                />
+            <CardFooter className="pt-2 border-t-2 border-gray-200 dark:border-gray-700">
+                {backButtonComponent ? (
+                    backButtonComponent
+                ) : backButtonHref ? (
+                    <BackButton 
+                        label={backButtonLabel}
+                        href={backButtonHref}
+                    />
+                ) : null}
             </CardFooter>
     </Card>
 )

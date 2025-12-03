@@ -45,12 +45,12 @@ export default function SessionAutoSignout() {
 
     const sendSignout = async (isInactivity: boolean = false) => {
       try {
-        // Si c'est une déconnexion pour inactivité, utiliser signOut avec redirection
+        // Si c'est une déconnexion pour inactivité, utiliser signOut avec redirection vers le modal de connexion
         if (isInactivity) {
           try {
             await signOut({
               redirect: true,
-              callbackUrl: "/?inactivity=true"
+              callbackUrl: "/?openLogin=true&inactivity=true"
             });
           } catch (signOutError: any) {
             // Ignorer les erreurs CSRF qui peuvent survenir en développement
@@ -59,7 +59,7 @@ export default function SessionAutoSignout() {
                 signOutError?.message?.includes('MissingCSRF') ||
                 signOutError?.type === 'MissingCSRF') {
               // En cas d'erreur CSRF, utiliser la redirection manuelle
-              window.location.href = "/?inactivity=true";
+              window.location.href = "/?openLogin=true&inactivity=true";
             } else {
               throw signOutError;
             }
@@ -81,14 +81,14 @@ export default function SessionAutoSignout() {
             error?.type === 'MissingCSRF') {
           // En cas d'erreur CSRF, utiliser la redirection manuelle
           if (isInactivity) {
-            window.location.href = "/?inactivity=true";
+            window.location.href = "/?openLogin=true&inactivity=true";
           }
           return;
         }
         console.error("Erreur lors de la déconnexion:", error);
-        // En cas d'erreur, rediriger quand même vers l'accueil
+        // En cas d'erreur, rediriger quand même vers l'accueil avec le modal
         if (isInactivity) {
-          window.location.href = "/?inactivity=true";
+          window.location.href = "/?openLogin=true&inactivity=true";
         }
       }
     };

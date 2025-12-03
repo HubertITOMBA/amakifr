@@ -80,11 +80,15 @@ export function SendEmailModal({
 
     setIsSending(true);
     try {
+      console.log(`[SendEmailModal] Début de l'envoi à ${userIds.length} destinataire(s)`);
+      
       const result = await sendCustomEmailToAdherents({
         userIds: userIds,
         subject: subject.trim(),
         body: body.trim(),
       });
+
+      console.log("[SendEmailModal] Résultat:", result);
 
       if (result.success) {
         toast.success(
@@ -96,11 +100,14 @@ export function SendEmailModal({
         setUserIds([]);
         onOpenChange(false);
       } else {
-        toast.error(result.error || "Erreur lors de l'envoi des emails");
+        const errorMessage = result.error || "Erreur lors de l'envoi des emails";
+        console.error("[SendEmailModal] Erreur:", errorMessage);
+        toast.error(errorMessage);
       }
     } catch (error: any) {
-      console.error("Erreur:", error);
-      toast.error("Erreur lors de l'envoi des emails");
+      console.error("[SendEmailModal] Exception:", error);
+      const errorMessage = error?.message || error?.toString() || "Erreur lors de l'envoi des emails";
+      toast.error(`Erreur: ${errorMessage}`);
     } finally {
       setIsSending(false);
     }

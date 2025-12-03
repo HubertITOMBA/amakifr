@@ -44,12 +44,12 @@ export function Hero() {
             </div>
             
             <div className="flex flex-col sm:flex-row gap-4">
-              <Link href="/inscription">
+              <RegisterButton mode="modal">
                 <Button size="lg" className="bg-white text-blue-600 hover:bg-blue-50 font-semibold px-8 py-4 rounded-xl shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-1">
                   Rejoindre AMAKI
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
-              </Link>
+              </RegisterButton>
               
               <Link href="/evenements">
                 <Button 

@@ -16,12 +16,15 @@ import {
 } from "@/components/ui/form"
 import Link from "next/link"
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Button } from "@/components/ui/button";
 import { CardWrapper } from "@/components/auth/card-wrapper"
 import { FormError } from '@/components/global/form-error';
 import { FormSuccess } from '@/components/global/form-success';
 import { login } from '@/actions/auth/login';
 import { useSession } from "next-auth/react";
+import { RegisterButton } from "@/components/auth/register-button";
+import { ResetButton } from "@/components/auth/reset-button";
 
 
 const LoginForm = () => {
@@ -63,8 +66,7 @@ const LoginForm = () => {
               setShowTwoFactor(true);
             } else {
               // Connexion réussie - forcer la mise à jour de la session
-              // Ne pas afficher le message de succès car on redirige immédiatement
-              setSuccess(undefined);
+              setSuccess("Connexion réussie !");
               
               // Attendre un peu pour que la session soit créée côté serveur
               await new Promise(resolve => setTimeout(resolve, 500));
@@ -81,18 +83,41 @@ const LoginForm = () => {
               router.refresh();
               
               // Attendre un peu pour que la session soit propagée
-              await new Promise(resolve => setTimeout(resolve, 200));
+              await new Promise(resolve => setTimeout(resolve, 300));
               
               // Rediriger vers la page d'accueil après la connexion
               // Utiliser window.location.href pour forcer un rechargement complet de la page
               // Cela garantit que la session est correctement chargée et que le middleware
               // peut correctement détecter l'utilisateur connecté
-              window.location.href = "/?loggedIn=true";
+              try {
+                window.location.href = "/?loggedIn=true";
+              } catch (redirectError) {
+                // Si la redirection échoue, utiliser router.push en dernier recours
+                console.warn("[login-form] Erreur lors de la redirection, utilisation de router.push:", redirectError);
+                router.push("/?loggedIn=true");
+              }
             }
           }
-        } catch (error) {
-          setError("Une erreur s'est produite !");
+        } catch (error: any) {
+          // Gérer les erreurs de manière plus robuste
           console.error("Erreur de connexion:", error);
+          
+          // Vérifier si c'est une erreur de redirection Next.js (qui est normale)
+          if (error?.digest?.startsWith('NEXT_REDIRECT') || 
+              error?.message?.includes('NEXT_REDIRECT') ||
+              error?.code === 'NEXT_REDIRECT' ||
+              error?.name === 'NEXT_REDIRECT') {
+            // C'est une redirection normale, ne pas afficher d'erreur
+            setSuccess("Connexion réussie !");
+            router.refresh();
+            setTimeout(() => {
+              window.location.href = "/?loggedIn=true";
+            }, 300);
+            return;
+          }
+          
+          // Pour les autres erreurs, afficher un message
+          setError(error?.message || "Une erreur s'est produite lors de la connexion !");
         }
       });
     }
@@ -106,8 +131,19 @@ const LoginForm = () => {
         <CardWrapper
             labelBox= "Connexion"
             headerLabel="Content de vous revoir !"
-            backButtonLabel="Vous n'avez pas encore de compte ?"
-            backButtonHref="/auth/sign-up"
+            backButtonLabel="Nouvel adhérent ? Commencez ici"
+            backButtonComponent={
+                <RegisterButton mode="modal">
+                    <Button
+                        variant="link"
+                        size="sm"
+                        type="button"
+                        className="w-full text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100 font-normal"
+                    >
+                        Nouvel adhérent ? Commencez ici
+                    </Button>
+                </RegisterButton>
+            }
             showSocial
             >
             <Form {...form}>
@@ -163,24 +199,25 @@ const LoginForm = () => {
                               <FormItem>
                                   <FormLabel>Mot de passe</FormLabel>
                                   <FormControl>
-                                      <Input 
+                                      <PasswordInput 
                                           {...field}
                                           disabled={isPending}
                                           placeholder=""
-                                          type="password"
                                       />
                                   </FormControl>
-                                  <Button
-                                      size="sm"
-                                      variant="link"
-                                      asChild
-                                      className="px-0 font-normal text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
-                                  >
-                                      <Link href="/auth/reset">Mot de passe oublié ?</Link>
-                                  </Button>
+                                  <ResetButton mode="modal">
+                                      <Button
+                                          size="sm"
+                                          variant="link"
+                                          type="button"
+                                          className="px-0 font-normal text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+                                      >
+                                          Mot de passe oublié ?
+                                      </Button>
+                                  </ResetButton>
                               </FormItem>
-                          )}   
-                      />
+                        )}
+                    />
                     {/* </>    */}
                   
                     

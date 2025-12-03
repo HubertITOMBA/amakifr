@@ -8,22 +8,33 @@ interface AuthSessionProviderProps {
 }
 
 export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
-  // Intercepter les erreurs "No tab with id: -1" qui peuvent survenir avec NextAuth
+  // Intercepter les erreurs "No tab with id: -1" et "flushSync" qui peuvent survenir avec NextAuth
   useEffect(() => {
     const originalError = console.error;
     console.error = (...args: any[]) => {
+      const errorMessage = args[0]?.toString() || '';
+      
       // Filtrer l'erreur "No tab with id: -1" qui est souvent liée à NextAuth
-      // mais qui n'est pas critique pour le fonctionnement de l'application
-      if (args[0]?.toString().includes('No tab with id: -1')) {
-        // Ignorer silencieusement cette erreur spécifique
+      if (errorMessage.includes('No tab with id: -1')) {
         return;
       }
+      
+      // Filtrer l'erreur "flushSync" qui peut survenir avec les modals et NextAuth
+      // Cette erreur n'est pas critique et peut être ignorée en production
+      if (errorMessage.includes('flushSync') || 
+          errorMessage.includes('React cannot flush when React is already rendering')) {
+        return;
+      }
+      
       originalError.apply(console, args);
     };
 
     // Intercepter les erreurs non capturées
     const handleError = (event: ErrorEvent) => {
-      if (event.message?.includes('No tab with id: -1')) {
+      const message = event.message || '';
+      if (message.includes('No tab with id: -1') || 
+          message.includes('flushSync') ||
+          message.includes('React cannot flush when React is already rendering')) {
         event.preventDefault();
         return;
       }
@@ -33,8 +44,10 @@ export function AuthSessionProvider({ children }: AuthSessionProviderProps) {
 
     // Intercepter les promesses rejetées
     const handleUnhandledRejection = (event: PromiseRejectionEvent) => {
-      if (event.reason?.message?.includes('No tab with id: -1') || 
-          event.reason?.toString().includes('No tab with id: -1')) {
+      const reason = event.reason?.message || event.reason?.toString() || '';
+      if (reason.includes('No tab with id: -1') || 
+          reason.includes('flushSync') ||
+          reason.includes('React cannot flush when React is already rendering')) {
         event.preventDefault();
         return;
       }

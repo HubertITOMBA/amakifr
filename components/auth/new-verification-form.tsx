@@ -26,6 +26,7 @@ import {
     InputOTPSlot
 } from '@/components/ui/input-otp'
 import { Button } from '@/components/ui/button'
+import { LoginButton } from "@/components/auth/login-button";
 import { 
     Shield, 
     Mail, 
@@ -121,13 +122,24 @@ export const NewVerificationForm = () => {
     };
 
     return (
-        <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 flex items-center justify-center p-4">
+        <div className="min-h-screen bg-transparent flex items-center justify-center p-4">
             <div className="w-full max-w-md transform transition-all duration-500 ease-out">
                 <CardWrapper
                     labelBox="🔐 Vérification de sécurité"
                     headerLabel="Entrez le code de vérification"
                     backButtonLabel="Retour à la connexion"
-                    backButtonHref="/auth/sign-in"
+                    backButtonComponent={
+                        <LoginButton mode="modal">
+                            <Button
+                                variant="link"
+                                size="sm"
+                                type="button"
+                                className="w-full text-gray-800 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100 font-normal"
+                            >
+                                Retour à la connexion
+                            </Button>
+                        </LoginButton>
+                    }
                 >
                     <div className="space-y-4 sm:space-y-6">
                         {/* Header avec icône animée */}

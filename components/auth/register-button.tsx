@@ -26,20 +26,21 @@ export const RegisterButton = ({
         const pathname = usePathname();
 
         const onClick = () => {
-            // Inclure l'URL actuelle comme callbackUrl pour rediriger après inscription
-            const callbackUrl = encodeURIComponent(pathname);
-            router.push(`/auth/sign-up?callbackUrl=${callbackUrl}`);
+            // Rediriger vers la page d'inscription avec le formulaire intégré
+            router.push(`/inscription`);
           }
 
          if (mode === "modal") {
             return (
                 <Dialog>
-                    <DialogTrigger asChild={asChild}>
+                    <DialogTrigger asChild={true}>
                         {children}
                     </DialogTrigger>
-                    <DialogContent className="p-0 w-auto bg-transparent border-none max-w-md">
+                    <DialogContent className="p-0 w-auto bg-transparent border-none max-w-md backdrop-blur-none">
                         <DialogTitle className="sr-only">Inscription</DialogTitle>
-                        <RegisterForm />
+                        <div className="bg-transparent">
+                            <RegisterForm />
+                        </div>
                     </DialogContent>
                 </Dialog>
                 )        

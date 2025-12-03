@@ -56,7 +56,7 @@ export function Footer() {
   ];
 
   const resources = [
-    { name: "Devenir Membre", href: "/membership" },
+    { name: "Devenir Membre", href: "/inscription" },
     { name: "Bourses d'Études", href: "/scholarships" },
     { name: "Mentorat", href: "/mentoring" },
     { name: "Réseau Professionnel", href: "/network" },

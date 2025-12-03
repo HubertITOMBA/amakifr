@@ -76,13 +76,19 @@ export async function sendCustomEmailToAdherents(
     let sentCount = 0;
     let failedCount = 0;
     const errors: string[] = [];
+    const totalUsers = usersWithEmail.length;
 
-    for (const user of usersWithEmail) {
+    console.log(`[Email] Début de l'envoi de ${totalUsers} email(s)`);
+
+    for (let i = 0; i < usersWithEmail.length; i++) {
+      const user = usersWithEmail[i];
       try {
         const userName = user.adherent
           ? `${user.adherent.civility || ""} ${user.adherent.firstname || ""} ${user.adherent.lastname || ""}`.trim() || user.name || "Adhérent"
           : user.name || "Adhérent";
 
+        console.log(`[Email] Envoi ${i + 1}/${totalUsers} à ${user.email}`);
+        
         await sendCustomEmailToUsers(
           user.email!,
           userName,
@@ -90,13 +96,28 @@ export async function sendCustomEmailToAdherents(
           emailData.body
         );
         sentCount++;
+        console.log(`[Email] ✓ Email ${i + 1}/${totalUsers} envoyé avec succès`);
+        
+        // Attendre 2 secondes avant d'envoyer le prochain email (sauf pour le dernier)
+        // Pour éviter l'erreur 429 (rate limit: 2 requêtes par seconde)
+        // 2 secondes = 0.5 requête/seconde, bien en dessous de la limite
+        if (i < usersWithEmail.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       } catch (error: any) {
         failedCount++;
         const errorMsg = `Erreur pour ${user.email}: ${error.message || "Erreur inconnue"}`;
         errors.push(errorMsg);
-        console.error(errorMsg, error);
+        console.error(`[Email] ✗ Erreur pour l'email ${i + 1}/${totalUsers}:`, errorMsg, error);
+        
+        // Attendre quand même 2 secondes même en cas d'erreur pour éviter le rate limit
+        if (i < usersWithEmail.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
     }
+
+    console.log(`[Email] Envoi terminé: ${sentCount} succès, ${failedCount} échecs`);
 
     if (sentCount === 0) {
       return {

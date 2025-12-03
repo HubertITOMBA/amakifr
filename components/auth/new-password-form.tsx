@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { NewPasswordSchema } from "@/schemas";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import {
     Form,
     FormControl,
@@ -19,6 +20,7 @@ import { Button } from "@/components/ui/button";
 import { FormError } from '@/components/global/form-error';
 import { FormSuccess } from '@/components/global/form-success';
 import { newPassword } from "@/actions/auth/new-password";
+import { LoginButton } from "@/components/auth/login-button";
 
 
 export const NewPasswordForm = () => {
@@ -62,7 +64,18 @@ export const NewPasswordForm = () => {
             labelBox= "Nouveau mot de passe"
             headerLabel="Entrez votre nouveau mot de passe ?"
             backButtonLabel="Retour à la connexion"
-            backButtonHref="/auth/sign-in"
+            backButtonComponent={
+                <LoginButton mode="modal">
+                    <Button
+                        variant="link"
+                        size="sm"
+                        type="button"
+                        className="w-full text-gray-800 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100 font-normal"
+                    >
+                        Retour à la connexion
+                    </Button>
+                </LoginButton>
+            }
             >
                 <Form {...form}>
                     <form 
@@ -77,11 +90,10 @@ export const NewPasswordForm = () => {
                                     <FormItem>
                                         <FormLabel>Mot de passe</FormLabel>
                                         <FormControl>
-                                            <Input 
+                                            <PasswordInput 
                                                 {...field}
                                                  disabled={isPending}
                                                  placeholder="******"
-                                                type="password"
                                             />
                                         </FormControl>
                                         <FormMessage />

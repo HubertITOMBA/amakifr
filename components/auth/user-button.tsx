@@ -146,9 +146,11 @@ export const UserButton = () => {
                 </div>
               </DropdownMenuLabel>
 
-              <DropdownMenuItem className="hover:bg-orange-300">
-                <LoginButton>
-                  Connexion
+              <DropdownMenuItem className="hover:bg-orange-300" onSelect={(e) => e.preventDefault()}>
+                <LoginButton mode="modal">
+                  <button type="button" className="w-full text-left">
+                    Connexion
+                  </button>
                 </LoginButton>    
               </DropdownMenuItem>
             </>

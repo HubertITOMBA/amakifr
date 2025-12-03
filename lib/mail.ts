@@ -891,7 +891,8 @@ export const sendNewUserNotificationEmail = async(
   // Envoyer à plusieurs destinataires
   const recipients = ["asso.amaki@gmail.com", "hubert.itomba@orange.fr","f3sbtevry@gmail.com"];
   
-  for (const recipient of recipients) {
+  for (let i = 0; i < recipients.length; i++) {
+    const recipient = recipients[i];
     try {
       await sendEmail({
         from: 'noreply@amaki.fr',
@@ -899,9 +900,21 @@ export const sendNewUserNotificationEmail = async(
         subject: `Nouvelle inscription : ${userName}`,
         html: wrapEmailContent(content)
       });
+      
+      // Attendre 5 secondes avant d'envoyer le prochain email (sauf pour le dernier)
+      // Pour éviter l'erreur 429 (rate limit: 2 requêtes par seconde)
+      // 5 secondes = 0.2 requête/seconde, bien en dessous de la limite
+      if (i < recipients.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
     } catch (error) {
       console.log("EMAIL_ERROR pour", recipient, error);
       // Ne pas throw pour ne pas bloquer l'inscription si l'email échoue
+      
+      // Attendre quand même 5 secondes même en cas d'erreur pour éviter le rate limit
+      if (i < recipients.length - 1) {
+        await new Promise(resolve => setTimeout(resolve, 5000));
+      }
     }
   }
 }
@@ -1086,7 +1099,7 @@ export const sendAdminPasswordResetEmail = async(
     
     <div style="margin-bottom: 20px; text-align: center;">
       <a 
-        href="${domain}/auth/sign-in" 
+        href="${domain}/?openLogin=true" 
         target="_blank" 
         rel="noopener noreferrer"
         style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 10px;">

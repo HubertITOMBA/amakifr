@@ -76,11 +76,39 @@ export async function createNotifications(data: z.infer<typeof CreateNotificatio
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
+    // Validation des données
     const validatedData = CreateNotificationsSchema.parse(data);
+
+    // Vérifier que les userIds existent
+    if (validatedData.userIds.length === 0) {
+      return { success: false, error: "Aucun utilisateur sélectionné" };
+    }
+
+    // Vérifier que les utilisateurs existent dans la base de données
+    const existingUsers = await db.user.findMany({
+      where: {
+        id: { in: validatedData.userIds },
+      },
+      select: { id: true },
+    });
+
+    if (existingUsers.length === 0) {
+      return { success: false, error: "Aucun utilisateur valide trouvé" };
+    }
+
+    if (existingUsers.length !== validatedData.userIds.length) {
+      const missingIds = validatedData.userIds.filter(
+        (id) => !existingUsers.some((u) => u.id === id)
+      );
+      console.warn(`[Notifications] Certains utilisateurs n'existent pas:`, missingIds);
+    }
+
+    // Filtrer pour ne garder que les utilisateurs valides
+    const validUserIds = existingUsers.map((u) => u.id);
 
     // Créer les notifications en batch
     const notifications = await db.notification.createMany({
-      data: validatedData.userIds.map((userId) => ({
+      data: validUserIds.map((userId) => ({
         userId,
         type: validatedData.type,
         titre: validatedData.titre,
@@ -88,6 +116,7 @@ export async function createNotifications(data: z.infer<typeof CreateNotificatio
         lien: validatedData.lien || null,
         lue: false,
       })),
+      skipDuplicates: true, // Ignorer les doublons si nécessaire
     });
 
     revalidatePath("/notifications");
@@ -101,10 +130,29 @@ export async function createNotifications(data: z.infer<typeof CreateNotificatio
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
-      return { success: false, error: error.errors[0].message };
+      const errorMessage = error.errors.map((e) => `${e.path.join(".")}: ${e.message}`).join(", ");
+      console.error("[Notifications] Erreur de validation Zod:", errorMessage);
+      return { success: false, error: `Erreur de validation: ${errorMessage}` };
     }
-    console.error("Erreur lors de la création des notifications:", error);
-    return { success: false, error: "Erreur lors de la création des notifications" };
+    
+    // Gérer les erreurs Prisma spécifiques
+    if (error && typeof error === "object" && "code" in error) {
+      const prismaError = error as { code: string; message: string };
+      console.error("[Notifications] Erreur Prisma:", prismaError.code, prismaError.message);
+      
+      if (prismaError.code === "P2002") {
+        return { success: false, error: "Une notification similaire existe déjà" };
+      }
+      if (prismaError.code === "P2003") {
+        return { success: false, error: "Un ou plusieurs utilisateurs sélectionnés n'existent pas" };
+      }
+      
+      return { success: false, error: `Erreur de base de données: ${prismaError.message}` };
+    }
+    
+    console.error("[Notifications] Erreur lors de la création des notifications:", error);
+    const errorMessage = error instanceof Error ? error.message : "Erreur inconnue";
+    return { success: false, error: `Erreur lors de la création des notifications: ${errorMessage}` };
   }
 }
 

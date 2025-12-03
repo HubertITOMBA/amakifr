@@ -17,6 +17,7 @@ export const publicRoutes = [
     "/candidatures",
     "/candidats",
     "/extrat",
+    "/inscription",
 ];
 
 /**

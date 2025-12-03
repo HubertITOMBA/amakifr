@@ -17,7 +17,6 @@ const navigation = [
   // { name: 'Accueil', href: '/' },
   { name: "L'amicale", href: '/amicale' },
   { name: 'Election', href: '/extrat' },
-   { name: 'Agenda', href: '/agenda' },
   { name: 'Evénements', href: '/evenements' },
  
   { name: 'Galerie', href: '/galerie' },
@@ -44,7 +43,7 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2">
+          <Link href="/" className="flex items-center gap-2 mr-8 lg:mr-12">
             <Image src={Logo} alt="Logo" className="size-10" />
             <h3 className="text-2xl font-semibold">
               Ama<span className="text-3xl text-red-500 font-semibold">K</span>i
@@ -108,7 +107,7 @@ export function Navbar() {
                 <Link
                   key={item.name}
                   href={item.href}
-                  className="block px-4 py-3 sm:px-3 sm:py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors min-h-[44px] sm:min-h-0 flex items-center touch-manipulation"
+                  className="px-4 py-3 sm:px-3 sm:py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors min-h-[44px] sm:min-h-0 flex items-center touch-manipulation"
                   onClick={() => {
                     setIsMenuOpen(false);
                   }}

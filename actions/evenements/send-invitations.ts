@@ -104,7 +104,8 @@ export async function sendEventInvitations(
     let failedCount = 0;
     const errors: string[] = [];
 
-    for (const user of usersWithEmail) {
+    for (let i = 0; i < usersWithEmail.length; i++) {
+      const user = usersWithEmail[i];
       try {
         const userName = user.adherent
           ? `${user.adherent.civility || ""} ${user.adherent.firstname || ""} ${user.adherent.lastname || ""}`.trim() || user.name || "Adhérent"
@@ -121,11 +122,23 @@ export async function sendEventInvitations(
           evenement.adresse || null
         );
         sentCount++;
+        
+        // Attendre 2 secondes avant d'envoyer le prochain email (sauf pour le dernier)
+        // Pour éviter l'erreur 429 (rate limit: 2 requêtes par seconde)
+        // 2 secondes = 0.5 requête/seconde, bien en dessous de la limite
+        if (i < usersWithEmail.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       } catch (error: any) {
         failedCount++;
         const errorMsg = `Erreur pour ${user.email}: ${error.message || "Erreur inconnue"}`;
         errors.push(errorMsg);
         console.error(errorMsg, error);
+        
+        // Attendre quand même 2 secondes même en cas d'erreur pour éviter le rate limit
+        if (i < usersWithEmail.length - 1) {
+          await new Promise(resolve => setTimeout(resolve, 2000));
+        }
       }
     }
 

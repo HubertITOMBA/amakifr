@@ -11,10 +11,11 @@ import { NewsletterSection } from "@/components/home/NewsletterSection";
 import { Footer } from "@/components/home/Footer";
 import { SessionDebug } from "@/components/debug/session-debug";
 import { motion } from "framer-motion";
-import { Suspense, useEffect } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { AlertCircle } from "lucide-react";
+import { LoginButton } from "@/components/auth/login-button";
 
 function InactivityNotification() {
   const searchParams = useSearchParams();
@@ -32,7 +33,7 @@ function InactivityNotification() {
         action: {
           label: "Se connecter",
           onClick: () => {
-            router.push("/auth/sign-in");
+            router.push("/?openLogin=true");
           }
         }
       });
@@ -44,6 +45,59 @@ function InactivityNotification() {
   }, [searchParams, router]);
 
   return null;
+}
+
+function AutoOpenLoginModal() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [shouldOpen, setShouldOpen] = useState(false);
+
+  useEffect(() => {
+    const openLogin = searchParams.get("openLogin");
+    const inactivity = searchParams.get("inactivity");
+    
+    if (openLogin === "true") {
+      setShouldOpen(true);
+      
+      // Si c'est une déconnexion pour inactivité, afficher aussi un toast informatif
+      if (inactivity === "true") {
+        toast.warning("Session expirée", {
+          description: "Vous avez été déconnecté automatiquement après 15 minutes d'inactivité pour des raisons de sécurité.",
+          duration: 8000,
+          icon: <AlertCircle className="h-5 w-5" />,
+        });
+      }
+      
+      // Nettoyer l'URL en retirant les paramètres
+      const newUrl = window.location.pathname;
+      router.replace(newUrl);
+    }
+  }, [searchParams, router]);
+
+  useEffect(() => {
+    if (shouldOpen) {
+      // Ouvrir le modal après un court délai pour s'assurer que le composant est monté
+      const timer = setTimeout(() => {
+        const trigger = document.querySelector('[data-auto-open-login]') as HTMLElement;
+        if (trigger) {
+          trigger.click();
+        }
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [shouldOpen]);
+
+  if (!shouldOpen) return null;
+
+  return (
+    <LoginButton mode="modal">
+      <button 
+        type="button" 
+        data-auto-open-login
+        style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}
+      />
+    </LoginButton>
+  );
 }
 
 export default function Home() {
@@ -60,6 +114,7 @@ export default function Home() {
       <div className="relative z-10">
         <Suspense fallback={null}>
           <InactivityNotification />
+          <AutoOpenLoginModal />
         </Suspense>
         
         <Navbar />
