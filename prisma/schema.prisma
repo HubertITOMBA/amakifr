@@ -712,11 +712,16 @@ model CotisationDuMois {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([periode, typeCotisationId])
+  // Contrainte : un adhérent ne peut avoir qu'une seule assistance par mois
+  // (peu importe le type d'assistance : mariage, anniversaire, etc.)
+  // Cette contrainte s'applique uniquement quand adherentBeneficiaireId n'est pas null
+  // PostgreSQL permet plusieurs NULL dans une contrainte unique, donc les types sans bénéficiaire ne sont pas affectés
+  @@unique([periode, adherentBeneficiaireId], name: "unique_adherent_assistance_periode")
   @@index([annee])
   @@index([mois])
   @@index([statut])
   @@index([adherentBeneficiaireId])
+  @@index([periode, typeCotisationId])
   @@map("cotisations_du_mois")
 }
 

@@ -68,7 +68,7 @@ export async function createStripeCheckoutSession(data: {
         where: { id: data.itemId },
         include: { TypeCotisation: true },
       });
-      if (cotisation) {
+      if (cotisation && cotisation.TypeCotisation) {
         description = `Cotisation mensuelle - ${cotisation.TypeCotisation.nom} - ${cotisation.periode}`;
       }
     } else if (data.type === "assistance" && data.itemId) {

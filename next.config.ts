@@ -19,6 +19,11 @@ const withPWA = require('next-pwa')({
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development', // Désactiver en développement pour éviter les problèmes
   buildExcludes: [/app-build-manifest\.json$/],
+  // Optimisations pour accélérer le build
+  cacheOnFrontEndNav: true,
+  aggressiveFrontEndNavCaching: true,
+  reloadOnOnline: true,
+  swcMinify: true, // Utiliser SWC pour minifier le service worker
   fallbacks: {
     document: '/offline',
   },
@@ -87,6 +92,20 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  
+  // Optimisations de compilation pour accélérer le build
+  swcMinify: true, // Utiliser SWC pour la minification (plus rapide que Terser)
+  
+  // Optimisations du compilateur
+  compiler: {
+    // Supprimer les console.log en production (réduit la taille du bundle)
+    removeConsole: process.env.NODE_ENV === 'production' ? {
+      exclude: ['error', 'warn'], // Garder les erreurs et warnings
+    } : false,
+  },
+  
+  // Optimiser la génération des pages
+  poweredByHeader: false, // Désactiver le header X-Powered-By (sécurité + performance)
   
   // En développement, forcer l'utilisation de HTTP et éviter 0.0.0.0
   // Le navigateur ne peut pas accéder à 0.0.0.0, il doit utiliser localhost ou l'IP réseau

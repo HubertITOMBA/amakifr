@@ -210,8 +210,8 @@ export default function AdminCotisationsDuMois() {
         const q = globalFilter.trim().toLowerCase();
         const searchText = [
           item.periode || "",
-          item.TypeCotisation.nom || "",
-          item.TypeCotisation.description || "",
+          item.TypeCotisation?.nom || "",
+          item.TypeCotisation?.description || "",
           item.description || "",
           item.statut || "",
           item.CreatedBy?.email || "",
@@ -264,9 +264,9 @@ export default function AdminCotisationsDuMois() {
       cell: ({ row }) => (
         <div className="flex flex-col">
           <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-            {row.original.TypeCotisation.nom}
+            {row.original.TypeCotisation?.nom || "Type inconnu"}
           </span>
-          {row.original.TypeCotisation.obligatoire && (
+          {row.original.TypeCotisation?.obligatoire && (
             <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs w-fit mt-1">
               Obligatoire
             </Badge>

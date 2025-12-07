@@ -29,7 +29,7 @@ async function createDefaultTypesCotisationMensuelle() {
         aBeneficiaire: false
       },
       {
-        nom: "Assistance anniversaire en salle",
+        nom: "Anniversaire en salle",
         description: "Assistance anniversaire en salle",
         montant: 50.00,
         obligatoire: true,
@@ -38,8 +38,8 @@ async function createDefaultTypesCotisationMensuelle() {
         aBeneficiaire: true // Nécessite un adhérent bénéficiaire
       },
       {
-        nom: "Assistance mariage",
-        description: "Assistance mariage de l'adhérent ou de son enfant ",
+        nom: "Mariage",
+        description: "Assistance mariage de l'adhérent, conjoint ou de son enfant ",
         montant: 50.00,
         obligatoire: true,
         actif: true,
@@ -47,8 +47,8 @@ async function createDefaultTypesCotisationMensuelle() {
         aBeneficiaire: true // Nécessite un adhérent bénéficiaire
       },
       {
-        nom: "Assistance décès",
-        description: "Assistance décès d'un membre de la famille restreint de l'adhérent",
+        nom: "Décès",
+        description: "Assistance décès d'un adhérent, conjoint , membre sa famille restreint ou parentde l'adhérent",
         montant: 50.00,
         obligatoire: true,
         actif: true,

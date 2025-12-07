@@ -333,10 +333,10 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
 
     // Séparer le forfait mensuel des assistances
     const cotisationForfait = cotisationsDuMois.find(cdm => 
-      cdm.TypeCotisation.nom.toLowerCase().includes("forfait") && cdm.TypeCotisation.obligatoire
+      cdm.TypeCotisation?.nom?.toLowerCase().includes("forfait") && cdm.TypeCotisation?.obligatoire
     );
     const cotisationsAssistances = cotisationsDuMois.filter(cdm => 
-      !cdm.TypeCotisation.nom.toLowerCase().includes("forfait") || !cdm.TypeCotisation.obligatoire
+      !cdm.TypeCotisation?.nom?.toLowerCase().includes("forfait") || !cdm.TypeCotisation?.obligatoire
     );
 
     if (!cotisationForfait) {
@@ -361,7 +361,8 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
     // Pour chaque adhérent, créer une cotisation mensuelle
     for (const adherent of adherents) {
       let montantTotal = montantForfait;
-      let description = `Cotisation ${periode} : ${cotisationForfait.TypeCotisation.nom} ${montantForfait.toFixed(2)}€`;
+      const nomForfait = cotisationForfait.TypeCotisation?.nom || "Forfait";
+      let description = `Cotisation ${periode} : ${nomForfait} ${montantForfait.toFixed(2)}€`;
 
       // Calculer le montant des assistances à payer
       let montantAssistances = 0;
@@ -376,7 +377,7 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
         
         if (assistancesBeneficiaires.length > 0) {
           const beneficiaireDetails = assistancesBeneficiaires.map(cdm => 
-            `${cdm.TypeCotisation.nom} (bénéficiaire)`
+            `${cdm.TypeCotisation?.nom || "Assistance"} (bénéficiaire)`
           ).join(", ");
           description += ` - Bénéficiaire de: ${beneficiaireDetails} (ne paie pas)`;
         }
@@ -387,7 +388,7 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
             const montant = Number(cdm.montantBase);
             montantAssistances += montant;
             assistancesDetails.push(
-              `${cdm.TypeCotisation.nom}${cdm.AdherentBeneficiaire ? ` pour ${cdm.AdherentBeneficiaire.firstname} ${cdm.AdherentBeneficiaire.lastname}` : ''} (${montant.toFixed(2)}€)`
+              `${cdm.TypeCotisation?.nom || "Assistance"}${cdm.AdherentBeneficiaire ? ` pour ${cdm.AdherentBeneficiaire.firstname} ${cdm.AdherentBeneficiaire.lastname}` : ''} (${montant.toFixed(2)}€)`
             );
           }
         }
@@ -397,7 +398,7 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
           const montant = Number(cdm.montantBase);
           montantAssistances += montant;
           assistancesDetails.push(
-            `${cdm.TypeCotisation.nom}${cdm.AdherentBeneficiaire ? ` pour ${cdm.AdherentBeneficiaire.firstname} ${cdm.AdherentBeneficiaire.lastname}` : ''} (${montant.toFixed(2)}€)`
+            `${cdm.TypeCotisation?.nom || "Assistance"}${cdm.AdherentBeneficiaire ? ` pour ${cdm.AdherentBeneficiaire.firstname} ${cdm.AdherentBeneficiaire.lastname}` : ''} (${montant.toFixed(2)}€)`
           );
         }
       }
@@ -414,7 +415,7 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
         periode,
         annee: validatedData.annee,
         mois: validatedData.mois,
-        typeCotisationId: cotisationForfait.TypeCotisation.id, // Utiliser le type Forfait
+        typeCotisationId: cotisationForfait.TypeCotisation?.id || cotisationForfait.typeCotisationId, // Utiliser le type Forfait
         adherentId: adherent.id,
         montantAttendu: montantTotal,
         montantPaye: 0,

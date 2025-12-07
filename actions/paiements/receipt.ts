@@ -198,7 +198,8 @@ export async function generateReceiptPDF(paiementId: string): Promise<{
       doc.text("Détails de la cotisation:", margin, yPosition);
       yPosition += 7;
       doc.setFont("helvetica", "normal");
-      doc.text(`Type: ${cotisation.TypeCotisation.nom}`, margin, yPosition);
+      const nomType = cotisation.TypeCotisation?.nom || "Type inconnu";
+      doc.text(`Type: ${nomType}`, margin, yPosition);
       yPosition += 7;
       doc.text(`Période: ${cotisation.periode}`, margin, yPosition);
     } else if (paiement.Assistance) {

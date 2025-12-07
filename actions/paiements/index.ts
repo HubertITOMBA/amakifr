@@ -636,39 +636,56 @@ export async function createAssistance(data: z.infer<typeof CreateAssistanceSche
       if (typeCotisation) {
         console.log(`[createAssistance] Type de cotisation trouvé: ${typeCotisation.id} - ${typeCotisation.nom}`);
         
-        // Vérifier si une cotisation du mois existe déjà pour cette période et ce type
-        const existingCotisationDuMois = await prisma.cotisationDuMois.findUnique({
+        // Vérifier si l'adhérent a déjà une assistance dans cette période
+        // Contrainte : un adhérent ne peut avoir qu'une seule assistance par mois (peu importe le type)
+        const existingAssistance = await prisma.cotisationDuMois.findFirst({
           where: {
-            periode_typeCotisationId: {
-              periode,
-              typeCotisationId: typeCotisation.id,
+            periode,
+            adherentBeneficiaireId: validatedData.adherentId,
+          },
+          include: {
+            TypeCotisation: {
+              select: {
+                nom: true,
+              },
             },
           },
         });
 
-        if (!existingCotisationDuMois) {
+        if (existingAssistance) {
+          const nomType = existingAssistance.TypeCotisation?.nom || "type inconnu";
+          console.log(`[createAssistance] ⚠️ L'adhérent a déjà une assistance pour ${periode} (${nomType}). Impossible d'en créer une autre.`);
+          // Ne pas créer de nouvelle cotisation du mois si l'adhérent a déjà une assistance
+        } else {
           // Créer la cotisation du mois
           // Date d'échéance : 15 du mois de l'événement
           const dateEcheance = new Date(annee, mois - 1, 15);
 
-          const cotisationDuMois = await prisma.cotisationDuMois.create({
-            data: {
-              periode,
-              annee,
-              mois,
-              typeCotisationId: typeCotisation.id,
-              montantBase: new Decimal(validatedData.montant),
-              dateEcheance: dateEcheance,
-              description: validatedData.description || `Cotisation du mois pour ${nomTypeCotisation} - ${periode}`,
-              adherentBeneficiaireId: validatedData.adherentId, // L'adhérent bénéficiaire de l'assistance
-              statut: "Planifie",
-              createdBy: session.user.id,
-            },
-          });
+          try {
+            const cotisationDuMois = await prisma.cotisationDuMois.create({
+              data: {
+                periode,
+                annee,
+                mois,
+                typeCotisationId: typeCotisation.id,
+                montantBase: new Decimal(validatedData.montant),
+                dateEcheance: dateEcheance,
+                description: validatedData.description || `Cotisation du mois pour ${nomTypeCotisation} - ${periode}`,
+                adherentBeneficiaireId: validatedData.adherentId, // L'adhérent bénéficiaire de l'assistance
+                statut: "Planifie",
+                createdBy: session.user.id,
+              },
+            });
 
-          console.log(`[createAssistance] ✅ Cotisation du mois créée avec succès: ${cotisationDuMois.id} pour ${periode} - ${nomTypeCotisation}`);
-        } else {
-          console.log(`[createAssistance] ⚠️ Cotisation du mois existe déjà pour ${periode} - ${nomTypeCotisation} (ID: ${existingCotisationDuMois.id})`);
+            console.log(`[createAssistance] ✅ Cotisation du mois créée avec succès: ${cotisationDuMois.id} pour ${periode} - ${nomTypeCotisation}`);
+          } catch (createError: any) {
+            // Gérer les erreurs de contrainte unique
+            if (createError?.code === 'P2002' && createError?.meta?.target?.includes('adherentBeneficiaireId')) {
+              console.log(`[createAssistance] ⚠️ L'adhérent a déjà une assistance pour ${periode}. Contrainte unique violée.`);
+            } else {
+              throw createError;
+            }
+          }
         }
       } else {
         console.error(`[createAssistance] ❌ Type de cotisation "${nomTypeCotisation}" non trouvé pour l'assistance de type "${validatedData.type}"`);

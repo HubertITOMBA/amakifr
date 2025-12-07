@@ -168,10 +168,10 @@ function CotisationsListTable({ cotisations, typesCotisation, loading, onEdit }:
       if (globalFilter.trim()) {
         const q = globalFilter.trim().toLowerCase();
         const searchText = [
-          item.TypeCotisation.nom || "",
-          item.Adherent.firstname || "",
-          item.Adherent.lastname || "",
-          item.Adherent.User.email || "",
+          item.TypeCotisation?.nom || "",
+          item.Adherent?.firstname || "",
+          item.Adherent?.lastname || "",
+          item.Adherent?.User?.email || "",
           item.statut || "",
           item.description || "",
         ].join(" ").toLowerCase();
@@ -197,7 +197,7 @@ function CotisationsListTable({ cotisations, typesCotisation, loading, onEdit }:
       }
       
       // Filtre par type
-      if (typeFilter !== "all" && item.TypeCotisation.id !== typeFilter) {
+      if (typeFilter !== "all" && item.TypeCotisation?.id !== typeFilter) {
         return false;
       }
       
@@ -225,7 +225,7 @@ function CotisationsListTable({ cotisations, typesCotisation, loading, onEdit }:
       header: "Type",
       cell: ({ row }) => (
         <span className="text-sm text-gray-900 dark:text-gray-100">
-          {row.original.TypeCotisation.nom}
+          {row.original.TypeCotisation?.nom || "Type inconnu"}
         </span>
       ),
       size: 200,
@@ -1045,8 +1045,8 @@ export default function AdminCotisationCreation() {
             <DialogDescription>
               {editingCotisation && (
                 <>
-                  Modifier la cotisation de {editingCotisation.Adherent.firstname} {editingCotisation.Adherent.lastname} 
-                  pour le type "{editingCotisation.TypeCotisation.nom}"
+                  Modifier la cotisation de {editingCotisation.Adherent?.firstname} {editingCotisation.Adherent?.lastname} 
+                  pour le type "{editingCotisation.TypeCotisation?.nom || "Type inconnu"}"
                 </>
               )}
             </DialogDescription>
@@ -1615,12 +1615,14 @@ function CotisationsMoisTable({
     // Trier chaque groupe : forfait en premier, puis les autres par nom
     Object.keys(grouped).forEach((moisKey) => {
       grouped[moisKey].sort((a, b) => {
-        const aIsForfait = a.TypeCotisation.nom.toLowerCase().includes('forfait');
-        const bIsForfait = b.TypeCotisation.nom.toLowerCase().includes('forfait');
+        const aNom = a.TypeCotisation?.nom || "";
+        const bNom = b.TypeCotisation?.nom || "";
+        const aIsForfait = aNom.toLowerCase().includes('forfait');
+        const bIsForfait = bNom.toLowerCase().includes('forfait');
         
         if (aIsForfait && !bIsForfait) return -1;
         if (!aIsForfait && bIsForfait) return 1;
-        return a.TypeCotisation.nom.localeCompare(b.TypeCotisation.nom);
+        return aNom.localeCompare(bNom);
       });
     });
 
@@ -1760,7 +1762,8 @@ function CotisationsMoisTable({
                 <CardContent className="p-4">
                   <div className="space-y-2">
                     {cotisationsMois.map((cotisation, index) => {
-                      const isForfait = cotisation.TypeCotisation.nom.toLowerCase().includes('forfait');
+                      const nomType = cotisation.TypeCotisation?.nom || "Type inconnu";
+                      const isForfait = nomType.toLowerCase().includes('forfait');
                       const editable = canEdit(cotisation);
                       
                       return (
@@ -1786,7 +1789,7 @@ function CotisationsMoisTable({
                                     ? 'text-blue-900 dark:text-blue-100'
                                     : 'text-gray-900 dark:text-gray-100'
                                 }`}>
-                                  {cotisation.TypeCotisation.nom}
+                                  {nomType}
                                 </span>
                                 {!isForfait && (
                                   <Badge className="bg-gray-200 text-gray-700 dark:bg-gray-700 dark:text-gray-300 text-xs">

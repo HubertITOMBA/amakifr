@@ -53,23 +53,6 @@ export async function createCotisationDuMois(formData: FormData) {
     const validatedData = CreateCotisationDuMoisSchema.parse(rawData);
     const periode = `${validatedData.annee}-${validatedData.mois.toString().padStart(2, '0')}`;
 
-    // Vérifier si une cotisation du mois existe déjà pour cette période et ce type
-    const existing = await db.cotisationDuMois.findUnique({
-      where: {
-        periode_typeCotisationId: {
-          periode,
-          typeCotisationId: validatedData.typeCotisationId,
-        },
-      },
-    });
-
-    if (existing) {
-      return { 
-        success: false, 
-        error: `Une cotisation du mois existe déjà pour ${periode} avec ce type de cotisation` 
-      };
-    }
-
     // Vérifier que le type de cotisation existe
     const typeCotisation = await db.typeCotisationMensuelle.findUnique({
       where: { id: validatedData.typeCotisationId },
@@ -77,6 +60,46 @@ export async function createCotisationDuMois(formData: FormData) {
 
     if (!typeCotisation) {
       return { success: false, error: "Type de cotisation introuvable" };
+    }
+
+    // Vérifications selon le type de cotisation
+    if (typeCotisation.aBeneficiaire && validatedData.adherentBeneficiaireId) {
+      // Pour les assistances (avec bénéficiaire) :
+      // - Un adhérent ne peut avoir qu'une seule assistance par mois (peu importe le type)
+      // - Plusieurs assistances du même type sont possibles si elles sont pour des adhérents différents
+      const existingAssistance = await db.cotisationDuMois.findFirst({
+        where: {
+          periode,
+          adherentBeneficiaireId: validatedData.adherentBeneficiaireId,
+        },
+      });
+
+      if (existingAssistance) {
+        const existingType = await db.typeCotisationMensuelle.findUnique({
+          where: { id: existingAssistance.typeCotisationId },
+        });
+        return { 
+          success: false, 
+          error: `L'adhérent bénéficiaire a déjà une assistance pour ${periode} (${existingType?.nom || "type inconnu"})` 
+        };
+      }
+    } else {
+      // Pour les types sans bénéficiaire (forfait, etc.) :
+      // - Un seul par période et type
+      const existing = await db.cotisationDuMois.findFirst({
+        where: {
+          periode,
+          typeCotisationId: validatedData.typeCotisationId,
+          adherentBeneficiaireId: null,
+        },
+      });
+
+      if (existing) {
+        return { 
+          success: false, 
+          error: `Une cotisation du mois existe déjà pour ${periode} avec ce type de cotisation (${typeCotisation.nom})` 
+        };
+      }
     }
 
     // Créer la cotisation du mois

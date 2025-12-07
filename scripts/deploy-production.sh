@@ -97,10 +97,6 @@ fi
 echo -e "${BLUE}📦 Installation des dépendances...${NC}"
 npm ci
 
-# Génération Prisma
-echo -e "${BLUE}🔧 Génération du client Prisma...${NC}"
-npx prisma generate
-
 # Exécution des migrations
 echo -e "${BLUE}🗄️  Exécution des migrations de base de données...${NC}"
 npx prisma migrate deploy || {
@@ -108,20 +104,9 @@ npx prisma migrate deploy || {
     npx prisma migrate status
 }
 
-# Nettoyage du cache Next.js avant le build
-echo -e "${BLUE}🧹 Nettoyage du cache Next.js...${NC}"
-if [ -d ".next" ]; then
-  rm -rf .next
-  echo -e "${GREEN}✅ Cache .next supprimé${NC}"
-fi
-if [ -d "node_modules/.cache" ]; then
-  rm -rf node_modules/.cache
-  echo -e "${GREEN}✅ Cache node_modules/.cache supprimé${NC}"
-fi
-
-# Build de production
-echo -e "${BLUE}🔨 Build de production...${NC}"
-npm run build
+# Build optimisé (génère Prisma seulement si nécessaire)
+echo -e "${BLUE}🔨 Build de production optimisé...${NC}"
+./scripts/optimize-build.sh
 
 # Vérification des fichiers PWA
 echo -e "${BLUE}📱 Vérification des fichiers PWA...${NC}"
