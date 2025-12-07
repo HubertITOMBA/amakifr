@@ -21,9 +21,7 @@ const withPWA = require('next-pwa')({
   buildExcludes: [/app-build-manifest\.json$/],
   // Optimisations pour accélérer le build
   cacheOnFrontEndNav: true,
-  aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
-  swcMinify: true, // Utiliser SWC pour minifier le service worker
   fallbacks: {
     document: '/offline',
   },
@@ -92,9 +90,6 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  
-  // Optimisations de compilation pour accélérer le build
-  swcMinify: true, // Utiliser SWC pour la minification (plus rapide que Terser)
   
   // Optimisations du compilateur
   compiler: {

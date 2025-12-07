@@ -30,8 +30,10 @@ function cleanUrl(url: string | undefined | null): string | undefined {
 
 /**
  * Fonction helper pour envoyer un email via le provider configuré
+ * 
+ * @param options - Les options d'envoi d'email (destinataire, sujet, contenu, etc.)
  */
-async function sendEmail(options: EmailOptions): Promise<void> {
+export async function sendEmail(options: EmailOptions): Promise<void> {
   try {
     console.log("[sendEmail] Début de l'envoi d'email à:", options.to);
     console.log("[sendEmail] Sujet:", options.subject);
