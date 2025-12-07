@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 /**
  * Nettoie une URL en supprimant les guillemets, points-virgules et espaces
@@ -118,9 +119,9 @@ const nextConfig: NextConfig = {
       config.cache = {
         type: 'filesystem',
         buildDependencies: {
-          config: [__filename],
+          config: [path.join(process.cwd(), 'next.config.ts')],
         },
-        cacheDirectory: '.next/cache/webpack',
+        cacheDirectory: path.join(process.cwd(), '.next/cache/webpack'),
       };
     }
     return config;

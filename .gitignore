@@ -37,6 +37,7 @@ POMPE_Dev_Master.pl
 PROMPTEUR.txt
 data/geonames/*
 *.md
+.cursorrules
 
 # vercel
 .vercel
