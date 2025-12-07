@@ -25,6 +25,12 @@ const withPWA = require('next-pwa')({
   fallbacks: {
     document: '/offline',
   },
+  // Réduire la taille du precache pour accélérer le build
+  publicExcludes: [
+    '!**/node_modules/**',
+    '!**/.next/**',
+    '!**/public/sw.js',
+  ],
   runtimeCaching: [
     // Cache des pages HTML avec stratégie NetworkFirst
     {
@@ -102,6 +108,24 @@ const nextConfig: NextConfig = {
   // Optimiser la génération des pages
   poweredByHeader: false, // Désactiver le header X-Powered-By (sécurité + performance)
   
+  // Désactiver les source maps en production pour accélérer le build
+  productionBrowserSourceMaps: false,
+  
+  // Optimiser le cache Webpack
+  webpack: (config, { dev, isServer }) => {
+    if (!dev && !isServer) {
+      // Optimiser le cache en production
+      config.cache = {
+        type: 'filesystem',
+        buildDependencies: {
+          config: [__filename],
+        },
+        cacheDirectory: '.next/cache/webpack',
+      };
+    }
+    return config;
+  },
+  
   // En développement, forcer l'utilisation de HTTP et éviter 0.0.0.0
   // Le navigateur ne peut pas accéder à 0.0.0.0, il doit utiliser localhost ou l'IP réseau
   ...(process.env.NODE_ENV === 'development' && {
@@ -150,6 +174,15 @@ const nextConfig: NextConfig = {
         ? [cleanUrl(process.env.NEXT_PUBLIC_APP_URL) || 'https://amaki.fr'].filter(Boolean)
         : ['*'], // Permettre toutes les origines en développement pour l'accès réseau
     },
+    // Optimiser les imports de packages volumineux
+    optimizePackageImports: [
+      '@prisma/client',
+      'lucide-react',
+      '@tanstack/react-table',
+      'react-toastify',
+      'framer-motion',
+      'zod',
+    ],
   },
 
   // Rewrite pour servir les fichiers statiques uploadés via l'API
