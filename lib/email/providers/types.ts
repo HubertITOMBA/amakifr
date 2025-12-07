@@ -2,7 +2,7 @@
  * Types et interfaces pour les providers d'email
  */
 
-export type EmailProvider = 'resend' | 'smtp' | 'sendgrid';
+export type EmailProvider = 'resend' | 'smtp';
 
 export interface EmailOptions {
   from: string;
@@ -30,8 +30,4 @@ export interface SMTPConfig {
   from: string; // Email de l'expéditeur
 }
 
-export interface SendGridConfig {
-  apiKey: string;
-  from: string; // Email de l'expéditeur
-}
 

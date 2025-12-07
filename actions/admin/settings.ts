@@ -11,7 +11,7 @@ import type { EmailProvider } from "@/lib/email/providers/types";
  * Schéma de validation pour la mise à jour du provider email
  */
 const UpdateEmailProviderSchema = z.object({
-  provider: z.enum(["resend", "smtp", "sendgrid"]),
+  provider: z.enum(["resend", "smtp"]),
 });
 
 /**
@@ -30,7 +30,7 @@ export async function getEmailProviderFromDB(): Promise<EmailProvider | null> {
     }
 
     const provider = setting.value as EmailProvider;
-    if (["resend", "smtp", "sendgrid"].includes(provider)) {
+    if (["resend", "smtp"].includes(provider)) {
       return provider;
     }
 
@@ -69,7 +69,7 @@ export async function updateEmailProvider(
       create: {
         key: "email_provider",
         value: validatedData.provider,
-        description: "Provider email par défaut pour l'application (resend, smtp, sendgrid)",
+        description: "Provider email par défaut pour l'application (resend, smtp)",
         category: "email",
         updatedBy: session.user.id,
       },

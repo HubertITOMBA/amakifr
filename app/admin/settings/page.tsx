@@ -295,7 +295,6 @@ export default function AdminSettingsPage() {
                     <SelectContent>
                       <SelectItem value="resend">Resend</SelectItem>
                       <SelectItem value="smtp">SMTP (Gmail, Outlook, etc.)</SelectItem>
-                      <SelectItem value="sendgrid">SendGrid</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-gray-500 dark:text-gray-400">
@@ -315,14 +314,6 @@ export default function AdminSettingsPage() {
                       <Info className="h-4 w-4" />
                       <AlertDescription>
                         SMTP nécessite les variables : <code className="text-xs">SMTP_HOST</code>, <code className="text-xs">SMTP_PORT</code>, <code className="text-xs">SMTP_USER</code>, <code className="text-xs">SMTP_PASS</code>, <code className="text-xs">SMTP_FROM</code>
-                      </AlertDescription>
-                    </Alert>
-                  )}
-                  {emailSettings.provider === 'sendgrid' && (
-                    <Alert>
-                      <Info className="h-4 w-4" />
-                      <AlertDescription>
-                        SendGrid nécessite les variables : <code className="text-xs">SENDGRID_API_KEY</code>, <code className="text-xs">SENDGRID_FROM</code>
                       </AlertDescription>
                     </Alert>
                   )}

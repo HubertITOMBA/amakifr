@@ -43,7 +43,7 @@ const baseEnvSchema = z.object({
   GOOGLE_CLIENT_SECRET: emptyStringToUndefined,
   
   // Email Provider
-  EMAIL_PROVIDER: z.enum(['resend', 'smtp', 'sendgrid']).optional().default('resend'),
+  EMAIL_PROVIDER: z.enum(['resend', 'smtp']).optional().default('resend'),
   
   // Email (Resend) - requis si EMAIL_PROVIDER=resend
   RESEND_API_KEY: z.preprocess(
@@ -63,9 +63,6 @@ const baseEnvSchema = z.object({
   SMTP_PASS: z.string().optional(),
   SMTP_FROM: z.string().optional(),
   
-  // Email (SendGrid) - requis si EMAIL_PROVIDER=sendgrid
-  SENDGRID_API_KEY: z.string().optional(),
-  SENDGRID_FROM: z.string().optional(),
   
   // Application
   NEXT_PUBLIC_APP_URL: z.preprocess(

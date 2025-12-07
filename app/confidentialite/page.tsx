@@ -121,7 +121,7 @@ export default function ConfidentialitePage() {
               <ul className="list-disc list-inside text-slate-700 dark:text-slate-300 space-y-2 ml-4">
                 <li><strong>Services tiers de paiement</strong> : Stripe, PayPal pour le traitement des paiements</li>
                 <li><strong>Services d'authentification</strong> : Google, Facebook, Apple pour la connexion OAuth</li>
-                <li><strong>Services d'email</strong> : Resend, SendGrid ou SMTP pour l'envoi d'emails</li>
+                <li><strong>Services d'email</strong> : Resend ou SMTP pour l'envoi d'emails</li>
                 <li><strong>Obligations légales</strong> : Si la loi l'exige ou en réponse à une demande judiciaire</li>
               </ul>
               <p className="text-slate-700 dark:text-slate-300 mt-4">

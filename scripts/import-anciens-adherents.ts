@@ -177,13 +177,46 @@ async function sendWelcomeEmail(
     });
 
     if (!result.success) {
-      console.error(`❌ Erreur lors de l'envoi de l'email à ${email}:`, result.error);
-      throw result.error;
+      // Vérifier si c'est une erreur d'authentification (401)
+      const isAuthError = result.error && 
+        typeof result.error === 'object' && 
+        'code' in result.error && 
+        result.error.code === 401;
+      
+      if (isAuthError) {
+        // Erreur d'authentification : logger une seule fois au début, puis être silencieux
+        if (!(global as any).emailAuthErrorLogged) {
+          console.error(`⚠️  EMAIL_AUTH_ERROR: La configuration du provider email est invalide ou manquante. Vérifiez les variables d'environnement (RESEND_API_KEY, SMTP_*, etc.).`);
+          console.error(`   Les emails ne seront pas envoyés pour les utilisateurs suivants.`);
+          (global as any).emailAuthErrorLogged = true;
+        }
+        // Ne pas throw pour continuer l'import même si l'email échoue
+        return;
+      }
+      
+      // Pour les autres erreurs, logger et continuer
+      console.error(`   ⚠️  Erreur lors de l'envoi de l'email à ${email}: ${result.error?.message || 'Erreur inconnue'}`);
+      return;
     }
-    console.log(`✅ Email de bienvenue envoyé à ${email}`);
-  } catch (error) {
-    console.error(`❌ Erreur lors de l'envoi de l'email à ${email}:`, error);
-    throw error;
+    console.log(`   ✅ Email de bienvenue envoyé à ${email}`);
+  } catch (error: any) {
+    // Vérifier si c'est une erreur d'authentification (401)
+    const isAuthError = error?.code === 401 || 
+      (error?.response?.body?.errors?.[0]?.message === 'Could not authenticate');
+    
+    if (isAuthError) {
+      // Erreur d'authentification : logger une seule fois au début, puis être silencieux
+      if (!(global as any).emailAuthErrorLogged) {
+        console.error(`⚠️  EMAIL_AUTH_ERROR: La configuration du provider email est invalide ou manquante. Vérifiez les variables d'environnement (RESEND_API_KEY, SMTP_*, etc.).`);
+        console.error(`   Les emails ne seront pas envoyés pour les utilisateurs suivants.`);
+        (global as any).emailAuthErrorLogged = true;
+      }
+      // Ne pas throw pour continuer l'import même si l'email échoue
+      return;
+    }
+    
+    // Pour les autres erreurs, logger et continuer
+    console.error(`   ⚠️  Erreur lors de l'envoi de l'email à ${email}: ${error?.message || 'Erreur inconnue'}`);
   }
 }
 
@@ -574,10 +607,40 @@ async function importAnciensAdherents() {
           // Créer un nouvel utilisateur
           console.log(`   ➕ Création d'un nouvel utilisateur...`);
           
+          // Gérer la contrainte unique sur le champ `name`
+          // Si un utilisateur avec ce nom existe déjà, rendre le nom unique
+          let uniqueName = userData.name;
+          if (uniqueName) {
+            let nameCounter = 1;
+            let existingUserWithName = await prisma.user.findUnique({
+              where: { name: uniqueName },
+            });
+            
+            // Si le nom existe déjà, ajouter un suffixe pour le rendre unique
+            while (existingUserWithName) {
+              uniqueName = `${userData.name} (${nameCounter})`;
+              existingUserWithName = await prisma.user.findUnique({
+                where: { name: uniqueName },
+              });
+              nameCounter++;
+              
+              // Limite de sécurité pour éviter une boucle infinie
+              if (nameCounter > 1000) {
+                // Utiliser l'email comme fallback si trop de collisions
+                uniqueName = userData.email || `User-${Date.now()}`;
+                break;
+              }
+            }
+            
+            if (uniqueName !== userData.name) {
+              console.log(`   ⚠️  Nom "${userData.name}" déjà utilisé, utilisation de "${uniqueName}"`);
+            }
+          }
+          
           const newUser = await prisma.user.create({
             data: {
               email: userData.email,
-              name: userData.name,
+              name: uniqueName,
               password: hashedPassword,
               role: userData.role,
               status: userData.status,

@@ -2,10 +2,9 @@
  * Factory pour créer le provider d'email approprié selon la configuration
  */
 
-import type { EmailProvider, EmailProviderInterface, SMTPConfig, SendGridConfig } from "./types";
+import type { EmailProvider, EmailProviderInterface, SMTPConfig } from "./types";
 import { ResendProvider } from "./resend-provider";
 import { SMTPProvider } from "./smtp-provider";
-import { SendGridProvider } from "./sendgrid-provider";
 
 /**
  * Récupère le provider email depuis la base de données ou la variable d'environnement
@@ -63,31 +62,8 @@ export async function createEmailProvider(): Promise<EmailProviderInterface> {
       return new SMTPProvider(config);
     }
 
-    case 'sendgrid': {
-      const apiKey = process.env.SENDGRID_API_KEY;
-      const from = process.env.SENDGRID_FROM;
-
-      if (!apiKey || !from) {
-        console.error("SENDGRID_CONFIG_ERROR: SENDGRID_API_KEY et SENDGRID_FROM sont requis quand EMAIL_PROVIDER=sendgrid");
-        throw new Error("SENDGRID_API_KEY et SENDGRID_FROM sont requis quand EMAIL_PROVIDER=sendgrid");
-      }
-
-      // Vérifier que la clé API n'est pas vide ou invalide
-      if (apiKey.trim() === '' || apiKey.length < 20) {
-        console.error("SENDGRID_CONFIG_ERROR: La clé API SendGrid semble invalide (trop courte ou vide)");
-        throw new Error("La clé API SendGrid est invalide. Vérifiez SENDGRID_API_KEY dans les variables d'environnement.");
-      }
-
-      const config: SendGridConfig = {
-        apiKey,
-        from,
-      };
-
-      return new SendGridProvider(config);
-    }
-
     default:
-      throw new Error(`Provider d'email non supporté: ${provider}. Valeurs possibles: resend, smtp, sendgrid`);
+      throw new Error(`Provider d'email non supporté: ${provider}. Valeurs possibles: resend, smtp`);
   }
 }
 
