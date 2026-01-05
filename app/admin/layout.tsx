@@ -101,6 +101,12 @@ const adminMenuItems = [
     description: "Créer et gérer les notifications"
   },
   {
+    title: "Emails",
+    href: "/admin/emails",
+    icon: Mail,
+    description: "Envoyer des emails et consulter l'historique"
+  },
+  {
     title: "Rappels Automatiques",
     href: "/admin/notifications/rappel",
     icon: Bell,

@@ -90,13 +90,49 @@ export default function AdminPaiementsPage() {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("admin-paiements-column-visibility");
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Object.keys(parsed).length > 0) {
+            return parsed;
+          }
+        }
+        // Par défaut sur mobile, masquer les colonnes non essentielles
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+          return {
+            moyenPaiement: false,
+            datePaiement: false,
+            reference: false,
+            description: false,
+            // Garder visible : Adherent, montant, actions (si présente)
+          };
+        }
       } catch (error) {
         console.error("Erreur lors du chargement des préférences:", error);
       }
     }
     return {};
   });
+
+  // Détecter les changements de taille d'écran
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      const saved = localStorage.getItem("admin-paiements-column-visibility");
+      
+      if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+        setColumnVisibility({
+          moyenPaiement: false,
+          datePaiement: false,
+          reference: false,
+          description: false,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [adherentSearchOpen, setAdherentSearchOpen] = useState(false);
   const [selectedAdherent, setSelectedAdherent] = useState<{
@@ -257,29 +293,50 @@ export default function AdminPaiementsPage() {
       header: "Adhérent",
       cell: ({ row }) => {
         const adherent = row.original.Adherent;
+        const datePaiement = row.original.datePaiement;
         return (
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-900 dark:text-gray-100">
-              {adherent?.firstname} {adherent?.lastname}
-            </span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                {adherent?.firstname} {adherent?.lastname}
+              </span>
+            </div>
+            {/* Afficher la date en petit sur mobile */}
+            {datePaiement && (
+              <span className="text-xs text-gray-500 dark:text-gray-400 md:hidden ml-6 font-normal">
+                {format(new Date(datePaiement), "d MMM yyyy", { locale: fr })}
+              </span>
+            )}
           </div>
         );
       },
       size: 200,
-      minSize: 150,
+      minSize: 120,
       maxSize: 300,
       enableResizing: true,
     }),
     columnHelper.accessor("montant", {
       header: "Montant",
-      cell: ({ row }) => (
-        <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-          {row.getValue("montant").toFixed(2)} €
-        </span>
-      ),
+      cell: ({ row }) => {
+        const montant = row.getValue("montant") as number;
+        const moyenPaiement = row.original.moyenPaiement;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold text-green-600 dark:text-green-400">
+              {montant.toFixed(2)} €
+            </span>
+            {/* Afficher le moyen de paiement en petit sur mobile */}
+            {moyenPaiement && (
+              <span className="text-xs text-gray-500 dark:text-gray-400 md:hidden font-normal">
+                {getMoyenPaiementLabel(moyenPaiement)}
+              </span>
+            )}
+          </div>
+        );
+      },
       size: 120,
-      minSize: 100,
+      minSize: 90,
       maxSize: 150,
       enableResizing: true,
     }),

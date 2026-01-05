@@ -109,13 +109,53 @@ export default function AdminAssistancesPage() {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("admin-assistances-column-visibility");
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Object.keys(parsed).length > 0) {
+            return parsed;
+          }
+        }
+        // Par défaut sur mobile, masquer les colonnes non essentielles
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+          return {
+            type: false,
+            dateEvenement: false,
+            montantPaye: false,
+            montantRestant: false,
+            description: false,
+            createdAt: false,
+            // Garder visible : Adherent, montant, actions (si présente)
+          };
+        }
       } catch (error) {
         console.error("Erreur lors du chargement des préférences:", error);
       }
     }
     return {};
   });
+
+  // Détecter les changements de taille d'écran
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      const saved = localStorage.getItem("admin-assistances-column-visibility");
+      
+      if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+        setColumnVisibility({
+          type: false,
+          dateEvenement: false,
+          montantPaye: false,
+          montantRestant: false,
+          description: false,
+          createdAt: false,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [adherentSearchOpen, setAdherentSearchOpen] = useState(false);
   const [selectedAdherent, setSelectedAdherent] = useState<{
@@ -232,17 +272,26 @@ export default function AdminAssistancesPage() {
       header: "Adhérent",
       cell: ({ row }) => {
         const adherent = row.original.Adherent;
+        const type = row.original.type;
         return (
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-900 dark:text-gray-100">
-              {adherent?.firstname} {adherent?.lastname}
-            </span>
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                {adherent?.firstname} {adherent?.lastname}
+              </span>
+            </div>
+            {/* Afficher le type en petit sur mobile */}
+            {type && (
+              <span className="text-xs text-gray-500 dark:text-gray-400 md:hidden ml-6 font-normal">
+                {getTypeAssistanceLabel(type)}
+              </span>
+            )}
           </div>
         );
       },
       size: 200,
-      minSize: 150,
+      minSize: 120,
       maxSize: 300,
       enableResizing: true,
     }),
@@ -281,13 +330,25 @@ export default function AdminAssistancesPage() {
     }),
     columnHelper.accessor("montant", {
       header: "Montant",
-      cell: ({ row }) => (
-        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          {row.getValue("montant").toFixed(2)} €
-        </span>
-      ),
+      cell: ({ row }) => {
+        const montant = row.getValue("montant") as number;
+        const restant = row.original.montantRestant as number;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {montant.toFixed(2)} €
+            </span>
+            {/* Afficher le montant restant en petit sur mobile */}
+            <span className={`text-xs md:hidden font-medium ${
+              restant > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
+            }`}>
+              Restant: {restant.toFixed(2)} €
+            </span>
+          </div>
+        );
+      },
       size: 100,
-      minSize: 80,
+      minSize: 90,
       maxSize: 150,
       enableResizing: true,
     }),

@@ -1,8 +1,9 @@
 import { NextAuthConfig } from "next-auth";
 import bcrypt from "bcryptjs";
 import Google from "next-auth/providers/google";
-import Facebook from "next-auth/providers/facebook";
-import Apple from "next-auth/providers/apple";
+// Désactivé temporairement - trop de contraintes
+// import Facebook from "next-auth/providers/facebook";
+// import Apple from "next-auth/providers/apple";
 import Credentials from "next-auth/providers/credentials";
 
 import { LoginSchema } from "@/schemas";
@@ -16,16 +17,17 @@ export default {
 			clientId: process.env.GOOGLE_CLIENT_ID,
 			clientSecret: process.env.GOOGLE_CLIENT_SECRET,
 		}),
-		Facebook({
-			clientId: process.env.FACEBOOK_CLIENT_ID,
-			clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
-		}),
-		Apple({
-			clientId: process.env.APPLE_ID,
-			clientSecret: process.env.APPLE_SECRET,
-			// Apple nécessite un teamId et keyId pour la génération du secret
-			// Ces valeurs sont optionnelles si APPLE_SECRET est déjà configuré
-		}),
+		// Désactivé temporairement - trop de contraintes
+		// Facebook({
+		// 	clientId: process.env.FACEBOOK_CLIENT_ID,
+		// 	clientSecret: process.env.FACEBOOK_CLIENT_SECRET,
+		// }),
+		// Apple({
+		// 	clientId: process.env.APPLE_ID,
+		// 	clientSecret: process.env.APPLE_SECRET,
+		// 	// Apple nécessite un teamId et keyId pour la génération du secret
+		// 	// Ces valeurs sont optionnelles si APPLE_SECRET est déjà configuré
+		// }),
 		Credentials({
 			async authorize(credentials) {
 				try {

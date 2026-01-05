@@ -32,7 +32,7 @@ module.exports = {
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
-        PORT: 9050,
+        PORT: 9060,
         HOSTNAME: '0.0.0.0',
         NEXT_PUBLIC_APP_URL: process.env.AMAKIFR_URL || 'https://amaki.fr',
       },
@@ -69,7 +69,7 @@ module.exports = {
       exec_mode: 'fork',
       env: {
         NODE_ENV: 'production',
-        PORT: 9051,
+        PORT: 9052,
         HOSTNAME: '0.0.0.0',
         NEXT_PUBLIC_APP_URL: process.env.HITOMBACOM_URL || 'https://hitomba.com',
       },
@@ -82,6 +82,43 @@ module.exports = {
       error_file: '/sites/hitombacom/logs/pm2-error.log',
       out_file: '/sites/hitombacom/logs/pm2-out.log',
       log_file: '/sites/hitombacom/logs/pm2-combined.log',
+      time: true,
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+      merge_logs: true,
+      
+      // Options de monitoring
+      min_uptime: '10s',
+      max_restarts: 10,
+      restart_delay: 4000,
+      
+      // Health check
+      kill_timeout: 5000,
+      listen_timeout: 10000,
+      shutdown_with_message: true,
+    },
+    {
+      name: 'naxhelfr',
+      script: 'npm',
+      args: ['run', 'start'],
+      cwd: '/sites/naxhelfr',
+      interpreter: 'none',
+      instances: 1,
+      exec_mode: 'fork',
+      env: {
+        NODE_ENV: 'production',
+        PORT: 9065,
+        HOSTNAME: '0.0.0.0',
+        NEXT_PUBLIC_APP_URL: process.env.NAXHELFR_URL || 'https://naxhel.fr',
+      },
+      // Options de redémarrage
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '1G',
+      
+      // Logs
+      error_file: '/sites/naxhelfr/logs/pm2-error.log',
+      out_file: '/sites/naxhelfr/logs/pm2-out.log',
+      log_file: '/sites/naxhelfr/logs/pm2-combined.log',
       time: true,
       log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
       merge_logs: true,

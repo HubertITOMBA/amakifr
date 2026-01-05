@@ -173,13 +173,47 @@ export default function AdminTypesCotisationMensuelle() {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("admin-types-cotisation-column-visibility");
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Object.keys(parsed).length > 0) {
+            return parsed;
+          }
+        }
+        // Par défaut sur mobile, masquer les colonnes non essentielles
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+          return {
+            description: false,
+            actif: false,
+            createdAt: false,
+            // Garder visible : nom, montant, actions (si présente)
+          };
+        }
       } catch (error) {
         console.error("Erreur lors du chargement des préférences:", error);
       }
     }
     return {};
   });
+
+  // Détecter les changements de taille d'écran
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      const saved = localStorage.getItem("admin-types-cotisation-column-visibility");
+      
+      if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+        setColumnVisibility({
+          description: false,
+          actif: false,
+          createdAt: false,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Debounce pour la recherche
   useEffect(() => {

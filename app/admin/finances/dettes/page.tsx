@@ -10,6 +10,16 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AdherentSearchDialog } from "@/components/admin/AdherentSearchDialog";
 import { Badge } from "@/components/ui/badge";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { ViewDialog } from "./ViewDialog";
+import { EditDialog } from "./EditDialog";
 import { 
   FileText, 
   Search, 
@@ -21,7 +31,10 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  MoreHorizontal,
+  Eye,
+  Edit
 } from "lucide-react";
 import { toast } from "sonner";
 import { 
@@ -34,9 +47,7 @@ import {
   useReactTable,
   getSortedRowModel,
   SortingState,
-  getFilteredRowModel,
   getPaginationRowModel,
-  ColumnFiltersState,
   VisibilityState,
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/admin/DataTable";
@@ -50,7 +61,6 @@ export default function AdminDettesPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [anneeFilter, setAnneeFilter] = useState<string>("all");
@@ -58,15 +68,59 @@ export default function AdminDettesPage() {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("admin-dettes-column-visibility");
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          // Vérifier si c'est la première fois ou si les préférences existent déjà
+          // Si les préférences existent, les utiliser
+          if (Object.keys(parsed).length > 0) {
+            return parsed;
+          }
+        }
+        // Par défaut sur mobile, masquer les colonnes non essentielles
+        const isMobile = window.innerWidth < 768; // md breakpoint
+        if (isMobile) {
+          return {
+            annee: false,
+            montantPaye: false,
+            montantRestant: false,
+            description: false,
+            createdAt: false,
+            // Garder visible : Adherent, montant, actions (forceVisible)
+          };
+        }
       } catch (error) {
         console.error("Erreur lors du chargement des préférences:", error);
       }
     }
     return {};
   });
+
+  // Détecter les changements de taille d'écran pour ajuster la visibilité des colonnes
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      const saved = localStorage.getItem("admin-dettes-column-visibility");
+      
+      // Si on passe en mode mobile et qu'il n'y a pas de préférences sauvegardées
+      if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+        setColumnVisibility({
+          annee: false,
+          montantPaye: false,
+          montantRestant: false,
+          description: false,
+          createdAt: false,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const [createDialogOpen, setCreateDialogOpen] = useState(false);
   const [adherentSearchOpen, setAdherentSearchOpen] = useState(false);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [selectedDetteId, setSelectedDetteId] = useState<string | null>(null);
   const [selectedAdherent, setSelectedAdherent] = useState<{
     id: string;
     firstname: string;
@@ -121,6 +175,9 @@ export default function AdminDettesPage() {
           item.Adherent?.User?.email || "",
           item.annee?.toString() || "",
           item.description || "",
+          item.montant?.toString() || "",
+          item.montantPaye?.toString() || "",
+          item.montantRestant?.toString() || "",
         ].join(" ").toLowerCase();
         if (!searchText.includes(q)) return false;
       }
@@ -173,17 +230,31 @@ export default function AdminDettesPage() {
       header: "Adhérent",
       cell: ({ row }) => {
         const adherent = row.original.Adherent;
+        const annee = row.original.annee;
         return (
-          <div className="flex items-center gap-2">
-            <User className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-900 dark:text-gray-100">
-              {adherent?.firstname} {adherent?.lastname}
+          <div className="flex flex-col gap-0.5">
+            <div className="flex items-center gap-2">
+              <User className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" />
+              <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                {adherent?.firstname} {adherent?.lastname}
+              </span>
+            </div>
+            {/* Afficher l'année en petit sur mobile */}
+            <span className="text-xs text-gray-500 dark:text-gray-400 md:hidden ml-6 font-normal">
+              {annee}
             </span>
           </div>
         );
       },
+      sortingFn: (rowA, rowB) => {
+        const adherentA = rowA.original.Adherent;
+        const adherentB = rowB.original.Adherent;
+        const nameA = `${adherentA?.firstname || ""} ${adherentA?.lastname || ""}`.trim().toLowerCase();
+        const nameB = `${adherentB?.firstname || ""} ${adherentB?.lastname || ""}`.trim().toLowerCase();
+        return nameA.localeCompare(nameB, "fr", { sensitivity: "base" });
+      },
       size: 200,
-      minSize: 150,
+      minSize: 120,
       maxSize: 300,
       enableResizing: true,
     }),
@@ -203,24 +274,39 @@ export default function AdminDettesPage() {
       enableResizing: true,
     }),
     columnHelper.accessor("montant", {
-      header: "Montant total",
-      cell: ({ row }) => (
-        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-          {row.getValue("montant").toFixed(2)} €
-        </span>
-      ),
+      header: "Montant",
+      cell: ({ row }) => {
+        const montant = row.getValue("montant") as number;
+        const restant = row.original.montantRestant as number;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+              {montant.toFixed(2)} €
+            </span>
+            {/* Afficher le montant restant en petit sur mobile */}
+            <span className={`text-xs md:hidden font-medium ${
+              restant > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
+            }`}>
+              Restant: {restant.toFixed(2)} €
+            </span>
+          </div>
+        );
+      },
       size: 120,
-      minSize: 100,
+      minSize: 90,
       maxSize: 150,
       enableResizing: true,
     }),
     columnHelper.accessor("montantPaye", {
       header: "Payé",
-      cell: ({ row }) => (
-        <span className="text-sm text-green-600 dark:text-green-400 font-medium">
-          {row.getValue("montantPaye").toFixed(2)} €
-        </span>
-      ),
+      cell: ({ row }) => {
+        const montantPaye = row.getValue("montantPaye") as number;
+        return (
+          <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+            {montantPaye.toFixed(2)} €
+          </span>
+        );
+      },
       size: 120,
       minSize: 100,
       maxSize: 150,
@@ -229,7 +315,7 @@ export default function AdminDettesPage() {
     columnHelper.accessor("montantRestant", {
       header: "Restant",
       cell: ({ row }) => {
-        const restant = row.getValue("montantRestant");
+        const restant = row.getValue("montantRestant") as number;
         return (
           <span className={`text-sm font-semibold ${
             restant > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"
@@ -250,6 +336,11 @@ export default function AdminDettesPage() {
           {row.getValue("description") || "—"}
         </span>
       ),
+      sortingFn: (rowA, rowB) => {
+        const descA = (rowA.original.description || "").trim().toLowerCase();
+        const descB = (rowB.original.description || "").trim().toLowerCase();
+        return descA.localeCompare(descB, "fr", { sensitivity: "base" });
+      },
       size: 200,
       minSize: 150,
       maxSize: 400,
@@ -267,6 +358,59 @@ export default function AdminDettesPage() {
       maxSize: 200,
       enableResizing: true,
     }),
+    columnHelper.display({
+      id: "actions",
+      header: () => <div className="text-center w-full">Actions</div>,
+      meta: { forceVisible: true },
+      enableResizing: false,
+      cell: ({ row }) => {
+        const dette = row.original;
+        return (
+          <div className="flex items-center justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Actions"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Ouvrir le menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => {
+                    setSelectedDetteId(dette.id);
+                    setViewDialogOpen(true);
+                  }}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Eye className="h-4 w-4" />
+                  <span>Voir</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => {
+                    setSelectedDetteId(dette.id);
+                    setEditDialogOpen(true);
+                  }}
+                  className="flex items-center gap-2 cursor-pointer"
+                >
+                  <Edit className="h-4 w-4" />
+                  <span>Modifier</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
+        );
+      },
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
+    }),
   ], []);
 
   const table = useReactTable({
@@ -275,10 +419,7 @@ export default function AdminDettesPage() {
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
     onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
     onColumnVisibilityChange: (updater) => {
       const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
       setColumnVisibility(newVisibility);
@@ -293,7 +434,7 @@ export default function AdminDettesPage() {
         pageSize: 10,
       },
     },
-    state: { sorting, columnFilters, globalFilter, columnVisibility },
+    state: { sorting, columnVisibility },
     defaultColumn: {
       minSize: 50,
       maxSize: 800,
@@ -464,7 +605,7 @@ export default function AdminDettesPage() {
               <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
                 {filteredData.length} dette(s) trouvée(s)
               </div>
-              <DataTable table={table} emptyMessage="Aucune dette initiale trouvée" compact={true} />
+              <DataTable table={table} emptyMessage="Aucune dette initiale trouvée" />
               
               {/* Pagination */}
               <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
@@ -542,6 +683,33 @@ export default function AdminDettesPage() {
         </CardContent>
       </Card>
       </div>
+
+      {/* Dialogs pour voir et modifier */}
+      {selectedDetteId && (
+        <>
+          <ViewDialog 
+            detteId={selectedDetteId} 
+            open={viewDialogOpen}
+            onOpenChange={(open) => {
+              setViewDialogOpen(open);
+              if (!open) setSelectedDetteId(null);
+            }}
+          />
+          <EditDialog 
+            detteId={selectedDetteId} 
+            open={editDialogOpen}
+            onOpenChange={(open) => {
+              setEditDialogOpen(open);
+              if (!open) setSelectedDetteId(null);
+            }}
+            onSuccess={() => {
+              loadData();
+              setEditDialogOpen(false);
+              setSelectedDetteId(null);
+            }}
+          />
+        </>
+      )}
     </div>
   );
 }

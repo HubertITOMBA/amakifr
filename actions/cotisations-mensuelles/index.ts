@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { calculerCotisationMensuelle } from "@/lib/utils/cotisations";
 
 // Schémas de validation
 const CreateTypeCotisationSchema = z.object({
@@ -331,12 +332,9 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
       };
     }
 
-    // Séparer le forfait mensuel des assistances
+    // Vérifier qu'il y a un forfait
     const cotisationForfait = cotisationsDuMois.find(cdm => 
-      cdm.TypeCotisation?.nom?.toLowerCase().includes("forfait") && cdm.TypeCotisation?.obligatoire
-    );
-    const cotisationsAssistances = cotisationsDuMois.filter(cdm => 
-      !cdm.TypeCotisation?.nom?.toLowerCase().includes("forfait") || !cdm.TypeCotisation?.obligatoire
+      !cdm.TypeCotisation?.aBeneficiaire
     );
 
     if (!cotisationForfait) {
@@ -346,69 +344,28 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
       };
     }
 
-    // Créer un Set des IDs des adhérents bénéficiaires (ils ne paient pas les assistances)
-    const adherentsBeneficiairesIds = new Set(
-      cotisationsAssistances
-        .filter(cdm => cdm.adherentBeneficiaireId)
-        .map(cdm => cdm.adherentBeneficiaireId!)
-    );
-
     const cotisationsCreated = [] as any[];
     const bulkData = [] as any[];
 
-    const montantForfait = Number(cotisationForfait.montantBase);
-
-    // Pour chaque adhérent, créer une cotisation mensuelle
+    // Pour chaque adhérent, calculer et créer une cotisation mensuelle
     for (const adherent of adherents) {
-      let montantTotal = montantForfait;
-      const nomForfait = cotisationForfait.TypeCotisation?.nom || "Forfait";
-      let description = `Cotisation ${periode} : ${nomForfait} ${montantForfait.toFixed(2)}€`;
-
-      // Calculer le montant des assistances à payer
-      let montantAssistances = 0;
-      const assistancesDetails: string[] = [];
-
-      // Si l'adhérent est bénéficiaire d'une assistance, il ne paie pas cette assistance
-      if (adherentsBeneficiairesIds.has(adherent.id)) {
-        // Trouver les assistances dont cet adhérent bénéficie
-        const assistancesBeneficiaires = cotisationsAssistances.filter(
-          cdm => cdm.adherentBeneficiaireId === adherent.id
-        );
-        
-        if (assistancesBeneficiaires.length > 0) {
-          const beneficiaireDetails = assistancesBeneficiaires.map(cdm => 
-            `${cdm.TypeCotisation?.nom || "Assistance"} (bénéficiaire)`
-          ).join(", ");
-          description += ` - Bénéficiaire de: ${beneficiaireDetails} (ne paie pas)`;
-        }
-
-        // Calculer le montant des assistances pour les autres (pas celles dont il bénéficie)
-        for (const cdm of cotisationsAssistances) {
-          if (cdm.adherentBeneficiaireId !== adherent.id) {
-            const montant = Number(cdm.montantBase);
-            montantAssistances += montant;
-            assistancesDetails.push(
-              `${cdm.TypeCotisation?.nom || "Assistance"}${cdm.AdherentBeneficiaire ? ` pour ${cdm.AdherentBeneficiaire.firstname} ${cdm.AdherentBeneficiaire.lastname}` : ''} (${montant.toFixed(2)}€)`
-            );
-          }
-        }
-      } else {
-        // L'adhérent paie toutes les assistances
-        for (const cdm of cotisationsAssistances) {
-          const montant = Number(cdm.montantBase);
-          montantAssistances += montant;
-          assistancesDetails.push(
-            `${cdm.TypeCotisation?.nom || "Assistance"}${cdm.AdherentBeneficiaire ? ` pour ${cdm.AdherentBeneficiaire.firstname} ${cdm.AdherentBeneficiaire.lastname}` : ''} (${montant.toFixed(2)}€)`
-          );
-        }
-      }
-
-      montantTotal = montantForfait + montantAssistances;
-
-      if (assistancesDetails.length > 0) {
-        description += ` + ${assistancesDetails.join(", ")}`;
-      }
-      description += ` = Total: ${montantTotal.toFixed(2)}€`;
+      // Utiliser la fonction utilitaire pour calculer le montant et générer la description
+      const result = calculerCotisationMensuelle(
+        adherent.id,
+        periode,
+        cotisationsDuMois.map(cdm => ({
+          id: cdm.id,
+          periode: cdm.periode,
+          montantBase: Number(cdm.montantBase),
+          adherentBeneficiaireId: cdm.adherentBeneficiaireId,
+          TypeCotisation: {
+            id: cdm.TypeCotisation.id,
+            nom: cdm.TypeCotisation.nom || "Assistance",
+            aBeneficiaire: cdm.TypeCotisation.aBeneficiaire || false,
+          },
+          AdherentBeneficiaire: cdm.AdherentBeneficiaire || null,
+        }))
+      );
 
       // Créer une seule cotisation mensuelle par adhérent
       bulkData.push({
@@ -417,12 +374,12 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
         mois: validatedData.mois,
         typeCotisationId: cotisationForfait.TypeCotisation?.id || cotisationForfait.typeCotisationId, // Utiliser le type Forfait
         adherentId: adherent.id,
-        montantAttendu: montantTotal,
+        montantAttendu: result.montantTotal,
         montantPaye: 0,
-        montantRestant: montantTotal,
+        montantRestant: result.montantTotal,
         dateEcheance: cotisationForfait.dateEcheance,
         statut: "EnAttente",
-        description: description,
+        description: result.description,
         cotisationDuMoisId: cotisationForfait.id, // Lier à la cotisation du mois
         createdBy: session.user.id,
       });
@@ -445,7 +402,7 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
     const cotisationsCreees = await prisma.cotisationMensuelle.findMany({
       where: {
         periode,
-        typeCotisationId: typeForfait.id,
+        typeCotisationId: cotisationForfait.TypeCotisation?.id || cotisationForfait.typeCotisationId,
       },
     });
 
@@ -497,7 +454,7 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
       data: {
         cotisationsCreated: createdCount,
         adherentsCount: adherents.length,
-        montantForfait: Number(typeForfait.montant),
+        montantForfait: Number(cotisationForfait.montantBase),
         avoirsAppliques
       }
     };

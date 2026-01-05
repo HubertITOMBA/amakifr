@@ -535,6 +535,155 @@ const CreateAssistanceSchema = z.object({
 });
 
 /**
+ * Fonction utilitaire pour synchroniser une assistance avec CotisationDuMois
+ * Utilisée par createAssistance et updateAssistance
+ */
+async function syncAssistanceWithCotisationDuMois(
+  adherentId: string,
+  type: TypeEvenementFamilial,
+  dateEvenement: Date,
+  montant: number,
+  description: string | undefined,
+  userId: string,
+  periode?: string
+) {
+  const annee = dateEvenement.getFullYear();
+  const mois = dateEvenement.getMonth() + 1;
+  const calculatedPeriode = periode || `${annee}-${mois.toString().padStart(2, '0')}`;
+
+  try {
+    console.log(`[syncAssistanceWithCotisationDuMois] Synchronisation pour assistance type: ${type}, date: ${dateEvenement.toISOString()}, periode: ${calculatedPeriode}`);
+    
+    // Mapper le type d'assistance au nom du type de cotisation
+    const typeCotisationMap: Record<string, string> = {
+      "AnniversaireSalle": "Anniversaire en salle",
+      "MariageEnfant": "Mariage",
+      "DecesFamille": "Décès",
+      "Naissance": "Naissance",
+      "Autre": "Décès",
+    };
+
+    const nomTypeCotisation = typeCotisationMap[type] || "Assistance décès";
+    console.log(`[syncAssistanceWithCotisationDuMois] Recherche du type de cotisation: "${nomTypeCotisation}"`);
+
+    // Récupérer tous les types actifs
+    const allTypes = await prisma.typeCotisationMensuelle.findMany({
+      where: { actif: true },
+      select: { id: true, nom: true, montant: true },
+    });
+
+    // Recherche exacte
+    let typeCotisation = allTypes.find(t => 
+      t.nom.toLowerCase().trim() === nomTypeCotisation.toLowerCase().trim()
+    );
+
+    // Recherche partielle si pas trouvé
+    if (!typeCotisation) {
+      typeCotisation = allTypes.find(t => 
+        t.nom.toLowerCase().includes(nomTypeCotisation.toLowerCase()) ||
+        nomTypeCotisation.toLowerCase().includes(t.nom.toLowerCase())
+      );
+    }
+
+    // Recherche par mots-clés avec montant 50€
+    if (!typeCotisation) {
+      const keywords = ["décès", "naissance", "anniversaire", "mariage"];
+      const searchKeyword = nomTypeCotisation.toLowerCase();
+      const matchingKeyword = keywords.find(kw => searchKeyword.includes(kw));
+      
+      if (matchingKeyword) {
+        typeCotisation = allTypes.find(t => 
+          t.nom.toLowerCase().includes(matchingKeyword) && 
+          Number(t.montant) === 50
+        );
+      }
+    }
+
+    // Récupérer l'objet complet
+    if (typeCotisation) {
+      const fullType = await prisma.typeCotisationMensuelle.findUnique({
+        where: { id: typeCotisation.id },
+      });
+      typeCotisation = fullType;
+    }
+
+    if (!typeCotisation) {
+      console.error(`[syncAssistanceWithCotisationDuMois] ❌ Type de cotisation "${nomTypeCotisation}" non trouvé`);
+      return null;
+    }
+
+    console.log(`[syncAssistanceWithCotisationDuMois] Type de cotisation trouvé: ${typeCotisation.id} - ${typeCotisation.nom}`);
+    
+    // Vérifier si une cotisation du mois existe déjà pour cette période et cet adhérent
+    const existingCotisationDuMois = await prisma.cotisationDuMois.findFirst({
+      where: {
+        periode: calculatedPeriode,
+        adherentBeneficiaireId: adherentId,
+      },
+      include: {
+        TypeCotisation: {
+          select: {
+            nom: true,
+          },
+        },
+      },
+    });
+
+    const dateEcheance = new Date(annee, mois - 1, 15);
+
+    if (existingCotisationDuMois) {
+      // Mettre à jour la cotisation du mois existante
+      const updated = await prisma.cotisationDuMois.update({
+        where: { id: existingCotisationDuMois.id },
+        data: {
+          typeCotisationId: typeCotisation.id,
+          montantBase: new Decimal(montant),
+          dateEcheance: dateEcheance,
+          description: description || `Cotisation du mois pour ${nomTypeCotisation} - ${calculatedPeriode}`,
+        },
+      });
+
+      console.log(`[syncAssistanceWithCotisationDuMois] ✅ Cotisation du mois mise à jour: ${updated.id}`);
+      return updated;
+    } else {
+      // Créer une nouvelle cotisation du mois
+      try {
+        const cotisationDuMois = await prisma.cotisationDuMois.create({
+          data: {
+            periode: calculatedPeriode,
+            annee,
+            mois,
+            typeCotisationId: typeCotisation.id,
+            montantBase: new Decimal(montant),
+            dateEcheance: dateEcheance,
+            description: description || `Cotisation du mois pour ${nomTypeCotisation} - ${calculatedPeriode}`,
+            adherentBeneficiaireId: adherentId,
+            statut: "Planifie",
+            createdBy: userId,
+          },
+        });
+
+        console.log(`[syncAssistanceWithCotisationDuMois] ✅ Cotisation du mois créée: ${cotisationDuMois.id}`);
+        return cotisationDuMois;
+      } catch (createError: any) {
+        if (createError?.code === 'P2002' && createError?.meta?.target?.includes('adherentBeneficiaireId')) {
+          console.log(`[syncAssistanceWithCotisationDuMois] ⚠️ L'adhérent a déjà une assistance pour ${calculatedPeriode}. Contrainte unique violée.`);
+        } else {
+          throw createError;
+        }
+        return null;
+      }
+    }
+  } catch (error) {
+    console.error("[syncAssistanceWithCotisationDuMois] ❌ Erreur lors de la synchronisation:", error);
+    if (error instanceof Error) {
+      console.error("[syncAssistanceWithCotisationDuMois] Message d'erreur:", error.message);
+    }
+    return null;
+  }
+}
+
+/**
  * Crée une assistance de 50€ pour un événement familial
  */
 export async function createAssistance(data: z.infer<typeof CreateAssistanceSchema>) {
@@ -572,133 +721,16 @@ export async function createAssistance(data: z.infer<typeof CreateAssistanceSche
       },
     });
 
-    // Créer automatiquement une entrée dans cotisation_du_mois si elle n'existe pas
-    try {
-      console.log(`[createAssistance] Début de la création de cotisation_du_mois pour assistance type: ${validatedData.type}, date: ${dateEvenement.toISOString()}, periode: ${periode}`);
-      
-      // Mapper le type d'assistance au nom du type de cotisation
-      // Les types de cotisation sont : "Décès", "Naissance", "Anniversaire en salle", "Mariage"
-      const typeCotisationMap: Record<string, string> = {
-        "AnniversaireSalle": "Anniversaire en salle",
-        "MariageEnfant": "Mariage",
-        "DecesFamille": "Décès",
-        "Naissance": "Naissance",
-        "Autre": "Décès", // Utiliser "Décès" comme type générique pour autre
-      };
-
-      const nomTypeCotisation = typeCotisationMap[validatedData.type] || "Assistance décès";
-      console.log(`[createAssistance] Recherche du type de cotisation: "${nomTypeCotisation}"`);
-
-      // Récupérer tous les types actifs pour recherche manuelle
-      const allTypes = await prisma.typeCotisationMensuelle.findMany({
-        where: { actif: true },
-        select: { id: true, nom: true, montant: true },
-      });
-      console.log(`[createAssistance] Types de cotisation actifs disponibles:`, JSON.stringify(allTypes, null, 2));
-
-      // Recherche manuelle dans tous les types (plus fiable que contains avec Prisma)
-      let typeCotisation = allTypes.find(t => 
-        t.nom.toLowerCase().trim() === nomTypeCotisation.toLowerCase().trim()
-      );
-
-      // Si pas trouvé, recherche partielle (contient le nom recherché)
-      if (!typeCotisation) {
-        console.log(`[createAssistance] Type non trouvé avec recherche exacte, essai recherche partielle...`);
-        typeCotisation = allTypes.find(t => 
-          t.nom.toLowerCase().includes(nomTypeCotisation.toLowerCase()) ||
-          nomTypeCotisation.toLowerCase().includes(t.nom.toLowerCase())
-        );
-      }
-
-      // Si toujours pas trouvé, chercher par mots-clés : décès, naissance, anniversaire, mariage avec montant 50€
-      if (!typeCotisation) {
-        console.log(`[createAssistance] Type non trouvé avec "${nomTypeCotisation}", recherche par mots-clés avec montant 50€...`);
-        const keywords = ["décès", "naissance", "anniversaire", "mariage"];
-        const searchKeyword = nomTypeCotisation.toLowerCase();
-        const matchingKeyword = keywords.find(kw => searchKeyword.includes(kw));
-        
-        if (matchingKeyword) {
-          typeCotisation = allTypes.find(t => 
-            t.nom.toLowerCase().includes(matchingKeyword) && 
-            Number(t.montant) === 50
-          );
-        }
-      }
-
-      // Si trouvé, récupérer l'objet complet depuis la base
-      if (typeCotisation) {
-        const fullType = await prisma.typeCotisationMensuelle.findUnique({
-          where: { id: typeCotisation.id },
-        });
-        typeCotisation = fullType;
-      }
-
-      if (typeCotisation) {
-        console.log(`[createAssistance] Type de cotisation trouvé: ${typeCotisation.id} - ${typeCotisation.nom}`);
-        
-        // Vérifier si l'adhérent a déjà une assistance dans cette période
-        // Contrainte : un adhérent ne peut avoir qu'une seule assistance par mois (peu importe le type)
-        const existingAssistance = await prisma.cotisationDuMois.findFirst({
-          where: {
-            periode,
-            adherentBeneficiaireId: validatedData.adherentId,
-          },
-          include: {
-            TypeCotisation: {
-              select: {
-                nom: true,
-              },
-            },
-          },
-        });
-
-        if (existingAssistance) {
-          const nomType = existingAssistance.TypeCotisation?.nom || "type inconnu";
-          console.log(`[createAssistance] ⚠️ L'adhérent a déjà une assistance pour ${periode} (${nomType}). Impossible d'en créer une autre.`);
-          // Ne pas créer de nouvelle cotisation du mois si l'adhérent a déjà une assistance
-        } else {
-          // Créer la cotisation du mois
-          // Date d'échéance : 15 du mois de l'événement
-          const dateEcheance = new Date(annee, mois - 1, 15);
-
-          try {
-            const cotisationDuMois = await prisma.cotisationDuMois.create({
-              data: {
-                periode,
-                annee,
-                mois,
-                typeCotisationId: typeCotisation.id,
-                montantBase: new Decimal(validatedData.montant),
-                dateEcheance: dateEcheance,
-                description: validatedData.description || `Cotisation du mois pour ${nomTypeCotisation} - ${periode}`,
-                adherentBeneficiaireId: validatedData.adherentId, // L'adhérent bénéficiaire de l'assistance
-                statut: "Planifie",
-                createdBy: session.user.id,
-              },
-            });
-
-            console.log(`[createAssistance] ✅ Cotisation du mois créée avec succès: ${cotisationDuMois.id} pour ${periode} - ${nomTypeCotisation}`);
-          } catch (createError: any) {
-            // Gérer les erreurs de contrainte unique
-            if (createError?.code === 'P2002' && createError?.meta?.target?.includes('adherentBeneficiaireId')) {
-              console.log(`[createAssistance] ⚠️ L'adhérent a déjà une assistance pour ${periode}. Contrainte unique violée.`);
-            } else {
-              throw createError;
-            }
-          }
-        }
-      } else {
-        console.error(`[createAssistance] ❌ Type de cotisation "${nomTypeCotisation}" non trouvé pour l'assistance de type "${validatedData.type}"`);
-        console.error(`[createAssistance] Les types disponibles ont été listés ci-dessus.`);
-      }
-    } catch (error) {
-      // Ne pas faire échouer la création de l'assistance si la création de cotisation_du_mois échoue
-      console.error("[createAssistance] ❌ Erreur lors de la création de la cotisation du mois:", error);
-      if (error instanceof Error) {
-        console.error("[createAssistance] Message d'erreur:", error.message);
-        console.error("[createAssistance] Stack:", error.stack);
-      }
-    }
+    // Synchroniser automatiquement avec cotisation_du_mois
+    await syncAssistanceWithCotisationDuMois(
+      validatedData.adherentId,
+      validatedData.type as TypeEvenementFamilial,
+      dateEvenement,
+      validatedData.montant,
+      validatedData.description,
+      session.user.id,
+      periode
+    );
 
     // Revalider les pages des adhérents et de gestion
     // Lors de la création d'une assistance, tous les profils d'adhérents sont mis à jour
@@ -878,6 +910,140 @@ export async function getAllDettesInitiales() {
   } catch (error) {
     console.error("Erreur lors de la récupération des dettes initiales:", error);
     return { success: false, error: "Erreur lors de la récupération des dettes initiales" };
+  }
+}
+
+/**
+ * Schéma de validation pour mettre à jour une dette initiale
+ */
+const UpdateDetteInitialeSchema = z.object({
+  id: z.string().min(1, "L'ID de la dette est requis"),
+  adherentId: z.string().min(1, "L'ID de l'adhérent est requis"),
+  annee: z.number().int().min(2020).max(2100, "L'année doit être valide"),
+  montant: z.number().positive("Le montant doit être positif"),
+  description: z.string().optional(),
+});
+
+/**
+ * Récupère une dette initiale par son ID
+ */
+export async function getDetteInitialeById(id: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const dette = await prisma.detteInitiale.findUnique({
+      where: { id },
+      include: {
+        Adherent: {
+          include: {
+            User: true,
+          },
+        },
+        CreatedBy: {
+          select: {
+            name: true,
+            email: true,
+          },
+        },
+      },
+    });
+
+    if (!dette) {
+      return { success: false, error: "Dette initiale non trouvée" };
+    }
+
+    return {
+      success: true,
+      data: {
+        ...dette,
+        montant: Number(dette.montant),
+        montantPaye: Number(dette.montantPaye),
+        montantRestant: Number(dette.montantRestant),
+      },
+    };
+  } catch (error) {
+    console.error("Erreur lors de la récupération de la dette initiale:", error);
+    return { success: false, error: "Erreur lors de la récupération de la dette initiale" };
+  }
+}
+
+/**
+ * Met à jour une dette initiale
+ */
+export async function updateDetteInitiale(data: z.infer<typeof UpdateDetteInitialeSchema>) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const validatedData = UpdateDetteInitialeSchema.parse(data);
+
+    // Vérifier que la dette existe
+    const existing = await prisma.detteInitiale.findUnique({
+      where: { id: validatedData.id },
+    });
+
+    if (!existing) {
+      return { success: false, error: "Dette initiale non trouvée" };
+    }
+
+    // Vérifier si une autre dette existe déjà pour cette année (sauf celle qu'on modifie)
+    const duplicate = await prisma.detteInitiale.findUnique({
+      where: {
+        adherentId_annee: {
+          adherentId: validatedData.adherentId,
+          annee: validatedData.annee,
+        },
+      },
+    });
+
+    if (duplicate && duplicate.id !== validatedData.id) {
+      return { success: false, error: `Une dette existe déjà pour l'année ${validatedData.annee}` };
+    }
+
+    // Calculer le nouveau montant restant
+    const nouveauMontantRestant = new Decimal(validatedData.montant).minus(existing.montantPaye);
+
+    const dette = await prisma.detteInitiale.update({
+      where: { id: validatedData.id },
+      data: {
+        adherentId: validatedData.adherentId,
+        annee: validatedData.annee,
+        montant: new Decimal(validatedData.montant),
+        montantRestant: nouveauMontantRestant,
+        description: validatedData.description,
+      },
+      include: {
+        Adherent: {
+          include: {
+            User: true,
+          },
+        },
+      },
+    });
+
+    return {
+      success: true,
+      message: `Dette initiale mise à jour avec succès`,
+      data: {
+        ...dette,
+        montant: Number(dette.montant),
+        montantPaye: Number(dette.montantPaye),
+        montantRestant: Number(dette.montantRestant),
+      },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Erreur lors de la mise à jour de la dette initiale:", error);
+    return { success: false, error: "Erreur lors de la mise à jour de la dette initiale" };
+  } finally {
+    revalidatePath("/admin/finances/dettes");
   }
 }
 
@@ -1351,8 +1517,128 @@ export async function createPaiementGeneral(data: {
 }
 
 /**
- * Récupère toutes les assistances
+ * Schéma de validation pour mettre à jour une assistance
  */
+const UpdateAssistanceSchema = z.object({
+  id: z.string().min(1, "L'ID de l'assistance est requis"),
+  adherentId: z.string().min(1, "L'ID de l'adhérent est requis").optional(),
+  type: z.enum(["Naissance", "MariageEnfant", "DecesFamille", "AnniversaireSalle", "Autre"]).optional(),
+  dateEvenement: z.string().optional(), // ISO string
+  montant: z.number().optional(),
+  description: z.string().optional(),
+});
+
+/**
+ * Met à jour une assistance et synchronise avec CotisationDuMois
+ */
+export async function updateAssistance(data: z.infer<typeof UpdateAssistanceSchema>) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const validatedData = UpdateAssistanceSchema.parse(data);
+
+    // Récupérer l'assistance existante
+    const existingAssistance = await prisma.assistance.findUnique({
+      where: { id: validatedData.id },
+    });
+
+    if (!existingAssistance) {
+      return { success: false, error: "Assistance introuvable" };
+    }
+
+    // Préparer les données de mise à jour
+    const updateData: any = {};
+    let dateEvenement = existingAssistance.dateEvenement;
+    let adherentId = existingAssistance.adherentId;
+    let type = existingAssistance.type;
+    let montant = Number(existingAssistance.montant);
+
+    if (validatedData.adherentId) {
+      updateData.adherentId = validatedData.adherentId;
+      adherentId = validatedData.adherentId;
+    }
+    if (validatedData.type) {
+      updateData.type = validatedData.type as TypeEvenementFamilial;
+      type = validatedData.type as TypeEvenementFamilial;
+    }
+    if (validatedData.dateEvenement) {
+      dateEvenement = new Date(validatedData.dateEvenement);
+      updateData.dateEvenement = dateEvenement;
+    }
+    if (validatedData.montant !== undefined) {
+      updateData.montant = new Decimal(validatedData.montant);
+      montant = validatedData.montant;
+      // Recalculer montantRestant si le montant change
+      const montantPaye = Number(existingAssistance.montantPaye);
+      updateData.montantRestant = new Decimal(validatedData.montant - montantPaye);
+    }
+    if (validatedData.description !== undefined) {
+      updateData.description = validatedData.description;
+    }
+
+    // Mettre à jour l'assistance
+    const updatedAssistance = await prisma.assistance.update({
+      where: { id: validatedData.id },
+      data: updateData,
+      include: {
+        Adherent: {
+          include: {
+            User: true,
+          },
+        },
+      },
+    });
+
+    // Synchroniser avec CotisationDuMois
+    const annee = dateEvenement.getFullYear();
+    const mois = dateEvenement.getMonth() + 1;
+    const periode = `${annee}-${mois.toString().padStart(2, '0')}`;
+
+    await syncAssistanceWithCotisationDuMois(
+      adherentId,
+      type,
+      dateEvenement,
+      montant,
+      validatedData.description,
+      session.user.id,
+      periode
+    );
+
+    // Revalider les pages
+    revalidatePath("/user/profile");
+    revalidatePath("/admin/finances/assistances");
+    revalidatePath("/admin/cotisations");
+    revalidatePath("/admin/cotisations/gestion");
+    revalidatePath("/admin/cotisations-du-mois");
+
+    return {
+      success: true,
+      message: `Assistance mise à jour avec succès`,
+      data: {
+        ...updatedAssistance,
+        montant: Number(updatedAssistance.montant),
+        montantPaye: Number(updatedAssistance.montantPaye),
+        montantRestant: Number(updatedAssistance.montantRestant),
+      },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Erreur lors de la mise à jour de l'assistance:", error);
+    return { success: false, error: "Erreur lors de la mise à jour de l'assistance" };
+  } finally {
+    revalidatePath("/user/profile");
+    revalidatePath("/admin/finances/assistances");
+    revalidatePath("/admin/cotisations");
+    revalidatePath("/admin/cotisations/gestion");
+    revalidatePath("/admin/cotisations-du-mois");
+  }
+}
+
 export async function getAllAssistances() {
   try {
     const session = await auth();

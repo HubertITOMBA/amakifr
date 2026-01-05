@@ -915,6 +915,80 @@ export default function AdminEntityPage() {
 - Inclure : compteur total, sélecteur de lignes par page, numéro de page, boutons de navigation
 - Boutons "première/dernière page" masqués sur mobile (`hidden lg:flex`)
 
+### Affichage mobile optimisé pour les listes
+- **OBLIGATOIRE** : Toutes les listes doivent être optimisées pour l'affichage mobile
+- **Principe** : Sur mobile (< 768px), n'afficher que 2-3 colonnes essentielles maximum (comme les applications bancaires)
+- **Colonnes toujours visibles sur mobile** :
+  - Colonne principale (ex: Nom, Adhérent, Titre, etc.)
+  - Colonne secondaire importante (ex: Montant, Statut, Date principale)
+  - Colonne Actions (si présente, avec `meta: { forceVisible: true }`)
+- **Implémentation** :
+  1. Détecter la taille d'écran au chargement et au redimensionnement
+  2. Masquer automatiquement les colonnes non essentielles sur mobile par défaut
+  3. Permettre à l'utilisateur de réafficher les colonnes via le toggle de visibilité
+  4. Afficher les informations secondaires sous la colonne principale en petit texte (`text-xs md:hidden`)
+  5. Utiliser `min-w-0 md:min-w-[640px]` dans DataTable pour éviter le scroll horizontal sur mobile
+- **Exemple de configuration** :
+```typescript
+const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+  if (typeof window !== "undefined") {
+    try {
+      const saved = localStorage.getItem("admin-entity-column-visibility");
+      if (saved) {
+        const parsed = JSON.parse(saved);
+        if (Object.keys(parsed).length > 0) {
+          return parsed; // Utiliser les préférences sauvegardées
+        }
+      }
+      // Par défaut sur mobile, masquer les colonnes non essentielles
+      const isMobile = window.innerWidth < 768; // md breakpoint
+      if (isMobile) {
+        return {
+          colonneSecondaire1: false,
+          colonneSecondaire2: false,
+          colonneSecondaire3: false,
+          // Garder visible : colonnePrincipale, colonneImportante, actions
+        };
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des préférences:", error);
+    }
+  }
+  return {};
+});
+
+// Détecter les changements de taille d'écran
+useEffect(() => {
+  const handleResize = () => {
+    const isMobile = window.innerWidth < 768;
+    const saved = localStorage.getItem("admin-entity-column-visibility");
+    
+    // Si on passe en mode mobile et qu'il n'y a pas de préférences sauvegardées
+    if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+      setColumnVisibility({
+        colonneSecondaire1: false,
+        colonneSecondaire2: false,
+        colonneSecondaire3: false,
+      });
+    }
+  };
+
+  window.addEventListener("resize", handleResize);
+  return () => window.removeEventListener("resize", handleResize);
+}, []);
+```
+- **Affichage compact sur mobile** :
+  - Colonne principale : peut afficher des informations secondaires en petit texte sous le contenu principal
+  - Colonne secondaire : peut afficher des informations complémentaires en petit texte
+  - Utiliser `flex flex-col gap-0.5` pour organiser les informations verticalement
+  - Texte secondaire : `text-xs text-gray-500 dark:text-gray-400 md:hidden`
+- **DataTable responsive** :
+  - Utiliser `min-w-0 md:min-w-[640px]` au lieu de `min-w-[640px]` pour permettre l'adaptation mobile
+  - Padding réduit sur mobile : `px-2 py-2.5 sm:px-4 sm:py-3`
+- **Tailles de colonnes** :
+  - Réduire `minSize` pour les colonnes principales sur mobile (ex: `minSize: 120` au lieu de `minSize: 150`)
+  - Colonnes Actions : `size: 80, minSize: 70, maxSize: 100`
+
 ## Notes importantes
 - Toujours vérifier le schéma Prisma avant de créer des requêtes
 - Respecter les contraintes de clés primaires composites

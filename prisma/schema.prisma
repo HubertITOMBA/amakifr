@@ -201,6 +201,8 @@ model User {
   messageReactions            MessageReaction[] // Réactions aux messages
   configurationsFraisAdhesion ConfigurationFraisAdhesion[] @relation("ConfigurationFraisAdhesionCreatedBy") // Configurations de frais d'adhésion créées
   notifications               Notification[] // Notifications reçues
+  emailsReceived              Email[]                      @relation("EmailRecipient") // Emails reçus
+  emailsSent                  Email[]                      @relation("EmailCreatedBy") // Emails envoyés
   documents                   Document[] // Documents uploadés
   badgesAttribues             BadgeAttribution[] // Badges attribués à cet utilisateur
   ressourcesCreees            Ressource[]                  @relation("RessourceCreatedBy") // Ressources créées
@@ -1265,6 +1267,29 @@ model Notification {
   @@index([lue])
   @@index([createdAt])
   @@map("notifications")
+}
+
+// Modèle pour l'historique des emails envoyés aux adhérents
+model Email {
+  id             String   @id @default(cuid())
+  userId         String // Destinataire de l'email
+  createdBy      String // Admin qui a envoyé l'email
+  subject        String   @db.VarChar(255)
+  body           String   @db.Text
+  recipientEmail String   @db.VarChar(255) // Email du destinataire au moment de l'envoi
+  sent           Boolean  @default(true) // Si l'email a été envoyé avec succès
+  error          String?  @db.Text // Message d'erreur si l'envoi a échoué
+  createdAt      DateTime @default(now())
+
+  // Relations
+  User      User @relation("EmailRecipient", fields: [userId], references: [id], onDelete: Cascade)
+  CreatedBy User @relation("EmailCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdBy])
+  @@index([createdAt])
+  @@index([sent])
+  @@map("emails")
 }
 
 // Modèle pour les documents uploadés

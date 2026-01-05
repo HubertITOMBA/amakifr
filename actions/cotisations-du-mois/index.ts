@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
+import { calculerCotisationMensuelle } from "@/lib/utils/cotisations";
 
 // Schémas de validation
 const CreateCotisationDuMoisSchema = z.object({
@@ -229,8 +230,103 @@ export async function updateCotisationDuMois(formData: FormData) {
             name: true,
           },
         },
+        CotisationsMensuelles: {
+          select: {
+            id: true,
+            adherentId: true,
+            montantAttendu: true,
+            montantPaye: true,
+          },
+        },
       },
     });
+
+    // Synchroniser avec les cotisations mensuelles existantes si elles existent
+    if (updated.CotisationsMensuelles && updated.CotisationsMensuelles.length > 0) {
+      try {
+        console.log(`[updateCotisationDuMois] Mise à jour de ${updated.CotisationsMensuelles.length} cotisation(s) mensuelle(s) existante(s)`);
+        
+        // Récupérer toutes les cotisations du mois pour cette période pour recalculer les montants
+        const allCotisationsDuMois = await db.cotisationDuMois.findMany({
+          where: {
+            periode: existing.periode,
+          },
+          include: {
+            TypeCotisation: true,
+            AdherentBeneficiaire: true,
+          },
+        });
+
+        // Trouver la cotisation forfait pour cette période
+        const cotisationForfait = allCotisationsDuMois.find(cdm => 
+          !cdm.TypeCotisation.aBeneficiaire
+        );
+
+        if (cotisationForfait) {
+          // Pour chaque cotisation mensuelle existante, recalculer le montant
+          for (const cotisationMensuelle of updated.CotisationsMensuelles) {
+            // Récupérer l'adhérent
+            const adherent = await db.adherent.findUnique({
+              where: { id: cotisationMensuelle.adherentId },
+            });
+
+            if (!adherent) continue;
+
+            // Utiliser la fonction utilitaire pour calculer le montant et générer la description
+            const result = calculerCotisationMensuelle(
+              adherent.id,
+              existing.periode,
+              allCotisationsDuMois.map(cdm => ({
+                id: cdm.id,
+                periode: cdm.periode,
+                montantBase: Number(cdm.montantBase),
+                adherentBeneficiaireId: cdm.adherentBeneficiaireId,
+                TypeCotisation: {
+                  id: cdm.TypeCotisation.id,
+                  nom: cdm.TypeCotisation.nom || "Assistance",
+                  aBeneficiaire: cdm.TypeCotisation.aBeneficiaire || false,
+                },
+                AdherentBeneficiaire: cdm.AdherentBeneficiaire || null,
+              }))
+            );
+
+            // Mettre à jour la cotisation mensuelle avec le nouveau montant
+            // Le montantRestant = montantAttendu - montantPaye
+            const montantPaye = Number(cotisationMensuelle.montantPaye);
+            const nouveauMontantRestant = Math.max(0, result.montantTotal - montantPaye);
+
+            // Mettre à jour le statut en fonction du montant restant
+            let nouveauStatut = cotisationMensuelle.statut;
+            if (nouveauMontantRestant <= 0) {
+              nouveauStatut = "Paye";
+            } else if (montantPaye > 0) {
+              nouveauStatut = "PartiellementPaye";
+            } else {
+              nouveauStatut = cotisationMensuelle.statut === "EnRetard" ? "EnRetard" : "EnAttente";
+            }
+
+            await db.cotisationMensuelle.update({
+              where: { id: cotisationMensuelle.id },
+              data: {
+                montantAttendu: new Decimal(result.montantTotal),
+                montantRestant: new Decimal(nouveauMontantRestant),
+                description: result.description,
+                statut: nouveauStatut,
+                // Mettre à jour la date d'échéance si elle a changé
+                ...(validatedData.dateEcheance ? {
+                  dateEcheance: new Date(validatedData.dateEcheance),
+                } : {}),
+              },
+            });
+
+            console.log(`[updateCotisationDuMois] ✅ Cotisation mensuelle ${cotisationMensuelle.id} mise à jour: ${result.montantTotal}€ (payé: ${montantPaye}€, restant: ${nouveauMontantRestant}€)`);
+          }
+        }
+      } catch (syncError) {
+        // Ne pas faire échouer la mise à jour de la cotisation du mois si la synchronisation échoue
+        console.error("[updateCotisationDuMois] ❌ Erreur lors de la synchronisation avec les cotisations mensuelles:", syncError);
+      }
+    }
 
     return { 
       success: true, 

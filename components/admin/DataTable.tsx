@@ -29,7 +29,7 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
   return (
     <div className="overflow-x-auto -mx-4 sm:mx-0">
       <div className="max-h-[70vh] overflow-auto">
-        <table className="w-full min-w-[640px]">
+        <table className="w-full min-w-0 md:min-w-[640px]">
           <thead>
             {headers.map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b border-gray-200 dark:border-gray-700">
@@ -71,7 +71,7 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
                 `}
               >
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-2 py-2 sm:px-4 sm:py-3 text-gray-900 dark:text-gray-100 text-xs sm:text-sm">
+                  <td key={cell.id} className="px-2 py-2.5 sm:px-4 sm:py-3 text-gray-900 dark:text-gray-100 text-xs sm:text-sm">
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
                 ))}

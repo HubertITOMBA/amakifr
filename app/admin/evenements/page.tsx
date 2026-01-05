@@ -68,7 +68,21 @@ export default function AdminEvenementsPage() {
       try {
         const saved = localStorage.getItem("admin-evenements-column-visibility");
         if (saved) {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          if (Object.keys(parsed).length > 0) {
+            return parsed;
+          }
+        }
+        // Par défaut sur mobile, masquer les colonnes non essentielles
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+          return {
+            dateDebut: false,
+            categorie: false,
+            statut: false,
+            inscriptions: false,
+            // Garder visible : titre, actions
+          };
         }
       } catch (error) {
         console.error("Erreur lors du chargement des préférences de colonnes:", error);
@@ -76,6 +90,26 @@ export default function AdminEvenementsPage() {
     }
     return {};
   });
+
+  // Détecter les changements de taille d'écran
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      const saved = localStorage.getItem("admin-evenements-column-visibility");
+      
+      if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+        setColumnVisibility({
+          dateDebut: false,
+          categorie: false,
+          statut: false,
+          inscriptions: false,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const loadAll = async () => {
     const res = await getAllEvenements();
@@ -109,7 +143,35 @@ export default function AdminEvenementsPage() {
   const columns = useMemo(() => [
     columnHelper.accessor("titre", {
       header: "Titre",
-      cell: info => <div className="font-medium">{info.getValue()}</div>,
+      cell: ({ row }) => {
+        const titre = row.getValue("titre") as string;
+        const dateDebut = row.original.dateDebut;
+        const categorie = row.original.categorie;
+        const statut = row.original.statut;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <div className="font-medium text-sm text-gray-900 dark:text-gray-100 truncate">
+              {titre}
+            </div>
+            {/* Afficher la date, catégorie et statut en petit sur mobile */}
+            <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden font-normal flex items-center gap-2 flex-wrap">
+              {dateDebut && (
+                <span>{new Date(dateDebut).toLocaleDateString('fr-FR')}</span>
+              )}
+              {categorie && (
+                <span>• {categorie}</span>
+              )}
+              {statut && (
+                <span>• {getStatusLabel(statut)}</span>
+              )}
+            </div>
+          </div>
+        );
+      },
+      size: 200,
+      minSize: 120,
+      maxSize: 300,
+      enableResizing: true,
     }),
     columnHelper.accessor("dateDebut", {
       header: "Date de début",

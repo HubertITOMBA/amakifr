@@ -84,7 +84,8 @@ export default function RootLayout({
             <ToastProvider />
             <Toaster richColors position="top-right" />
             <ReactToastifyProvider />
-            <SessionAutoSignout />
+            {/* TODO: Réactiver la déconnexion automatique après le développement */}
+            {/* <SessionAutoSignout /> */}
             <InstallPrompt />
           </ThemeProvider>
         </AuthSessionProvider>

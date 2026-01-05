@@ -133,13 +133,53 @@ export default function AdminDepensesPage() {
     if (typeof window !== "undefined") {
       try {
         const saved = localStorage.getItem("admin-depenses-column-visibility");
-        if (saved) return JSON.parse(saved);
+        if (saved) {
+          const parsed = JSON.parse(saved);
+          if (Object.keys(parsed).length > 0) {
+            return parsed;
+          }
+        }
+        // Par défaut sur mobile, masquer les colonnes non essentielles
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+          return {
+            categorie: false,
+            typeDepenseId: false,
+            dateDepense: false,
+            statut: false,
+            description: false,
+            createdAt: false,
+            // Garder visible : libelle, montant, actions (si présente)
+          };
+        }
       } catch (error) {
         console.error("Erreur lors du chargement des préférences:", error);
       }
     }
     return {};
   });
+
+  // Détecter les changements de taille d'écran
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      const saved = localStorage.getItem("admin-depenses-column-visibility");
+      
+      if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+        setColumnVisibility({
+          categorie: false,
+          typeDepenseId: false,
+          dateDepense: false,
+          statut: false,
+          description: false,
+          createdAt: false,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Debounce pour la recherche
   useEffect(() => {
@@ -426,13 +466,30 @@ export default function AdminDepensesPage() {
     }),
     columnHelper.accessor("libelle", {
       header: "Libellé",
-      cell: ({ row }) => (
-        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-          {row.getValue("libelle")}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const libelle = row.getValue("libelle") as string;
+        const type = row.original.TypeDepense;
+        const categorie = row.original.categorie;
+        const statut = row.original.statut;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+              {libelle}
+            </span>
+            {/* Afficher le type et statut en petit sur mobile */}
+            <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden ml-0 font-normal flex items-center gap-2">
+              {(type?.titre || categorie) && (
+                <span>{type?.titre || categorie}</span>
+              )}
+              {statut && (
+                <span className="text-xs">• {statut}</span>
+              )}
+            </div>
+          </div>
+        );
+      },
       size: 200,
-      minSize: 150,
+      minSize: 120,
       maxSize: 300,
       enableResizing: true,
     }),
@@ -454,13 +511,25 @@ export default function AdminDepensesPage() {
     }),
     columnHelper.accessor("montant", {
       header: "Montant",
-      cell: ({ row }) => (
-        <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
-          {Number(row.getValue("montant")).toFixed(2).replace('.', ',')} €
-        </span>
-      ),
+      cell: ({ row }) => {
+        const montant = Number(row.getValue("montant"));
+        const dateDepense = row.original.dateDepense;
+        return (
+          <div className="flex flex-col gap-0.5">
+            <span className="text-sm font-bold text-gray-900 dark:text-gray-100">
+              {montant.toFixed(2).replace('.', ',')} €
+            </span>
+            {/* Afficher la date en petit sur mobile */}
+            {dateDepense && (
+              <span className="text-xs text-gray-500 dark:text-gray-400 md:hidden font-normal">
+                {format(new Date(dateDepense), "d MMM yyyy", { locale: fr })}
+              </span>
+            )}
+          </div>
+        );
+      },
       size: 120,
-      minSize: 100,
+      minSize: 90,
       maxSize: 150,
       enableResizing: true,
     }),

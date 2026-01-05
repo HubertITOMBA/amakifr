@@ -28,7 +28,7 @@ export const CardWrapper = ({
     }: CardWrapperProps ) => {
 
 return (
-    <Card className="w-full max-w-[400px] shadow-2xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 rounded-xl animate-in fade-in-0 zoom-in-95 duration-300">
+    <Card className="w-full max-w-[95vw] sm:max-w-[400px] shadow-2xl bg-white/95 dark:bg-gray-900/95 backdrop-blur-md border-2 border-gray-200 dark:border-gray-700 rounded-xl animate-in fade-in-0 zoom-in-95 duration-300">
         <CardHeader className="pb-3">
             <Header  label={headerLabel} labelBox={labelBox}/>
         </CardHeader>
