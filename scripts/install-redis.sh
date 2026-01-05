@@ -52,7 +52,25 @@ elif [[ "$OS" == "centos" ]] || [[ "$OS" == "rhel" ]] || [[ "$OS" == "fedora" ]]
     if [[ "$OS" == "fedora" ]]; then
         sudo dnf install -y redis
     else
-        sudo yum install -y redis
+        # Pour CentOS/RHEL, installer EPEL d'abord si nécessaire
+        if ! rpm -qa | grep -q epel-release; then
+            echo -e "${BLUE}📦 Installation d'EPEL (requis pour Redis)...${NC}"
+            # Détecter la version de CentOS/RHEL
+            if [[ "$VER" == "8" ]] || [[ "$VER" == "9" ]] || [[ "$VER" == "10" ]]; then
+                # CentOS 8/9/10 ou RHEL 8/9/10
+                sudo dnf install -y epel-release
+            else
+                # CentOS 7 ou versions antérieures
+                sudo yum install -y epel-release
+            fi
+        fi
+        
+        # Installer Redis
+        if command -v dnf &> /dev/null; then
+            sudo dnf install -y redis
+        else
+            sudo yum install -y redis
+        fi
     fi
 else
     echo -e "${RED}❌ Système d'exploitation non supporté: $OS${NC}"
