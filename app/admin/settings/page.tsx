@@ -23,15 +23,22 @@ import {
   Bell,
   Globe,
   Eye,
-  EyeOff
+  EyeOff,
+  Users,
+  LogOut,
+  RefreshCw
 } from "lucide-react";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { useSession } from "next-auth/react";
 import { getEmailProviderFromDB, updateEmailProvider } from "@/actions/admin/settings";
 import type { EmailProvider } from "@/lib/email/providers/types";
+import { getAllSessions, revokeSessionAction, revokeAllUserSessionsAction } from "@/actions/sessions";
+import type { UserSession } from "@/lib/session-tracker";
 
 export default function AdminSettingsPage() {
+  const { data: session } = useSession();
   const [activeTab, setActiveTab] = useState("general");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -70,10 +77,29 @@ export default function AdminSettingsPage() {
   // Statistiques système
   const [systemStats, setSystemStats] = useState<any>(null);
 
+  // Sessions actives
+  const [sessions, setSessions] = useState<UserSession[]>([]);
+  const [loadingSessions, setLoadingSessions] = useState(false);
+
   useEffect(() => {
     loadSettings();
     loadSystemStats();
     loadEmailProvider();
+    if (activeTab === "sessions") {
+      loadSessions();
+    }
+  }, [activeTab]);
+
+  // Tracker la session actuelle au chargement
+  useEffect(() => {
+    const trackCurrentSession = async () => {
+      try {
+        await fetch("/api/sessions/track", { method: "POST" });
+      } catch (error) {
+        // Ignorer silencieusement
+      }
+    };
+    trackCurrentSession();
   }, []);
 
   const loadEmailProvider = async () => {
@@ -85,6 +111,86 @@ export default function AdminSettingsPage() {
     } catch (error) {
       console.error("Erreur lors du chargement du provider email:", error);
     }
+  };
+
+  const loadSessions = async () => {
+    try {
+      setLoadingSessions(true);
+      const result = await getAllSessions();
+      if (result.success && result.sessions) {
+        // Marquer la session actuelle
+        const currentSessionId = (session?.user as any)?.sessionId;
+        const sessionsWithCurrent = result.sessions.map((s) => ({
+          ...s,
+          isCurrentSession: s.sessionId === currentSessionId,
+        }));
+        setSessions(sessionsWithCurrent);
+      } else {
+        toast.error(result.error || "Erreur lors du chargement des sessions");
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement des sessions:", error);
+      toast.error("Erreur lors du chargement des sessions");
+    } finally {
+      setLoadingSessions(false);
+    }
+  };
+
+  const handleRevokeSession = async (userId: string, sessionId: string) => {
+    try {
+      const result = await revokeSessionAction(userId, sessionId);
+      if (result.success) {
+        toast.success(result.message || "Session déconnectée avec succès");
+        await loadSessions();
+      } else {
+        toast.error(result.error || "Erreur lors de la déconnexion");
+      }
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion de la session:", error);
+      toast.error("Erreur lors de la déconnexion de la session");
+    }
+  };
+
+  const handleRevokeAllSessions = async (userId: string) => {
+    if (!confirm("Êtes-vous sûr de vouloir déconnecter toutes les sessions de cet utilisateur ?")) {
+      return;
+    }
+
+    try {
+      const result = await revokeAllUserSessionsAction(userId);
+      if (result.success) {
+        toast.success(result.message || "Toutes les sessions ont été déconnectées");
+        await loadSessions();
+      } else {
+        toast.error(result.error || "Erreur lors de la déconnexion");
+      }
+    } catch (error) {
+      console.error("Erreur lors de la déconnexion des sessions:", error);
+      toast.error("Erreur lors de la déconnexion des sessions");
+    }
+  };
+
+  const formatDate = (timestamp: number) => {
+    return new Date(timestamp).toLocaleString("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  };
+
+  const getTimeAgo = (timestamp: number) => {
+    const now = Date.now();
+    const diff = now - timestamp;
+    const minutes = Math.floor(diff / 60000);
+    const hours = Math.floor(minutes / 60);
+    const days = Math.floor(hours / 24);
+
+    if (days > 0) return `Il y a ${days} jour${days > 1 ? "s" : ""}`;
+    if (hours > 0) return `Il y a ${hours} heure${hours > 1 ? "s" : ""}`;
+    if (minutes > 0) return `Il y a ${minutes} minute${minutes > 1 ? "s" : ""}`;
+    return "À l'instant";
   };
 
   const loadSettings = () => {
@@ -190,7 +296,7 @@ export default function AdminSettingsPage() {
 
       {/* Onglets */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-6">
           <TabsTrigger value="general">
             <Globe className="h-4 w-4 mr-2" />
             Général
@@ -210,6 +316,10 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="system">
             <Database className="h-4 w-4 mr-2" />
             Système
+          </TabsTrigger>
+          <TabsTrigger value="sessions">
+            <Users className="h-4 w-4 mr-2" />
+            Sessions
           </TabsTrigger>
         </TabsList>
 
@@ -643,6 +753,108 @@ export default function AdminSettingsPage() {
                   </Button>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Onglet Sessions */}
+        <TabsContent value="sessions" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="flex items-center justify-between">
+                <div>
+                  <CardTitle>Sessions actives</CardTitle>
+                  <CardDescription>
+                    Gérer les sessions des utilisateurs connectés
+                  </CardDescription>
+                </div>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadSessions}
+                  disabled={loadingSessions}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loadingSessions ? "animate-spin" : ""}`} />
+                  Actualiser
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent>
+              {loadingSessions ? (
+                <div className="flex items-center justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                </div>
+              ) : sessions.length === 0 ? (
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Aucune session active trouvée. Les sessions sont trackées uniquement si Redis est configuré.
+                  </AlertDescription>
+                </Alert>
+              ) : (
+                <div className="space-y-4">
+                  <div className="text-sm text-gray-600 dark:text-gray-400">
+                    {sessions.length} session(s) active(s)
+                  </div>
+                  <div className="space-y-3">
+                    {sessions.map((session) => (
+                      <Card key={session.sessionId} className="border-l-4 border-l-blue-500">
+                        <CardContent className="pt-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-center gap-2">
+                                <span className="font-semibold">{session.userName}</span>
+                                <Badge variant="outline">{session.userEmail}</Badge>
+                                {session.isCurrentSession && (
+                                  <Badge variant="default">Session actuelle</Badge>
+                                )}
+                              </div>
+                              <div className="grid grid-cols-2 gap-4 text-sm text-gray-600 dark:text-gray-400">
+                                <div>
+                                  <span className="font-medium">IP:</span> {session.ipAddress}
+                                </div>
+                                <div>
+                                  <span className="font-medium">Dernière activité:</span> {getTimeAgo(session.lastActivity)}
+                                </div>
+                                <div>
+                                  <span className="font-medium">Créée le:</span> {formatDate(session.createdAt)}
+                                </div>
+                                <div>
+                                  <span className="font-medium">Appareil:</span>{" "}
+                                  <span className="text-xs">{session.userAgent.substring(0, 50)}...</span>
+                                </div>
+                              </div>
+                              <div className="text-xs text-gray-500 dark:text-gray-500">
+                                Session ID: {session.sessionId.substring(0, 20)}...
+                              </div>
+                            </div>
+                            <div className="flex flex-col gap-2 ml-4">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRevokeSession(session.userId, session.sessionId)}
+                                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                              >
+                                <LogOut className="h-4 w-4 mr-2" />
+                                Déconnecter
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => handleRevokeAllSessions(session.userId)}
+                                className="text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-900/20"
+                              >
+                                <LogOut className="h-4 w-4 mr-2" />
+                                Tout déconnecter
+                              </Button>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

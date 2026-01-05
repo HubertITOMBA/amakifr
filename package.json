@@ -86,6 +86,7 @@
     "formidable": "^3.5.4",
     "framer-motion": "^12.23.24",
     "html2canvas": "^1.4.1",
+    "ioredis": "^5.4.1",
     "input-otp": "^1.4.2",
     "isomorphic-dompurify": "^2.33.0",
     "jspdf": "^3.0.3",
@@ -116,7 +117,6 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
-    "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20.19.25",
     "@types/nodemailer": "^6.4.14",
     "@types/qrcode.react": "^1.0.5",

@@ -93,6 +93,21 @@ else
     exit 1
 fi
 
+# Vérifier Redis (optionnel mais recommandé)
+echo -e "${BLUE}🔍 Vérification de Redis...${NC}"
+if command -v redis-cli &> /dev/null; then
+    if redis-cli ping &> /dev/null; then
+        echo -e "${GREEN}✅ Redis est disponible${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Redis est installé mais ne répond pas${NC}"
+        echo -e "${YELLOW}💡 Exécutez: ./scripts/install-redis.sh pour installer Redis${NC}"
+    fi
+else
+    echo -e "${YELLOW}⚠️  Redis n'est pas installé${NC}"
+    echo -e "${YELLOW}💡 Redis est recommandé pour le rate limiting et le cache${NC}"
+    echo -e "${YELLOW}💡 Exécutez: ./scripts/install-redis.sh pour installer Redis${NC}"
+fi
+
 # Installation des dépendances
 echo -e "${BLUE}📦 Installation des dépendances...${NC}"
 npm ci

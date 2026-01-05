@@ -1,6 +1,10 @@
 /**
- * Système de rate limiting simple en mémoire
- * Pour la production, migrer vers Redis (@upstash/ratelimit)
+ * Système de rate limiting avec Redis (fallback en mémoire)
+ * Utilise Redis si disponible, sinon utilise un stockage en mémoire
+ * 
+ * NOTE: Le middleware Next.js s'exécute dans Edge Runtime qui ne supporte pas ioredis.
+ * Le middleware utilise uniquement le fallback en mémoire.
+ * Redis est utilisé uniquement dans les Server Actions et API routes (Node.js runtime).
  */
 
 interface RateLimitStore {
@@ -8,8 +12,7 @@ interface RateLimitStore {
   resetTime: number;
 }
 
-// Stockage en mémoire (perdu au redémarrage)
-// En production, utiliser Redis
+// Stockage en mémoire (fallback si Redis n'est pas disponible ou dans Edge Runtime)
 const rateLimitStore = new Map<string, RateLimitStore>();
 
 /**
@@ -26,19 +29,75 @@ const defaultConfig: RateLimitConfig = {
 };
 
 /**
+ * Détecte si on est dans Edge Runtime
+ */
+function isEdgeRuntime(): boolean {
+  // Edge Runtime n'a pas process.versions.node
+  return typeof process === 'undefined' || !process.versions?.node;
+}
+
+/**
  * Vérifie si une requête est autorisée selon le rate limit
+ * Utilise Redis si disponible (Node.js runtime uniquement), sinon utilise un stockage en mémoire
  * 
  * @param identifier - Identifiant unique (IP, userId, etc.)
  * @param config - Configuration du rate limit
  * @returns true si autorisé, false si limité
  */
-export function checkRateLimit(
+export async function checkRateLimit(
   identifier: string,
   config: Partial<RateLimitConfig> = {}
-): { allowed: boolean; remaining: number; resetTime: number } {
+): Promise<{ allowed: boolean; remaining: number; resetTime: number }> {
   const finalConfig = { ...defaultConfig, ...config };
   const now = Date.now();
   
+  // Essayer d'utiliser Redis si disponible (uniquement dans Node.js runtime, pas dans Edge Runtime)
+  // Le middleware Next.js s'exécute dans Edge Runtime qui ne supporte pas ioredis
+  if (!isEdgeRuntime()) {
+    try {
+      // Import dynamique pour éviter les erreurs dans Edge Runtime
+      const { getRedisClient } = await import('./redis');
+      const redisClient = getRedisClient();
+      
+      if (redisClient) {
+        try {
+          const key = `ratelimit:${identifier}`;
+          const windowSeconds = Math.ceil(finalConfig.windowMs / 1000);
+          
+          // Utiliser INCR avec EXPIRE pour un rate limiting atomique
+          const count = await redisClient.incr(key);
+          
+          // Si c'est la première requête dans cette fenêtre, définir le TTL
+          if (count === 1) {
+            await redisClient.expire(key, windowSeconds);
+          }
+          
+          // Vérifier si le TTL existe (si count > 1 mais pas de TTL, le définir)
+          const ttl = await redisClient.ttl(key);
+          if (ttl === -1) {
+            await redisClient.expire(key, windowSeconds);
+          }
+          
+          const allowed = count <= finalConfig.maxRequests;
+          const resetTime = now + (ttl > 0 ? ttl * 1000 : finalConfig.windowMs);
+          
+          return {
+            allowed,
+            remaining: Math.max(0, finalConfig.maxRequests - count),
+            resetTime,
+          };
+        } catch (error) {
+          // En cas d'erreur Redis, fallback en mémoire
+          console.warn('[RateLimit] Erreur Redis, fallback en mémoire:', error);
+        }
+      }
+    } catch (error) {
+      // Ignorer les erreurs d'import dans Edge Runtime
+      // console.warn('[RateLimit] Impossible d'importer Redis:', error);
+    }
+  }
+  
+  // Fallback en mémoire (utilisé dans Edge Runtime ou si Redis n'est pas disponible)
   const stored = rateLimitStore.get(identifier);
   
   // Si pas de stockage ou fenêtre expirée, réinitialiser
@@ -108,7 +167,7 @@ export const rateLimitPresets = {
 /**
  * Helper pour obtenir l'identifiant depuis une requête
  */
-export function getRateLimitIdentifier(request: NextRequest): string {
+export function getRateLimitIdentifier(request: { headers: Headers; ip?: string | null }): string {
   // Priorité: userId > IP
   // Pour l'instant, on utilise l'IP
   // TODO: Utiliser userId si disponible dans la session
@@ -117,4 +176,3 @@ export function getRateLimitIdentifier(request: NextRequest): string {
   
   return ip;
 }
-

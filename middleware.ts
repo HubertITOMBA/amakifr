@@ -10,7 +10,7 @@ import {
     isPublicRoute,
   } from "@/routes";
 
-export default auth((req: NextRequest) => {
+export default auth(async (req: NextRequest) => {
     const { nextUrl } = req;
     const isApiAuthRoute = nextUrl.pathname.startsWith(apiAuthPrefix);
     
@@ -38,7 +38,9 @@ export default auth((req: NextRequest) => {
     const hasAuthCookies = req.cookies.has('next-auth.session-token') || 
                            req.cookies.has('__Secure-next-auth.session-token') ||
                            req.cookies.has('authjs.session-token') ||
-                           req.cookies.has('authjs.csrf-token');
+                           req.cookies.has('authjs.csrf-token') ||
+                           req.cookies.has('next-auth.pkce.code_verifier') ||
+                           req.cookies.has('__Secure-next-auth.pkce.code_verifier');
     
     // req.auth peut être undefined si les cookies sont invalides (ancien secret, domaine différent)
     // Dans ce cas, NextAuth logge l'erreur mais continue l'exécution
@@ -83,11 +85,13 @@ export default auth((req: NextRequest) => {
     if (hasAuthCookies && !req.auth && !isAuthRoute && !isPublicRouteCheck && !isAuthCallbackRoute && 
         nextUrl.pathname !== '/' && !isJustLoggedIn) {
         const response = NextResponse.next();
+        // Ne supprimer que les cookies de session, PAS les cookies PKCE (ils sont nécessaires pour le flux OAuth)
         response.cookies.set('next-auth.session-token', '', { expires: new Date(0), path: '/' });
         response.cookies.set('__Secure-next-auth.session-token', '', { expires: new Date(0), path: '/' });
         response.cookies.set('next-auth.csrf-token', '', { expires: new Date(0), path: '/' });
         response.cookies.set('authjs.session-token', '', { expires: new Date(0), path: '/' });
         response.cookies.set('authjs.csrf-token', '', { expires: new Date(0), path: '/' });
+        // NE PAS supprimer les cookies PKCE ici car ils sont nécessaires pour le flux OAuth
         return addSecurityHeaders(response, req);
     }
     
@@ -105,7 +109,8 @@ export default auth((req: NextRequest) => {
         }
         
         const identifier = getRateLimitIdentifier(req);
-        const rateLimitResult = checkRateLimit(identifier, preset);
+        // checkRateLimit est maintenant async, utiliser await
+        const rateLimitResult = await checkRateLimit(identifier, preset);
         
         if (!rateLimitResult.allowed) {
             const response = NextResponse.json(
