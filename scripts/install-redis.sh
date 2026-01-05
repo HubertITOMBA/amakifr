@@ -2,6 +2,16 @@
 
 # Script d'installation de Redis sur un VPS Linux
 # Supporte Ubuntu/Debian et CentOS/RHEL
+# 
+# NOTE: Sur CentOS/RHEL, si l'installation native échoue, vous pouvez utiliser Podman/Docker:
+#   sudo podman run -d --replace --name redis \
+#     -p 6380:6379 \
+#     -v /var/lib/redis:/data \
+#     --restart=always \
+#     docker.io/library/redis:8
+# 
+# Puis configurez REDIS_URL=redis://127.0.0.1:6380 dans votre .env
+#
 # Usage: ./scripts/install-redis.sh
 
 set -e
@@ -181,3 +191,20 @@ echo -e "${YELLOW}REDIS_HOST=127.0.0.1${NC}"
 echo -e "${YELLOW}REDIS_PORT=6379${NC}"
 
 echo -e "\n${GREEN}✅ Installation de Redis terminée avec succès!${NC}"
+
+# Vérifier si Redis est dans un conteneur Podman/Docker
+if command -v podman &> /dev/null; then
+    if podman ps --format "{{.Names}}" | grep -q "^redis$"; then
+        echo -e "\n${YELLOW}ℹ️  Redis est en cours d'exécution dans un conteneur Podman${NC}"
+        REDIS_PORT=$(podman port redis 6379 2>/dev/null | cut -d: -f2 || echo "6379")
+        echo -e "${YELLOW}   Port mappé: ${REDIS_PORT}${NC}"
+        echo -e "${YELLOW}   Utilisez REDIS_URL=redis://127.0.0.1:${REDIS_PORT} dans votre .env${NC}"
+    fi
+elif command -v docker &> /dev/null; then
+    if docker ps --format "{{.Names}}" | grep -q "^redis$"; then
+        echo -e "\n${YELLOW}ℹ️  Redis est en cours d'exécution dans un conteneur Docker${NC}"
+        REDIS_PORT=$(docker port redis 6379 2>/dev/null | cut -d: -f2 || echo "6379")
+        echo -e "${YELLOW}   Port mappé: ${REDIS_PORT}${NC}"
+        echo -e "${YELLOW}   Utilisez REDIS_URL=redis://127.0.0.1:${REDIS_PORT} dans votre .env${NC}"
+    fi
+fi
