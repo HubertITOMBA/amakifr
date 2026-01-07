@@ -14,6 +14,7 @@ import { Toaster } from "sonner";
 import SessionAutoSignout from "@/components/SessionAutoSignout";
 import { ReactToastifyProvider } from "@/components/providers/react-toastify-provider";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
+import { ChatBotProvider } from "@/components/user/ChatBotProvider";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -87,6 +88,7 @@ export default function RootLayout({
             {/* TODO: Réactiver la déconnexion automatique après le développement */}
             {/* <SessionAutoSignout /> */}
             <InstallPrompt />
+            <ChatBotProvider />
           </ThemeProvider>
         </AuthSessionProvider>
       </body>
