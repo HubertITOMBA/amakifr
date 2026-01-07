@@ -18,7 +18,6 @@ const navigation = [
   { name: "L'amicale", href: '/amicale' },
   { name: 'Election', href: '/extrat' },
   { name: 'Evénements', href: '/evenements' },
- 
   { name: 'Galerie', href: '/galerie' },
   // { name: 'Upload', href: '/upload' },
   { name: 'Contact', href: '/contact' },

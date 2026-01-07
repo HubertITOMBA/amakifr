@@ -119,6 +119,12 @@ const adminMenuItems = [
     description: "Gérer tous les documents des utilisateurs"
   },
   {
+    title: "Rapports de Réunion",
+    href: "/admin/rapports-reunion",
+    icon: FileText,
+    description: "Gérer les rapports de réunions mensuelles"
+  },
+  {
     title: "Exports",
     href: "/admin/exports",
     icon: FileText,

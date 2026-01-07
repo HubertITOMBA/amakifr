@@ -208,6 +208,8 @@ model User {
   ressourcesCreees            Ressource[]                  @relation("RessourceCreatedBy") // Ressources créées
   reservationsConfirmees      Reservation[]                @relation("ReservationConfirmeePar") // Réservations confirmées
   mediaGalerieCrees           MediaGalerie[]               @relation("MediaGalerieCreatedBy") // Médias de galerie créés
+  rapportsReunionCrees        RapportReunion[]             @relation("RapportReunionCreatedBy") // Rapports de réunion créés
+  rapportsReunionModifies     RapportReunion[]             @relation("RapportReunionUpdatedBy") // Rapports de réunion modifiés
 
   lastLogin DateTime? @updatedAt
   createdAt DateTime  @default(now())
@@ -1316,6 +1318,27 @@ model Document {
   @@index([type])
   @@index([createdAt])
   @@map("documents")
+}
+
+// Modèle pour les rapports de réunions mensuelles
+model RapportReunion {
+  id          String   @id @default(cuid())
+  titre       String   @db.VarChar(255) // Titre du rapport (ex: "Réunion mensuelle - Janvier 2024")
+  dateReunion DateTime // Date de la réunion
+  contenu     String   @db.Text // Contenu du rapport (markdown ou texte)
+  createdBy   String   // Admin qui a créé le rapport
+  updatedBy   String?  // Admin qui a modifié le rapport
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  CreatedBy User @relation("RapportReunionCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  UpdatedBy User? @relation("RapportReunionUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+
+  @@index([dateReunion])
+  @@index([createdAt])
+  @@index([createdBy])
+  @@map("rapports_reunion")
 }
 
 // Modèles pour le système de réservations et gestion de ressources

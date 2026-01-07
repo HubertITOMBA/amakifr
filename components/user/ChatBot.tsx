@@ -43,7 +43,7 @@ export function ChatBot() {
         content: welcomeMessages[Math.floor(Math.random() * welcomeMessages.length)] + '\n\n' + 
                  quickHelpMessages[0] + '\n\n' +
                  chatbotGuides.slice(0, 5).map(g => `• ${g.title}`).join('\n') +
-                 '\n\nPosez-moi une question et je vous guiderai étape par étape !',
+                 '\n\nN\'hésitez pas à me poser une question, je suis là pour vous aider !',
         timestamp: new Date()
       };
       setMessages([welcomeMessage]);
@@ -52,11 +52,14 @@ export function ChatBot() {
 
   // Scroll automatique vers le bas quand de nouveaux messages arrivent
   useEffect(() => {
-    if (scrollAreaRef.current) {
-      const scrollContainer = scrollAreaRef.current.querySelector('[data-radix-scroll-area-viewport]');
-      if (scrollContainer) {
-        scrollContainer.scrollTop = scrollContainer.scrollHeight;
-      }
+    if (scrollAreaRef.current && messages.length > 0) {
+      // Utiliser requestAnimationFrame pour s'assurer que le DOM est mis à jour
+      requestAnimationFrame(() => {
+        const scrollContainer = scrollAreaRef.current?.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement;
+        if (scrollContainer) {
+          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+        }
+      });
     }
   }, [messages]);
 
@@ -70,11 +73,13 @@ export function ChatBot() {
   const handleSendMessage = () => {
     if (!inputValue.trim()) return;
 
+    const question = inputValue.trim();
+    
     // Ajouter le message de l'utilisateur
     const userMessage: ChatMessage = {
       id: `user-${Date.now()}`,
       type: 'user',
-      content: inputValue.trim(),
+      content: question,
       timestamp: new Date()
     };
 
@@ -84,17 +89,34 @@ export function ChatBot() {
 
     // Simuler un délai de réponse du bot
     setTimeout(() => {
-      const response = generateBotResponse(userMessage.content);
-      const botMessage: ChatMessage = {
-        id: `bot-${Date.now()}`,
-        type: 'bot',
-        content: response.message,
-        timestamp: new Date(),
-        actions: response.guide?.actions
-      };
-      
-      setMessages(prev => [...prev, botMessage]);
-      setIsTyping(false);
+      try {
+        const response = generateBotResponse(question);
+        
+        if (!response || !response.message) {
+          throw new Error('Réponse invalide du bot');
+        }
+        
+        const botMessage: ChatMessage = {
+          id: `bot-${Date.now()}`,
+          type: 'bot',
+          content: response.message,
+          timestamp: new Date(),
+          actions: response.guide?.actions
+        };
+        
+        setMessages(prev => [...prev, botMessage]);
+      } catch (error) {
+        console.error('Erreur lors de la génération de la réponse:', error);
+        const errorMessage: ChatMessage = {
+          id: `bot-error-${Date.now()}`,
+          type: 'bot',
+          content: 'Désolé, une erreur est survenue. Pouvez-vous reformuler votre question ?\n\nJe suis Amaki et je peux vous aider avec :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport',
+          timestamp: new Date()
+        };
+        setMessages(prev => [...prev, errorMessage]);
+      } finally {
+        setIsTyping(false);
+      }
     }, 800);
   };
 
@@ -124,7 +146,7 @@ export function ChatBot() {
             setIsMinimized(false);
           }}
           className="h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 flex items-center justify-center"
-          title="Ouvrir l'assistant"
+          title="Ouvrir Amaki - Votre assistant"
         >
           <MessageSquare className="h-6 w-6" />
         </Button>
@@ -138,14 +160,14 @@ export function ChatBot() {
     }`}>
       <Card className={`shadow-2xl border-blue-200 dark:border-blue-800 ${
         isMinimized ? 'h-auto' : 'h-[600px]'
-      } flex flex-col`}>
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white pb-3 pt-3 px-4 flex flex-row items-center justify-between">
+      } flex flex-col !py-0`}>
+        <CardHeader className="!py-0 bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white pb-3 pt-3 px-4 flex flex-row items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="h-8 w-8 rounded-full bg-white/20 flex items-center justify-center">
               <Bot className="h-5 w-5 text-white" />
             </div>
             <CardTitle className="text-base font-semibold text-white">
-              Assistant Virtuel
+              Amaki - Votre Assistant
             </CardTitle>
           </div>
           <div className="flex items-center gap-1">
@@ -177,9 +199,9 @@ export function ChatBot() {
         
         {!isMinimized && (
           <>
-            <CardContent className="flex-1 flex flex-col p-0 overflow-hidden">
-              <ScrollArea className="flex-1 px-4 py-3" ref={scrollAreaRef}>
-                <div className="space-y-4">
+            <CardContent className="flex-1 flex flex-col p-0 overflow-hidden min-h-0">
+              <ScrollArea className="flex-1 px-4 py-3 min-h-0" ref={scrollAreaRef}>
+                <div className="space-y-4 pb-2">
                   {messages.map((message) => (
                     <div
                       key={message.id}
@@ -268,6 +290,9 @@ export function ChatBot() {
                 </div>
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 text-center">
                   Exemples : "Comment modifier mon mot de passe ?", "Comment payer ma cotisation ?"
+                </p>
+                <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 text-center font-medium">
+                  💬 Amaki est là pour vous aider !
                 </p>
               </div>
             </CardContent>

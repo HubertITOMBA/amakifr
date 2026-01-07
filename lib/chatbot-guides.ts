@@ -30,7 +30,7 @@ export interface Guide {
  */
 export const chatbotGuides: Guide[] = [
   {
-    keywords: ['mot de passe', 'password', 'changer mot de passe', 'modifier mot de passe', 'oublié mot de passe', 'reset password'],
+    keywords: ['mot de passe', 'password', 'changer mot de passe', 'modifier mot de passe', 'oublié mot de passe', 'reset password', 'mdp', 'changer mdp', 'modifier mdp', 'mot passe'],
     title: 'Comment modifier mon mot de passe',
     steps: [
       'Cliquez sur votre nom ou photo en haut à droite de l\'écran',
@@ -48,7 +48,7 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
-    keywords: ['cotisation', 'payer cotisation', 'paiement cotisation', 'cotisation mensuelle', 'payer', 'paiement'],
+    keywords: ['cotisation', 'payer cotisation', 'paiement cotisation', 'cotisation mensuelle', 'payer', 'paiement', 'cotiser', 'verser', 'régler', 'payer ma cotisation', 'comment payer'],
     title: 'Comment payer ma cotisation',
     steps: [
       'Allez dans "Mon Profil" > "Mes Cotisations"',
@@ -66,7 +66,7 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
-    keywords: ['photo', 'avatar', 'image profil', 'changer photo', 'modifier photo', 'photo profil'],
+    keywords: ['photo', 'avatar', 'image profil', 'changer photo', 'modifier photo', 'photo profil', 'image', 'photo de profil', 'changer ma photo', 'modifier ma photo'],
     title: 'Comment modifier ma photo de profil',
     steps: [
       'Allez dans "Mon Profil"',
@@ -99,7 +99,7 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
-    keywords: ['profil', 'modifier profil', 'éditer profil', 'mettre à jour profil', 'informations personnelles'],
+    keywords: ['profil', 'modifier profil', 'éditer profil', 'mettre à jour profil', 'informations personnelles', 'changer profil', 'modifier mon profil', 'éditer mon profil', 'mes informations'],
     title: 'Comment modifier mon profil',
     steps: [
       'Allez dans "Mon Profil"',
@@ -115,7 +115,7 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
-    keywords: ['passeport', 'imprimer passeport', 'télécharger passeport', 'pdf passeport'],
+    keywords: ['passeport', 'imprimer passeport', 'télécharger passeport', 'pdf passeport', 'mon passeport', 'imprimer mon passeport', 'télécharger mon passeport'],
     title: 'Comment imprimer mon passeport',
     steps: [
       'Allez dans "Mon Profil" > "Mon Passeport"',
@@ -188,10 +188,11 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
-    keywords: ['aide', 'help', 'assistance', 'support', 'comment faire'],
+    keywords: ['aide', 'help', 'assistance', 'support', 'comment faire', 'amaki', 'qui es-tu', 'présente-toi'],
     title: 'Besoin d\'aide ?',
     steps: [
-      'Je suis là pour vous aider !',
+      'Bonjour ! Je suis Amaki, votre assistant virtuel sur la plateforme AMAKI France.',
+      'Je suis là pour vous aider à naviguer et utiliser toutes les fonctionnalités de la plateforme.',
       'Vous pouvez me poser des questions sur :',
       '• Comment modifier votre mot de passe',
       '• Comment payer vos cotisations',
@@ -213,19 +214,40 @@ export const chatbotGuides: Guide[] = [
 export function findGuideForQuestion(question: string): Guide | null {
   const questionLower = question.toLowerCase().trim();
   
+  // Si la question est vide, retourner null
+  if (!questionLower) {
+    return null;
+  }
+  
   // Chercher le guide avec le plus de mots-clés correspondants
   let bestMatch: Guide | null = null;
   let bestScore = 0;
   
   for (const guide of chatbotGuides) {
-    const score = guide.keywords.filter(keyword => 
-      questionLower.includes(keyword.toLowerCase())
-    ).length;
+    // Vérifier chaque mot-clé
+    let score = 0;
+    for (const keyword of guide.keywords) {
+      const keywordLower = keyword.toLowerCase();
+      // Vérifier si le mot-clé est présent dans la question
+      if (questionLower.includes(keywordLower)) {
+        score++;
+        // Bonus si le mot-clé correspond exactement ou est au début
+        if (questionLower.startsWith(keywordLower) || questionLower === keywordLower) {
+          score += 2;
+        }
+      }
+    }
     
     if (score > bestScore) {
       bestScore = score;
       bestMatch = guide;
     }
+  }
+  
+  // Si aucun match n'a été trouvé avec un score > 0, retourner le guide d'aide par défaut
+  if (bestScore === 0) {
+    // Chercher le guide d'aide
+    return chatbotGuides.find(g => g.keywords.includes('aide')) || null;
   }
   
   return bestMatch;
@@ -235,16 +257,22 @@ export function findGuideForQuestion(question: string): Guide | null {
  * Génère une réponse du bot basée sur une question
  */
 export function generateBotResponse(question: string): { message: string; guide?: Guide } {
+  if (!question || !question.trim()) {
+    return {
+      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\nJe peux vous aider avec :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter`
+    };
+  }
+  
   const guide = findGuideForQuestion(question);
   
   if (guide) {
-    const message = `Voici comment ${guide.title.toLowerCase()} :\n\n${guide.steps.map((step, index) => `${index + 1}. ${step}`).join('\n\n')}`;
+    const message = `Voici comment ${guide.title.toLowerCase()} :\n\n${guide.steps.map((step, index) => `${index + 1}. ${step}`).join('\n\n')}\n\nN'hésitez pas si vous avez d'autres questions !`;
     return { message, guide };
   }
   
-  // Réponse par défaut
+  // Réponse par défaut avec suggestions
   return {
-    message: `Je n'ai pas trouvé de guide spécifique pour votre question. Voici ce que je peux vous aider à faire :\n\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n\nPosez-moi une question plus précise et je vous guiderai étape par étape !`
+    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\nVoici ce que je peux vous expliquer :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n\nPosez-moi une question plus précise en utilisant des mots-clés comme "mot de passe", "cotisation", "photo", "profil", "passeport", etc. et je vous guiderai étape par étape !`
   };
 }
 
@@ -252,9 +280,10 @@ export function generateBotResponse(question: string): { message: string; guide?
  * Messages de bienvenue
  */
 export const welcomeMessages = [
-  "Bonjour ! Je suis votre assistant virtuel. Comment puis-je vous aider aujourd'hui ?",
-  "Salut ! Je suis là pour vous guider dans l'utilisation de la plateforme. Que souhaitez-vous faire ?",
-  "Bonjour ! Posez-moi une question et je vous expliquerai comment procéder étape par étape."
+  "Bonjour ! Je suis Amaki, votre assistant virtuel. Je suis là pour vous aider à naviguer sur la plateforme. Comment puis-je vous assister aujourd'hui ?",
+  "Salut ! Moi c'est Amaki. Je suis là pour vous guider dans l'utilisation de la plateforme AMAKI France. Que souhaitez-vous faire ?",
+  "Bonjour ! Je suis Amaki, votre assistant. Posez-moi une question et je vous expliquerai comment procéder étape par étape.",
+  "Bonjour ! Amaki à votre service. Je peux vous aider avec toutes vos questions sur la plateforme. Que puis-je faire pour vous ?"
 ];
 
 /**
