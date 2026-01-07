@@ -15,7 +15,6 @@ import {
   Plus,
   Search,
   Filter,
-  Trash2,
   X,
   Send,
   Users,
@@ -31,7 +30,6 @@ import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
 import {
   getAllEmails,
-  deleteEmail,
   sendEmails,
 } from "@/actions/emails";
 import { ViewEmailDialog } from "./ViewEmailDialog";
@@ -134,19 +132,6 @@ export default function AdminEmailsPage() {
     }
   };
 
-  const handleDelete = async (emailId: string) => {
-    if (!confirm("Êtes-vous sûr de vouloir supprimer cet email de l'historique ?")) {
-      return;
-    }
-
-    const result = await deleteEmail(emailId);
-    if (result.success) {
-      setEmails((prev) => prev.filter((e) => e.id !== emailId));
-      toast.success("Email supprimé de l'historique");
-    } else {
-      toast.error(result.error || "Erreur");
-    }
-  };
 
   const filteredEmails = emails.filter((email) => {
     if (searchTerm) {
@@ -439,18 +424,7 @@ export default function AdminEmailsPage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-center">
-                              <div className="flex items-center justify-center gap-1">
-                                <ViewEmailDialog email={email} />
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => handleDelete(email.id)}
-                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                  title="Supprimer"
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
-                              </div>
+                              <ViewEmailDialog email={email} />
                             </TableCell>
                           </TableRow>
                         ));

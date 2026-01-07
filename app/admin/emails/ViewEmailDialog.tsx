@@ -1,5 +1,6 @@
 "use client";
 
+import { useState } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -48,8 +49,9 @@ export function ViewEmailDialog({
   onOpenChange, 
   triggerButton 
 }: ViewEmailDialogProps) {
-  const open = controlledOpen !== undefined ? controlledOpen : false;
-  const setOpen = onOpenChange || (() => {});
+  const [internalOpen, setInternalOpen] = useState(false);
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = onOpenChange || setInternalOpen;
 
   const recipientName = email.User?.adherent
     ? `${email.User.adherent.firstname || ""} ${email.User.adherent.lastname || ""}`.trim() || email.User?.name || "—"
