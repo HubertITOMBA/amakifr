@@ -43,7 +43,8 @@ import {
   ChevronsLeft,
   ChevronsRight,
   FileText,
-  X
+  X,
+  MoreHorizontal
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAdherentsWithCotisations, createManualCotisation, updateCotisation } from "@/actions/cotisations";
@@ -53,6 +54,14 @@ import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 interface AdherentWithCotisations {
   id: string;
@@ -97,7 +106,24 @@ export default function AdminCotisationManagement() {
       try {
         const saved = localStorage.getItem("admin-cotisations-column-visibility");
         if (saved) {
-          return JSON.parse(saved);
+          const parsed = JSON.parse(saved);
+          if (Object.keys(parsed).length > 0) {
+            return parsed;
+          }
+        }
+        // Par défaut sur mobile, masquer les colonnes non essentielles
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) {
+          return {
+            civility: false,
+            status: false,
+            totalDette: false,
+            moisDeRetard: false,
+            forfaitMoisCourant: false,
+            assistanceMoisCourant: false,
+            totalAvoirs: false,
+            // Garder visible : name, montantAPayerPourAnnulerDette, actions
+          };
         }
       } catch (error) {
         console.error("Erreur lors du chargement des préférences de colonnes:", error);
@@ -105,6 +131,29 @@ export default function AdminCotisationManagement() {
     }
     return {};
   });
+
+  // Détecter les changements de taille d'écran
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      const saved = localStorage.getItem("admin-cotisations-column-visibility");
+      
+      if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+        setColumnVisibility({
+          civility: false,
+          status: false,
+          totalDette: false,
+          moisDeRetard: false,
+          forfaitMoisCourant: false,
+          assistanceMoisCourant: false,
+          totalAvoirs: false,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
   const [showManualForm, setShowManualForm] = useState(false);
   const [showViewModal, setShowViewModal] = useState(false);
   const [showPaiementDialog, setShowPaiementDialog] = useState(false);
@@ -149,21 +198,52 @@ export default function AdminCotisationManagement() {
   const columns: ColumnDef<AdherentWithCotisations>[] = useMemo(
     () => [
       {
-        accessorKey: "name",
-        header: "Adhérent",
+        accessorKey: "civility",
+        header: "Civilité",
         cell: ({ row }) => {
           const adherent = row.original;
           return (
+            <div className="text-sm font-medium text-gray-900 dark:text-white">
+              {adherent.civility || "—"}
+            </div>
+          );
+        },
+      },
+      {
+        accessorKey: "name",
+        header: "Nom complet",
+        cell: ({ row }) => {
+          const adherent = row.original;
+          const status = adherent.User.status;
+          const mois = adherent.moisDeRetard;
+          return (
             <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center">
+              <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center flex-shrink-0">
                 <span className="text-xs font-medium text-blue-600 dark:text-blue-300">
                   {adherent.firstname[0]}{adherent.lastname[0]}
                 </span>
               </div>
-              <div>
-                <p className="text-sm font-medium text-gray-900 dark:text-white">
-                  {adherent.civility} {adherent.firstname} {adherent.lastname}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium text-gray-900 dark:text-white truncate">
+                  {adherent.firstname} {adherent.lastname}
                 </p>
+                {/* Afficher le statut et le retard en petit sur mobile */}
+                <div className="text-xs text-gray-500 dark:text-gray-400 md:hidden flex items-center gap-2 mt-0.5 flex-wrap">
+                  <Badge 
+                    className={
+                      status === "Actif" 
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-[10px] px-1.5 py-0" 
+                        : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px] px-1.5 py-0"
+                    }
+                  >
+                    {status}
+                  </Badge>
+                  {mois > 0 && (
+                    <Badge className="bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-[10px] px-1.5 py-0">
+                      {mois} mois retard
+                    </Badge>
+                  )}
+                </div>
               </div>
             </div>
           );
@@ -254,26 +334,44 @@ export default function AdminCotisationManagement() {
         accessorKey: "montantAPayerPourAnnulerDette",
         header: "A Payer",
         cell: ({ row }) => {
+          const adherent = row.original;
           const montant = row.getValue("montantAPayerPourAnnulerDette") as number;
+          const dette = adherent.totalDette;
+          const avoirs = adherent.totalAvoirs;
           return (
             <div className="text-right">
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <div className="flex items-center justify-end gap-1 cursor-help">
-                    <span className={`text-sm font-bold ${montant > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
-                      {montant.toFixed(2).replace('.', ',')} €
+              <div className="flex flex-col gap-0.5 items-end">
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="flex items-center justify-end gap-1 cursor-help">
+                      <span className={`text-sm font-bold ${montant > 0 ? 'text-red-600 dark:text-red-400' : 'text-green-600 dark:text-green-400'}`}>
+                        {montant.toFixed(2).replace('.', ',')} €
+                      </span>
+                      {montant > 0 && (
+                        <Info className="h-3 w-3 text-gray-400 dark:text-gray-500" />
+                      )}
+                    </div>
+                  </TooltipTrigger>
+                  {montant > 0 && (
+                    <TooltipContent>
+                      <p>Pour annuler la dette</p>
+                    </TooltipContent>
+                  )}
+                </Tooltip>
+                {/* Afficher la dette totale et les avoirs en petit sur mobile */}
+                <div className="text-[10px] text-gray-500 dark:text-gray-400 md:hidden flex flex-col items-end gap-0.5">
+                  {dette > 0 && (
+                    <span className="text-red-600 dark:text-red-400">
+                      Dette: {dette.toFixed(2).replace('.', ',')} €
                     </span>
-                    {montant > 0 && (
-                      <Info className="h-3 w-3 text-gray-400 dark:text-gray-500" />
-                    )}
-                  </div>
-                </TooltipTrigger>
-                {montant > 0 && (
-                  <TooltipContent>
-                    <p>Pour annuler la dette</p>
-                  </TooltipContent>
-                )}
-              </Tooltip>
+                  )}
+                  {avoirs > 0 && (
+                    <span className="text-green-600 dark:text-green-400">
+                      Avoirs: {avoirs.toFixed(2).replace('.', ',')} €
+                    </span>
+                  )}
+                </div>
+              </div>
             </div>
           );
         },
@@ -298,81 +396,93 @@ export default function AdminCotisationManagement() {
       },
       {
         id: "actions",
-        header: "Actions",
+        header: () => <div className="text-center w-full">Actions</div>,
         meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
         cell: ({ row }) => {
           const adherent = row.original;
           return (
-            <div className="flex items-center space-x-1">
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => {
-                  setSelectedAdherent(adherent);
-                  setShowManualForm(true);
-                }}
-                className="text-blue-600 hover:text-blue-700 h-7 px-2 text-xs"
-              >
-                <Edit className="h-3 w-3 mr-1" />
-                Saisir
-              </Button>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={async () => {
-                  setLoadingDetails(true);
-                  setShowViewModal(true);
-                  try {
-                    // Récupérer les détails complets de l'adhérent
-                    const result = await getAdherentsWithCotisations();
-                    if (result.success && result.data) {
-                      const found = (result.data as unknown as AdherentWithCotisations[]).find(a => a.id === adherent.id);
-                      if (found) {
-                        setAdherentDetails(found);
+            <div className="flex items-center justify-center">
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                    title="Actions"
+                  >
+                    <MoreHorizontal className="h-4 w-4" />
+                    <span className="sr-only">Ouvrir le menu</span>
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={() => {
+                      setSelectedAdherent(adherent);
+                      setShowManualForm(true);
+                    }}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Edit className="h-4 w-4" />
+                    <span>Saisir une cotisation</span>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      setLoadingDetails(true);
+                      setShowViewModal(true);
+                      try {
+                        // Récupérer les détails complets de l'adhérent
+                        const result = await getAdherentsWithCotisations();
+                        if (result.success && result.data) {
+                          const found = (result.data as unknown as AdherentWithCotisations[]).find(a => a.id === adherent.id);
+                          if (found) {
+                            setAdherentDetails(found);
+                          }
+                        }
+                      } catch (error) {
+                        toast.error("Erreur lors du chargement des détails");
+                      } finally {
+                        setLoadingDetails(false);
                       }
-                    }
-                  } catch (error) {
-                    toast.error("Erreur lors du chargement des détails");
-                  } finally {
-                    setLoadingDetails(false);
-                  }
-                }}
-                className="text-green-600 hover:text-green-700 h-7 px-2 text-xs"
-              >
-                <Eye className="h-3 w-3 mr-1" />
-                Voir
-              </Button>
-              {adherent.enRetard && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  className="text-red-600 hover:text-red-700 h-7 px-2 text-xs"
-                >
-                  <Mail className="h-3 w-3 mr-1" />
-                  Relancer
-                </Button>
-              )}
-              {adherent.montantAPayerPourAnnulerDette > 0 && (
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    setPaiementAdherent(adherent);
-                    setPaiementFormData({
-                      montant: "", // Laisser libre pour que l'admin puisse saisir le montant qu'il souhaite
-                      datePaiement: new Date().toISOString().split('T')[0],
-                      moyenPaiement: "Especes",
-                      reference: "",
-                      description: "",
-                    });
-                    setShowPaiementDialog(true);
-                  }}
-                  className="text-purple-600 hover:text-purple-700 h-7 px-2 text-xs"
-                >
-                  <CreditCard className="h-3 w-3 mr-1" />
-                  Encaisser
-                </Button>
-              )}
+                    }}
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>Voir les détails</span>
+                  </DropdownMenuItem>
+                  {adherent.montantAPayerPourAnnulerDette > 0 && (
+                    <DropdownMenuItem
+                      onClick={() => {
+                        setPaiementAdherent(adherent);
+                        setPaiementFormData({
+                          montant: "", // Laisser libre pour que l'admin puisse saisir le montant qu'il souhaite
+                          datePaiement: new Date().toISOString().split('T')[0],
+                          moyenPaiement: "Especes",
+                          reference: "",
+                          description: "",
+                        });
+                        setShowPaiementDialog(true);
+                      }}
+                      className="flex items-center gap-2 cursor-pointer"
+                    >
+                      <CreditCard className="h-4 w-4" />
+                      <span>Encaisser un paiement</span>
+                    </DropdownMenuItem>
+                  )}
+                  {adherent.enRetard && (
+                    <>
+                      <DropdownMenuSeparator />
+                      <DropdownMenuItem
+                        className="flex items-center gap-2 cursor-pointer text-red-600 dark:text-red-400"
+                      >
+                        <Mail className="h-4 w-4" />
+                        <span>Relancer l'adhérent</span>
+                      </DropdownMenuItem>
+                    </>
+                  )}
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           );
         },
@@ -399,6 +509,12 @@ export default function AdminCotisationManagement() {
       } catch (error) {
         console.error("Erreur lors de la sauvegarde des préférences:", error);
       }
+    },
+    state: {
+      sorting,
+      columnFilters,
+      globalFilter,
+      columnVisibility,
     },
     state: {
       sorting,
@@ -611,7 +727,7 @@ export default function AdminCotisationManagement() {
                       }
                       
                       doc.setFontSize(9);
-                      doc.text(`${adherent.civility || ''} ${adherent.firstname} ${adherent.lastname}`.trim(), 20, yPos);
+                      doc.text(`${adherent.firstname} ${adherent.lastname}`.trim(), 20, yPos);
                       doc.text(`${adherent.totalDette.toFixed(2).replace('.', ',')} €`, 100, yPos);
                       doc.text(`${adherent.moisDeRetard}`, 140, yPos);
                       doc.setTextColor(adherent.enRetard ? 255 : 0, adherent.enRetard ? 0 : 200, 0);
@@ -686,23 +802,32 @@ export default function AdminCotisationManagement() {
           {/* Table */}
           <div className="rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm overflow-x-auto -mx-4 sm:mx-0">
             <div className="inline-block min-w-full align-middle px-4 sm:px-0">
-              <table className="w-full min-w-[800px]">
+              <table className="w-full min-w-0 md:min-w-[800px]">
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
                   <tr key={headerGroup.id} className="border-b bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700">
-                    {headerGroup.headers.map((header) => (
-                      <th
-                        key={header.id}
-                        className="px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider"
-                      >
-                        {header.isPlaceholder
-                          ? null
-                          : flexRender(
-                              header.column.columnDef.header,
-                              header.getContext()
-                            )}
-                      </th>
-                    ))}
+                    {headerGroup.headers.map((header) => {
+                      const columnId = header.column.id;
+                      const isVisible = header.column.getIsVisible();
+                      // Masquer certaines colonnes sur mobile
+                      const isMobileHidden = ['civility', 'status', 'totalDette', 'moisDeRetard', 'forfaitMoisCourant', 'assistanceMoisCourant', 'totalAvoirs'].includes(columnId);
+                      
+                      if (!isVisible) return null;
+                      
+                      return (
+                        <th
+                          key={header.id}
+                          className={`px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
+                        >
+                          {header.isPlaceholder
+                            ? null
+                            : flexRender(
+                                header.column.columnDef.header,
+                                header.getContext()
+                              )}
+                        </th>
+                      );
+                    })}
                   </tr>
                 ))}
               </thead>
@@ -721,11 +846,23 @@ export default function AdminCotisationManagement() {
                       cursor-pointer
                     `}
                   >
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="px-2 sm:px-3 py-2 text-xs sm:text-sm whitespace-nowrap text-gray-900 dark:text-gray-100">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
+                    {row.getVisibleCells().map((cell) => {
+                      const columnId = cell.column.id;
+                      const isVisible = cell.column.getIsVisible();
+                      // Masquer certaines colonnes sur mobile
+                      const isMobileHidden = ['civility', 'status', 'totalDette', 'moisDeRetard', 'forfaitMoisCourant', 'assistanceMoisCourant', 'totalAvoirs'].includes(columnId);
+                      
+                      if (!isVisible) return null;
+                      
+                      return (
+                        <td 
+                          key={cell.id} 
+                          className={`px-2 sm:px-3 py-2 text-xs sm:text-sm whitespace-nowrap text-gray-900 dark:text-gray-100 ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
+                        >
+                          {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                        </td>
+                      );
+                    })}
                   </tr>
                 ))}
               </tbody>
@@ -819,7 +956,7 @@ export default function AdminCotisationManagement() {
                 Saisir une Cotisation
               </DialogTitle>
               <DialogDescription className="text-sm text-gray-600 dark:text-gray-400 mt-2">
-                Pour {selectedAdherent.civility} {selectedAdherent.firstname} {selectedAdherent.lastname}
+                Pour {selectedAdherent.firstname} {selectedAdherent.lastname}
               </DialogDescription>
             </DialogHeader>
             <form onSubmit={handleManualCotisation} className="space-y-4 mt-6">
@@ -977,7 +1114,7 @@ export default function AdminCotisationManagement() {
                           Nom complet
                         </Label>
                         <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
-                          {adherentDetails.civility} {adherentDetails.firstname} {adherentDetails.lastname}
+                          {adherentDetails.firstname} {adherentDetails.lastname}
                         </div>
                       </div>
                       <div className="space-y-1">
@@ -1156,7 +1293,7 @@ export default function AdminCotisationManagement() {
             <DialogHeader>
               <DialogTitle>Encaisser un Paiement</DialogTitle>
               <DialogDescription>
-                Pour {paiementAdherent.civility} {paiementAdherent.firstname} {paiementAdherent.lastname}
+                Pour {paiementAdherent.firstname} {paiementAdherent.lastname}
               </DialogDescription>
             </DialogHeader>
             <form

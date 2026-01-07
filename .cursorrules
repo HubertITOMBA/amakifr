@@ -915,6 +915,39 @@ export default function AdminEntityPage() {
 - Inclure : compteur total, sélecteur de lignes par page, numéro de page, boutons de navigation
 - Boutons "première/dernière page" masqués sur mobile (`hidden lg:flex`)
 
+### Affichage des noms et civilités dans les listes
+
+#### Séparation civilité et nom complet
+- **OBLIGATOIRE** : Dans toutes les listes d'utilisateurs ou d'adhérents, la civilité et le nom complet doivent être dans des colonnes séparées
+- **Colonne "Civilité"** : Affiche uniquement la civilité (Monsieur, Madame, Mademoiselle, etc.)
+- **Colonne "Nom complet"** : Affiche uniquement le prénom et le nom (ex: "Hubert Itomba" et non "Monsieur Hubert Itomba")
+- **Tri** : La colonne civilité doit être triable pour permettre de filtrer par type de civilité
+- **Format** : `{firstname} {lastname}` sans la civilité dans la colonne nom complet
+
+#### Exemple d'implémentation
+```typescript
+// ❌ INCORRECT - Civilité avec le nom
+{adherent.civility} {adherent.firstname} {adherent.lastname}
+
+// ✅ CORRECT - Colonnes séparées
+// Colonne 1: Civilité
+columnHelper.accessor("adherent.civility", {
+  id: "civility",
+  header: "Civilité",
+  cell: ({ row }) => row.original.adherent?.civility || "—"
+})
+
+// Colonne 2: Nom complet
+columnHelper.accessor((row) => `${row.adherent.firstname} ${row.adherent.lastname}`, {
+  id: "name",
+  header: "Nom complet",
+  cell: ({ row }) => {
+    const adherent = row.original.adherent;
+    return `${adherent.firstname} ${adherent.lastname}`;
+  }
+})
+```
+
 ### Affichage mobile optimisé pour les listes
 - **OBLIGATOIRE** : Toutes les listes doivent être optimisées pour l'affichage mobile
 - **Principe** : Sur mobile (< 768px), n'afficher que 2-3 colonnes essentielles maximum (comme les applications bancaires)

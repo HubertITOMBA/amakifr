@@ -24,7 +24,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  Eye
 } from "lucide-react";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -33,6 +34,7 @@ import {
   deleteEmail,
   sendEmails,
 } from "@/actions/emails";
+import { ViewEmailDialog } from "./ViewEmailDialog";
 import { getAllUsersForAdmin } from "@/actions/user";
 import { toast } from "sonner";
 import {
@@ -437,20 +439,18 @@ export default function AdminEmailsPage() {
                               </div>
                             </TableCell>
                             <TableCell className="text-center">
-                              {email.error && (
-                                <div className="text-xs text-red-600 dark:text-red-400 mb-1 max-w-xs truncate" title={email.error}>
-                                  {email.error}
-                                </div>
-                              )}
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleDelete(email.id)}
-                                className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-                                title="Supprimer"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
+                              <div className="flex items-center justify-center gap-1">
+                                <ViewEmailDialog email={email} />
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDelete(email.id)}
+                                  className="h-8 w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
+                                  title="Supprimer"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
                             </TableCell>
                           </TableRow>
                         ));

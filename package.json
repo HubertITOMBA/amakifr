@@ -3,9 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev -H 0.0.0.0 -p 9060",
+    "dev": "next dev -p 9052",
     "build": "next build",
-    "start": "next start -H 0.0.0.0 -p 9060",
+    "start": "next start -H 192.168.1.49 -p 9060",
     "lint": "next lint",
     "db:seed": "tsx scripts/create-test-users.ts",
     "db:seed-elections": "tsx scripts/create-test-elections.ts",

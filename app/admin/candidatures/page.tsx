@@ -115,6 +115,7 @@ export default function AdminCandidaturesPage() {
         const isMobile = window.innerWidth < 768;
         if (isMobile) {
           return {
+            civility: false,
             position: false,
             election: false,
             dateCandidature: false,
@@ -244,17 +245,25 @@ export default function AdminCandidaturesPage() {
   }, [candidacies, globalFilter, statusFilter, electionFilter]);
 
   const columns = useMemo(() => [
-    columnHelper.accessor("adherent.firstname", {
-      header: "Candidat",
+    columnHelper.accessor("adherent.civility", {
+      id: "civility",
+      header: "Civilité",
       cell: ({ row }) => {
         const c = row.original;
         return (
-          <div className="font-medium text-gray-900 dark:text-gray-100">
-            {c.adherent.civility && (
-              <span className="text-sm text-gray-500 mr-1">
-                {c.adherent.civility === 'Monsieur' ? 'M.' : c.adherent.civility === 'Madame' ? 'Mme' : c.adherent.civility}
-              </span>
-            )}
+          <div className="font-medium text-gray-900 dark:text-gray-100 text-xs sm:text-sm">
+            {c.adherent.civility || "—"}
+          </div>
+        );
+      },
+    }),
+    columnHelper.accessor("adherent.firstname", {
+      id: "name",
+      header: "Nom complet",
+      cell: ({ row }) => {
+        const c = row.original;
+        return (
+          <div className="font-medium text-gray-900 dark:text-gray-100 text-xs sm:text-sm">
             {c.adherent.firstname} {c.adherent.lastname}
           </div>
         );

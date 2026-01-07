@@ -6,23 +6,37 @@
 import Redis, { RedisOptions } from 'ioredis';
 
 let redisClient: Redis | null = null;
+let connectionAttempted = false;
+let isConnected = false;
 
 /**
  * Initialise et retourne le client Redis
  * Utilise le pattern singleton pour éviter plusieurs connexions
  */
 export function getRedisClient(): Redis | null {
+  // Si Redis est explicitement désactivé, retourner null
+  if (process.env.REDIS_DISABLED === 'true') {
+    return null;
+  }
+
   // Si Redis n'est pas configuré, retourner null (fallback en mémoire)
   if (!process.env.REDIS_URL && !process.env.REDIS_HOST) {
     return null;
   }
 
-  // Si le client existe déjà, le retourner
-  if (redisClient) {
+  // Si le client existe déjà et est connecté, le retourner
+  if (redisClient && isConnected) {
     return redisClient;
   }
 
+  // Si une tentative de connexion a déjà échoué, ne pas réessayer
+  if (connectionAttempted && !isConnected) {
+    return null;
+  }
+
   try {
+    connectionAttempted = true;
+    
     // Créer le client Redis
     const options: RedisOptions = {
       // Utiliser REDIS_URL si disponible, sinon construire depuis REDIS_HOST/PORT
@@ -31,16 +45,19 @@ export function getRedisClient(): Redis | null {
       password: process.env.REDIS_PASSWORD || undefined,
       // Préfixe pour toutes les clés
       keyPrefix: process.env.REDIS_KEY_PREFIX || 'amakifr:',
-      // Options de reconnexion
-      retryStrategy: (times: number) => {
-        const delay = Math.min(times * 50, 2000);
-        return delay;
+      // Options de reconnexion - désactiver les tentatives automatiques
+      retryStrategy: () => {
+        // Ne pas reconnecter automatiquement
+        return null;
       },
       // Timeout de connexion
-      connectTimeout: 10000,
+      connectTimeout: 5000,
       // Options de performance
-      maxRetriesPerRequest: 3,
+      maxRetriesPerRequest: 1,
       lazyConnect: true,
+      // Ne pas reconnecter automatiquement
+      enableReadyCheck: true,
+      enableOfflineQueue: false,
     };
 
     // Si REDIS_URL est défini, l'utiliser (priorité)
@@ -53,34 +70,57 @@ export function getRedisClient(): Redis | null {
       redisClient = new Redis(options);
     }
 
-    // Gestion des erreurs
+    // Gestion des erreurs - silencieuse par défaut
+    // Les erreurs Redis sont gérées silencieusement, le fallback en mémoire est utilisé automatiquement
+    let errorLogged = false;
     redisClient.on('error', (error) => {
-      console.error('[Redis] Erreur:', error);
-      // Ne pas reconnecter automatiquement si Redis n'est pas disponible
-      // Le fallback en mémoire sera utilisé
+      // Ne logger que si explicitement demandé via REDIS_DEBUG=true
+      if (process.env.REDIS_DEBUG === 'true' && !errorLogged) {
+        console.warn('[Redis] Redis n\'est pas disponible, utilisation du fallback en mémoire:', error.message);
+        errorLogged = true;
+      }
+      isConnected = false;
     });
 
     redisClient.on('connect', () => {
-      console.log('[Redis] Connecté avec succès');
+      // Ne logger que si explicitement demandé
+      if (process.env.REDIS_DEBUG === 'true') {
+        console.log('[Redis] Connexion établie');
+      }
+      isConnected = true;
     });
 
     redisClient.on('ready', () => {
-      console.log('[Redis] Prêt à recevoir des commandes');
+      // Ne logger que si explicitement demandé
+      if (process.env.REDIS_DEBUG === 'true') {
+        console.log('[Redis] Prêt à recevoir des commandes');
+      }
+      isConnected = true;
     });
 
     redisClient.on('close', () => {
-      console.log('[Redis] Connexion fermée');
+      isConnected = false;
+      // Ne pas logger la fermeture
     });
 
-    // Connecter le client
+    // Connecter le client de manière silencieuse
     redisClient.connect().catch((error) => {
-      console.error('[Redis] Erreur de connexion:', error);
+      // Ne logger que si explicitement demandé
+      if (process.env.REDIS_DEBUG === 'true' && !errorLogged) {
+        console.warn('[Redis] Impossible de se connecter à Redis, utilisation du fallback en mémoire');
+      }
+      isConnected = false;
       redisClient = null;
     });
 
     return redisClient;
   } catch (error) {
-    console.error('[Redis] Erreur lors de l\'initialisation:', error);
+    connectionAttempted = true;
+    isConnected = false;
+    // Ne logger que si explicitement demandé
+    if (process.env.REDIS_DEBUG === 'true') {
+      console.warn('[Redis] Erreur lors de l\'initialisation, utilisation du fallback en mémoire');
+    }
     return null;
   }
 }
@@ -90,7 +130,7 @@ export function getRedisClient(): Redis | null {
  */
 export async function isRedisAvailable(): Promise<boolean> {
   const client = getRedisClient();
-  if (!client) {
+  if (!client || !isConnected) {
     return false;
   }
 
@@ -98,6 +138,7 @@ export async function isRedisAvailable(): Promise<boolean> {
     await client.ping();
     return true;
   } catch (error) {
+    isConnected = false;
     return false;
   }
 }
@@ -107,8 +148,14 @@ export async function isRedisAvailable(): Promise<boolean> {
  */
 export async function closeRedisConnection(): Promise<void> {
   if (redisClient) {
-    await redisClient.quit();
+    try {
+      await redisClient.quit();
+    } catch (error) {
+      // Ignorer les erreurs lors de la fermeture
+    }
     redisClient = null;
+    isConnected = false;
+    connectionAttempted = false;
   }
 }
 

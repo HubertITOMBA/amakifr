@@ -455,15 +455,31 @@ export default function AdminUsersPage() {
       meta: { forceVisible: true },
     }),
     columnHelper.accessor((row) => {
+      return row.adherent?.civility || "—";
+    }, {
+      id: "civility",
+      header: "Civilité",
+      cell: ({ row }) => {
+        const user = row.original;
+        const civility = user.adherent?.civility || "—";
+        return (
+          <div className="font-medium text-gray-900 dark:text-gray-100 text-xs sm:text-sm">
+            {civility}
+          </div>
+        );
+      },
+    }),
+    columnHelper.accessor((row) => {
       return row.adherent 
-        ? `${row.adherent.civility || ''} ${row.adherent.firstname || ''} ${row.adherent.lastname || ''}`.trim()
+        ? `${row.adherent.firstname || ''} ${row.adherent.lastname || ''}`.trim()
         : row.name || "Sans nom";
     }, {
-      header: "Adhérent",
+      id: "name",
+      header: "Nom complet",
       cell: ({ row }) => {
         const user = row.original;
         const fullName = user.adherent 
-          ? `${user.adherent.civility || ''} ${user.adherent.firstname || ''} ${user.adherent.lastname || ''}`.trim()
+          ? `${user.adherent.firstname || ''} ${user.adherent.lastname || ''}`.trim()
           : user.name || "Sans nom";
         return (
           <div className="font-medium text-gray-900 dark:text-gray-100 text-xs sm:text-sm truncate max-w-[120px] sm:max-w-none">

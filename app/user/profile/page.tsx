@@ -138,43 +138,67 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-7 px-2 font-semibold text-xs text-red-900 dark:text-red-300"
+            className="h-7 px-1 sm:px-2 font-semibold text-[10px] sm:text-xs text-red-900 dark:text-red-300 whitespace-nowrap"
           >
             Année
             {column.getIsSorted() === 'asc' ? (
-              <ChevronUp className="ml-2 h-4 w-4" />
+              <ChevronUp className="ml-0.5 h-3 w-3 sm:ml-1 sm:h-4 sm:w-4" />
             ) : column.getIsSorted() === 'desc' ? (
-              <ChevronDown className="ml-2 h-4 w-4" />
+              <ChevronDown className="ml-0.5 h-3 w-3 sm:ml-1 sm:h-4 sm:w-4" />
             ) : null}
           </Button>
         ),
         cell: ({ row }) => (
-          <div className="flex items-center gap-2 justify-center">
-            <Calendar className="h-4 w-4 text-red-600 dark:text-red-400" />
-            <span className="font-medium">{row.getValue('annee')}</span>
+          <div className="flex items-center justify-center">
+            <Calendar className="h-3 w-3 sm:h-4 sm:w-4 text-red-600 dark:text-red-400 hidden sm:block mr-1" />
+            <span className="font-medium text-xs sm:text-sm whitespace-nowrap">{row.getValue('annee')}</span>
           </div>
         ),
+        size: 80,
+        minSize: 70,
+        maxSize: 120,
       }),
       columnHelper.accessor('montant', {
         header: ({ column }) => (
           <Button
             variant="ghost"
             onClick={() => column.toggleSorting(column.getIsSorted() === 'asc')}
-            className="h-7 px-2 font-semibold text-xs text-gray-900 dark:text-gray-300"
+            className="h-7 px-1 sm:px-2 font-semibold text-[10px] sm:text-xs text-gray-900 dark:text-gray-300 whitespace-nowrap"
           >
             Montant total
             {column.getIsSorted() === 'asc' ? (
-              <ChevronUp className="ml-2 h-4 w-4" />
+              <ChevronUp className="ml-0.5 h-3 w-3 sm:ml-1 sm:h-4 sm:w-4" />
             ) : column.getIsSorted() === 'desc' ? (
-              <ChevronDown className="ml-2 h-4 w-4" />
+              <ChevronDown className="ml-0.5 h-3 w-3 sm:ml-1 sm:h-4 sm:w-4" />
             ) : null}
           </Button>
         ),
-        cell: ({ row }) => (
-          <span className="font-bold text-gray-900 dark:text-white">
-            {parseFloat(row.getValue('montant')).toFixed(2).replace('.', ',')} €
-          </span>
-        ),
+        cell: ({ row }) => {
+          const dette = row.original;
+          const montant = parseFloat(dette.montant.toString());
+          const montantRestant = parseFloat(dette.montantRestant.toString());
+          
+          return (
+            <div className="flex flex-col gap-0.5 items-center">
+              <span className="font-bold text-xs sm:text-sm text-gray-900 dark:text-white whitespace-nowrap">
+                {montant.toFixed(2).replace('.', ',')} €
+              </span>
+              {/* Afficher le montant restant en petit sur mobile */}
+              <span className="text-[10px] text-gray-500 dark:text-gray-400 md:hidden whitespace-nowrap">
+                Rest: <span className={`font-semibold ${
+                  montantRestant > 0 
+                    ? 'text-red-600 dark:text-red-400' 
+                    : 'text-green-600 dark:text-green-400'
+                }`}>
+                  {montantRestant.toFixed(2).replace('.', ',')} €
+                </span>
+              </span>
+            </div>
+          );
+        },
+        size: 120,
+        minSize: 100,
+        maxSize: 180,
       }),
       columnHelper.accessor('montantPaye', {
         header: ({ column }) => (
@@ -225,14 +249,15 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
           );
         },
       }),
-      columnHelper.accessor('description', {
-        header: 'Description',
-        cell: ({ row }) => (
-          <span className="text-xs text-gray-600 dark:text-gray-400">
-            {row.getValue('description') || '-'}
-          </span>
-        ),
-      }),
+      // Colonne description masquée - ne pas afficher
+      // columnHelper.accessor('description', {
+      //   header: 'Description',
+      //   cell: ({ row }) => (
+      //     <span className="text-xs text-gray-600 dark:text-gray-400">
+      //       {row.getValue('description') || '-'}
+      //     </span>
+      //   ),
+      // }),
       columnHelper.display({
         id: 'statut',
         header: 'Statut',
@@ -270,7 +295,7 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
 
           if (montantRestant <= 0) {
             return (
-              <span className="text-xs text-gray-400 dark:text-gray-500">
+              <span className="text-xs text-gray-400 dark:text-gray-500 whitespace-nowrap">
                 Payée
               </span>
             );
@@ -280,14 +305,17 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
             <Button
               onClick={handlePayer}
               size="sm"
-              className="bg-blue-600 hover:bg-blue-700 text-white h-7 sm:h-8 text-xs px-2 sm:px-3"
+              className="bg-blue-600 hover:bg-blue-700 text-white h-7 sm:h-8 text-xs px-2 sm:px-3 whitespace-nowrap"
             >
-              <Euro className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+              <Euro className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
               <span className="hidden sm:inline">Payer</span>
               <span className="sm:hidden">€</span>
             </Button>
           );
         },
+        size: 80,
+        minSize: 70,
+        maxSize: 120,
       }),
     ],
     [router, userProfile]
@@ -303,22 +331,41 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
     state: {
       sorting,
     },
+    defaultColumn: {
+      minSize: 50,
+      maxSize: 200,
+    },
   });
 
   return (
     <div className="overflow-x-auto -mx-4 sm:mx-0">
       <div className="inline-block min-w-full align-middle px-4 sm:px-0">
-        <Table className="min-w-[640px]">
+        <Table className="min-w-0 w-full md:min-w-[640px]">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="bg-red-50 dark:bg-red-900/20">
-                {headerGroup.headers.map((header) => (
-                  <TableHead key={header.id} className="font-semibold text-center text-xs px-2 py-1.5">
-                    {header.isPlaceholder
-                      ? null
-                      : flexRender(header.column.columnDef.header, header.getContext())}
-                  </TableHead>
-                ))}
+                {headerGroup.headers.map((header) => {
+                  const columnId = header.column.id;
+                  // Masquer certaines colonnes sur mobile (description est complètement masquée)
+                  const isMobileHidden = ['montantPaye', 'montantRestant', 'statut'].includes(columnId);
+                  const isAlwaysHidden = ['description'].includes(columnId);
+                  
+                  const columnSize = header.column.getSize();
+                  
+                  if (isAlwaysHidden) return null;
+                  
+                  return (
+                    <TableHead 
+                      key={header.id} 
+                      className={`font-semibold text-center text-[10px] sm:text-xs px-1 sm:px-2 py-1.5 ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
+                      style={{ width: `${columnSize}px`, minWidth: `${columnSize}px`, maxWidth: `${columnSize}px` }}
+                    >
+                      {header.isPlaceholder
+                        ? null
+                        : flexRender(header.column.columnDef.header, header.getContext())}
+                    </TableHead>
+                  );
+                })}
               </TableRow>
             ))}
           </TableHeader>
@@ -329,11 +376,26 @@ function DettesInitialesTable({ dettes }: { dettes: DetteInitiale[] }) {
                   key={row.id}
                   className="hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
                 >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="text-center text-xs px-2 py-1.5">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
+                  {row.getVisibleCells().map((cell) => {
+                    const columnId = cell.column.id;
+                    // Masquer certaines colonnes sur mobile (description est complètement masquée)
+                    const isMobileHidden = ['montantPaye', 'montantRestant', 'statut'].includes(columnId);
+                    const isAlwaysHidden = ['description'].includes(columnId);
+                    
+                    if (isAlwaysHidden) return null;
+                    
+                    const columnSize = cell.column.getSize();
+                    
+                    return (
+                      <TableCell 
+                        key={cell.id} 
+                        className={`text-center text-xs px-1 sm:px-2 py-1.5 ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
+                        style={{ width: `${columnSize}px`, minWidth: `${columnSize}px`, maxWidth: `${columnSize}px` }}
+                      >
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    );
+                  })}
                 </TableRow>
               ))
             ) : (
