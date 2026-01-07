@@ -188,6 +188,174 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
+    keywords: ['événement', 'événements', 'evenement', 'evenements', 'participer événement', 'inscription événement', 'voir événements', 'liste événements', 'calendrier'],
+    title: 'Comment participer à un événement',
+    steps: [
+      'Allez dans la section "Événements" du menu principal',
+      'Parcourez la liste des événements à venir',
+      'Cliquez sur l\'événement qui vous intéresse pour voir les détails',
+      'Si l\'inscription est ouverte, cliquez sur "S\'inscrire" ou "Participer"',
+      'Remplissez le formulaire d\'inscription si nécessaire',
+      'Confirmez votre participation',
+      'Vous recevrez une confirmation par email',
+      'Vous pouvez voir tous vos événements dans "Mon Profil" > "Mes Événements"'
+    ],
+    actions: [
+      { label: 'Voir les événements', action: 'open_events', href: '/evenements' }
+    ]
+  },
+  {
+    keywords: ['rapport', 'rapports', 'réunion', 'reunion', 'compte rendu', 'rapport réunion', 'rapports réunion', 'compte rendu réunion'],
+    title: 'Comment consulter les rapports de réunion',
+    steps: [
+      'Allez dans "Mon Profil" > "Rapports de Réunion"',
+      'Vous verrez la liste de tous les rapports de réunion mensuels',
+      'Cliquez sur "Lire" pour voir le contenu complet d\'un rapport',
+      'Vous pouvez également cliquer sur "Imprimer" pour télécharger le rapport en PDF',
+      'Les rapports sont classés par date, du plus récent au plus ancien'
+    ],
+    actions: [
+      { label: 'Voir les rapports', action: 'open_rapports', href: '/user/profile?section=rapports' }
+    ]
+  },
+  {
+    keywords: ['notification', 'notifications', 'alerte', 'alertes', 'préférences notification', 'gérer notifications'],
+    title: 'Comment gérer mes notifications',
+    steps: [
+      'Allez dans "Mon Profil" > "Notifications"',
+      'Vous verrez vos préférences de notifications',
+      'Activez ou désactivez les types de notifications que vous souhaitez recevoir',
+      'Vous pouvez choisir de recevoir des notifications par email, SMS, ou dans l\'application',
+      'Sauvegardez vos préférences',
+      'Vous recevrez les notifications selon vos préférences'
+    ],
+    actions: [
+      { label: 'Gérer mes notifications', action: 'open_notifications', href: '/user/profile?section=notifications' }
+    ]
+  },
+  {
+    keywords: ['idée', 'idées', 'idee', 'idees', 'proposer idée', 'soumettre idée', 'boîte à idées'],
+    title: 'Comment proposer une idée',
+    steps: [
+      'Allez dans "Mon Profil" > "Mes Idées"',
+      'Cliquez sur "Nouvelle idée" ou "Proposer une idée"',
+      'Remplissez le formulaire avec votre idée',
+      'Ajoutez une description détaillée',
+      'Soumettez votre idée',
+      'Votre idée sera examinée par les administrateurs',
+      'Vous pouvez suivre le statut de votre idée dans "Mes Idées"'
+    ],
+    actions: [
+      { label: 'Voir mes idées', action: 'open_idees', href: '/user/profile?section=idees' }
+    ]
+  },
+  {
+    keywords: ['galerie', 'photos', 'images', 'vidéos', 'videos', 'voir galerie', 'consulter galerie'],
+    title: 'Comment consulter la galerie',
+    steps: [
+      'Allez dans la section "Galerie" du menu principal',
+      'Vous verrez toutes les photos et vidéos de l\'association',
+      'Vous pouvez filtrer par type (photos, vidéos)',
+      'Cliquez sur une image pour l\'agrandir',
+      'Les médias sont organisés par événements ou catégories'
+    ],
+    actions: [
+      { label: 'Voir la galerie', action: 'open_galerie', href: '/galerie' }
+    ]
+  },
+  {
+    keywords: ['contact', 'contacter', 'support', 'aide', 'assistance', 'écrire', 'message'],
+    title: 'Comment contacter l\'association',
+    steps: [
+      'Allez dans la section "Contact" du menu principal',
+      'Remplissez le formulaire de contact',
+      'Indiquez votre nom, email et votre message',
+      'Sélectionnez le sujet de votre demande',
+      'Envoyez votre message',
+      'Vous recevrez une réponse par email dans les plus brefs délais'
+    ],
+    actions: [
+      { label: 'Page de contact', action: 'open_contact', href: '/contact' }
+    ]
+  },
+  {
+    keywords: ['inscription', 's\'inscrire', 'sinscrire', 'adhérer', 'adherer', 'devenir membre', 'nouveau membre'],
+    title: 'Comment s\'inscrire à l\'association',
+    steps: [
+      'Allez dans la section "Inscription" du menu principal',
+      'Remplissez le formulaire d\'inscription avec vos informations',
+      'Vérifiez que toutes les informations sont correctes',
+      'Acceptez les conditions d\'utilisation',
+      'Soumettez votre demande d\'inscription',
+      'Vous recevrez un email de confirmation',
+      'Votre demande sera examinée par les administrateurs',
+      'Une fois approuvée, vous recevrez vos identifiants de connexion'
+    ],
+    actions: [
+      { label: 'Page d\'inscription', action: 'open_inscription', href: '/inscription' }
+    ]
+  },
+  {
+    keywords: ['enfant', 'enfants', 'ajouter enfant', 'modifier enfant', 'gérer enfants', 'mes enfants'],
+    title: 'Comment gérer mes enfants',
+    steps: [
+      'Allez dans "Mon Profil" > "Mes Enfants"',
+      'Cliquez sur "Ajouter un enfant" pour enregistrer un nouvel enfant',
+      'Remplissez les informations de l\'enfant (nom, prénom, date de naissance)',
+      'Vous pouvez modifier les informations d\'un enfant existant',
+      'Les informations sur vos enfants sont utilisées pour les événements familiaux et les assistances'
+    ],
+    actions: [
+      { label: 'Gérer mes enfants', action: 'open_enfants', href: '/user/profile?section=enfants' }
+    ]
+  },
+  {
+    keywords: ['statistique', 'statistiques', 'stats', 'mes stats', 'mon activité', 'mon historique'],
+    title: 'Comment voir mes statistiques',
+    steps: [
+      'Allez dans "Mon Profil" > "Statistiques"',
+      'Vous verrez vos statistiques personnelles :',
+      '• Nombre de cotisations payées',
+      '• Nombre d\'événements auxquels vous avez participé',
+      '• Nombre de votes effectués',
+      '• Nombre de badges obtenus',
+      '• Votre ancienneté dans l\'association',
+      'Ces statistiques sont mises à jour automatiquement'
+    ],
+    actions: [
+      { label: 'Voir mes statistiques', action: 'open_statistiques', href: '/user/profile?section=statistiques' }
+    ]
+  },
+  {
+    keywords: ['dette', 'dettes', 'devoir', 'devoirs', 'mes dettes', 'dettes initiales', 'voir mes dettes'],
+    title: 'Comment voir mes dettes',
+    steps: [
+      'Allez dans "Mon Profil" > "Mes Cotisations"',
+      'Vous verrez la section "Dettes initiales"',
+      'Toutes vos dettes sont listées par année',
+      'Pour chaque dette, vous verrez le montant total et le montant restant à payer',
+      'Cliquez sur "Payer" pour régler une dette',
+      'Vous pouvez payer une dette en plusieurs fois'
+    ],
+    actions: [
+      { label: 'Voir mes cotisations', action: 'open_cotisations', href: '/user/profile?section=cotisations' }
+    ]
+  },
+  {
+    keywords: ['historique', 'historique paiement', 'historique cotisation', 'mes paiements', 'voir paiements'],
+    title: 'Comment voir mon historique de paiements',
+    steps: [
+      'Allez dans "Mon Profil" > "Mes Cotisations"',
+      'Vous verrez la section "Historique des cotisations"',
+      'Tous vos paiements sont listés avec la date, le montant et le moyen de paiement',
+      'Vous pouvez filtrer par période ou par type de cotisation',
+      'Chaque paiement affiche un reçu téléchargeable'
+    ],
+    actions: [
+      { label: 'Voir mes cotisations', action: 'open_cotisations', href: '/user/profile?section=cotisations' }
+    ]
+  },
+  {
     keywords: ['aide', 'help', 'assistance', 'support', 'comment faire', 'amaki', 'qui es-tu', 'présente-toi'],
     title: 'Besoin d\'aide ?',
     steps: [
@@ -203,39 +371,137 @@ export const chatbotGuides: Guide[] = [
       '• Comment voir vos badges',
       '• Comment postuler à une élection',
       '• Comment voter',
+      '• Comment participer à un événement',
+      '• Comment consulter les rapports de réunion',
+      '• Comment gérer vos notifications',
+      '• Comment proposer une idée',
       'Tapez simplement votre question et je vous guiderai étape par étape !'
     ]
   }
 ];
 
 /**
- * Trouve le guide correspondant à une question
+ * Normalise une chaîne pour la comparaison (supprime accents, ponctuation, etc.)
+ */
+function normalizeString(str: string): string {
+  return str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '') // Supprime les accents
+    .replace(/[^\w\s]/g, ' ') // Remplace la ponctuation par des espaces
+    .replace(/\s+/g, ' ') // Normalise les espaces
+    .trim();
+}
+
+/**
+ * Calcule la distance de Levenshtein entre deux chaînes (pour la détection de fautes)
+ */
+function levenshteinDistance(str1: string, str2: string): number {
+  const matrix: number[][] = [];
+  const len1 = str1.length;
+  const len2 = str2.length;
+
+  if (len1 === 0) return len2;
+  if (len2 === 0) return len1;
+
+  for (let i = 0; i <= len1; i++) {
+    matrix[i] = [i];
+  }
+
+  for (let j = 0; j <= len2; j++) {
+    matrix[0][j] = j;
+  }
+
+  for (let i = 1; i <= len1; i++) {
+    for (let j = 1; j <= len2; j++) {
+      if (str1[i - 1] === str2[j - 1]) {
+        matrix[i][j] = matrix[i - 1][j - 1];
+      } else {
+        matrix[i][j] = Math.min(
+          matrix[i - 1][j] + 1,
+          matrix[i][j - 1] + 1,
+          matrix[i - 1][j - 1] + 1
+        );
+      }
+    }
+  }
+
+  return matrix[len1][len2];
+}
+
+/**
+ * Vérifie si deux mots sont similaires (tolérance aux fautes)
+ */
+function isSimilar(word1: string, word2: string, threshold: number = 2): boolean {
+  const normalized1 = normalizeString(word1);
+  const normalized2 = normalizeString(word2);
+  
+  if (normalized1 === normalized2) return true;
+  if (normalized1.includes(normalized2) || normalized2.includes(normalized1)) return true;
+  
+  const distance = levenshteinDistance(normalized1, normalized2);
+  const maxLen = Math.max(normalized1.length, normalized2.length);
+  
+  // Si la distance est faible par rapport à la longueur, considérer comme similaire
+  return distance <= threshold && distance / maxLen < 0.3;
+}
+
+/**
+ * Trouve le guide correspondant à une question avec amélioration de la détection
  */
 export function findGuideForQuestion(question: string): Guide | null {
-  const questionLower = question.toLowerCase().trim();
+  const questionLower = normalizeString(question);
   
   // Si la question est vide, retourner null
   if (!questionLower) {
     return null;
   }
   
+  // Mots de la question
+  const questionWords = questionLower.split(' ').filter(w => w.length > 2);
+  
   // Chercher le guide avec le plus de mots-clés correspondants
   let bestMatch: Guide | null = null;
   let bestScore = 0;
   
   for (const guide of chatbotGuides) {
-    // Vérifier chaque mot-clé
     let score = 0;
+    let exactMatches = 0;
+    let partialMatches = 0;
+    
     for (const keyword of guide.keywords) {
-      const keywordLower = keyword.toLowerCase();
-      // Vérifier si le mot-clé est présent dans la question
-      if (questionLower.includes(keywordLower)) {
-        score++;
-        // Bonus si le mot-clé correspond exactement ou est au début
-        if (questionLower.startsWith(keywordLower) || questionLower === keywordLower) {
+      const keywordLower = normalizeString(keyword);
+      const keywordWords = keywordLower.split(' ');
+      
+      // Vérifier correspondance exacte
+      if (questionLower.includes(keywordLower) || keywordLower.includes(questionLower)) {
+        score += 3;
+        exactMatches++;
+        // Bonus si le mot-clé est au début de la question
+        if (questionLower.startsWith(keywordLower)) {
           score += 2;
         }
+      } else {
+        // Vérifier correspondance partielle (mots individuels)
+        for (const keywordWord of keywordWords) {
+          if (keywordWord.length > 2) {
+            for (const questionWord of questionWords) {
+              if (questionWord.includes(keywordWord) || keywordWord.includes(questionWord)) {
+                score += 1;
+                partialMatches++;
+              } else if (isSimilar(questionWord, keywordWord)) {
+                score += 0.5;
+                partialMatches++;
+              }
+            }
+          }
+        }
       }
+    }
+    
+    // Bonus si plusieurs mots-clés correspondent
+    if (exactMatches > 1) {
+      score += exactMatches;
     }
     
     if (score > bestScore) {
@@ -259,7 +525,7 @@ export function findGuideForQuestion(question: string): Guide | null {
 export function generateBotResponse(question: string): { message: string; guide?: Guide } {
   if (!question || !question.trim()) {
     return {
-      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\nJe peux vous aider avec :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter`
+      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\nJe peux vous aider avec :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Proposer une idée\n• Consulter la galerie\n• Contacter l'association`
     };
   }
   
@@ -272,7 +538,7 @@ export function generateBotResponse(question: string): { message: string; guide?
   
   // Réponse par défaut avec suggestions
   return {
-    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\nVoici ce que je peux vous expliquer :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n\nPosez-moi une question plus précise en utilisant des mots-clés comme "mot de passe", "cotisation", "photo", "profil", "passeport", etc. et je vous guiderai étape par étape !`
+    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\nVoici ce que je peux vous expliquer :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Proposer une idée\n• Consulter la galerie\n• Contacter l'association\n\nPosez-moi une question plus précise en utilisant des mots-clés comme "mot de passe", "cotisation", "photo", "profil", "passeport", "événement", "rapport", etc. et je vous guiderai étape par étape !`
   };
 }
 
@@ -293,4 +559,18 @@ export const quickHelpMessages = [
   "Voici quelques actions que je peux vous aider à réaliser :",
   "Je peux vous guider pour :",
   "Voici ce que je peux vous expliquer :"
+];
+
+/**
+ * Suggestions de questions rapides
+ */
+export const quickQuestions = [
+  "Comment payer ma cotisation ?",
+  "Comment modifier mon mot de passe ?",
+  "Comment modifier ma photo ?",
+  "Comment voir mes documents ?",
+  "Comment participer à un événement ?",
+  "Comment consulter les rapports ?",
+  "Comment voir mes badges ?",
+  "Comment modifier mon profil ?"
 ];

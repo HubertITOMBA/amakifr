@@ -15,7 +15,7 @@ import {
   Maximize2,
   HelpCircle
 } from "lucide-react";
-import { generateBotResponse, welcomeMessages, quickHelpMessages, chatbotGuides, type ChatMessage, type ChatAction } from "@/lib/chatbot-guides";
+import { generateBotResponse, welcomeMessages, quickHelpMessages, chatbotGuides, quickQuestions, type ChatMessage, type ChatAction } from "@/lib/chatbot-guides";
 import { useRouter } from "next/navigation";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -34,7 +34,41 @@ export function ChatBot() {
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
-  // Message de bienvenue au premier chargement
+  // Charger l'historique depuis localStorage au montage
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const savedHistory = localStorage.getItem('amaki-chat-history');
+        if (savedHistory) {
+          const parsed = JSON.parse(savedHistory);
+          // Convertir les timestamps en Date
+          const messagesWithDates = parsed.map((msg: any) => ({
+            ...msg,
+            timestamp: new Date(msg.timestamp)
+          }));
+          setMessages(messagesWithDates);
+        }
+      } catch (error) {
+        console.error('Erreur lors du chargement de l\'historique:', error);
+      }
+    }
+  }, []);
+
+  // Sauvegarder l'historique dans localStorage
+  useEffect(() => {
+    if (typeof window !== 'undefined' && messages.length > 0) {
+      try {
+        // Ne pas sauvegarder le message de bienvenue seul
+        if (messages.length > 1 || (messages.length === 1 && messages[0].id !== 'welcome')) {
+          localStorage.setItem('amaki-chat-history', JSON.stringify(messages));
+        }
+      } catch (error) {
+        console.error('Erreur lors de la sauvegarde de l\'historique:', error);
+      }
+    }
+  }, [messages]);
+
+  // Message de bienvenue au premier chargement (seulement si pas d'historique)
   useEffect(() => {
     if (isOpen && messages.length === 0) {
       const welcomeMessage: ChatMessage = {
@@ -48,7 +82,7 @@ export function ChatBot() {
       };
       setMessages([welcomeMessage]);
     }
-  }, [isOpen, messages.length]);
+  }, [isOpen]);
 
   // Scroll automatique vers le bas quand de nouveaux messages arrivent
   useEffect(() => {
@@ -70,10 +104,9 @@ export function ChatBot() {
     }
   }, [isOpen]);
 
-  const handleSendMessage = () => {
-    if (!inputValue.trim()) return;
-
-    const question = inputValue.trim();
+  const handleSendMessage = (questionText?: string) => {
+    const question = questionText || inputValue.trim();
+    if (!question) return;
     
     // Ajouter le message de l'utilisateur
     const userMessage: ChatMessage = {
@@ -84,7 +117,9 @@ export function ChatBot() {
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputValue("");
+    if (!questionText) {
+      setInputValue("");
+    }
     setIsTyping(true);
 
     // Simuler un délai de réponse du bot
@@ -186,6 +221,8 @@ export function ChatBot() {
               variant="ghost"
               size="sm"
               onClick={() => {
+                // Optionnel : effacer l'historique en fermant
+                // localStorage.removeItem('amaki-chat-history');
                 setIsOpen(false);
                 setIsMinimized(false);
               }}
@@ -227,14 +264,14 @@ export function ChatBot() {
                           <p className="text-sm whitespace-pre-wrap">{message.content}</p>
                         </div>
                         {message.actions && message.actions.length > 0 && (
-                          <div className="mt-2 flex flex-col gap-2 w-full">
+                          <div className="mt-3 flex flex-col gap-2 w-full">
                             {message.actions.map((action, index) => (
                               <Button
                                 key={index}
                                 variant="outline"
                                 size="sm"
                                 onClick={() => handleActionClick(action)}
-                                className="text-xs bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 text-blue-700 dark:text-blue-300"
+                                className="text-xs font-medium bg-blue-50 dark:bg-blue-900/30 border-2 border-blue-400 dark:border-blue-600 hover:bg-blue-100 dark:hover:bg-blue-900/50 text-blue-700 dark:text-blue-300 shadow-sm transition-all duration-200 hover:shadow-md hover:scale-[1.02]"
                               >
                                 {action.label}
                               </Button>
@@ -271,6 +308,31 @@ export function ChatBot() {
               </ScrollArea>
               
               <div className="border-t border-gray-200 dark:border-gray-700 p-3">
+                {/* Suggestions de questions rapides */}
+                {messages.length <= 1 && (
+                  <div className="mb-3 p-2 bg-blue-50/50 dark:bg-blue-900/10 rounded-lg border border-blue-200/50 dark:border-blue-800/50">
+                    <p className="text-xs text-blue-700 dark:text-blue-300 mb-2 font-semibold flex items-center gap-1">
+                      <HelpCircle className="h-3 w-3" />
+                      Questions rapides :
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      {quickQuestions.slice(0, 4).map((question, index) => (
+                        <Button
+                          key={index}
+                          variant="outline"
+                          size="sm"
+                          onClick={() => {
+                            handleSendMessage(question);
+                          }}
+                          className="text-xs h-8 px-3 font-medium bg-white dark:bg-gray-800 border-2 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-100 dark:hover:bg-blue-900/40 hover:border-blue-400 dark:hover:border-blue-600 shadow-sm transition-all duration-200 hover:shadow-md hover:scale-[1.02]"
+                        >
+                          {question}
+                        </Button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                
                 <div className="flex gap-2">
                   <Input
                     ref={inputRef}
