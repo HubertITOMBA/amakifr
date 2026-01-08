@@ -35,7 +35,7 @@ SELECT
     a.lastname AS "Nom",
     CASE WHEN a."fraisAdhesionPaye" THEN 'Oui' ELSE 'Non' END AS "Frais payés",
     u.email AS "Email"
-FROM adherents a
+FROM adherent a
 INNER JOIN users u ON a."userId" = u.id
 WHERE u.email IN (
     'maya.thethe@gmail.com',
@@ -55,7 +55,7 @@ SELECT
     ad.codepost AS "Code postal",
     ad.city AS "Ville",
     ad.country AS "Pays"
-FROM adherents a
+FROM adherent a
 INNER JOIN users u ON a."userId" = u.id
 INNER JOIN adresses ad ON ad."adherentId" = a.id 
 WHERE u.email IN (
@@ -75,7 +75,7 @@ SELECT
     t.numero AS "Téléphone",
     t.type AS "Type",
     CASE WHEN t."estPrincipal" THEN 'Oui' ELSE 'Non' END AS "Principal"
-FROM adherents a
+FROM adherent a
 INNER JOIN users u ON a."userId" = u.id
 INNER JOIN telephones t ON t."adherentId" = a.id
 WHERE u.email IN (
@@ -98,7 +98,7 @@ SELECT
     t.numero AS "Téléphone",
     u.status AS "Statut"
 FROM users u
-INNER JOIN adherents a ON a."userId" = u.id
+INNER JOIN adherent a ON a."userId" = u.id
 LEFT JOIN adresses ad ON ad."adherentId" = a.id 
 LEFT JOIN telephones t ON t."adherentId" = a.id AND t."estPrincipal" = true
 WHERE u.email IN (
