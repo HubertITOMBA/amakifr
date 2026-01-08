@@ -343,7 +343,7 @@ export function ChatBot() {
                     className="flex-1 text-sm"
                   />
                   <Button
-                    onClick={handleSendMessage}
+                    onClick={() => handleSendMessage()}
                     disabled={!inputValue.trim() || isTyping}
                     className="bg-blue-600 hover:bg-blue-700 text-white"
                   >

@@ -537,7 +537,8 @@ export function findGuideForQuestion(question: string): Guide | null {
  * Génère une réponse du bot basée sur une question
  */
 export function generateBotResponse(question: string): { message: string; guide?: Guide } {
-  if (!question || !question.trim()) {
+  // Validation de type pour éviter les erreurs
+  if (typeof question !== 'string' || !question || !question.trim()) {
     return {
       message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\nJe peux vous aider avec :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Proposer une idée\n• Consulter la galerie\n• Contacter l'association`
     };
