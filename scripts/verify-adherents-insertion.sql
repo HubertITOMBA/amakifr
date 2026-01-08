@@ -57,7 +57,7 @@ SELECT
     ad.country AS "Pays"
 FROM adherent a
 INNER JOIN users u ON a."userId" = u.id
-INNER JOIN adresses ad ON ad."adherentId" = a.id 
+INNER JOIN adresse ad ON ad."adherentId" = a.id 
 WHERE u.email IN (
     'maya.thethe@gmail.com',
     'eugenembongopasy@gmail.com',
@@ -99,7 +99,7 @@ SELECT
     u.status AS "Statut"
 FROM users u
 INNER JOIN adherent a ON a."userId" = u.id
-LEFT JOIN adresses ad ON ad."adherentId" = a.id 
+LEFT JOIN adresse ad ON ad."adherentId" = a.id 
 LEFT JOIN telephones t ON t."adherentId" = a.id AND t."estPrincipal" = true
 WHERE u.email IN (
     'maya.thethe@gmail.com',

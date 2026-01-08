@@ -67,7 +67,7 @@ INSERT INTO adherent (
 );
 
 -- Insérer l'adresse
-INSERT INTO adresses (
+INSERT INTO adresse (
     id,
     "adherentId",
     streetnum,
@@ -157,7 +157,7 @@ INSERT INTO adherent (
 );
 
 -- Insérer l'adresse
-INSERT INTO adresses (
+INSERT INTO adresse (
     id,
     "adherentId",
     streetnum,
@@ -247,7 +247,7 @@ INSERT INTO adherent (
 );
 
 -- Insérer l'adresse
-INSERT INTO adresses (
+INSERT INTO adresse (
     id,
     "adherentId",
     streetnum,
@@ -337,7 +337,7 @@ INSERT INTO adherent (
 );
 
 -- Insérer l'adresse (vide car pas d'infos)
-INSERT INTO adresses (
+INSERT INTO adresse (
     id,
     "adherentId",
     streetnum,
@@ -427,7 +427,7 @@ INSERT INTO adherent (
 );
 
 -- Insérer l'adresse (partielle car seule la ville est connue)
-INSERT INTO adresses (
+INSERT INTO adresse (
     id,
     "adherentId",
     streetnum,
@@ -476,7 +476,7 @@ SELECT
     t.numero AS "Téléphone"
 FROM users u
 INNER JOIN adherents a ON a."userId" = u.id
-LEFT JOIN adresses ad ON ad."adherentId" = a.id
+LEFT JOIN adresse ad ON ad."adherentId" = a.id
 LEFT JOIN telephones t ON t."adherentId" = a.id AND t."estPrincipal" = true
 WHERE u.email IN (
     'maya.thethe@gmail.com',
