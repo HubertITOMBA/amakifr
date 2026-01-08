@@ -515,7 +515,7 @@ SELECT
     ad.city AS "Ville",
     t.numero AS "Téléphone"
 FROM users u
-INNER JOIN adherents a ON a."userId" = u.id
+INNER JOIN adherent a ON a."userId" = u.id
 LEFT JOIN adresse ad ON ad."adherentId" = a.id
 LEFT JOIN telephones t ON t."adherentId" = a.id AND t."estPrincipal" = true
 WHERE u.email IN (
