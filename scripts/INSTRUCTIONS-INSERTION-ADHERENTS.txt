@@ -1,0 +1,144 @@
+================================================================
+  INSTRUCTIONS D'INSERTION DE 5 NOUVEAUX ADHÉRENTS
+================================================================
+
+LISTE DES ADHÉRENTS À INSÉRER :
+-------------------------------
+1. Thérèse Mayakampongo - maya.thethe@gmail.com - +33680595471
+2. Eugène Mbongo - eugenembongopasy@gmail.com - +33625506069
+3. Marie Muilu - mariemuilu243@gmail.com - +33634310747
+4. JC Mvuama - Jcmvuama@yahoo.fr - +33784846102
+5. José Tshikuna - jostshik@yahoo.fr - +33695365359
+
+INFORMATIONS DE CONNEXION :
+---------------------------
+Email    : Voir liste ci-dessus
+Mot de passe : password
+Rôle     : Membre
+Statut   : Actif
+
+⚠️  IMPORTANT : Les adhérents doivent changer leur mot de passe après la première connexion !
+
+================================================================
+  MÉTHODE 1 : SCRIPT BASH AUTOMATIQUE (RECOMMANDÉ)
+================================================================
+
+1. Depuis le dossier racine du projet :
+   
+   ./scripts/apply-insert-adherents.sh
+
+   Ce script va :
+   ✓ Vérifier que DATABASE_URL est configuré
+   ✓ Vérifier si les emails existent déjà
+   ✓ Créer une sauvegarde automatique
+   ✓ Exécuter le script SQL
+   ✓ Afficher un résumé des insertions
+
+================================================================
+  MÉTHODE 2 : EXÉCUTION MANUELLE DU SCRIPT SQL
+================================================================
+
+En développement :
+------------------
+psql $DATABASE_URL -f scripts/insert-nouveaux-adherents.sql
+
+En production :
+---------------
+psql -h <DB_HOST> -p <DB_PORT> -U <DB_USER> -d <DB_NAME> \
+  -f scripts/insert-nouveaux-adherents.sql
+
+================================================================
+  VÉRIFICATION APRÈS INSERTION
+================================================================
+
+Pour vérifier que tout s'est bien passé :
+
+psql $DATABASE_URL -f scripts/verify-adherents-insertion.sql
+
+Ou manuellement :
+
+SELECT u.name, u.email, a.firstname, a.lastname, ad.city, t.numero
+FROM users u
+INNER JOIN adherents a ON a."userId" = u.id
+LEFT JOIN adresses ad ON ad."adherentId" = a.id AND ad."estPrincipale" = true
+LEFT JOIN telephones t ON t."adherentId" = a.id AND t."estPrincipal" = true
+WHERE u.email IN (
+    'maya.thethe@gmail.com',
+    'eugenembongopasy@gmail.com',
+    'mariemuilu243@gmail.com',
+    'Jcmvuama@yahoo.fr',
+    'jostshik@yahoo.fr'
+)
+ORDER BY u.name;
+
+================================================================
+  ROLLBACK (EN CAS DE PROBLÈME)
+================================================================
+
+Si vous devez annuler les insertions :
+
+BEGIN;
+
+DELETE FROM users 
+WHERE email IN (
+    'maya.thethe@gmail.com',
+    'eugenembongopasy@gmail.com',
+    'mariemuilu243@gmail.com',
+    'Jcmvuama@yahoo.fr',
+    'jostshik@yahoo.fr'
+);
+
+COMMIT;
+
+Note : La suppression des users supprimera automatiquement
+       les adherents, adresses et téléphones associés (CASCADE).
+
+================================================================
+  FICHIERS DISPONIBLES
+================================================================
+
+📄 insert-nouveaux-adherents.sql (504 lignes)
+   → Script SQL principal avec transaction
+
+📄 apply-insert-adherents.sh (125 lignes)
+   → Script bash automatique avec sauvegarde
+
+📄 verify-adherents-insertion.sql (116 lignes)
+   → Script de vérification des insertions
+
+📄 generate-password-hashes.ts (58 lignes)
+   → Générateur de hash bcrypt (si besoin de régénérer)
+
+📄 README-insertion-adherents.md
+   → Documentation complète (non tracké par git)
+
+================================================================
+  SÉCURITÉ
+================================================================
+
+✓ Transaction SQL (BEGIN/COMMIT)
+✓ Rollback automatique en cas d'erreur
+✓ Mot de passe hashé avec bcrypt ($2b$10$...)
+✓ Sauvegarde automatique avant insertion
+✓ Vérification des doublons
+
+================================================================
+  APRÈS L'INSERTION
+================================================================
+
+1. Vérifier que les 5 adhérents sont bien créés
+2. Se connecter avec chaque compte pour tester
+3. Demander aux adhérents de changer leur mot de passe
+4. Vérifier que les cotisations mensuelles sont bien générées
+
+================================================================
+  SUPPORT
+================================================================
+
+En cas de problème :
+1. Vérifier les logs du script
+2. Consulter la sauvegarde créée dans backups/
+3. Utiliser le script de vérification
+4. Contacter l'administrateur système si nécessaire
+
+================================================================
