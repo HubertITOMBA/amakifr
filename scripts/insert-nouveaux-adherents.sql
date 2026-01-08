@@ -75,7 +75,9 @@ INSERT INTO adresse (
     street2,
     codepost,
     city,
-    country
+    country,
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     (SELECT id FROM adherent WHERE "userId" = (SELECT id FROM users WHERE email = 'maya.thethe@gmail.com')),
@@ -84,7 +86,9 @@ INSERT INTO adresse (
     '',
     '92390',
     'Villeneuve La Garenne',
-    'France'
+    'France',
+    NOW(),
+    NOW()
 );
 
 -- Insérer le téléphone
@@ -93,13 +97,17 @@ INSERT INTO telephones (
     "adherentId",
     numero,
     type,
-    "estPrincipal"
+    "estPrincipal",
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     (SELECT id FROM adherent WHERE "userId" = (SELECT id FROM users WHERE email = 'maya.thethe@gmail.com')),
     '+33680595471',
     'Mobile',
-    true
+    true,
+    NOW(),
+    NOW()
 );
 
 -- ================================================================
@@ -165,7 +173,9 @@ INSERT INTO adresse (
     street2,
     codepost,
     city,
-    country
+    country,
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     (SELECT id FROM adherent WHERE "userId" = (SELECT id FROM users WHERE email = 'eugenembongopasy@gmail.com')),
@@ -174,7 +184,9 @@ INSERT INTO adresse (
     '',
     '91070',
     'Bondoufle',
-    'France'
+    'France',
+    NOW(),
+    NOW()
 );
 
 -- Insérer le téléphone
@@ -183,13 +195,17 @@ INSERT INTO telephones (
     "adherentId",
     numero,
     type,
-    "estPrincipal"
+    "estPrincipal",
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     (SELECT id FROM adherent WHERE "userId" = (SELECT id FROM users WHERE email = 'eugenembongopasy@gmail.com')),
     '+33625506069',
     'Mobile',
-    true
+    true,
+    NOW(),
+    NOW()
 );
 
 -- ================================================================
@@ -255,7 +271,9 @@ INSERT INTO adresse (
     street2,
     codepost,
     city,
-    country
+    country,
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     (SELECT id FROM adherent WHERE "userId" = (SELECT id FROM users WHERE email = 'mariemuilu243@gmail.com')),
@@ -264,7 +282,9 @@ INSERT INTO adresse (
     '',
     '77550',
     'Moissy Cramayel',
-    'France'
+    'France',
+    NOW(),
+    NOW()
 );
 
 -- Insérer le téléphone
@@ -273,13 +293,17 @@ INSERT INTO telephones (
     "adherentId",
     numero,
     type,
-    "estPrincipal"
+    "estPrincipal",
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     (SELECT id FROM adherent WHERE "userId" = (SELECT id FROM users WHERE email = 'mariemuilu243@gmail.com')),
     '+33634310747',
     'Mobile',
-    true
+    true,
+    NOW(),
+    NOW()
 );
 
 -- ================================================================
@@ -345,7 +369,9 @@ INSERT INTO adresse (
     street2,
     codepost,
     city,
-    country
+    country,
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     (SELECT id FROM adherent WHERE "userId" = (SELECT id FROM users WHERE email = 'Jcmvuama@yahoo.fr')),
@@ -354,7 +380,9 @@ INSERT INTO adresse (
     '',
     '',
     '',
-    'France'
+    'France',
+    NOW(),
+    NOW()
 );
 
 -- Insérer le téléphone
@@ -363,13 +391,17 @@ INSERT INTO telephones (
     "adherentId",
     numero,
     type,
-    "estPrincipal"
+    "estPrincipal",
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     (SELECT id FROM adherent WHERE "userId" = (SELECT id FROM users WHERE email = 'Jcmvuama@yahoo.fr')),
     '+33784846102',
     'Mobile',
-    true
+    true,
+    NOW(),
+    NOW()
 );
 
 -- ================================================================
@@ -435,7 +467,9 @@ INSERT INTO adresse (
     street2,
     codepost,
     city,
-    country
+    country,
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     (SELECT id FROM adherent WHERE "userId" = (SELECT id FROM users WHERE email = 'jostshik@yahoo.fr')),
@@ -444,7 +478,9 @@ INSERT INTO adresse (
     '',
     '',
     'Courcouronnes',
-    'France'
+    'France',
+    NOW(),
+    NOW()
 );
 
 -- Insérer le téléphone
@@ -453,13 +489,17 @@ INSERT INTO telephones (
     "adherentId",
     numero,
     type,
-    "estPrincipal"
+    "estPrincipal",
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     (SELECT id FROM adherent WHERE "userId" = (SELECT id FROM users WHERE email = 'jostshik@yahoo.fr')),
     '+33695365359',
     'Mobile',
-    true
+    true,
+    NOW(),
+    NOW()
 );
 
 -- ================================================================
