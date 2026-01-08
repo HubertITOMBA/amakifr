@@ -24,7 +24,9 @@ INSERT INTO users (
     email_verified,
     password,
     role,
-    status
+    status,
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     'Thethe',
@@ -32,7 +34,9 @@ INSERT INTO users (
     NOW(),
     '$2b$10$sGs5y7rCBkg./6f6E0sWYevDjiUM4SqS8tX2KjVSlZkraKqgaV13S', -- Hash bcrypt du mot de passe 'password'
     'Membre',
-    'Actif'
+    'Actif',
+    NOW(),
+    NOW()
 );
 
 -- Insérer l'adhérent
@@ -110,7 +114,9 @@ INSERT INTO users (
     email_verified,
     password,
     role,
-    status
+    status,
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     'Eugène',
@@ -118,7 +124,9 @@ INSERT INTO users (
     NOW(),
     '$2b$10$sGs5y7rCBkg./6f6E0sWYevDjiUM4SqS8tX2KjVSlZkraKqgaV13S', -- Hash bcrypt du mot de passe 'password'
     'Membre',
-    'Actif'
+    'Actif',
+    NOW(),
+    NOW()
 );
 
 -- Insérer l'adhérent
@@ -196,7 +204,9 @@ INSERT INTO users (
     email_verified,
     password,
     role,
-    status
+    status,
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     'Marie',
@@ -204,7 +214,9 @@ INSERT INTO users (
     NOW(),
     '$2b$10$sGs5y7rCBkg./6f6E0sWYevDjiUM4SqS8tX2KjVSlZkraKqgaV13S', -- Hash bcrypt du mot de passe 'password'
     'Membre',
-    'Actif'
+    'Actif',
+    NOW(),
+    NOW()
 );
 
 -- Insérer l'adhérent
@@ -282,7 +294,9 @@ INSERT INTO users (
     email_verified,
     password,
     role,
-    status
+    status,
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     'Azalya',
@@ -290,7 +304,9 @@ INSERT INTO users (
     NOW(),
     '$2b$10$sGs5y7rCBkg./6f6E0sWYevDjiUM4SqS8tX2KjVSlZkraKqgaV13S', -- Hash bcrypt du mot de passe 'password'
     'Membre',
-    'Actif'
+    'Actif',
+    NOW(),
+    NOW()
 );
 
 -- Insérer l'adhérent
@@ -368,7 +384,9 @@ INSERT INTO users (
     email_verified,
     password,
     role,
-    status
+    status,
+    "createdAt",
+    "updatedAt"
 ) VALUES (
     gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
     'José',
@@ -376,7 +394,9 @@ INSERT INTO users (
     NOW(),
     '$2b$10$sGs5y7rCBkg./6f6E0sWYevDjiUM4SqS8tX2KjVSlZkraKqgaV13S', -- Hash bcrypt du mot de passe 'password'
     'Membre',
-    'Actif'
+    'Actif',
+    NOW(),
+    NOW()
 );
 
 -- Insérer l'adhérent
