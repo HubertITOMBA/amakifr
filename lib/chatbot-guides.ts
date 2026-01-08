@@ -356,6 +356,21 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
+    keywords: ['statut', 'statuts', 'juridique', 'loi 1901', 'consulter statut', 'voir statut', 'règlement'],
+    title: 'Comment consulter les statuts de l\'association',
+    steps: [
+      'Allez dans la section "L\'amicale" du menu principal',
+      'Dans la section "Informations Légales", cliquez sur "Notre Statut"',
+      'Le dialog des statuts s\'ouvrira avec tous les articles',
+      'Vous pouvez lire les statuts complets dans le dialog',
+      'Cliquez sur "Télécharger le PDF" pour obtenir une copie officielle des statuts signés',
+      'Les statuts ont été validés et signés par les autorités le 29 novembre 2025'
+    ],
+    actions: [
+      { label: 'Voir la page Amicale', action: 'open_amicale', href: '/amicale' }
+    ]
+  },
+  {
     keywords: ['aide', 'help', 'assistance', 'support', 'comment faire', 'amaki', 'qui es-tu', 'présente-toi'],
     title: 'Besoin d\'aide ?',
     steps: [

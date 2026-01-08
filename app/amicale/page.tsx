@@ -411,14 +411,20 @@ export default function AmicalePage() {
                   </div>
                 </div>
                 <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
-                  Notre Statut
+                  Nos Statuts
                 </h3>
+                <div className="mb-4">
+                  <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-300">
+                    <CheckCircle className="h-3 w-3 mr-1" />
+                    Validés et signés
+                  </Badge>
+                </div>
                 <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4 sm:mb-6">
-                  Consultez le statut juridique de l'association AMAKI France
+                  Consultez les statuts officiels de l'association AMAKI France, validés par les autorités le 29 novembre 2025
                 </p>
                 <Button className="w-full bg-blue-600 hover:bg-blue-700 text-white">
                   <FileText className="h-4 w-4 mr-2" />
-                  Consulter le statut
+                  Consulter les statuts
                 </Button>
               </div>
             </Card>
