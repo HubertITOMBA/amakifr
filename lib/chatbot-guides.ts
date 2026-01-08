@@ -61,8 +61,7 @@ export const chatbotGuides: Guide[] = [
       'Pour payer en plusieurs fois : vous pouvez effectuer plusieurs paiements partiels jusqu\'à régulariser votre situation'
     ],
     actions: [
-      { label: 'Voir mes cotisations', action: 'open_cotisations', href: '/user/profile?section=cotisations' },
-      { label: 'Page de paiement', action: 'open_paiement', href: '/paiement' }
+      { label: 'Voir mes cotisations', action: 'open_cotisations', href: '/user/profile?section=cotisations' }
     ]
   },
   {
