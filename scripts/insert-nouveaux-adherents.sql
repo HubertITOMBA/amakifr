@@ -9,423 +9,443 @@
 -- 4. JC Mvuama (Jcmvuama@yahoo.fr)
 -- 5. José Tshikuna (jostshik@yahoo.fr)
 -- ================================================================
+
 BEGIN;
+
 -- ================================================================
 -- 1. THÉRÈSE MAYAKAMPONGO
 -- ================================================================
+
 -- Insérer l'utilisateur
 INSERT INTO users (
-    id
-    name
-    email
-    email_verified
-    password
-    role
+    id,
+    name,
+    email,
+    email_verified,
+    password,
+    role,
     status
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    'Thethe'
-    'maya.thethe@gmail.com'
-    NOW()
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    'Thethe',
+    'maya.thethe@gmail.com',
+    NOW(),
     '$2b$10$sGs5y7rCBkg./6f6E0sWYevDjiUM4SqS8tX2KjVSlZkraKqgaV13S', -- Hash bcrypt du mot de passe 'password'
-    'Membre'
+    'Membre',
     'Actif'
 );
+
 -- Insérer l'adhérent
 INSERT INTO adherents (
-    id
-    "userId"
-    civility
-    firstname
-    lastname
-    "typeAdhesion"
-    "datePremiereAdhesion"
-    "nombreEnfants"
-    "autorisationImage"
-    "accepteCommunications"
+    id,
+    "userId",
+    civility,
+    firstname,
+    lastname,
+    "typeAdhesion",
+    "datePremiereAdhesion",
+    "nombreEnfants",
+    "autorisationImage",
+    "accepteCommunications",
     "fraisAdhesionPaye"
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM users WHERE email = 'maya.thethe@gmail.com')
-    'Madame'
-    'Thérèse'
-    'Mayakampongo'
-    'AdhesionAnnuelle'
-    NOW()
-    0
-    false
-    true
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM users WHERE email = 'maya.thethe@gmail.com'),
+    'Madame',
+    'Thérèse',
+    'Mayakampongo',
+    'AdhesionAnnuelle',
+    NOW(),
+    0,
+    false,
+    true,
     false
 );
+
 -- Insérer l'adresse
 INSERT INTO adresses (
-    id
-    "adherentId"
-    streetnum
-    street1
-    street2
-    codepost
-    city
+    id,
+    "adherentId",
+    streetnum,
+    street1,
+    street2,
+    codepost,
+    city,
     country
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'maya.thethe@gmail.com'))
-    ''
-    ''
-    ''
-    '92390'
-    'Villeneuve La Garenne'
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'maya.thethe@gmail.com')),
+    '',
+    '',
+    '',
+    '92390',
+    'Villeneuve La Garenne',
     'France'
 );
+
 -- Insérer le téléphone
 INSERT INTO telephones (
-    id
-    "adherentId"
-    numero
-    type
+    id,
+    "adherentId",
+    numero,
+    type,
     "estPrincipal"
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'maya.thethe@gmail.com'))
-    '+33680595471'
-    'Mobile'
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'maya.thethe@gmail.com')),
+    '+33680595471',
+    'Mobile',
     true
 );
+
 -- ================================================================
 -- 2. EUGÈNE MBONGO
 -- ================================================================
+
 -- Insérer l'utilisateur
 INSERT INTO users (
-    id
-    name
-    email
-    email_verified
-    password
-    role
+    id,
+    name,
+    email,
+    email_verified,
+    password,
+    role,
     status
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    'Eugène'
-    'eugenembongopasy@gmail.com'
-    NOW()
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    'Eugène',
+    'eugenembongopasy@gmail.com',
+    NOW(),
     '$2b$10$sGs5y7rCBkg./6f6E0sWYevDjiUM4SqS8tX2KjVSlZkraKqgaV13S', -- Hash bcrypt du mot de passe 'password'
-    'Membre'
+    'Membre',
     'Actif'
 );
+
 -- Insérer l'adhérent
 INSERT INTO adherents (
-    id
-    "userId"
-    civility
-    firstname
-    lastname
-    "typeAdhesion"
-    "datePremiereAdhesion"
-    "nombreEnfants"
-    "autorisationImage"
-    "accepteCommunications"
+    id,
+    "userId",
+    civility,
+    firstname,
+    lastname,
+    "typeAdhesion",
+    "datePremiereAdhesion",
+    "nombreEnfants",
+    "autorisationImage",
+    "accepteCommunications",
     "fraisAdhesionPaye"
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM users WHERE email = 'eugenembongopasy@gmail.com')
-    'Monsieur'
-    'Eugène'
-    'Mbongo'
-    'AdhesionAnnuelle'
-    NOW()
-    0
-    false
-    true
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM users WHERE email = 'eugenembongopasy@gmail.com'),
+    'Monsieur',
+    'Eugène',
+    'Mbongo',
+    'AdhesionAnnuelle',
+    NOW(),
+    0,
+    false,
+    true,
     false
 );
+
 -- Insérer l'adresse
 INSERT INTO adresses (
-    id
-    "adherentId"
-    streetnum
-    street1
-    street2
-    codepost
-    city
+    id,
+    "adherentId",
+    streetnum,
+    street1,
+    street2,
+    codepost,
+    city,
     country
-    
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'eugenembongopasy@gmail.com'))
-    '7'
-    'Rue de la libération'
-    ''
-    '91070'
-    'Bondoufle'
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'eugenembongopasy@gmail.com')),
+    '7',
+    'Rue de la libération',
+    '',
+    '91070',
+    'Bondoufle',
     'France'
-    true
 );
+
 -- Insérer le téléphone
 INSERT INTO telephones (
-    id
-    "adherentId"
-    numero
-    type
+    id,
+    "adherentId",
+    numero,
+    type,
     "estPrincipal"
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'eugenembongopasy@gmail.com'))
-    '+33625506069'
-    'Mobile'
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'eugenembongopasy@gmail.com')),
+    '+33625506069',
+    'Mobile',
     true
 );
+
 -- ================================================================
 -- 3. MARIE MUILU
 -- ================================================================
+
 -- Insérer l'utilisateur
 INSERT INTO users (
-    id
-    name
-    email
-    email_verified
-    password
-    role
+    id,
+    name,
+    email,
+    email_verified,
+    password,
+    role,
     status
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    'Marie'
-    'mariemuilu243@gmail.com'
-    NOW()
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    'Marie',
+    'mariemuilu243@gmail.com',
+    NOW(),
     '$2b$10$sGs5y7rCBkg./6f6E0sWYevDjiUM4SqS8tX2KjVSlZkraKqgaV13S', -- Hash bcrypt du mot de passe 'password'
-    'Membre'
+    'Membre',
     'Actif'
 );
+
 -- Insérer l'adhérent
 INSERT INTO adherents (
-    id
-    "userId"
-    civility
-    firstname
-    lastname
-    "typeAdhesion"
-    "datePremiereAdhesion"
-    "nombreEnfants"
-    "autorisationImage"
-    "accepteCommunications"
+    id,
+    "userId",
+    civility,
+    firstname,
+    lastname,
+    "typeAdhesion",
+    "datePremiereAdhesion",
+    "nombreEnfants",
+    "autorisationImage",
+    "accepteCommunications",
     "fraisAdhesionPaye"
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM users WHERE email = 'mariemuilu243@gmail.com')
-    'Madame'
-    'Marie'
-    'Muilu'
-    'AdhesionAnnuelle'
-    NOW()
-    0
-    false
-    true
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM users WHERE email = 'mariemuilu243@gmail.com'),
+    'Madame',
+    'Marie',
+    'Muilu',
+    'AdhesionAnnuelle',
+    NOW(),
+    0,
+    false,
+    true,
     false
 );
+
 -- Insérer l'adresse
 INSERT INTO adresses (
-    id
-    "adherentId"
-    streetnum
-    street1
-    street2
-    codepost
-    city
+    id,
+    "adherentId",
+    streetnum,
+    street1,
+    street2,
+    codepost,
+    city,
     country
-    
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'mariemuilu243@gmail.com'))
-    '292'
-    'rue des pièces de Lugny'
-    ''
-    '77550'
-    'Moissy Cramayel'
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'mariemuilu243@gmail.com')),
+    '292',
+    'rue des pièces de Lugny',
+    '',
+    '77550',
+    'Moissy Cramayel',
     'France'
-    true
 );
+
 -- Insérer le téléphone
 INSERT INTO telephones (
-    id
-    "adherentId"
-    numero
-    type
+    id,
+    "adherentId",
+    numero,
+    type,
     "estPrincipal"
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'mariemuilu243@gmail.com'))
-    '+33634310747'
-    'Mobile'
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'mariemuilu243@gmail.com')),
+    '+33634310747',
+    'Mobile',
     true
 );
+
 -- ================================================================
 -- 4. JC MVUAMA
 -- ================================================================
+
 -- Insérer l'utilisateur
 INSERT INTO users (
-    id
-    name
-    email
-    email_verified
-    password
-    role
+    id,
+    name,
+    email,
+    email_verified,
+    password,
+    role,
     status
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    'Azalya'
-    'Jcmvuama@yahoo.fr'
-    NOW()
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    'Azalya',
+    'Jcmvuama@yahoo.fr',
+    NOW(),
     '$2b$10$sGs5y7rCBkg./6f6E0sWYevDjiUM4SqS8tX2KjVSlZkraKqgaV13S', -- Hash bcrypt du mot de passe 'password'
-    'Membre'
+    'Membre',
     'Actif'
 );
+
 -- Insérer l'adhérent
 INSERT INTO adherents (
-    id
-    "userId"
-    civility
-    firstname
-    lastname
-    "typeAdhesion"
-    "datePremiereAdhesion"
-    "nombreEnfants"
-    "autorisationImage"
-    "accepteCommunications"
+    id,
+    "userId",
+    civility,
+    firstname,
+    lastname,
+    "typeAdhesion",
+    "datePremiereAdhesion",
+    "nombreEnfants",
+    "autorisationImage",
+    "accepteCommunications",
     "fraisAdhesionPaye"
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM users WHERE email = 'Jcmvuama@yahoo.fr')
-    'Monsieur'
-    'JC'
-    'Mvuama'
-    'AdhesionAnnuelle'
-    NOW()
-    0
-    false
-    true
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM users WHERE email = 'Jcmvuama@yahoo.fr'),
+    'Monsieur',
+    'JC',
+    'Mvuama',
+    'AdhesionAnnuelle',
+    NOW(),
+    0,
+    false,
+    true,
     false
 );
+
 -- Insérer l'adresse (vide car pas d'infos)
 INSERT INTO adresses (
-    id
-    "adherentId"
-    streetnum
-    street1
-    street2
-    codepost
-    city
+    id,
+    "adherentId",
+    streetnum,
+    street1,
+    street2,
+    codepost,
+    city,
     country
-    
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'Jcmvuama@yahoo.fr'))
-    ''
-    ''
-    ''
-    ''
-    ''
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'Jcmvuama@yahoo.fr')),
+    '',
+    '',
+    '',
+    '',
+    '',
     'France'
-    true
 );
+
 -- Insérer le téléphone
 INSERT INTO telephones (
-    id
-    "adherentId"
-    numero
-    type
+    id,
+    "adherentId",
+    numero,
+    type,
     "estPrincipal"
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'Jcmvuama@yahoo.fr'))
-    '+33784846102'
-    'Mobile'
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'Jcmvuama@yahoo.fr')),
+    '+33784846102',
+    'Mobile',
     true
 );
+
 -- ================================================================
 -- 5. JOSÉ TSHIKUNA
 -- ================================================================
+
 -- Insérer l'utilisateur
 INSERT INTO users (
-    id
-    name
-    email
-    email_verified
-    password
-    role
+    id,
+    name,
+    email,
+    email_verified,
+    password,
+    role,
     status
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    'José'
-    'jostshik@yahoo.fr'
-    NOW()
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    'José',
+    'jostshik@yahoo.fr',
+    NOW(),
     '$2b$10$sGs5y7rCBkg./6f6E0sWYevDjiUM4SqS8tX2KjVSlZkraKqgaV13S', -- Hash bcrypt du mot de passe 'password'
-    'Membre'
+    'Membre',
     'Actif'
 );
+
 -- Insérer l'adhérent
 INSERT INTO adherents (
-    id
-    "userId"
-    civility
-    firstname
-    lastname
-    "typeAdhesion"
-    "datePremiereAdhesion"
-    "nombreEnfants"
-    "autorisationImage"
-    "accepteCommunications"
+    id,
+    "userId",
+    civility,
+    firstname,
+    lastname,
+    "typeAdhesion",
+    "datePremiereAdhesion",
+    "nombreEnfants",
+    "autorisationImage",
+    "accepteCommunications",
     "fraisAdhesionPaye"
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM users WHERE email = 'jostshik@yahoo.fr')
-    'Monsieur'
-    'José'
-    'Tshikuna'
-    'AdhesionAnnuelle'
-    NOW()
-    0
-    false
-    true
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM users WHERE email = 'jostshik@yahoo.fr'),
+    'Monsieur',
+    'José',
+    'Tshikuna',
+    'AdhesionAnnuelle',
+    NOW(),
+    0,
+    false,
+    true,
     false
 );
+
 -- Insérer l'adresse (partielle car seule la ville est connue)
 INSERT INTO adresses (
-    id
-    "adherentId"
-    streetnum
-    street1
-    street2
-    codepost
-    city
+    id,
+    "adherentId",
+    streetnum,
+    street1,
+    street2,
+    codepost,
+    city,
     country
-    
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'jostshik@yahoo.fr'))
-    ''
-    ''
-    ''
-    ''
-    'Courcouronnes'
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'jostshik@yahoo.fr')),
+    '',
+    '',
+    '',
+    '',
+    'Courcouronnes',
     'France'
-    true
 );
+
 -- Insérer le téléphone
 INSERT INTO telephones (
-    id
-    "adherentId"
-    numero
-    type
+    id,
+    "adherentId",
+    numero,
+    type,
     "estPrincipal"
 ) VALUES (
-    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', '')
-    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'jostshik@yahoo.fr'))
-    '+33695365359'
-    'Mobile'
+    gen_random_uuid()::text || replace(gen_random_uuid()::text, '-', ''),
+    (SELECT id FROM adherents WHERE "userId" = (SELECT id FROM users WHERE email = 'jostshik@yahoo.fr')),
+    '+33695365359',
+    'Mobile',
     true
 );
+
 -- ================================================================
 -- VÉRIFICATIONS
 -- ================================================================
+
 -- Vérifier les insertions
 SELECT 
     u.name AS "Nom",
@@ -446,7 +466,9 @@ WHERE u.email IN (
     'jostshik@yahoo.fr'
 )
 ORDER BY u.name;
+
 COMMIT;
+
 -- ================================================================
 -- INSTRUCTIONS D'UTILISATION
 -- ================================================================
