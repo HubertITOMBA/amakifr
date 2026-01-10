@@ -1,0 +1,267 @@
+# Guide de l'Assistant Virtuel AMAKI
+
+## 📋 Vue d'ensemble
+
+L'assistant virtuel "Amaki" est maintenant enrichi avec 25 guides complets pour aider les adhérents et les administrateurs à utiliser toutes les fonctionnalités de la plateforme.
+
+## 🔵 Guides pour les ADHÉRENTS (18 guides)
+
+### 1. Gestion du compte
+- Modifier mon mot de passe
+- Modifier ma photo de profil
+- Modifier mon profil
+- Gérer mes enfants
+
+### 2. Cotisations et paiements
+- Payer ma cotisation
+- Payer en plusieurs fois
+- Voir mes dettes
+- Voir mon historique de paiements
+
+### 3. Événements et participation
+- Participer à un événement
+- Voir le calendrier des événements
+
+### 4. Vote et candidatures
+- Postuler à une élection
+- Voter
+- Voir mes candidatures
+- Voir mes votes
+
+### 5. Documents et informations
+- Imprimer mon passeport
+- Accéder à mes documents
+- Consulter les rapports de réunion
+- Consulter les statuts de l'association
+
+### 6. Participation et idées
+- Ajouter une idée dans la boîte à idées (AMÉLIORÉ)
+- Suivre mes idées
+- Voter pour des idées
+
+### 7. Badges et statistiques
+- Voir mes badges
+- Voir mes statistiques
+
+### 8. Communication
+- Gérer mes notifications
+- Consulter la galerie
+- Contacter l'association
+
+### 9. Inscription
+- S'inscrire à l'association
+
+## 🔴 Guides pour les ADMINISTRATEURS (7 nouveaux guides)
+
+### 1. Gestion des cotisations
+**Encaisser une cotisation manuelle**
+- Enregistrer un paiement manuel (espèces, chèque, virement)
+- Générer automatiquement un reçu
+- Mise à jour de l'historique adhérent
+- Lien : /admin/cotisations/gestion
+
+**Créer la cotisation mensuelle**
+- Processus de création mensuelle automatique
+- Application des assistances programmées
+- Notifications automatiques aux adhérents
+- À faire une seule fois par mois
+- Lien : /admin/cotisations/mensuelles
+
+**Ajouter ou créer une assistance**
+- Assistance ponctuelle (une fois)
+- Assistance mensuelle récurrente
+- Gestion bénéficiaire/donateur
+- Lien : /admin/cotisations/assistances
+
+### 2. Gestion des événements
+**Ajouter un événement**
+- Création complète (titre, description, date, lieu)
+- Gestion des inscriptions et places
+- Paramètres de paiement
+- Upload d'image de couverture
+- Lien : /admin/evenements
+
+### 3. Gestion de la galerie
+**Ajouter un élément dans la galerie**
+- Upload photos et vidéos (batch)
+- Optimisation automatique des images
+- Organisation par événements
+- Tags et catégories
+- Lien : /admin/galerie
+
+### 4. Communication administrative
+**Envoyer une notification**
+- Ciblage des destinataires (tous, sélection, filtres)
+- Types de notifications (info, succès, avertissement, erreur)
+- Programmation d'envoi (immédiat ou différé)
+- Lien vers une page spécifique
+- Lien : /admin/notifications
+
+**Envoyer un email aux adhérents**
+- Éditeur riche avec variables personnalisées
+- Pièces jointes (PDF, DOCX, images)
+- Filtrage avancé des destinataires
+- Envoi immédiat ou programmé
+- Statistiques d'ouverture et clics
+- Lien : /admin/emails
+
+## 📝 Exemples de questions à poser
+
+### Pour les adhérents :
+
+**Compte et profil :**
+- "Comment modifier mon mot de passe ?"
+- "Comment changer ma photo de profil ?"
+- "Comment mettre à jour mes informations personnelles ?"
+
+**Cotisations :**
+- "Comment payer ma cotisation ?"
+- "Comment payer en plusieurs fois ?"
+- "Comment voir mes dettes ?"
+- "Où voir mon historique de paiements ?"
+
+**Événements :**
+- "Comment participer à un événement ?"
+- "Où voir les événements à venir ?"
+- "Comment m'inscrire à une sortie ?"
+
+**Idées et participation :**
+- "Comment proposer une idée ?"
+- "Comment ajouter une idée dans la boîte à idées ?"
+- "Où voir mes idées ?"
+
+**Documents :**
+- "Comment télécharger mon passeport ?"
+- "Comment consulter les statuts ?"
+- "Où voir les rapports de réunion ?"
+
+### Pour les administrateurs :
+
+**Cotisations :**
+- "Comment encaisser une cotisation ?"
+- "Comment enregistrer un paiement manuel ?"
+- "Comment créer la cotisation mensuelle ?"
+- "Comment créer la cotisation du mois ?"
+- "Comment ajouter une assistance ?"
+- "Comment créer une assistance mensuelle ?"
+
+**Événements :**
+- "Comment créer un événement ?"
+- "Comment ajouter un événement ?"
+- "Comment organiser une sortie ?"
+
+**Galerie :**
+- "Comment ajouter des photos ?"
+- "Comment télécharger des images dans la galerie ?"
+- "Comment publier une vidéo ?"
+
+**Communication :**
+- "Comment envoyer une notification ?"
+- "Comment notifier les adhérents ?"
+- "Comment envoyer un email ?"
+- "Comment envoyer un mail aux adhérents ?"
+- "Comment faire un emailing ?"
+
+## 🎯 Fonctionnalités clés de l'assistant
+
+### 1. Détection intelligente
+- Reconnaissance de mots-clés multiples
+- Synonymes et variantes acceptés
+- Tolérance aux fautes de frappe (algorithme de Levenshtein)
+- Normalisation des accents et ponctuation
+
+### 2. Réponses détaillées
+- Instructions étape par étape numérotées
+- Émojis pour meilleure lisibilité (📋 📝 👥 ✅ 💡)
+- Sections organisées et structurées
+- Conseils pratiques (💡 Conseil)
+- Avertissements importants (⚠️ Important)
+
+### 3. Actions rapides
+- Boutons d'action dans les réponses
+- Liens directs vers les pages concernées
+- Navigation facilitée
+
+### 4. Messages personnalisés
+- Séparation claire entre fonctionnalités adhérents et admin
+- Suggestions contextuelles
+- Messages d'aide par défaut
+
+## 🔧 Comment utiliser l'assistant
+
+1. **Ouvrir le chatbot**
+   - Cliquez sur l'icône de chat en bas à droite de l'écran
+   - L'assistant Amaki vous accueille
+
+2. **Poser une question**
+   - Tapez votre question en langage naturel
+   - Utilisez des mots-clés pertinents
+   - Exemples : "payer cotisation", "créer événement", "envoyer notification"
+
+3. **Lire la réponse**
+   - L'assistant vous guide étape par étape
+   - Suivez les instructions numérotées
+   - Cliquez sur les boutons d'action pour accéder directement aux pages
+
+4. **Questions de suivi**
+   - Posez d'autres questions si nécessaire
+   - L'historique des conversations est sauvegardé dans votre navigateur
+
+## 💡 Conseils d'utilisation
+
+### Pour de meilleurs résultats :
+- Utilisez des mots-clés clairs ("payer", "créer", "envoyer", "modifier")
+- Soyez spécifique ("cotisation mensuelle" plutôt que juste "cotisation")
+- N'hésitez pas à reformuler si la première réponse n'est pas celle attendue
+
+### Les mots-clés qui fonctionnent bien :
+
+**Adhérents :**
+- mot de passe, password, mdp
+- cotisation, payer, paiement
+- photo, image, avatar
+- profil, informations
+- événement, participer
+- idée, proposer, boîte à idées
+- passeport, document
+- rapport, réunion
+- statut, juridique
+
+**Administrateurs :**
+- encaisser, enregistrer paiement
+- créer cotisation, cotisation mensuelle
+- assistance, aider adhérent
+- créer événement, ajouter événement
+- galerie, photo, upload
+- notification, notifier, alerter
+- email, mail, envoyer, emailing
+
+## 📊 Statistiques
+
+- **25 guides complets** (18 adhérents + 7 admin)
+- **Plus de 200 mots-clés** reconnus
+- **Instructions détaillées** avec moyenne de 10-15 étapes par guide
+- **Détection intelligente** avec tolérance aux fautes
+- **Actions rapides** avec liens directs
+
+## 🚀 Prochaines améliorations possibles
+
+- [ ] Ajout de tutoriels vidéo dans les réponses
+- [ ] Support multilingue (anglais, lingala)
+- [ ] Intégration avec l'historique des actions utilisateur
+- [ ] Suggestions proactives basées sur le profil
+- [ ] Chatbot vocal (reconnaissance vocale)
+- [ ] Réponses contextuelles selon le rôle (Admin/Membre)
+
+## 📞 Support
+
+Si l'assistant virtuel ne répond pas à votre question :
+1. Reformulez avec des mots-clés différents
+2. Contactez le support via la page "Contact"
+3. Envoyez un email à l'administration
+
+---
+
+**Version :** 2.0 (Enrichi avec fonctionnalités administratives)
+**Date :** Janvier 2026
+**Auteur :** Équipe de développement AMAKI France
