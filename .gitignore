@@ -56,3 +56,4 @@ public/fallback-*.js.map
 
 # Prisma schema hash (pour optimiser les builds)
 .prisma-schema-hash
+/private/

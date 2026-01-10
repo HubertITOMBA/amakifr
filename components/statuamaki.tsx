@@ -504,7 +504,7 @@ export function StatuAmaki({ open, onOpenChange }: StatuAmakiProps) {
               Fermer
             </Button>
             <Button
-              onClick={() => window.open('/statut-amaki-france.pdf', '_blank')}
+              onClick={() => window.open('/api/documents/statut', '_blank')}
               className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
             >
               <Download className="h-4 w-4 mr-2" />
