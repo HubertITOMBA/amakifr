@@ -1,0 +1,170 @@
+# Déploiement des Documents Privés
+
+## 📋 Contexte
+
+Les statuts de l'association (et autres documents sensibles) ne sont plus accessibles publiquement via le dossier `public/`. Ils sont maintenant stockés dans le dossier `private/documents/` et servis via une API route protégée qui vérifie l'authentification.
+
+## 🔒 Sécurité
+
+- ✅ Les documents ne sont **plus dans Git** (dossier `private/` dans `.gitignore`)
+- ✅ Accessible uniquement aux **adhérents connectés**
+- ✅ Vérification de l'authentification via **NextAuth**
+- ✅ Protection contre les accès non autorisés
+
+## 📁 Structure
+
+```
+private/
+└── documents/
+    ├── README.md
+    └── statut-amaki-france.pdf
+```
+
+## 🚀 Déploiement en Production
+
+### Méthode 1 : Script automatique (recommandé)
+
+```bash
+# Depuis votre machine locale
+./scripts/deploy-private-documents.sh
+```
+
+Le script va :
+1. Vérifier les fichiers locaux
+2. Créer le dossier sur le serveur
+3. Copier les fichiers via SCP
+4. Définir les bonnes permissions
+
+### Méthode 2 : Déploiement manuel
+
+#### Étape 1 : Connexion au serveur
+
+```bash
+ssh root@amakifrance.com
+cd /soft/dev/nextjs/amakifr
+```
+
+#### Étape 2 : Créer le dossier
+
+```bash
+mkdir -p private/documents
+```
+
+#### Étape 3 : Copier les fichiers
+
+Depuis votre machine locale :
+
+```bash
+scp private/documents/statut-amaki-france.pdf root@amakifrance.com:/soft/dev/nextjs/amakifr/private/documents/
+```
+
+#### Étape 4 : Vérifier les permissions
+
+Sur le serveur :
+
+```bash
+chmod 644 private/documents/*.pdf
+ls -lh private/documents/
+```
+
+### Étape 5 : Redémarrer l'application
+
+```bash
+pm2 restart amakifr
+```
+
+## 🧪 Vérification
+
+### Test 1 : Utilisateur non connecté
+
+```bash
+curl -I https://amakifrance.com/api/documents/statut
+# Devrait retourner: 401 Unauthorized
+```
+
+### Test 2 : Utilisateur connecté
+
+1. Se connecter sur https://amakifrance.com
+2. Aller sur la page "L'amicale"
+3. Cliquer sur "Nos Statuts"
+4. Cliquer sur "Télécharger le PDF"
+5. Le PDF devrait s'ouvrir dans un nouvel onglet
+
+### Test 3 : Vérification sur le serveur
+
+```bash
+ssh root@amakifrance.com
+ls -lh /soft/dev/nextjs/amakifr/private/documents/
+# Devrait afficher:
+# -rw-r--r--. 1 root root 759K ... statut-amaki-france.pdf
+```
+
+## 🔄 Mise à jour d'un document
+
+Pour mettre à jour un document (ex: nouveau statut) :
+
+1. Remplacer le fichier local dans `private/documents/`
+2. Relancer le script de déploiement :
+   ```bash
+   ./scripts/deploy-private-documents.sh
+   ```
+3. Redémarrer l'application sur le serveur :
+   ```bash
+   ssh root@amakifrance.com "cd /soft/dev/nextjs/amakifr && pm2 restart amakifr"
+   ```
+
+## 📚 API Routes Disponibles
+
+### GET /api/documents/statut
+
+Télécharge les statuts de l'association.
+
+**Authentification** : Requise (session NextAuth)
+
+**Réponse** :
+- `200` : PDF des statuts
+- `401` : Non authentifié
+- `500` : Erreur serveur
+
+**Headers** :
+- `Content-Type: application/pdf`
+- `Content-Disposition: inline; filename="statut-amaki-france.pdf"`
+- `Cache-Control: private, max-age=3600`
+
+## 🛠️ Ajout de nouveaux documents
+
+Pour ajouter un nouveau document privé :
+
+1. Placer le fichier dans `private/documents/`
+2. Créer une nouvelle API route dans `app/api/documents/[nom]/route.ts`
+3. Copier le code de `app/api/documents/statut/route.ts` et adapter
+4. Déployer avec le script `./scripts/deploy-private-documents.sh`
+
+## ⚠️ Important
+
+- Le dossier `private/` n'est **jamais commité** dans Git
+- Les documents doivent être **déployés manuellement** sur chaque serveur
+- En **développement local**, placer les documents dans `private/documents/` pour les tester
+- Sauvegarder les documents originaux dans un **lieu sécurisé** (hors Git)
+
+## 🐛 Dépannage
+
+### Erreur "Fichier introuvable"
+
+Vérifier que le fichier existe sur le serveur :
+```bash
+ls -lh /soft/dev/nextjs/amakifr/private/documents/
+```
+
+### Erreur "Permission denied"
+
+Vérifier les permissions :
+```bash
+chmod 644 /soft/dev/nextjs/amakifr/private/documents/*.pdf
+```
+
+### Erreur 401 même en étant connecté
+
+Vérifier la session NextAuth :
+- Effacer les cookies et se reconnecter
+- Vérifier les logs de l'application : `pm2 logs amakifr`
