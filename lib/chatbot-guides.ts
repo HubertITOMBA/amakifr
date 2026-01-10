@@ -388,8 +388,382 @@ export const chatbotGuides: Guide[] = [
       '• Comment participer à un événement',
       '• Comment consulter les rapports de réunion',
       '• Comment gérer vos notifications',
-      '• Comment proposer une idée',
+      '• Comment proposer une idée dans la boîte à idées',
+      '• [ADMIN] Comment encaisser une cotisation manuelle',
+      '• [ADMIN] Comment créer une cotisation mensuelle',
+      '• [ADMIN] Comment ajouter une assistance',
+      '• [ADMIN] Comment ajouter un événement',
+      '• [ADMIN] Comment ajouter un élément dans la galerie',
+      '• [ADMIN] Comment envoyer une notification',
+      '• [ADMIN] Comment envoyer un email aux adhérents',
       'Tapez simplement votre question et je vous guiderai étape par étape !'
+    ]
+  },
+  // ============================================================
+  // GUIDES POUR LES ADMINISTRATEURS
+  // ============================================================
+  {
+    keywords: ['encaisser', 'encaissement', 'cotisation manuelle', 'paiement manuel', 'enregistrer paiement', 'saisir paiement', 'enregistrer cotisation', 'admin encaisser', 'encaisser cotisation'],
+    title: '[ADMIN] Comment encaisser une cotisation manuelle',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Allez dans "Admin" > "Gestion des Cotisations"',
+      'Recherchez l\'adhérent concerné dans la liste',
+      'Cliquez sur le bouton "Actions" (trois points) à côté de l\'adhérent',
+      'Sélectionnez "Encaisser un paiement manuel"',
+      'Dans le formulaire qui s\'ouvre :',
+      '  • Sélectionnez le type de cotisation (Mensuelle, Dette initiale, etc.)',
+      '  • Entrez le montant encaissé',
+      '  • Choisissez le moyen de paiement (Espèces, Chèque, Virement)',
+      '  • Si c\'est un chèque, notez le numéro',
+      '  • Ajoutez une note si nécessaire (optionnel)',
+      'Vérifiez toutes les informations',
+      'Cliquez sur "Enregistrer le paiement"',
+      'Un reçu sera automatiquement généré et envoyé à l\'adhérent par email',
+      'Le paiement sera visible dans l\'historique de l\'adhérent',
+      '💡 Conseil : Pour les paiements en espèces, pensez à émettre un reçu papier également'
+    ],
+    actions: [
+      { label: 'Gestion des cotisations', action: 'open_admin_cotisations', href: '/admin/cotisations/gestion' }
+    ]
+  },
+  {
+    keywords: ['créer cotisation mensuelle', 'générer cotisation mensuelle', 'cotisation du mois', 'lancer cotisation', 'nouvelle cotisation mensuelle', 'admin cotisation', 'créer cotisation'],
+    title: '[ADMIN] Comment créer la cotisation mensuelle',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Allez dans "Admin" > "Gestion des Cotisations" > "Cotisations Mensuelles"',
+      'Cliquez sur le bouton "Créer la cotisation du mois"',
+      'Un dialog de confirmation s\'ouvre avec les informations suivantes :',
+      '  • Le mois et l\'année de la cotisation à créer',
+      '  • Le nombre d\'adhérents éligibles',
+      '  • Le montant de la cotisation mensuelle actuel',
+      'Vérifiez que le mois affiché est correct',
+      'Cliquez sur "Confirmer la création"',
+      'Le système va automatiquement :',
+      '  • Créer la cotisation pour tous les adhérents éligibles',
+      '  • Appliquer les assistances programmées',
+      '  • Calculer les montants dus pour chaque adhérent',
+      '  • Envoyer des notifications aux adhérents',
+      'Une fois terminé, vous verrez un message de confirmation avec le nombre de cotisations créées',
+      'Les adhérents recevront un email les informant de leur nouvelle cotisation',
+      '⚠️ Important : Cette opération ne peut être effectuée qu\'une seule fois par mois',
+      '💡 Conseil : Créez la cotisation mensuelle au début de chaque mois (idéalement le 1er)'
+    ],
+    actions: [
+      { label: 'Cotisations mensuelles', action: 'open_admin_cotisations_mensuelles', href: '/admin/cotisations/mensuelles' }
+    ]
+  },
+  {
+    keywords: ['assistance', 'aider adhérent', 'créer assistance', 'ajouter assistance', 'enregistrer assistance', 'admin assistance', 'soutien adhérent', 'aide financière'],
+    title: '[ADMIN] Comment ajouter ou créer une assistance',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Il existe deux types d\'assistances : ponctuelle et mensuelle récurrente',
+      '',
+      '🔹 Pour créer une assistance ponctuelle :',
+      'Allez dans "Admin" > "Gestion des Cotisations" > "Assistances"',
+      'Cliquez sur "Nouvelle assistance ponctuelle"',
+      'Remplissez le formulaire :',
+      '  • Sélectionnez le bénéficiaire (adhérent)',
+      '  • Choisissez le donateur (adhérent qui aide)',
+      '  • Entrez le montant de l\'assistance',
+      '  • Sélectionnez la période (mois/année)',
+      '  • Ajoutez une description (motif de l\'assistance)',
+      'Cliquez sur "Enregistrer"',
+      '',
+      '🔹 Pour créer une assistance mensuelle récurrente :',
+      'Allez dans "Admin" > "Gestion des Cotisations" > "Assistances Mensuelles"',
+      'Cliquez sur "Nouvelle assistance mensuelle"',
+      'Remplissez le formulaire :',
+      '  • Sélectionnez le bénéficiaire',
+      '  • Choisissez le donateur',
+      '  • Entrez le montant mensuel',
+      '  • Définissez la date de début',
+      '  • Définissez la date de fin (optionnel)',
+      '  • Choisissez la récurrence (tous les mois, tous les 2 mois, etc.)',
+      '  • Ajoutez une description',
+      'Cliquez sur "Enregistrer"',
+      '',
+      'L\'assistance sera automatiquement appliquée lors de la création des cotisations mensuelles',
+      'Les deux adhérents (donateur et bénéficiaire) recevront une notification',
+      '💡 Conseil : Les assistances mensuelles sont idéales pour les soutiens réguliers'
+    ],
+    actions: [
+      { label: 'Gérer les assistances', action: 'open_admin_assistances', href: '/admin/cotisations/assistances' }
+    ]
+  },
+  {
+    keywords: ['ajouter événement', 'créer événement', 'nouvel événement', 'organiser événement', 'admin événement', 'event', 'créer event', 'ajouter event'],
+    title: '[ADMIN] Comment ajouter un événement',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Allez dans "Admin" > "Gestion des Événements"',
+      'Cliquez sur le bouton "Nouvel événement" ou "Créer un événement"',
+      'Remplissez le formulaire de création :',
+      '',
+      '📝 Informations principales :',
+      '  • Titre de l\'événement',
+      '  • Description détaillée',
+      '  • Type d\'événement (Réunion, Fête, Formation, Sortie, etc.)',
+      '  • Catégorie (Culturel, Social, Sportif, etc.)',
+      '',
+      '📅 Date et lieu :',
+      '  • Date et heure de début',
+      '  • Date et heure de fin',
+      '  • Lieu (adresse complète)',
+      '  • Lien Google Maps (optionnel)',
+      '',
+      '👥 Paramètres d\'inscription :',
+      '  • Nombre de places disponibles (optionnel)',
+      '  • Date limite d\'inscription',
+      '  • Événement payant ou gratuit',
+      '  • Si payant, définir le prix',
+      '  • Autoriser les inscriptions avec accompagnants',
+      '',
+      '🖼️ Média :',
+      '  • Téléchargez une image de couverture (recommandé)',
+      '  • Format : JPG, PNG (max 5 Mo)',
+      '',
+      '✅ Validation :',
+      'Vérifiez toutes les informations',
+      'Cliquez sur "Créer l\'événement"',
+      '',
+      'L\'événement sera publié et visible par tous les adhérents',
+      'Une notification sera envoyée à tous les adhérents',
+      'Vous pourrez gérer les inscriptions dans "Gestion des inscriptions"',
+      '',
+      '💡 Conseil : Créez l\'événement au moins 2 semaines à l\'avance pour permettre aux adhérents de s\'organiser'
+    ],
+    actions: [
+      { label: 'Gestion des événements', action: 'open_admin_events', href: '/admin/evenements' }
+    ]
+  },
+  {
+    keywords: ['galerie', 'ajouter photo', 'ajouter image', 'télécharger photo', 'upload photo', 'admin galerie', 'ajouter média', 'publier photo', 'uploader image'],
+    title: '[ADMIN] Comment ajouter un élément dans la galerie',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Allez dans "Admin" > "Gestion de la Galerie"',
+      'Cliquez sur le bouton "Ajouter des médias" ou "Télécharger"',
+      '',
+      '📤 Téléchargement :',
+      'Vous pouvez télécharger plusieurs fichiers en même temps',
+      'Cliquez sur "Choisir des fichiers" ou glissez-déposez vos fichiers',
+      'Formats acceptés :',
+      '  • Images : JPG, PNG, GIF, WEBP (max 10 Mo par image)',
+      '  • Vidéos : MP4, WEBM (max 100 Mo par vidéo)',
+      '',
+      '🏷️ Informations pour chaque média :',
+      '  • Titre du média',
+      '  • Description (optionnel)',
+      '  • Catégorie (Événement, Réunion, Fête, Divers, etc.)',
+      '  • Tags pour faciliter la recherche (optionnel)',
+      '  • Date de prise de vue (optionnel)',
+      '  • Associer à un événement existant (optionnel)',
+      '',
+      '✅ Publication :',
+      'Vérifiez que toutes les informations sont correctes',
+      'Cochez "Publier immédiatement" ou programmez une publication',
+      'Cliquez sur "Télécharger et publier"',
+      '',
+      'Le système va :',
+      '  • Optimiser automatiquement les images',
+      '  • Générer des vignettes',
+      '  • Publier les médias dans la galerie',
+      '',
+      'Les adhérents verront les nouveaux médias dans la galerie publique',
+      '',
+      '💡 Conseil : Organisez vos médias par événement pour faciliter la navigation',
+      '💡 Conseil : Utilisez des titres descriptifs et des tags pour améliorer la recherche'
+    ],
+    actions: [
+      { label: 'Gestion de la galerie', action: 'open_admin_galerie', href: '/admin/galerie' }
+    ]
+  },
+  {
+    keywords: ['envoyer notification', 'notifier', 'créer notification', 'admin notification', 'notification adhérent', 'notification groupe', 'alerter adhérent', 'message notification'],
+    title: '[ADMIN] Comment envoyer une notification à un ou plusieurs adhérents',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Allez dans "Admin" > "Gestion des Notifications"',
+      'Cliquez sur "Nouvelle notification"',
+      '',
+      '📝 Contenu de la notification :',
+      '  • Titre de la notification (court et explicite)',
+      '  • Message (texte de la notification)',
+      '  • Type de notification :',
+      '    - Info (bleu) : Information générale',
+      '    - Succès (vert) : Confirmation, félicitations',
+      '    - Avertissement (orange) : Attention importante',
+      '    - Erreur (rouge) : Alerte urgente',
+      '  • Lien optionnel vers une page spécifique',
+      '',
+      '👥 Destinataires :',
+      'Vous pouvez choisir plusieurs options :',
+      '',
+      '🔹 Envoyer à tous les adhérents :',
+      '  • Cochez "Tous les adhérents"',
+      '  • La notification sera envoyée à tous',
+      '',
+      '🔹 Envoyer à des adhérents spécifiques :',
+      '  • Décochez "Tous les adhérents"',
+      '  • Recherchez et sélectionnez les adhérents dans la liste',
+      '  • Vous pouvez sélectionner plusieurs adhérents',
+      '',
+      '🔹 Envoyer par critères :',
+      '  • Filtrez par statut (Actif, Inactif, En attente)',
+      '  • Filtrez par type d\'adhésion',
+      '  • Filtrez par situation de paiement (à jour, en dette)',
+      '  • Filtrez par présence à un événement',
+      '',
+      '📅 Programmation :',
+      '  • Envoi immédiat : la notification est envoyée dès la validation',
+      '  • Envoi programmé : choisissez une date et heure d\'envoi',
+      '',
+      '✅ Validation :',
+      'Vérifiez le contenu et les destinataires',
+      'Cliquez sur "Envoyer la notification"',
+      '',
+      'Les adhérents verront la notification :',
+      '  • Dans l\'application (cloche de notification)',
+      '  • Par email si l\'option est activée',
+      '  • Sur leur téléphone si les notifications push sont activées',
+      '',
+      '💡 Conseil : Utilisez des titres clairs pour que les adhérents comprennent rapidement le sujet'
+    ],
+    actions: [
+      { label: 'Gestion des notifications', action: 'open_admin_notifications', href: '/admin/notifications' }
+    ]
+  },
+  {
+    keywords: ['envoyer email', 'envoyer mail', 'email adhérent', 'mail adhérent', 'admin email', 'admin mail', 'emailing', 'mailing', 'email groupe', 'mail collectif'],
+    title: '[ADMIN] Comment envoyer un email à un ou plusieurs adhérents',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Allez dans "Admin" > "Gestion des Emails"',
+      'Cliquez sur "Nouvel email" ou "Composer un email"',
+      '',
+      '📝 Composition de l\'email :',
+      '  • Objet de l\'email (ligne d\'objet)',
+      '  • Corps du message :',
+      '    - Utilisez l\'éditeur riche pour formater le texte',
+      '    - Ajoutez des images, liens, tableaux',
+      '    - Insérez des variables personnalisées (prénom, nom, etc.)',
+      '  • Signature automatique de l\'association',
+      '',
+      '📎 Pièces jointes (optionnel) :',
+      '  • Cliquez sur "Ajouter une pièce jointe"',
+      '  • Formats acceptés : PDF, DOCX, XLSX, JPG, PNG',
+      '  • Taille maximale : 10 Mo par fichier',
+      '  • Maximum 5 pièces jointes par email',
+      '',
+      '👥 Destinataires :',
+      'Plusieurs options disponibles :',
+      '',
+      '🔹 Envoyer à tous :',
+      '  • Cochez "Tous les adhérents"',
+      '  • L\'email sera envoyé à tous les adhérents actifs',
+      '',
+      '🔹 Sélection manuelle :',
+      '  • Décochez "Tous les adhérents"',
+      '  • Recherchez et sélectionnez les destinataires',
+      '  • Vous pouvez sélectionner plusieurs adhérents',
+      '',
+      '🔹 Filtrage avancé :',
+      '  • Par statut d\'adhésion',
+      '  • Par type d\'adhésion',
+      '  • Par situation de cotisation',
+      '  • Par année de promotion',
+      '  • Par ville ou pays',
+      '  • Par participation à des événements',
+      '',
+      '🔍 Aperçu :',
+      'Cliquez sur "Prévisualiser" pour voir le rendu final',
+      'Vérifiez que les variables personnalisées s\'affichent correctement',
+      '',
+      '📤 Envoi :',
+      'Deux options :',
+      '  • Envoi immédiat : cliquez sur "Envoyer maintenant"',
+      '  • Envoi programmé : choisissez date et heure, puis "Programmer l\'envoi"',
+      '',
+      '📊 Suivi :',
+      'Après l\'envoi, vous pourrez consulter :',
+      '  • Le nombre d\'emails envoyés',
+      '  • Le nombre d\'emails ouverts',
+      '  • Le nombre de clics sur les liens',
+      '  • Les erreurs d\'envoi éventuelles',
+      '',
+      '💡 Conseil : Testez l\'email en l\'envoyant d\'abord à vous-même',
+      '💡 Conseil : Utilisez des objets courts et accrocheurs pour améliorer le taux d\'ouverture',
+      '⚠️ Important : Les emails sont envoyés depuis l\'adresse officielle de l\'association'
+    ],
+    actions: [
+      { label: 'Gestion des emails', action: 'open_admin_emails', href: '/admin/emails' }
+    ]
+  },
+  // ============================================================
+  // GUIDE AMÉLIORÉ POUR LA BOÎTE À IDÉES (TOUT LE MONDE)
+  // ============================================================
+  {
+    keywords: ['boîte à idées', 'boite a idees', 'ajouter idée', 'proposer idée', 'soumettre idée', 'nouvelle idée', 'idée association', 'suggestion', 'proposition'],
+    title: 'Comment ajouter une idée dans la boîte à idées',
+    steps: [
+      '💡 La boîte à idées permet à tous les adhérents de proposer des idées pour améliorer l\'association',
+      '',
+      '📝 Pour ajouter une nouvelle idée :',
+      'Allez dans "Idées" depuis le menu principal',
+      'ou',
+      'Allez dans "Mon Profil" > "Mes Idées"',
+      '',
+      'Cliquez sur le bouton "Proposer une idée" ou "Nouvelle idée"',
+      '',
+      'Remplissez le formulaire :',
+      '  • Titre de votre idée (court et explicite)',
+      '  • Catégorie :',
+      '    - Événement : Proposition d\'événement à organiser',
+      '    - Amélioration : Amélioration de l\'association ou du site',
+      '    - Projet : Nouveau projet ou initiative',
+      '    - Autre : Autres suggestions',
+      '  • Description détaillée :',
+      '    - Expliquez votre idée clairement',
+      '    - Mentionnez les bénéfices pour l\'association',
+      '    - Si possible, proposez un plan de mise en œuvre',
+      '  • Budget estimé (optionnel)',
+      '  • Échéance souhaitée (optionnel)',
+      '',
+      'Vous pouvez ajouter des pièces jointes :',
+      '  • Documents explicatifs (PDF, DOCX)',
+      '  • Images illustratives (JPG, PNG)',
+      '  • Taille maximale : 5 Mo par fichier',
+      '',
+      'Cliquez sur "Soumettre l\'idée"',
+      '',
+      '📊 Après la soumission :',
+      '  • Votre idée sera visible par tous les adhérents',
+      '  • Les autres adhérents pourront :',
+      '    - Voter pour votre idée (👍 J\'aime)',
+      '    - Commenter et enrichir votre proposition',
+      '    - Proposer des améliorations',
+      '  • Les administrateurs examineront les idées populaires',
+      '  • Vous serez notifié de l\'évolution de votre idée',
+      '',
+      '🏆 Statuts possibles de votre idée :',
+      '  • En attente : L\'idée vient d\'être soumise',
+      '  • En examen : Les administrateurs étudient l\'idée',
+      '  • Approuvée : L\'idée est retenue et sera mise en œuvre',
+      '  • En cours : L\'idée est en cours de réalisation',
+      '  • Réalisée : L\'idée a été mise en œuvre avec succès',
+      '  • Rejetée : L\'idée n\'a pas été retenue (avec explication)',
+      '',
+      '✨ Vous pouvez suivre toutes vos idées dans "Mon Profil" > "Mes Idées"',
+      '',
+      '💡 Conseil : Plus votre idée est détaillée et concrète, plus elle a de chances d\'être retenue',
+      '💡 Conseil : N\'hésitez pas à proposer des idées innovantes, même audacieuses !'
+    ],
+    actions: [
+      { label: 'Voir la boîte à idées', action: 'open_idees', href: '/idees' },
+      { label: 'Mes idées', action: 'open_mes_idees', href: '/user/profile?section=idees' }
     ]
   }
 ];
@@ -540,20 +914,24 @@ export function generateBotResponse(question: string): { message: string; guide?
   // Validation de type pour éviter les erreurs
   if (typeof question !== 'string' || !question || !question.trim()) {
     return {
-      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\nJe peux vous aider avec :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Proposer une idée\n• Consulter la galerie\n• Contacter l'association`
+      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Ajouter un événement\n• Ajouter un élément dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents`
     };
   }
   
   const guide = findGuideForQuestion(question);
   
   if (guide) {
-    const message = `Voici comment ${guide.title.toLowerCase()} :\n\n${guide.steps.map((step, index) => `${index + 1}. ${step}`).join('\n\n')}\n\nN'hésitez pas si vous avez d'autres questions !`;
+    const message = `Voici comment ${guide.title.toLowerCase()} :\n\n${guide.steps.map((step, index) => {
+      // Ne pas numéroter les lignes vides
+      if (step.trim() === '') return '\n';
+      return `${index + 1}. ${step}`;
+    }).join('\n\n')}\n\nN'hésitez pas si vous avez d'autres questions !`;
     return { message, guide };
   }
   
   // Réponse par défaut avec suggestions
   return {
-    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\nVoici ce que je peux vous expliquer :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Proposer une idée\n• Consulter la galerie\n• Contacter l'association\n\nPosez-moi une question plus précise en utilisant des mots-clés comme "mot de passe", "cotisation", "photo", "profil", "passeport", "événement", "rapport", etc. et je vous guiderai étape par étape !`
+    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Ajouter un événement\n• Ajouter un élément dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n\nPosez-moi une question plus précise en utilisant des mots-clés et je vous guiderai étape par étape !`
   };
 }
 
@@ -586,6 +964,10 @@ export const quickQuestions = [
   "Comment voir mes documents ?",
   "Comment participer à un événement ?",
   "Comment consulter les rapports ?",
-  "Comment voir mes badges ?",
-  "Comment modifier mon profil ?"
+  "Comment ajouter une idée ?",
+  "Comment modifier mon profil ?",
+  "[ADMIN] Comment encaisser une cotisation ?",
+  "[ADMIN] Comment créer la cotisation mensuelle ?",
+  "[ADMIN] Comment ajouter un événement ?",
+  "[ADMIN] Comment envoyer une notification ?"
 ];
