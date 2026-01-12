@@ -76,7 +76,7 @@ server {
     
     set $maintenance 0;
     
-    if (-f /var/www/amaki/maintenance.flag) {
+    if (-f /sites/amakifr/maintenance.flag) {
         set $maintenance 1;
     }
     
@@ -88,7 +88,7 @@ server {
     
     location @maintenance {
         allow all;
-        root /var/www/amaki/.next/server/app;
+        root /sites/amakifr/.next/server/app;
         rewrite ^(.*)$ /maintenance.html break;
         add_header Cache-Control "no-store, no-cache, must-revalidate";
         default_type text/html;
@@ -109,8 +109,8 @@ server {
 3. **Adapter les chemins si nécessaire**
 
 Par défaut, la configuration utilise :
-- Fichier flag : `/var/www/amaki/maintenance.flag`
-- Page HTML : `/var/www/amaki/.next/server/app/maintenance.html`
+- Fichier flag : `/sites/amakifr/maintenance.flag`
+- Page HTML : `/sites/amakifr/.next/server/app/maintenance.html`
 
 Modifiez ces chemins selon votre configuration.
 
@@ -142,7 +142,7 @@ git commit -m "feat: Ajout du mode maintenance"
 git push origin main
 
 # Sur le serveur
-cd /var/www/amaki
+cd /sites/amakifr
 git pull origin main
 ```
 
@@ -154,7 +154,7 @@ Le script `maintenance-on.sh` copiera automatiquement `public/maintenance.html` 
 
 ```bash
 # Sur le serveur
-cd /var/www/amaki
+cd /sites/amakifr
 bash scripts/maintenance-on.sh
 ```
 
@@ -176,12 +176,12 @@ Le site devrait être accessible normalement.
 **Depuis le serveur de production :**
 
 ```bash
-cd /var/www/amaki
+cd /sites/amakifr
 bash scripts/maintenance-on.sh
 ```
 
 Le script va :
-1. ✅ Créer le fichier flag `/var/www/amaki/maintenance.flag`
+1. ✅ Créer le fichier flag `/sites/amakifr/maintenance.flag`
 2. ✅ Copier `public/maintenance.html` vers `.next/server/app/maintenance.html`
 3. ✅ Recharger nginx
 4. ✅ Afficher un résumé de l'activation
@@ -199,11 +199,11 @@ Le script va :
 Voulez-vous continuer ? (o/n) : o
 
 📝 Étape 1/3: Création du fichier flag...
-   ✅ Fichier flag créé: /var/www/amaki/maintenance.flag
+   ✅ Fichier flag créé: /sites/amakifr/maintenance.flag
    ✅ Horodatage ajouté au fichier flag
 
 📄 Étape 2/3: Copie de la page de maintenance...
-   ✅ Page de maintenance copiée vers: /var/www/amaki/.next/server/app/maintenance.html
+   ✅ Page de maintenance copiée vers: /sites/amakifr/.next/server/app/maintenance.html
    ✅ Permissions définies (644)
 
 🔄 Étape 3/3: Rechargement de la configuration nginx...
@@ -215,8 +215,8 @@ Voulez-vous continuer ? (o/n) : o
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 📌 Statut:
-   • Fichier flag: /var/www/amaki/maintenance.flag
-   • Page HTML: /var/www/amaki/.next/server/app/maintenance.html
+   • Fichier flag: /sites/amakifr/maintenance.flag
+   • Page HTML: /sites/amakifr/.next/server/app/maintenance.html
    • Date d'activation: 12/01/2026 à 15:30:00
 
 💡 Tous les utilisateurs voient maintenant la page de maintenance.
@@ -231,12 +231,12 @@ Voulez-vous continuer ? (o/n) : o
 **Depuis le serveur de production :**
 
 ```bash
-cd /var/www/amaki
+cd /sites/amakifr
 bash scripts/maintenance-off.sh
 ```
 
 Le script va :
-1. ✅ Supprimer le fichier flag `/var/www/amaki/maintenance.flag`
+1. ✅ Supprimer le fichier flag `/sites/amakifr/maintenance.flag`
 2. ✅ Recharger nginx
 3. ✅ Afficher un résumé de la désactivation
 
@@ -253,7 +253,7 @@ Le script va :
 Voulez-vous désactiver le mode maintenance ? (o/n) : o
 
 🗑️  Suppression du fichier flag...
-   ✅ Fichier flag supprimé: /var/www/amaki/maintenance.flag
+   ✅ Fichier flag supprimé: /sites/amakifr/maintenance.flag
 
 🔄 Rechargement de la configuration nginx...
    ✅ Configuration nginx valide
@@ -299,7 +299,7 @@ Application AMAKI
 
 ### Fichier flag
 
-Le fichier flag `/var/www/amaki/maintenance.flag` est un simple fichier texte qui sert de "switch" :
+Le fichier flag `/sites/amakifr/maintenance.flag` est un simple fichier texte qui sert de "switch" :
 
 - **Fichier existe** → nginx redirige vers la page de maintenance
 - **Fichier n'existe pas** → nginx sert l'application normalement
@@ -316,7 +316,7 @@ La configuration utilise plusieurs directives nginx :
 1. **Vérification du fichier flag**
    ```nginx
    set $maintenance 0;
-   if (-f /var/www/amaki/maintenance.flag) {
+   if (-f /sites/amakifr/maintenance.flag) {
        set $maintenance 1;
    }
    ```
@@ -333,7 +333,7 @@ La configuration utilise plusieurs directives nginx :
    error_page 503 @maintenance;
    
    location @maintenance {
-       root /var/www/amaki/.next/server/app;
+       root /sites/amakifr/.next/server/app;
        rewrite ^(.*)$ /maintenance.html break;
        # Headers anti-cache
    }
@@ -424,7 +424,7 @@ Pour permettre aux administrateurs d'accéder au site même en mode maintenance 
 ```nginx
 set $maintenance 0;
 
-if (-f /var/www/amaki/maintenance.flag) {
+if (-f /sites/amakifr/maintenance.flag) {
     set $maintenance 1;
 }
 
@@ -467,7 +467,7 @@ Exemples :
 **Vérification 1 : Le fichier flag existe-t-il ?**
 
 ```bash
-ls -la /var/www/amaki/maintenance.flag
+ls -la /sites/amakifr/maintenance.flag
 ```
 
 Si le fichier n'existe pas, exécutez :
@@ -478,13 +478,13 @@ bash scripts/maintenance-on.sh
 **Vérification 2 : La page HTML existe-t-elle ?**
 
 ```bash
-ls -la /var/www/amaki/.next/server/app/maintenance.html
+ls -la /sites/amakifr/.next/server/app/maintenance.html
 ```
 
 Si le fichier n'existe pas :
 ```bash
-sudo mkdir -p /var/www/amaki/.next/server/app
-sudo cp public/maintenance.html /var/www/amaki/.next/server/app/maintenance.html
+sudo mkdir -p /sites/amakifr/.next/server/app
+sudo cp public/maintenance.html /sites/amakifr/.next/server/app/maintenance.html
 ```
 
 **Vérification 3 : Configuration nginx correcte ?**
@@ -517,7 +517,7 @@ Recherchez les erreurs liées à `/maintenance.html` ou `503`.
 **Solution 1 : Supprimer manuellement le fichier flag**
 
 ```bash
-sudo rm -f /var/www/amaki/maintenance.flag
+sudo rm -f /sites/amakifr/maintenance.flag
 sudo systemctl reload nginx
 ```
 
@@ -542,7 +542,7 @@ Cela signifie que nginx ne détecte pas le fichier flag correctement.
 1. Le chemin du fichier flag dans la configuration nginx
 2. Les permissions du fichier flag :
    ```bash
-   sudo chmod 644 /var/www/amaki/maintenance.flag
+   sudo chmod 644 /sites/amakifr/maintenance.flag
    ```
 
 ### La page est blanche ou ne charge pas
@@ -550,7 +550,7 @@ Cela signifie que nginx ne détecte pas le fichier flag correctement.
 **Vérification 1 : Permissions du fichier HTML**
 
 ```bash
-sudo chmod 644 /var/www/amaki/.next/server/app/maintenance.html
+sudo chmod 644 /sites/amakifr/.next/server/app/maintenance.html
 ```
 
 **Vérification 2 : Type MIME**
@@ -695,7 +695,7 @@ echo "✅ Déploiement terminé !"
 
 ```bash
 # Voir la date d'activation
-cat /var/www/amaki/maintenance.flag
+cat /sites/amakifr/maintenance.flag
 ```
 
 ### Logs nginx pour le mode maintenance
@@ -719,12 +719,12 @@ Vous pouvez ajouter des outils de monitoring pour être alerté si :
 
 ```bash
 # Fichier flag
-sudo chown www-data:www-data /var/www/amaki/maintenance.flag
-sudo chmod 644 /var/www/amaki/maintenance.flag
+sudo chown www-data:www-data /sites/amakifr/maintenance.flag
+sudo chmod 644 /sites/amakifr/maintenance.flag
 
 # Page HTML
-sudo chown www-data:www-data /var/www/amaki/.next/server/app/maintenance.html
-sudo chmod 644 /var/www/amaki/.next/server/app/maintenance.html
+sudo chown www-data:www-data /sites/amakifr/.next/server/app/maintenance.html
+sudo chmod 644 /sites/amakifr/.next/server/app/maintenance.html
 
 # Scripts
 chmod +x scripts/maintenance-on.sh

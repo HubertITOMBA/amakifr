@@ -20,7 +20,7 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-MAINTENANCE_FLAG="/var/www/amaki/maintenance.flag"
+MAINTENANCE_FLAG="/sites/amakifr/maintenance.flag"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"

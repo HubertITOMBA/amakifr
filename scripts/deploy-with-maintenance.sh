@@ -27,7 +27,7 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 # Configuration
-APP_DIR="/var/www/amaki"
+APP_DIR="/sites/amakifr"
 PM2_APP_NAME="amaki"
 GIT_BRANCH="main"
 

@@ -20,8 +20,8 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Configuration
-MAINTENANCE_FLAG="/var/www/amaki/maintenance.flag"
-MAINTENANCE_HTML="/var/www/amaki/.next/server/app/maintenance.html"
+MAINTENANCE_FLAG="/sites/amakifr/maintenance.flag"
+MAINTENANCE_HTML="/sites/amakifr/.next/server/app/maintenance.html"
 PUBLIC_MAINTENANCE_HTML="./public/maintenance.html"
 
 echo ""
