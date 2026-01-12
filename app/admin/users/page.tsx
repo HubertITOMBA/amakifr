@@ -36,7 +36,8 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  KeyRound
 } from "lucide-react";
 import { UserRole, UserStatus } from "@prisma/client";
 import { 
@@ -56,6 +57,7 @@ import {
   adminUpdateUserStatus,
   adminUpdateAdherentPoste
 } from "@/actions/user";
+import { adminResetUserPassword } from "@/actions/user/admin-reset-password";
 import { getAllPostesTemplates } from "@/actions/postes";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -430,6 +432,28 @@ export default function AdminUsersPage() {
     setIsEmailModalOpen(true);
   }, []);
 
+  const handleResetPassword = useCallback(async (userId: string, email: string, fullName: string) => {
+    // Confirmation de l'action
+    const confirmMessage = `Êtes-vous sûr de vouloir réinitialiser le mot de passe de ${fullName} ?\n\nUn nouveau mot de passe temporaire sera généré et envoyé à ${email}.`;
+    
+    if (!window.confirm(confirmMessage)) {
+      return;
+    }
+
+    try {
+      const result = await adminResetUserPassword(userId);
+      
+      if (result.success) {
+        toast.success(result.message || "Mot de passe réinitialisé avec succès");
+      } else {
+        toast.error(result.error || "Erreur lors de la réinitialisation du mot de passe");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Une erreur s'est produite lors de la réinitialisation du mot de passe");
+    }
+  }, []);
+
   // Colonnes du tableau
   const columns = useMemo(() => [
     columnHelper.display({
@@ -719,6 +743,14 @@ export default function AdminUsersPage() {
                 >
                   <Mail className="h-4 w-4" />
                   <span>Envoyer un email</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => handleResetPassword(user.id, user.email || "", user.adherent ? `${user.adherent.firstname} ${user.adherent.lastname}` : user.name || "Utilisateur")}
+                  className="flex items-center gap-2 text-orange-600 dark:text-orange-400"
+                >
+                  <KeyRound className="h-4 w-4" />
+                  <span>Réinitialiser le mot de passe</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>

@@ -1184,6 +1184,92 @@ export const sendAdminCreatedAccountEmail = async(
 };
 
 /**
+ * Envoie un email à un adhérent dont le mot de passe a été réinitialisé par un administrateur
+ * 
+ * @param email - L'adresse email de l'adhérent
+ * @param fullName - Le nom complet de l'adhérent
+ * @param temporaryPassword - Le mot de passe temporaire généré
+ */
+export const sendPasswordResetByAdminEmail = async(
+  email: string,
+  fullName: string,
+  temporaryPassword: string
+) => {
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Réinitialisation de votre mot de passe AMAKI</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${fullName},</p>
+      <p style="margin: 10px 0; color: #666;">Un administrateur a réinitialisé votre mot de passe sur le portail AMAKI France.</p>
+    </div>
+    
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+      <h2 style="color: #856404; margin-top: 0;">🔐 Votre nouveau mot de passe temporaire</h2>
+      <p style="color: #856404; margin: 10px 0;">Utilisez ce mot de passe pour vous connecter :</p>
+      <div style="background-color: #fff; padding: 15px; border-radius: 5px; margin: 15px 0; text-align: center;">
+        <code style="font-size: 24px; font-weight: bold; color: #2563eb; letter-spacing: 2px; font-family: 'Courier New', monospace;">${temporaryPassword}</code>
+      </div>
+      <p style="color: #856404; margin: 10px 0;"><strong>⚠️ Important :</strong> Pour des raisons de sécurité, nous vous recommandons vivement de <strong>changer ce mot de passe</strong> dès votre première connexion.</p>
+    </div>
+    
+    <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+      <h3 style="color: #166534; margin-top: 0; font-size: 18px;">✅ Comment vous connecter ?</h3>
+      <ol style="color: #166534; padding-left: 20px;">
+        <li style="margin: 10px 0;">Allez sur la page de connexion</li>
+        <li style="margin: 10px 0;">Entrez votre email : <strong>${email}</strong></li>
+        <li style="margin: 10px 0;">Entrez le mot de passe temporaire ci-dessus</li>
+        <li style="margin: 10px 0;">Une fois connecté, changez immédiatement votre mot de passe</li>
+      </ol>
+    </div>
+    
+    <div style="margin-bottom: 20px; text-align: center;">
+      <a 
+        href="${domain}/auth/sign-in" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 10px;">
+        Se connecter au portail
+      </a>
+    </div>
+    
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <h3 style="color: #333; margin-top: 0; font-size: 18px;">🔒 Comment changer votre mot de passe ?</h3>
+      <ol style="color: #666; padding-left: 20px;">
+        <li style="margin: 10px 0;">Connectez-vous avec le mot de passe temporaire</li>
+        <li style="margin: 10px 0;">Allez dans <strong>Mon Profil</strong> → <strong>Paramètres</strong></li>
+        <li style="margin: 10px 0;">Cliquez sur <strong>"Changer mon mot de passe"</strong></li>
+        <li style="margin: 10px 0;">Entrez l'ancien mot de passe (le temporaire)</li>
+        <li style="margin: 10px 0;">Définissez votre nouveau mot de passe sécurisé</li>
+      </ol>
+    </div>
+    
+    <div style="background-color: #fee2e2; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ef4444;">
+      <h3 style="color: #991b1b; margin-top: 0; font-size: 18px;">⚠️ Sécurité</h3>
+      <ul style="color: #991b1b; padding-left: 20px; margin: 0;">
+        <li style="margin: 5px 0;">Ne partagez jamais votre mot de passe avec personne</li>
+        <li style="margin: 5px 0;">Choisissez un mot de passe fort et unique</li>
+        <li style="margin: 5px 0;">Si vous n'êtes pas à l'origine de cette demande, contactez immédiatement l'administration</li>
+      </ul>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Si vous rencontrez des difficultés, n'hésitez pas à nous contacter à <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>.
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement suite à une réinitialisation de mot de passe par un administrateur. Si vous n'êtes pas à l'origine de cette demande, veuillez contacter l'administration immédiatement.
+    </p>
+  `;
+
+  await sendEmail({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: `🔐 Réinitialisation de votre mot de passe AMAKI`,
+    html: wrapEmailContent(content),
+  });
+};
+
+/**
  * Envoyer le passeport adhérent par email avec le PDF en pièce jointe
  * 
  * @param email - L'email de l'adhérent

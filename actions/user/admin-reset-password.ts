@@ -1,129 +1,131 @@
-"use server";
+"use server"
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
-import { sendAdminPasswordResetEmail } from "@/lib/mail";
+import crypto from "crypto";
 
 /**
- * Génère un mot de passe sécurisé aléatoire
- * @param length - Longueur du mot de passe (défaut: 12)
- * @returns Mot de passe généré
+ * Génère un mot de passe temporaire sécurisé
+ * Format: 3 lettres majuscules + 4 chiffres + 3 lettres minuscules (ex: ABC1234xyz)
+ * 
+ * @returns Un mot de passe temporaire de 10 caractères
  */
-function generatePassword(length: number = 12): string {
-  const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+function generateTemporaryPassword(): string {
+  const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // Sans I et O pour éviter confusion
+  const numbers = '23456789'; // Sans 0 et 1 pour éviter confusion
+  const lowercase = 'abcdefghjkmnpqrstuvwxyz'; // Sans i, l et o
+
   let password = '';
   
-  // S'assurer qu'il y a au moins une majuscule, une minuscule, un chiffre et un caractère spécial
-  password += 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'[Math.floor(Math.random() * 26)];
-  password += 'abcdefghijklmnopqrstuvwxyz'[Math.floor(Math.random() * 26)];
-  password += '0123456789'[Math.floor(Math.random() * 10)];
-  password += '!@#$%^&*'[Math.floor(Math.random() * 8)];
-  
-  // Remplir le reste avec des caractères aléatoires
-  for (let i = password.length; i < length; i++) {
-    password += charset[Math.floor(Math.random() * charset.length)];
+  // 3 lettres majuscules
+  for (let i = 0; i < 3; i++) {
+    password += uppercase[crypto.randomInt(0, uppercase.length)];
   }
   
-  // Mélanger le mot de passe
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  // 4 chiffres
+  for (let i = 0; i < 4; i++) {
+    password += numbers[crypto.randomInt(0, numbers.length)];
+  }
+  
+  // 3 lettres minuscules
+  for (let i = 0; i < 3; i++) {
+    password += lowercase[crypto.randomInt(0, lowercase.length)];
+  }
+  
+  return password;
 }
 
 /**
- * Réinitialise le mot de passe d'un utilisateur et lui envoie le nouveau mot de passe par email
- * (Admin uniquement)
+ * Réinitialise le mot de passe d'un utilisateur (réservé aux administrateurs)
+ * Génère un nouveau mot de passe temporaire et l'envoie par email à l'utilisateur
  * 
  * @param userId - L'ID de l'utilisateur dont le mot de passe doit être réinitialisé
- * @returns Un objet avec success (boolean), message (string) en cas de succès, ou error (string) en cas d'échec
+ * @returns Un objet avec success (boolean), message (string) en cas de succès,
+ * ou error (string) en cas d'échec
  */
-export async function adminResetUserPassword(
-  userId: string
-): Promise<{ success: boolean; message?: string; error?: string }> {
+export async function adminResetUserPassword(userId: string) {
   try {
-    // Vérifier que l'utilisateur est connecté et est admin
+    // Vérifier que l'utilisateur connecté est admin
     const session = await auth();
-    if (!session?.user?.id) {
-      return { success: false, error: "Non autorisé" };
+    if (!session?.user || session.user.role !== "Admin") {
+      return { 
+        success: false, 
+        error: "Non autorisé. Seuls les administrateurs peuvent réinitialiser les mots de passe." 
+      };
     }
 
-    const adminUser = await db.user.findUnique({
-      where: { id: session.user.id },
-    });
-
-    if (!adminUser || adminUser.role !== "Admin") {
-      return { success: false, error: "Seuls les administrateurs peuvent réinitialiser les mots de passe" };
-    }
-
-    // Récupérer l'utilisateur cible
-    const targetUser = await db.user.findUnique({
+    // Vérifier que l'utilisateur existe
+    const user = await db.user.findUnique({
       where: { id: userId },
       include: {
-        adherent: true,
-      },
+        adherent: {
+          select: {
+            firstname: true,
+            lastname: true,
+          }
+        }
+      }
     });
 
-    if (!targetUser) {
-      return { success: false, error: "Utilisateur introuvable" };
+    if (!user) {
+      return { success: false, error: "Utilisateur introuvable." };
     }
 
-    if (!targetUser.email) {
-      return { success: false, error: "L'utilisateur n'a pas d'email associé" };
+    if (!user.email) {
+      return { success: false, error: "Cet utilisateur n'a pas d'adresse email." };
     }
 
-    // Générer un nouveau mot de passe sécurisé
-    const newPassword = generatePassword(12);
+    // Empêcher la réinitialisation du mot de passe d'un autre admin (sécurité)
+    if (user.role === "Admin" && user.id !== session.user.id) {
+      return { 
+        success: false, 
+        error: "Vous ne pouvez pas réinitialiser le mot de passe d'un autre administrateur." 
+      };
+    }
 
-    // Hasher le mot de passe
-    const hashedPassword = await bcrypt.hash(newPassword, 12);
+    // Générer un nouveau mot de passe temporaire
+    const temporaryPassword = generateTemporaryPassword();
+    const hashedPassword = await bcrypt.hash(temporaryPassword, 10);
 
     // Mettre à jour le mot de passe dans la base de données
     await db.user.update({
       where: { id: userId },
-      data: {
-        password: hashedPassword,
-      },
+      data: { password: hashedPassword },
     });
 
-    // Préparer le nom de l'utilisateur pour l'email
-    const userName = targetUser.adherent
-      ? `${targetUser.adherent.firstname || ''} ${targetUser.adherent.lastname || ''}`.trim() || targetUser.name || "Utilisateur"
-      : targetUser.name || "Utilisateur";
-
-    // Envoyer le nouveau mot de passe par email
+    // Envoyer l'email avec le nouveau mot de passe (non bloquant)
     try {
-      console.log(`[adminResetUserPassword] Tentative d'envoi d'email à ${targetUser.email}`);
-      await sendAdminPasswordResetEmail(
-        targetUser.email,
-        userName,
-        newPassword
+      const { sendPasswordResetByAdminEmail } = await import("@/lib/mail");
+      const fullName = user.adherent 
+        ? `${user.adherent.firstname} ${user.adherent.lastname}`
+        : user.name || "Utilisateur";
+      
+      await sendPasswordResetByAdminEmail(
+        user.email,
+        fullName,
+        temporaryPassword
       );
-      console.log(`[adminResetUserPassword] Email envoyé avec succès à ${targetUser.email}`);
-    } catch (emailError: any) {
-      console.error("[adminResetUserPassword] Erreur lors de l'envoi de l'email:", {
-        email: targetUser.email,
-        error: emailError,
-        message: emailError?.message,
-        stack: emailError?.stack,
-      });
-      // Ne pas échouer complètement si l'email n'a pas pu être envoyé
-      // Le mot de passe a déjà été changé dans la base de données
-      const errorMessage = emailError?.message || emailError?.toString() || "Erreur inconnue";
+    } catch (emailError) {
+      console.error("Erreur lors de l'envoi de l'email:", emailError);
       return {
         success: false,
-        error: `Le mot de passe a été réinitialisé mais l'email n'a pas pu être envoyé à ${targetUser.email}. Veuillez contacter l'utilisateur manuellement. Erreur: ${errorMessage}`,
+        error: "Mot de passe réinitialisé mais l'email de notification n'a pas pu être envoyé. Veuillez communiquer le mot de passe manuellement."
       };
     }
 
     return {
       success: true,
-      message: `Le mot de passe a été réinitialisé et envoyé par email à ${targetUser.email}`,
+      message: `Mot de passe réinitialisé avec succès. Un email a été envoyé à ${user.email}.`,
     };
-  } catch (error: any) {
+  } catch (error) {
     console.error("Erreur lors de la réinitialisation du mot de passe:", error);
-    return {
-      success: false,
-      error: "Une erreur s'est produite lors de la réinitialisation du mot de passe",
+    return { 
+      success: false, 
+      error: "Une erreur s'est produite lors de la réinitialisation du mot de passe." 
     };
+  } finally {
+    revalidatePath("/admin/users");
   }
 }
-
