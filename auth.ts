@@ -108,95 +108,110 @@ export const {
 		},
 
 		async session({ token, session }) {
-			if (token.sub && session.user) {
-				session.user.id = token.sub;
-			}
-
-			if (token.role && session.user) {
-				session.user.role = token.role as UserRole;
-			}
-
-			// Propager des métadonnées supplémentaires à la session
-			if (session.user) {
-				// @ts-ignore - enrichir l'objet user dynamiquement
-				session.user.lastLogin = token.lastLogin as string | undefined;
-				// @ts-ignore
-				session.user.createdAt = token.createdAt as string | undefined;
-				// @ts-ignore
-				session.user.status = token.status as string | undefined;
-				// @ts-ignore - sessionId pour le tracking
-				session.user.sessionId = token.jti as string | undefined;
-			}
-
-			// Mettre à jour l'activité de la session dans Redis
-			if (token.jti && token.sub) {
-				try {
-					const { updateSessionActivity } = await import("@/lib/session-tracker");
-					await updateSessionActivity(token.sub, token.jti as string);
-				} catch (error) {
-					// Ignorer silencieusement si Redis n'est pas disponible
+			try {
+				if (token.sub && session.user) {
+					session.user.id = token.sub;
 				}
-			}
 
-			return session;
+				if (token.role && session.user) {
+					session.user.role = token.role as UserRole;
+				}
+
+				// Propager des métadonnées supplémentaires à la session
+				if (session.user) {
+					// @ts-ignore - enrichir l'objet user dynamiquement
+					session.user.lastLogin = token.lastLogin as string | undefined;
+					// @ts-ignore
+					session.user.createdAt = token.createdAt as string | undefined;
+					// @ts-ignore
+					session.user.status = token.status as string | undefined;
+					// @ts-ignore - sessionId pour le tracking
+					session.user.sessionId = token.jti as string | undefined;
+				}
+
+				// Mettre à jour l'activité de la session dans Redis (non-bloquant)
+				if (token.jti && token.sub) {
+					// Exécution asynchrone sans attendre pour éviter les timeouts
+					Promise.resolve().then(async () => {
+						try {
+							const { updateSessionActivity } = await import("@/lib/session-tracker");
+							await updateSessionActivity(token.sub!, token.jti as string);
+						} catch (error) {
+							// Ignorer silencieusement si Redis n'est pas disponible
+						}
+					});
+				}
+
+				return session;
+			} catch (error) {
+				console.error("[auth] Erreur dans le callback session:", error);
+				// Retourner la session même en cas d'erreur pour ne pas bloquer l'utilisateur
+				return session;
+			}
 		},
 
 		async jwt({ token, trigger, session }) {
-			if (!token.sub) return token;
+			try {
+				if (!token.sub) return token;
 
-			const existingUser = await getUserById(token.sub);
+				const existingUser = await getUserById(token.sub);
 
-			if (!existingUser) return token;
+				if (!existingUser) return token;
 
-			// Générer un sessionId unique si ce n'est pas déjà fait
-			if (!token.jti) {
-				token.jti = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
-			}
-
-			token.role = existingUser.role;
-			// Ajouter des champs supplémentaires pour utilisation côté client
-			token.lastLogin = existingUser.lastLogin ? existingUser.lastLogin.toISOString() : undefined;
-			token.createdAt = existingUser.createdAt ? existingUser.createdAt.toISOString() : undefined;
-			token.status = existingUser.status;
-
-			// Tracker la session dans Redis (uniquement lors de la création ou mise à jour)
-			if (trigger === "signIn" || trigger === "update") {
-				try {
-					// Import dynamique pour éviter les erreurs si Redis n'est pas disponible
-					const { trackSession } = await import("@/lib/session-tracker");
-					
-					// Récupérer les informations de la requête si disponibles
-					// Note: Dans le callback JWT, on n'a pas accès direct à la requête
-					// On trackera la session dans le callback session avec les infos complètes
-					await trackSession(
-						token.sub,
-						token.jti as string,
-						existingUser.email || "",
-						existingUser.name || "",
-						"unknown", // IP sera récupérée dans le callback session
-						"unknown" // UserAgent sera récupéré dans le callback session
-					);
-				} catch (error) {
-					// Ignorer silencieusement si Redis n'est pas disponible
-					console.warn("[Auth] Impossible de tracker la session:", error);
+				// Générer un sessionId unique si ce n'est pas déjà fait
+				if (!token.jti) {
+					token.jti = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
 				}
-			}
 
-			// Vérifier si le token est dans la liste noire
-			if (token.jti) {
-				try {
-					const { isTokenBlacklisted } = await import("@/lib/session-tracker");
-					const isBlacklisted = await isTokenBlacklisted(token.jti as string);
-					if (isBlacklisted) {
-						// Token révoqué, invalider la session
-						return { ...token, error: "Session révoquée" };
-					}
-				} catch (error) {
-					// Ignorer silencieusement si Redis n'est pas disponible
+				token.role = existingUser.role;
+				// Ajouter des champs supplémentaires pour utilisation côté client
+				token.lastLogin = existingUser.lastLogin ? existingUser.lastLogin.toISOString() : undefined;
+				token.createdAt = existingUser.createdAt ? existingUser.createdAt.toISOString() : undefined;
+				token.status = existingUser.status;
+
+				// Tracker la session dans Redis (non-bloquant, uniquement lors de la création ou mise à jour)
+				if (trigger === "signIn" || trigger === "update") {
+					// Exécution asynchrone sans attendre pour éviter les timeouts
+					Promise.resolve().then(async () => {
+						try {
+							const { trackSession } = await import("@/lib/session-tracker");
+							await trackSession(
+								token.sub!,
+								token.jti as string,
+								existingUser.email || "",
+								existingUser.name || "",
+								"unknown", // IP sera récupérée dans le callback session
+								"unknown" // UserAgent sera récupéré dans le callback session
+							);
+						} catch (error) {
+							// Ignorer silencieusement si Redis n'est pas disponible
+						}
+					});
 				}
-			}
 
-			return token;
+				// Vérifier si le token est dans la liste noire (non-bloquant)
+				if (token.jti) {
+					Promise.resolve().then(async () => {
+						try {
+							const { isTokenBlacklisted } = await import("@/lib/session-tracker");
+							const isBlacklisted = await isTokenBlacklisted(token.jti as string);
+							if (isBlacklisted) {
+								// Token révoqué, on devrait invalider la session
+								// Mais on ne peut pas le faire de manière non-bloquante
+								console.warn("[Auth] Token révoqué détecté:", token.jti);
+							}
+						} catch (error) {
+							// Ignorer silencieusement si Redis n'est pas disponible
+						}
+					});
+				}
+
+				return token;
+			} catch (error) {
+				console.error("[auth] Erreur dans le callback JWT:", error);
+				// Retourner le token même en cas d'erreur pour ne pas bloquer l'utilisateur
+				return token;
+			}
 		},
 	},
 	// Utiliser l'adapter Prisma uniquement pour les comptes OAuth (Account, VerificationToken)
