@@ -210,9 +210,9 @@ export default function GestionUsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={UserRole.Membre}>Membre</SelectItem>
-                    <SelectItem value={UserRole.Admin}>Admin</SelectItem>
-                    <SelectItem value={UserRole.Bureau}>Bureau</SelectItem>
+                    <SelectItem key="role-membre" value={UserRole.Membre}>Membre</SelectItem>
+                    <SelectItem key="role-admin" value={UserRole.Admin}>Admin</SelectItem>
+                    <SelectItem key="role-bureau" value={UserRole.Bureau}>Bureau</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -229,9 +229,9 @@ export default function GestionUsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={UserStatus.Actif}>Actif</SelectItem>
-                    <SelectItem value={UserStatus.Inactif}>Inactif</SelectItem>
-                    <SelectItem value={UserStatus.Suspendu}>Suspendu</SelectItem>
+                    <SelectItem key="status-actif" value={UserStatus.Actif}>Actif</SelectItem>
+                    <SelectItem key="status-inactif" value={UserStatus.Inactif}>Inactif</SelectItem>
+                    <SelectItem key="status-suspendu" value={UserStatus.Suspendu}>Suspendu</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -264,10 +264,10 @@ export default function GestionUsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={Civilities.Monsieur}>Monsieur</SelectItem>
-                    <SelectItem value={Civilities.Madame}>Madame</SelectItem>
-                    <SelectItem value={Civilities.Mademoiselle}>Mademoiselle</SelectItem>
-                    <SelectItem value={Civilities.Partenaire}>Partenaire</SelectItem>
+                    <SelectItem key="civility-monsieur" value={Civilities.Monsieur}>Monsieur</SelectItem>
+                    <SelectItem key="civility-madame" value={Civilities.Madame}>Madame</SelectItem>
+                    <SelectItem key="civility-mademoiselle" value={Civilities.Mademoiselle}>Mademoiselle</SelectItem>
+                    <SelectItem key="civility-partenaire" value={Civilities.Partenaire}>Partenaire</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -358,9 +358,9 @@ export default function GestionUsersPage() {
                     <SelectValue placeholder="Sélectionner un type" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={TypeAdhesion.AdhesionAnnuelle}>Adhésion annuelle</SelectItem>
-                    <SelectItem value={TypeAdhesion.Renouvellement}>Renouvellement</SelectItem>
-                    <SelectItem value={TypeAdhesion.Autre}>Autre</SelectItem>
+                    <SelectItem key="type-adhesion-annuelle" value={TypeAdhesion.AdhesionAnnuelle}>Adhésion annuelle</SelectItem>
+                    <SelectItem key="type-renouvellement" value={TypeAdhesion.Renouvellement}>Renouvellement</SelectItem>
+                    <SelectItem key="type-autre" value={TypeAdhesion.Autre}>Autre</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -582,9 +582,9 @@ export default function GestionUsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={TypeTelephone.Mobile}>Mobile</SelectItem>
-                    <SelectItem value={TypeTelephone.Fixe}>Fixe</SelectItem>
-                    <SelectItem value={TypeTelephone.Professionnel}>Professionnel</SelectItem>
+                    <SelectItem key="tel-mobile" value={TypeTelephone.Mobile}>Mobile</SelectItem>
+                    <SelectItem key="tel-fixe" value={TypeTelephone.Fixe}>Fixe</SelectItem>
+                    <SelectItem key="tel-professionnel" value={TypeTelephone.Professionnel}>Professionnel</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
