@@ -36,6 +36,7 @@ import { getEmailProviderFromDB, updateEmailProvider } from "@/actions/admin/set
 import type { EmailProvider } from "@/lib/email/providers/types";
 import { getAllSessions, revokeSessionAction, revokeAllUserSessionsAction } from "@/actions/sessions";
 import type { UserSession } from "@/lib/session-tracker";
+import { getElectoralMenuStatus, updateElectoralMenuStatus } from "@/actions/settings/electoral-menu";
 
 export default function AdminSettingsPage() {
   const { data: session } = useSession();
@@ -72,6 +73,7 @@ export default function AdminSettingsPage() {
   const [displaySettings, setDisplaySettings] = useState({
     theme: "system",
     showColumnVisibilityToggle: true,
+    electoralMenuEnabled: true,
   });
 
   // Statistiques système
@@ -85,6 +87,7 @@ export default function AdminSettingsPage() {
     loadSettings();
     loadSystemStats();
     loadEmailProvider();
+    loadElectoralMenuStatus();
     if (activeTab === "sessions") {
       loadSessions();
     }
@@ -110,6 +113,17 @@ export default function AdminSettingsPage() {
       }
     } catch (error) {
       console.error("Erreur lors du chargement du provider email:", error);
+    }
+  };
+
+  const loadElectoralMenuStatus = async () => {
+    try {
+      const result = await getElectoralMenuStatus();
+      if (result.success) {
+        setDisplaySettings(prev => ({ ...prev, electoralMenuEnabled: result.enabled }));
+      }
+    } catch (error) {
+      console.error("Erreur lors du chargement du statut des menus électoraux:", error);
     }
   };
 
@@ -260,6 +274,12 @@ export default function AdminSettingsPage() {
           break;
         case "display":
           localStorage.setItem("admin-settings-display", JSON.stringify(displaySettings));
+          // Sauvegarder également le paramètre des menus électoraux dans la base
+          const electoralMenuResult = await updateElectoralMenuStatus(displaySettings.electoralMenuEnabled);
+          if (!electoralMenuResult.success) {
+            toast.error(electoralMenuResult.error || "Erreur lors de la sauvegarde des menus électoraux");
+            return;
+          }
           toast.success("Paramètres sauvegardés avec succès");
           break;
       }
@@ -637,6 +657,39 @@ export default function AdminSettingsPage() {
                     onCheckedChange={(checked) => setDisplaySettings({ ...displaySettings, showColumnVisibilityToggle: checked })}
                   />
                 </div>
+              </div>
+
+              <Separator />
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">Menus électoraux</h3>
+                <div className="flex items-center justify-between">
+                  <div className="space-y-0.5">
+                    <Label htmlFor="electoralMenuEnabled">Afficher les menus électoraux</Label>
+                    <p className="text-sm text-gray-500 dark:text-gray-400">
+                      Affiche les menus Élections, Votes, Candidatures et Résultats dans les différentes interfaces
+                    </p>
+                  </div>
+                  <Switch
+                    id="electoralMenuEnabled"
+                    checked={displaySettings.electoralMenuEnabled}
+                    onCheckedChange={(checked) => setDisplaySettings({ ...displaySettings, electoralMenuEnabled: checked })}
+                  />
+                </div>
+                <Alert>
+                  <Info className="h-4 w-4" />
+                  <AlertDescription>
+                    Lorsque désactivé, les menus électoraux seront masqués dans :
+                    <ul className="list-disc list-inside mt-2 ml-4">
+                      <li><strong>Navbar publique :</strong> Election et Résultats</li>
+                      <li><strong>Menu admin :</strong> Postes, Élections, Votes et Candidatures</li>
+                      <li><strong>Menu adhérent :</strong> Mes Candidatures, Mes Votes et Liste des Candidats</li>
+                    </ul>
+                    <p className="mt-2 text-sm font-semibold">
+                      💡 Réactivez ces menus uniquement lors des périodes électorales.
+                    </p>
+                  </AlertDescription>
+                </Alert>
               </div>
 
               <Separator />

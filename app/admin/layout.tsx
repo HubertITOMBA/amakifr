@@ -1,9 +1,10 @@
 "use client";
 
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useElectoralMenu } from "@/hooks/use-electoral-menu";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { 
   Users, 
   Euro, 
@@ -25,177 +26,205 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 
-const adminMenuItems = [
+const allAdminMenuItems = [
   {
     title: "Tableau de bord",
     href: "/admin",
     icon: BarChart3,
-    description: "Vue d'ensemble des statistiques"
+    description: "Vue d'ensemble des statistiques",
+    electoral: false
   },
   {
     title: "Analytics",
     href: "/admin/analytics",
     icon: TrendingUp,
-    description: "Dashboard analytique avancé"
+    description: "Dashboard analytique avancé",
+    electoral: false
   },
   {
     title: "Adhérents",
     href: "/admin/users",
     icon: Users,
-    description: "Gestion des membres"
+    description: "Gestion des membres",
+    electoral: false
   },
 
   {
     title: "Cotisations",
     href: "/admin/cotisations",
     icon: Euro,
-    description: "Gestion des cotisations"
+    description: "Gestion des cotisations",
+    electoral: false
   },
   {
     title: "Gestion des Cotisations",
     href: "/admin/cotisations/gestion",
     icon: Euro,
-    description: "Gestion des cotisations"
+    description: "Gestion des cotisations",
+    electoral: false
   },
   {
     title: "Cotisations du Mois",
     href: "/admin/cotisations-du-mois",
     icon: Calendar,
-    description: "Planification des cotisations par mois"
+    description: "Planification des cotisations par mois",
+    electoral: false
   },
   {
     title: "Depenses",
     href: "/admin/depenses",
     icon: Euro,
-    description: "Gestion des depenses"
+    description: "Gestion des depenses",
+    electoral: false
   },
 
   {
     title: "Événements",
     href: "/admin/evenements",
     icon: Calendar,
-    description: "Gestion des événements"
+    description: "Gestion des événements",
+    electoral: false
   },
   {
     title: "Bureau",
     href: "/admin/bureau",
     icon: Building2,
-    description: "Gestion du bureau et organigramme"
+    description: "Gestion du bureau et organigramme",
+    electoral: false
   },
   {
     title: "Réservations",
     href: "/admin/reservations",
     icon: Calendar,
-    description: "Gestion des réservations de ressources"
+    description: "Gestion des réservations de ressources",
+    electoral: false
   },
   {
     title: "Boîte à idées",
     href: "/admin/idees",
     icon: Lightbulb,
-    description: "Gestion des idées soumises"
+    description: "Gestion des idées soumises",
+    electoral: false
   },
   {
     title: "Notifications",
     href: "/admin/notifications",
     icon: Mail,
-    description: "Créer et gérer les notifications"
+    description: "Créer et gérer les notifications",
+    electoral: false
   },
   {
     title: "Emails",
     href: "/admin/emails",
     icon: Mail,
-    description: "Envoyer des emails et consulter l'historique"
+    description: "Envoyer des emails et consulter l'historique",
+    electoral: false
   },
   {
     title: "Rappels Automatiques",
     href: "/admin/notifications/rappel",
     icon: Bell,
-    description: "Gérer les rappels automatiques"
+    description: "Gérer les rappels automatiques",
+    electoral: false
   },
   {
     title: "Documents",
     href: "/admin/documents",
     icon: FileText,
-    description: "Gérer tous les documents des utilisateurs"
+    description: "Gérer tous les documents des utilisateurs",
+    electoral: false
   },
   {
     title: "Rapports de Réunion",
     href: "/admin/rapports-reunion",
     icon: FileText,
-    description: "Gérer les rapports de réunions mensuelles"
+    description: "Gérer les rapports de réunions mensuelles",
+    electoral: false
   },
   {
     title: "Exports",
     href: "/admin/exports",
     icon: FileText,
-    description: "Exporter les données en Excel/CSV"
+    description: "Exporter les données en Excel/CSV",
+    electoral: false
   },
   {
     title: "Badges",
     href: "/admin/badges",
     icon: Award,
-    description: "Gestion des badges et récompenses"
+    description: "Gestion des badges et récompenses",
+    electoral: false
   },
   {
     title: "Galerie",
     href: "/admin/galerie",
     icon: Camera,
-    description: "Gestion de la galerie photos et vidéos"
+    description: "Gestion de la galerie photos et vidéos",
+    electoral: false
   },
   {
     title: "Finances",
     href: "/admin/finances",
     icon: Euro,
-    description: "Gestion financière"
+    description: "Gestion financière",
+    electoral: false
   },
   {
     title: "Relances Automatiques",
     href: "/admin/relances/automatiques",
     icon: Mail,
-    description: "Gestion des relances automatiques"
+    description: "Gestion des relances automatiques",
+    electoral: false
   },
   // {
   //   title: "Contenu",
   //   href: "/admin/content",
   //   icon: FileText,
-  //   description: "Gestion du contenu"
+  //   description: "Gestion du contenu",
+  //   electoral: false
   // },
   // {
   //   title: "Newsletter",
   //   href: "/admin/newsletter",
   //   icon: Mail,
-  //   description: "Gestion des abonnements"
+  //   description: "Gestion des abonnements",
+  //   electoral: false
   // },
   // Menus périodiques (élections) - placés à la fin car peu fréquemment consultés
   {
     title: "Postes",
     href: "/admin/postes",
     icon: Calendar,
-    description: "Gestion des postes électoraux"
+    description: "Gestion des postes électoraux",
+    electoral: true
   },
   {
     title: "Élections",
     href: "/admin/elections",
     icon: Calendar,
-    description: "Gestion des élections"
+    description: "Gestion des élections",
+    electoral: true
   },
   {
     title: "Votes",
     href: "/admin/votes",
     icon: Shield,
-    description: "Votes et résultats"
+    description: "Votes et résultats",
+    electoral: true
   },
   {
     title: "Candidatures",
     href: "/admin/candidatures",
     icon: Users,
-    description: "Gestion des candidatures"
+    description: "Gestion des candidatures",
+    electoral: true
   },
   {
     title: "Paramètres",
     href: "/admin/settings",
     icon: Settings,
-    description: "Configuration du site"
+    description: "Configuration du site",
+    electoral: false
   }
 ];
 
@@ -206,8 +235,20 @@ export default function AdminLayout({
 }) {
   const { data: session, status } = useSession();
   const user = useCurrentUser();
+  const { enabled: electoralMenuEnabled } = useElectoralMenu();
   const router = useRouter();
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Filtrer les menus selon le paramètre electoral_menu_enabled
+  const adminMenuItems = useMemo(() => {
+    return allAdminMenuItems.filter(item => {
+      // Si c'est un menu électoral et que les menus électoraux sont désactivés
+      if (item.electoral && !electoralMenuEnabled) {
+        return false;
+      }
+      return true;
+    });
+  }, [electoralMenuEnabled]);
 
   useEffect(() => {
     if (status === "unauthenticated") {

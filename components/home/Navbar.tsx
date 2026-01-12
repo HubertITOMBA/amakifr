@@ -8,20 +8,20 @@ import { buttonVariants } from "@/components/ui/button";
 import { UserButton } from "../auth/user-button";
 import { ThemeToggle } from "../ThemeToggle";
 import { NotificationCenter } from "../notifications/NotificationCenter";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Menu, X, Shield } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { useElectoralMenu } from "@/hooks/use-electoral-menu";
 
-
-const navigation = [
+const allNavigation = [
   // { name: 'Accueil', href: '/' },
-  { name: "L'amicale", href: '/amicale' },
-  { name: 'Election', href: '/extrat' },
-  { name: 'Evénements', href: '/evenements' },
-  { name: 'Galerie', href: '/galerie' },
+  { name: "L'amicale", href: '/amicale', electoral: false },
+  { name: 'Election', href: '/extrat', electoral: true },
+  { name: 'Evénements', href: '/evenements', electoral: false },
+  { name: 'Galerie', href: '/galerie', electoral: false },
   // { name: 'Upload', href: '/upload' },
-  { name: 'Contact', href: '/contact' },
-  { name: 'Résultats', href: '/resultats' },
+  { name: 'Contact', href: '/contact', electoral: false },
+  { name: 'Résultats', href: '/resultats', electoral: true },
   // { name: 'Elections', href: '/elections' },
   // { name: 'Candidatures', href: '/candidatures' },
   // { name: 'Vote', href: '/vote' },
@@ -32,6 +32,18 @@ const navigation = [
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const user = useCurrentUser();
+  const { enabled: electoralMenuEnabled } = useElectoralMenu();
+
+  // Filtrer les menus selon le paramètre electoral_menu_enabled
+  const navigation = useMemo(() => {
+    return allNavigation.filter(item => {
+      // Si c'est un menu électoral et que les menus électoraux sont désactivés
+      if (item.electoral && !electoralMenuEnabled) {
+        return false;
+      }
+      return true;
+    });
+  }, [electoralMenuEnabled]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);

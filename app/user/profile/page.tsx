@@ -73,6 +73,7 @@ import {
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUserProfile } from "@/hooks/use-user-profile";
+import { useElectoralMenu } from "@/hooks/use-electoral-menu";
 import { updateUserData, getUserCandidatures, getUserVotes, getAllCandidatesForProfile } from "@/actions/user";
 import { downloadPasseportPDF } from "@/actions/passeport";
 import { differenceInYears, differenceInMonths } from "date-fns";
@@ -1426,94 +1427,122 @@ function UserProfilePageContent() {
   const userRole = (user as any)?.role || 'Membre';
   const userCreatedAt = (user as any)?.createdAt || new Date().toISOString();
   const userLastLogin = (user as any)?.lastLogin || null;
+  
+  // Hook pour récupérer l'état d'activation des menus électoraux
+  const { enabled: electoralMenuEnabled } = useElectoralMenu();
 
-  // Menu latéral
-  const menuItems = [
+  // Menu latéral - tous les menus
+  const allMenuItems = [
     {
       id: 'profile' as MenuSection,
       label: 'Mon Profil',
       icon: User,
-      description: 'Informations personnelles'
+      description: 'Informations personnelles',
+      electoral: false
     },
     {
       id: 'cotisations' as MenuSection,
       label: 'Mes Cotisations',
       icon: Euro,
-      description: 'Cotisations et obligations'
+      description: 'Cotisations et obligations',
+      electoral: false
     },
     {
       id: 'documents' as MenuSection,
       label: 'Mes Documents',
       icon: FileText,
-      description: 'Gérer mes documents'
+      description: 'Gérer mes documents',
+      electoral: false
     },
     {
       id: 'rapports' as MenuSection,
       label: 'Rapports de Réunion',
       icon: FileText,
-      description: 'Consulter les rapports de réunion'
+      description: 'Consulter les rapports de réunion',
+      electoral: false
     },
     {
       id: 'badges' as MenuSection,
       label: 'Mes Badges',
       icon: Award,
-      description: 'Mes récompenses et badges'
+      description: 'Mes récompenses et badges',
+      electoral: false
     },
     {
       id: 'passeport' as MenuSection,
       label: 'Mon Passeport',
       icon: Shield,
-      description: 'Droits et obligations'
+      description: 'Droits et obligations',
+      electoral: false
     },
     {
       id: 'statistiques' as MenuSection,
       label: 'Statistiques',
       icon: BarChart3,
-      description: 'Mes statistiques personnelles'
+      description: 'Mes statistiques personnelles',
+      electoral: false
     },
     {
       id: 'enfants' as MenuSection,
       label: 'Mes Enfants',
       icon: Baby,
-      description: 'Gérer mes enfants'
+      description: 'Gérer mes enfants',
+      electoral: false
     },
     {
       id: 'idees' as MenuSection,
       label: 'Mes Idées',
       icon: Lightbulb,
-      description: 'Gérer mes idées'
+      description: 'Gérer mes idées',
+      electoral: false
     },
     {
       id: 'candidatures' as MenuSection,
       label: 'Mes Candidatures',
       icon: Vote,
-      description: 'Candidatures soumises'
+      description: 'Candidatures soumises',
+      electoral: true
     },
     {
       id: 'votes' as MenuSection,
       label: 'Mes Votes',
       icon: Vote,
-      description: 'Historique des votes'
+      description: 'Historique des votes',
+      electoral: true
     },
     {
       id: 'candidates' as MenuSection,
       label: 'Liste des Candidats',
       icon: Users,
-      description: 'Voir tous les candidats'
+      description: 'Voir tous les candidats',
+      electoral: true
     },
     {
       id: 'notifications' as MenuSection,
       label: 'Notifications',
       icon: Bell,
-      description: 'Préférences de notifications'
+      description: 'Préférences de notifications',
+      electoral: false
     },
     {
       id: 'settings' as MenuSection,
       label: 'Paramètres',
       icon: Settings,
-      description: 'Gestion du compte'
+      description: 'Gestion du compte',
+      electoral: false
     }
   ];
+
+  // Filtrer les menus selon le paramètre electoral_menu_enabled
+  const menuItems = useMemo(() => {
+    return allMenuItems.filter(item => {
+      // Si c'est un menu électoral et que les menus électoraux sont désactivés
+      if (item.electoral && !electoralMenuEnabled) {
+        return false;
+      }
+      return true;
+    });
+  }, [electoralMenuEnabled]);
 
   // Fonction pour rendre le contenu de chaque section
   const renderSectionContent = () => {
