@@ -336,10 +336,10 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <Button 
               onClick={() => router.push('/admin/users/gestion')}
-              className="flex items-center space-x-2 h-auto p-3 sm:p-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
+              className="flex items-center justify-start gap-3 h-auto px-4 py-3 sm:px-5 sm:py-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
             >
-              <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" />
-              <div className="text-left">
+              <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <div className="text-left flex-1">
                 <div className="font-medium">Ajouter un membre</div>
                 <div className="text-xs sm:text-sm opacity-80">Créer un nouveau profil</div>
               </div>
@@ -348,10 +348,10 @@ export default function AdminDashboard() {
             <Button 
               variant="outline" 
               onClick={() => router.push('/admin/evenements/gestion')}
-              className="flex items-center space-x-2 h-auto p-3 sm:p-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
+              className="flex items-center justify-start gap-3 h-auto px-4 py-3 sm:px-5 sm:py-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
             >
-              <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
-              <div className="text-left">
+              <Calendar className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <div className="text-left flex-1">
                 <div className="font-medium">Créer un événement</div>
                 <div className="text-xs sm:text-sm opacity-80">Planifier une activité</div>
               </div>
@@ -360,10 +360,10 @@ export default function AdminDashboard() {
             <Button 
               variant="outline" 
               onClick={() => router.push('/admin/notifications')}
-              className="flex items-center space-x-2 h-auto p-3 sm:p-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
+              className="flex items-center justify-start gap-3 h-auto px-4 py-3 sm:px-5 sm:py-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
             >
-              <Mail className="h-4 w-4 sm:h-5 sm:w-5" />
-              <div className="text-left">
+              <Mail className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <div className="text-left flex-1">
                 <div className="font-medium">Envoyer notification</div>
                 <div className="text-xs sm:text-sm opacity-80">Communiquer avec les membres</div>
               </div>
