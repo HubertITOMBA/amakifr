@@ -5,18 +5,14 @@ import { ChatBot } from "./ChatBot";
 
 /**
  * Provider pour le ChatBot
- * Affiche le chatbot uniquement pour les utilisateurs connectés (non-admin)
+ * Affiche le chatbot pour tous les utilisateurs connectés (membres, bureau et admins)
  */
 export function ChatBotProvider() {
   const { data: session, status } = useSession();
   
-  // Afficher le chatbot uniquement pour les utilisateurs connectés (Membre ou Invite)
-  // Ne pas l'afficher pour les admins (ils ont déjà accès à toutes les fonctionnalités)
+  // Afficher le chatbot uniquement pour les utilisateurs connectés
+  // (Admins, Bureau, Membre et Invite)
   if (status === "loading" || !session?.user) {
-    return null;
-  }
-  
-  if (session.user.role === "Admin") {
     return null;
   }
   
