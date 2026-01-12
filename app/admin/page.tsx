@@ -336,36 +336,36 @@ export default function AdminDashboard() {
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
             <Button 
               onClick={() => router.push('/admin/users/gestion')}
-              className="flex items-center justify-start gap-3 h-auto px-4 py-3 sm:px-5 sm:py-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
+              className="flex items-center justify-start gap-3 h-auto px-4 py-4 sm:px-5 sm:py-5 text-xs sm:text-sm hover:shadow-md transition-shadow"
             >
               <UserPlus className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-              <div className="text-left flex-1">
-                <div className="font-medium">Ajouter un membre</div>
-                <div className="text-xs sm:text-sm opacity-80">Créer un nouveau profil</div>
+              <div className="text-left flex-1 space-y-1">
+                <div className="font-medium leading-tight">Ajouter un membre</div>
+                <div className="text-xs sm:text-sm opacity-80 leading-tight">Créer un nouveau profil</div>
               </div>
             </Button>
             
             <Button 
               variant="outline" 
               onClick={() => router.push('/admin/evenements/gestion')}
-              className="flex items-center justify-start gap-3 h-auto px-4 py-3 sm:px-5 sm:py-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
+              className="flex items-center justify-start gap-3 h-auto px-4 py-4 sm:px-5 sm:py-5 text-xs sm:text-sm hover:shadow-md transition-shadow"
             >
               <Calendar className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-              <div className="text-left flex-1">
-                <div className="font-medium">Créer un événement</div>
-                <div className="text-xs sm:text-sm opacity-80">Planifier une activité</div>
+              <div className="text-left flex-1 space-y-1">
+                <div className="font-medium leading-tight">Créer un événement</div>
+                <div className="text-xs sm:text-sm opacity-80 leading-tight">Planifier une activité</div>
               </div>
             </Button>
             
             <Button 
               variant="outline" 
               onClick={() => router.push('/admin/notifications')}
-              className="flex items-center justify-start gap-3 h-auto px-4 py-3 sm:px-5 sm:py-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
+              className="flex items-center justify-start gap-3 h-auto px-4 py-4 sm:px-5 sm:py-5 text-xs sm:text-sm hover:shadow-md transition-shadow"
             >
               <Mail className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
-              <div className="text-left flex-1">
-                <div className="font-medium">Envoyer notification</div>
-                <div className="text-xs sm:text-sm opacity-80">Communiquer avec les membres</div>
+              <div className="text-left flex-1 space-y-1">
+                <div className="font-medium leading-tight">Envoyer notification</div>
+                <div className="text-xs sm:text-sm opacity-80 leading-tight">Communiquer avec les membres</div>
               </div>
             </Button>
           </div>
