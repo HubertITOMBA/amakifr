@@ -207,9 +207,24 @@ export async function adminCreateAdherent(formData: FormData) {
       return { user, adherent };
     });
 
+    // Envoyer l'email de bienvenue à l'adhérent (non bloquant)
+    try {
+      const { sendAdminCreatedAccountEmail } = await import("@/lib/mail");
+      await sendAdminCreatedAccountEmail(
+        validatedData.email,
+        validatedData.firstname,
+        validatedData.lastname,
+        !!hashedPassword, // true si un mot de passe a été défini
+        validatedData.name && validatedData.name.trim() !== "" ? validatedData.name : null
+      );
+    } catch (emailError) {
+      console.error("Erreur lors de l'envoi de l'email de bienvenue:", emailError);
+      // Ne pas bloquer la création si l'envoi d'email échoue
+    }
+
     return {
       success: true,
-      message: `Adhérent ${validatedData.firstname} ${validatedData.lastname} créé avec succès.`,
+      message: `Adhérent ${validatedData.firstname} ${validatedData.lastname} créé avec succès. Un email de bienvenue a été envoyé à ${validatedData.email}.`,
       id: result.user.id,
     };
   } catch (error) {

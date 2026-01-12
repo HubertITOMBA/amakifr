@@ -1063,6 +1063,127 @@ export const sendUserRegistrationThankYouEmail = async(
 }
 
 /**
+ * Envoie un email à un adhérent dont le compte a été créé par un administrateur
+ * 
+ * @param email - L'adresse email de l'adhérent
+ * @param firstname - Le prénom de l'adhérent
+ * @param lastname - Le nom de l'adhérent
+ * @param hasPassword - Indique si un mot de passe temporaire a été défini
+ * @param username - Le nom d'utilisateur (si défini)
+ */
+export const sendAdminCreatedAccountEmail = async(
+  email: string,
+  firstname: string,
+  lastname: string,
+  hasPassword: boolean = false,
+  username?: string | null
+) => {
+  const fullName = `${firstname} ${lastname}`;
+  
+  const passwordInstructions = hasPassword
+    ? `
+      <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+        <h3 style="color: #856404; margin-top: 0; font-size: 18px;">🔐 Mot de passe temporaire</h3>
+        <p style="color: #856404; margin: 10px 0;">Un mot de passe temporaire a été défini pour votre compte.</p>
+        <p style="color: #856404; margin: 10px 0;"><strong>Important :</strong> Pour des raisons de sécurité, nous vous recommandons vivement de <strong>changer votre mot de passe</strong> dès votre première connexion.</p>
+      </div>
+    `
+    : `
+      <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+        <h3 style="color: #166534; margin-top: 0; font-size: 18px;">🔑 Définir votre mot de passe</h3>
+        <p style="color: #166534; margin: 10px 0;">Aucun mot de passe n'a été défini pour votre compte.</p>
+        <p style="color: #166534; margin: 10px 0;">Pour vous connecter, veuillez cliquer sur <strong>"Mot de passe oublié"</strong> sur la page de connexion et suivre les instructions pour créer votre mot de passe.</p>
+      </div>
+    `;
+
+  const usernameInfo = username
+    ? `<p style="margin: 10px 0;"><strong>Nom d'utilisateur :</strong> ${username}</p>`
+    : `<p style="margin: 10px 0; color: #666;">Vous pourrez définir votre nom d'utilisateur lors de votre première connexion.</p>`;
+
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Votre compte AMAKI France a été créé</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${fullName},</p>
+      <p style="margin: 10px 0; color: #666;">Nous avons le plaisir de vous informer qu'un compte a été créé pour vous sur le portail AMAKI France par un administrateur.</p>
+    </div>
+    
+    <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+      <h2 style="color: #333; margin-top: 0;">✅ Votre compte est actif</h2>
+      <p style="color: #666; margin: 10px 0;">Vous pouvez dès maintenant accéder à votre espace membre et découvrir toutes les fonctionnalités du portail.</p>
+    </div>
+    
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <h3 style="color: #333; margin-top: 0; font-size: 18px;">👤 Vos informations de connexion</h3>
+      <p style="margin: 10px 0;"><strong>Email :</strong> ${email}</p>
+      ${usernameInfo}
+    </div>
+    
+    ${passwordInstructions}
+    
+    <div style="margin-bottom: 20px; text-align: center;">
+      <a 
+        href="${domain}/auth/sign-in" 
+        target="_blank" 
+        rel="noopener noreferrer"
+        style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 16px; margin-top: 10px;">
+        Se connecter au portail
+      </a>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 10px;">🚀 Prochaines étapes</h3>
+      <ol style="color: #666; padding-left: 20px;">
+        <li style="margin: 10px 0;">Connectez-vous à votre espace membre avec votre email</li>
+        ${hasPassword 
+          ? '<li style="margin: 10px 0;">Changez votre mot de passe temporaire (recommandé)</li>'
+          : '<li style="margin: 10px 0;">Utilisez "Mot de passe oublié" pour définir votre mot de passe</li>'
+        }
+        <li style="margin: 10px 0;">Complétez votre profil et vos informations personnelles</li>
+        <li style="margin: 10px 0;">Découvrez les fonctionnalités du portail (événements, galerie, idées...)</li>
+        <li style="margin: 10px 0;">Participez à la vie de l'association</li>
+      </ol>
+    </div>
+    
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <h3 style="color: #333; margin-top: 0; font-size: 18px;">💡 Besoin d'aide ?</h3>
+      <p style="color: #666; margin: 10px 0;">Si vous rencontrez des difficultés pour vous connecter ou si vous avez des questions, n'hésitez pas à contacter l'administration :</p>
+      <p style="margin: 10px 0;">
+        📧 Email : <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>
+      </p>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 10px;">📋 Qu'est-ce que le portail AMAKI France ?</h3>
+      <p style="color: #666; margin: 10px 0;">Le portail AMAKI France est votre espace membre qui vous permet de :</p>
+      <ul style="color: #666; padding-left: 20px;">
+        <li style="margin: 5px 0;">Consulter et participer aux événements de l'association</li>
+        <li style="margin: 5px 0;">Accéder à la galerie photos et vidéos</li>
+        <li style="margin: 5px 0;">Proposer des idées pour améliorer la vie associative</li>
+        <li style="margin: 5px 0;">Gérer vos cotisations et paiements</li>
+        <li style="margin: 5px 0;">Rester informé via les notifications</li>
+        <li style="margin: 5px 0;">Échanger avec les autres membres</li>
+      </ul>
+    </div>
+    
+    <p style="margin-top: 30px; color: #666; font-size: 14px;">
+      Nous sommes ravis de vous compter parmi les membres d'AMAKI France !
+    </p>
+    
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement suite à la création de votre compte par un administrateur. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  await sendEmail({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: `🎉 Votre compte AMAKI France a été créé - Bienvenue ${firstname} !`,
+    html: wrapEmailContent(content),
+  });
+};
+
+/**
  * Envoyer le passeport adhérent par email avec le PDF en pièce jointe
  * 
  * @param email - L'email de l'adhérent
