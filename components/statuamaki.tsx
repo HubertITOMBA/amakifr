@@ -2,10 +2,11 @@
 
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { FileText, Scale, Building2, Calendar, Users, Shield, Download, ExternalLink } from "lucide-react";
+import { FileText, Scale, Building2, Calendar, Users, Shield, Download, ExternalLink, Lock } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { useCurrentUser } from "@/hooks/use-current-user";
 
 interface StatuAmakiProps {
   open: boolean;
@@ -13,6 +14,7 @@ interface StatuAmakiProps {
 }
 
 export function StatuAmaki({ open, onOpenChange }: StatuAmakiProps) {
+  const user = useCurrentUser();
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] p-0">
@@ -503,13 +505,24 @@ export function StatuAmaki({ open, onOpenChange }: StatuAmakiProps) {
             >
               Fermer
             </Button>
-            <Button
-              onClick={() => window.open('/api/documents/statut', '_blank')}
-              className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-            >
-              <Download className="h-4 w-4 mr-2" />
-              Télécharger le PDF
-            </Button>
+            {user ? (
+              <Button
+                onClick={() => window.open('/api/documents/statut', '_blank')}
+                className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+              >
+                <Download className="h-4 w-4 mr-2" />
+                Télécharger le PDF
+              </Button>
+            ) : (
+              <Button
+                disabled
+                className="flex-1 bg-slate-400 text-slate-600 cursor-not-allowed"
+                title="Connectez-vous pour télécharger le document"
+              >
+                <Lock className="h-4 w-4 mr-2" />
+                Réservé aux membres
+              </Button>
+            )}
           </div>
         </DialogFooter>
       </DialogContent>
