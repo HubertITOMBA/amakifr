@@ -703,19 +703,17 @@ export default function AdminRapportsReunionPage() {
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{selectedRapport?.titre}</DialogTitle>
-            <DialogDescription>
-              <div className="space-y-1 mt-2">
-                <p><strong>Date de la réunion :</strong> {selectedRapport && format(new Date(selectedRapport.dateReunion), "dd MMMM yyyy", { locale: fr })}</p>
-                <p><strong>Créé le :</strong> {selectedRapport && format(new Date(selectedRapport.createdAt), "dd MMMM yyyy à HH:mm", { locale: fr })}</p>
-                {selectedRapport?.CreatedBy && (
-                  <p><strong>Créé par :</strong> {selectedRapport.CreatedBy.name || selectedRapport.CreatedBy.email}</p>
-                )}
-                {selectedRapport?.UpdatedBy && (
-                  <p><strong>Modifié par :</strong> {selectedRapport.UpdatedBy.name || selectedRapport.UpdatedBy.email}</p>
-                )}
-              </div>
-            </DialogDescription>
           </DialogHeader>
+          <div className="space-y-1 mt-2 text-sm text-muted-foreground">
+            <p><strong>Date de la réunion :</strong> {selectedRapport && format(new Date(selectedRapport.dateReunion), "dd MMMM yyyy", { locale: fr })}</p>
+            <p><strong>Créé le :</strong> {selectedRapport && format(new Date(selectedRapport.createdAt), "dd MMMM yyyy à HH:mm", { locale: fr })}</p>
+            {selectedRapport?.CreatedBy && (
+              <p><strong>Créé par :</strong> {selectedRapport.CreatedBy.name || selectedRapport.CreatedBy.email}</p>
+            )}
+            {selectedRapport?.UpdatedBy && (
+              <p><strong>Modifié par :</strong> {selectedRapport.UpdatedBy.name || selectedRapport.UpdatedBy.email}</p>
+            )}
+          </div>
           <div className="mt-4">
             <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg whitespace-pre-wrap text-sm">
               {selectedRapport?.contenu}
