@@ -1184,6 +1184,87 @@ export const sendAdminCreatedAccountEmail = async(
 };
 
 /**
+ * Envoie un email à un adhérent dont le compte va être supprimé
+ * 
+ * @param email - L'adresse email de l'adhérent
+ * @param fullName - Le nom complet de l'adhérent
+ * @param reason - La raison de la suppression
+ */
+export const sendAccountDeletionEmail = async(
+  email: string,
+  fullName: string,
+  reason: string
+) => {
+  const content = `
+    <h1 style="color: #dc2626; margin-bottom: 20px; margin-top: 0;">Suppression de votre compte AMAKI</h1>
+    
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${fullName},</p>
+      <p style="margin: 10px 0; color: #666;">Nous vous informons que votre compte sur le portail AMAKI France a été supprimé par un administrateur.</p>
+    </div>
+    
+    <div style="background-color: #fee2e2; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #dc2626;">
+      <h2 style="color: #991b1b; margin-top: 0;">🗑️ Suppression de compte</h2>
+      <p style="color: #991b1b; margin: 10px 0;"><strong>Date :</strong> ${new Date().toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+      <p style="color: #991b1b; margin: 10px 0;"><strong>Raison :</strong> ${reason}</p>
+    </div>
+    
+    <div style="background-color: #fef3c7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+      <h3 style="color: #92400e; margin-top: 0; font-size: 18px;">⚠️ Informations importantes</h3>
+      <p style="color: #92400e; margin: 10px 0;">Cette suppression est <strong>définitive et irréversible</strong>.</p>
+      <p style="color: #92400e; margin: 10px 0;">Toutes vos données personnelles ont été supprimées de nos systèmes :</p>
+      <ul style="color: #92400e; padding-left: 20px;">
+        <li style="margin: 5px 0;">Informations de compte</li>
+        <li style="margin: 5px 0;">Données d'adhérent</li>
+        <li style="margin: 5px 0;">Historique de cotisations</li>
+        <li style="margin: 5px 0;">Messages et conversations</li>
+        <li style="margin: 5px 0;">Documents et réservations</li>
+        <li style="margin: 5px 0;">Tout autre historique lié à votre compte</li>
+      </ul>
+    </div>
+    
+    <div style="background-color: #dbeafe; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #3b82f6;">
+      <h3 style="color: #1e40af; margin-top: 0; font-size: 18px;">🔒 Conformité RGPD</h3>
+      <p style="color: #1e40af; margin: 10px 0;">Conformément au Règlement Général sur la Protection des Données (RGPD), toutes vos données personnelles ont été définitivement supprimées de nos bases de données.</p>
+      <p style="color: #1e40af; margin: 10px 0;">Vous ne pourrez plus accéder au portail AMAKI avec vos anciens identifiants.</p>
+    </div>
+    
+    ${reason.toLowerCase().includes('rgpd') || reason.toLowerCase().includes('droit à l\'oubli') ? `
+    <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+      <h3 style="color: #166534; margin-top: 0; font-size: 18px;">✅ Demande de suppression traitée</h3>
+      <p style="color: #166534; margin: 10px 0;">Votre demande de suppression de données (droit à l'oubli) a été traitée avec succès.</p>
+      <p style="color: #166534; margin: 10px 0;">Toutes vos données personnelles ont été effacées de nos systèmes conformément à votre demande.</p>
+    </div>
+    ` : ''}
+    
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #333; margin-top: 20px; font-size: 18px;">💬 Questions ou réclamations ?</h3>
+      <p style="color: #666; margin: 10px 0;">Si vous pensez que cette suppression est une erreur ou si vous avez des questions, veuillez contacter l'administration :</p>
+      <p style="color: #666; margin: 10px 0;">
+        <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2; text-decoration: none; font-weight: 500;">asso.amaki@gmail.com</a>
+      </p>
+    </div>
+    
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #333; margin-top: 20px; font-size: 18px;">🔄 Réadhésion</h3>
+      <p style="color: #666; margin: 10px 0;">Si vous souhaitez rejoindre à nouveau l'association AMAKI France, vous devrez créer un nouveau compte et effectuer une nouvelle adhésion.</p>
+      <p style="color: #666; margin: 10px 0;">Contactez-nous pour plus d'informations sur les modalités de réadhésion.</p>
+    </div>
+    
+    <p style="margin-top: 30px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement suite à la suppression de votre compte par un administrateur de l'association AMAKI France. Si vous n'êtes pas à l'origine de cette action, veuillez contacter immédiatement l'administration.
+    </p>
+  `;
+
+  await sendEmail({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject: `🗑️ Suppression de votre compte AMAKI - ${fullName}`,
+    html: wrapEmailContent(content),
+  });
+};
+
+/**
  * Envoie un email à un adhérent dont le mot de passe a été réinitialisé par un administrateur
  * 
  * @param email - L'adresse email de l'adhérent

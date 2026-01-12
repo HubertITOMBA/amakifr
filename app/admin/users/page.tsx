@@ -37,7 +37,8 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  KeyRound
+  KeyRound,
+  Trash2
 } from "lucide-react";
 import { UserRole, UserStatus } from "@prisma/client";
 import { 
@@ -58,6 +59,7 @@ import {
   adminUpdateAdherentPoste
 } from "@/actions/user";
 import { adminResetUserPassword } from "@/actions/user/admin-reset-password";
+import { DeleteAdherentDialog } from "@/components/admin/DeleteAdherentDialog";
 import { getAllPostesTemplates } from "@/actions/postes";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -751,6 +753,19 @@ export default function AdminUsersPage() {
                 >
                   <KeyRound className="h-4 w-4" />
                   <span>Réinitialiser le mot de passe</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  asChild
+                  className="focus:bg-red-50 dark:focus:bg-red-900/20"
+                >
+                  <div>
+                    <DeleteAdherentDialog
+                      userId={user.id}
+                      userName={user.adherent ? `${user.adherent.firstname} ${user.adherent.lastname}` : user.name || "Utilisateur"}
+                      userEmail={user.email}
+                    />
+                  </div>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
