@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -60,6 +61,7 @@ const cardColors = {
 };
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState<Array<{
     title: string;
@@ -332,7 +334,10 @@ export default function AdminDashboard() {
         </CardHeader>
         <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-            <Button className="flex items-center space-x-2 h-auto p-3 sm:p-4 text-xs sm:text-sm">
+            <Button 
+              onClick={() => router.push('/admin/users/gestion')}
+              className="flex items-center space-x-2 h-auto p-3 sm:p-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
+            >
               <UserPlus className="h-4 w-4 sm:h-5 sm:w-5" />
               <div className="text-left">
                 <div className="font-medium">Ajouter un membre</div>
@@ -340,7 +345,11 @@ export default function AdminDashboard() {
               </div>
             </Button>
             
-            <Button variant="outline" className="flex items-center space-x-2 h-auto p-3 sm:p-4 text-xs sm:text-sm">
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/admin/evenements/gestion')}
+              className="flex items-center space-x-2 h-auto p-3 sm:p-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
+            >
               <Calendar className="h-4 w-4 sm:h-5 sm:w-5" />
               <div className="text-left">
                 <div className="font-medium">Créer un événement</div>
@@ -348,10 +357,14 @@ export default function AdminDashboard() {
               </div>
             </Button>
             
-            <Button variant="outline" className="flex items-center space-x-2 h-auto p-3 sm:p-4 text-xs sm:text-sm">
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/admin/notifications')}
+              className="flex items-center space-x-2 h-auto p-3 sm:p-4 text-xs sm:text-sm hover:shadow-md transition-shadow"
+            >
               <Mail className="h-4 w-4 sm:h-5 sm:w-5" />
               <div className="text-left">
-                <div className="font-medium">Envoyer newsletter</div>
+                <div className="font-medium">Envoyer notification</div>
                 <div className="text-xs sm:text-sm opacity-80">Communiquer avec les membres</div>
               </div>
             </Button>
