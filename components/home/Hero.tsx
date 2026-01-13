@@ -55,7 +55,7 @@ export function Hero() {
                 <Button 
                   variant="outline" 
                   size="lg" 
-                  className="border-2 border-white/30 text-white hover:bg-white/10 font-semibold px-8 py-4 rounded-xl backdrop-blur-lg transition-all duration-300"
+                  className="border-2 border-white text-white bg-white/10 hover:bg-white hover:text-blue-700 font-semibold px-8 py-4 rounded-xl backdrop-blur-lg transition-all duration-300 shadow-lg"
                 >
                   Découvrir nos Événements
                 </Button>

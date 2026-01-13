@@ -1130,6 +1130,7 @@ enum TypeNotification {
   Idee
   Election
   Evenement
+  Chat
   Autre
 }
 

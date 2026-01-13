@@ -11,6 +11,7 @@ import { Menu, X } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useElectoralMenu } from "@/hooks/use-electoral-menu";
 import { useDynamicMenus, getUserMenuRoles } from "@/hooks/use-dynamic-menus";
+import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import * as LucideIcons from "lucide-react";
 
 /**
@@ -20,6 +21,7 @@ export function DynamicNavbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const user = useCurrentUser();
   const { enabled: electoralMenuEnabled } = useElectoralMenu();
+  const { count: unreadCount } = useUnreadMessages();
   
   // Déterminer les rôles de l'utilisateur
   const userRoles = getUserMenuRoles(user?.role, !!user);
@@ -27,16 +29,23 @@ export function DynamicNavbar() {
   // Charger les menus depuis la DB
   const { menus, loading } = useDynamicMenus("NAVBAR", userRoles);
 
-  // Filtrer les menus selon le paramètre electoral_menu_enabled
+  // Filtrer les menus selon le paramètre electoral_menu_enabled et l'état de connexion
   const filteredMenus = useMemo(() => {
     return menus.filter(menu => {
       // Si c'est un menu électoral et que les menus électoraux sont désactivés
       if (menu.electoral && !electoralMenuEnabled) {
         return false;
       }
+      
+      // Filtrer les menus réservés aux utilisateurs connectés
+      // Messages (/chat) et Notifications ne sont visibles que pour les utilisateurs connectés
+      if (!user && (menu.lien === "/chat" || menu.lien === "/notifications")) {
+        return false;
+      }
+      
       return true;
     });
-  }, [menus, electoralMenuEnabled]);
+  }, [menus, electoralMenuEnabled, user]);
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -69,30 +78,40 @@ export function DynamicNavbar() {
                 Chargement...
               </div>
             ) : (
-              filteredMenus.map((menu) => (
-                <Link 
-                  key={menu.id} 
-                  href={menu.lien} 
-                  className="font-title text-xl font-semibold leading-6 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2"
-                  title={menu.description || undefined}
-                >
-                  {getIcon(menu.icone)}
-                  {menu.libelle}
-                </Link>
-              ))
+              filteredMenus.map((menu) => {
+                const isChat = menu.lien === "/chat";
+                const hasNotifications = isChat && unreadCount > 0;
+                
+                return (
+                  <Link 
+                    key={menu.id} 
+                    href={menu.lien} 
+                    className="font-title text-xl font-semibold leading-6 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2 relative"
+                    title={menu.description || undefined}
+                  >
+                    {getIcon(menu.icone)}
+                    {menu.libelle}
+                    {hasNotifications && (
+                      <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })
             )}
           </div>
 
           {/* Actions Desktop */}
           <div className="hidden lg:flex lg:items-center lg:gap-2">
-            <NotificationCenter />
+            {user && <NotificationCenter />}
             <ThemeToggle />
             <UserButton />
           </div>
 
           {/* Menu Mobile Button */}
           <div className="lg:hidden flex items-center gap-1 sm:gap-2">
-            <NotificationCenter />
+            {user && <NotificationCenter />}
             <ThemeToggle />
             <UserButton />
             <button
@@ -120,18 +139,28 @@ export function DynamicNavbar() {
                 Chargement...
               </div>
             ) : (
-              filteredMenus.map((menu) => (
-                <Link
-                  key={menu.id}
-                  href={menu.lien}
-                  className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2"
-                  onClick={() => setIsMenuOpen(false)}
-                  title={menu.description || undefined}
-                >
-                  {getIcon(menu.icone)}
-                  {menu.libelle}
-                </Link>
-              ))
+              filteredMenus.map((menu) => {
+                const isChat = menu.lien === "/chat";
+                const hasNotifications = isChat && unreadCount > 0;
+                
+                return (
+                  <Link
+                    key={menu.id}
+                    href={menu.lien}
+                    className="block px-3 py-2 rounded-md text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-800 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2 relative"
+                    onClick={() => setIsMenuOpen(false)}
+                    title={menu.description || undefined}
+                  >
+                    {getIcon(menu.icone)}
+                    {menu.libelle}
+                    {hasNotifications && (
+                      <span className="ml-auto flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs font-bold text-white">
+                        {unreadCount > 9 ? "9+" : unreadCount}
+                      </span>
+                    )}
+                  </Link>
+                );
+              })
             )}
           </div>
         </div>

@@ -464,8 +464,52 @@ export async function sendMessage(data: z.infer<typeof SendMessageSchema>) {
       data: { updatedAt: new Date() },
     });
 
+    // Créer des notifications pour tous les autres participants
+    const conversation = await prisma.conversation.findUnique({
+      where: { id: validatedData.conversationId },
+      include: {
+        Participants: {
+          where: {
+            leftAt: null,
+            userId: { not: session.user.id }, // Exclure l'expéditeur
+          },
+          include: {
+            User: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    if (conversation && conversation.Participants.length > 0) {
+      // Créer une notification pour chaque participant
+      const senderName = session.user.name || session.user.email || "Un utilisateur";
+      const conversationTitle = conversation.titre || "Conversation";
+      const messagePreview = validatedData.content.length > 50 
+        ? validatedData.content.substring(0, 50) + "..." 
+        : validatedData.content;
+
+      const notifications = conversation.Participants.map((participant) => ({
+        userId: participant.userId,
+        type: "Chat" as const,
+        titre: `Nouveau message de ${senderName}`,
+        message: `${conversationTitle}: ${messagePreview}`,
+        lien: `/chat/${validatedData.conversationId}`,
+        lue: false,
+      }));
+
+      await prisma.notification.createMany({
+        data: notifications,
+      });
+    }
+
     revalidatePath(`/chat/${validatedData.conversationId}`);
     revalidatePath("/chat");
+    revalidatePath("/notifications");
 
     return { success: true, data: message };
   } catch (error) {
@@ -801,6 +845,67 @@ export async function getEvenementsForConversation() {
   } catch (error) {
     console.error("Erreur lors de la récupération des événements:", error);
     return { success: false, error: "Erreur lors de la récupération des événements" };
+  }
+}
+
+/**
+ * Récupérer le nombre de notifications de chat non lues
+ */
+export async function getUnreadMessagesCount() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé", count: 0 };
+    }
+
+    const count = await prisma.notification.count({
+      where: {
+        userId: session.user.id,
+        type: "Chat",
+        lue: false,
+      },
+    });
+
+    return { success: true, count };
+  } catch (error) {
+    console.error("Erreur lors de la récupération du nombre de messages non lus:", error);
+    return { success: false, error: "Erreur", count: 0 };
+  }
+}
+
+/**
+ * Marquer les notifications de chat comme lues pour une conversation spécifique
+ */
+export async function markChatNotificationsAsRead(conversationId?: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const whereClause: any = {
+      userId: session.user.id,
+      type: "Chat",
+      lue: false,
+    };
+
+    // Si une conversation spécifique est fournie, ne marquer que ses notifications
+    if (conversationId) {
+      whereClause.lien = `/chat/${conversationId}`;
+    }
+
+    await prisma.notification.updateMany({
+      where: whereClause,
+      data: {
+        lue: true,
+      },
+    });
+
+    revalidatePath("/notifications");
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur lors du marquage des notifications:", error);
+    return { success: false, error: "Erreur lors du marquage des notifications" };
   }
 }
 

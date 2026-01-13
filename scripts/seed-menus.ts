@@ -113,6 +113,17 @@ async function seedMenus() {
         electoral: true, // Menu électoral
       },
       {
+        libelle: "Messages",
+        description: "Messagerie interne",
+        lien: "/chat",
+        niveau: "NAVBAR" as const,
+        roles: ["ADMIN", "PRESID", "VICEPR", "SECRET", "VICESE", "COMCPT", "MEMBRE"],
+        icone: "MessageSquare",
+        statut: true,
+        ordre: 7,
+        electoral: false,
+      },
+      {
         libelle: "Admin",
         description: "Panneau d'administration",
         lien: "/admin",
@@ -120,7 +131,7 @@ async function seedMenus() {
         roles: ["ADMIN"], // Réservé aux admins
         icone: "Shield",
         statut: true,
-        ordre: 7,
+        ordre: 8,
         electoral: false,
       },
     ];
@@ -385,7 +396,7 @@ async function seedMenus() {
         description: "Messagerie interne",
         lien: "/chat",
         niveau: "SIDEBAR" as const,
-        roles: ["ADMIN"],
+        roles: ["ADMIN", "PRESID", "VICEPR", "SECRET", "VICESE", "COMCPT", "MEMBRE"],
         icone: "MessageSquare",
         statut: true,
         ordre: 24,
