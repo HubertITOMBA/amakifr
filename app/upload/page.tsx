@@ -1,6 +1,6 @@
 "use client";
 
-import { Navbar } from "@/components/home/Navbar";
+import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -197,7 +197,7 @@ export default function UploadPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-      <Navbar />
+      <DynamicNavbar />
       
       {/* Hero Section */}
       <section className="relative py-20 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 text-white">

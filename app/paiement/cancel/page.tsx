@@ -4,13 +4,13 @@ import Link from "next/link";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { XCircle, ArrowLeft, CreditCard } from "lucide-react";
-import { Navbar } from "@/components/home/Navbar";
+import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Footer } from "@/components/home/Footer";
 
 export default function PaymentCancelPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-      <Navbar />
+      <DynamicNavbar />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <Card className="border-orange-200 dark:border-orange-800 shadow-xl">
           <CardHeader className="bg-gradient-to-r from-orange-500 to-orange-600 text-white rounded-t-lg">

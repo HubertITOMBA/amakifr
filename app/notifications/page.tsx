@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Navbar } from "@/components/home/Navbar";
+import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -150,7 +150,7 @@ export default function NotificationsPage() {
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:to-slate-800">
-      <Navbar />
+      <DynamicNavbar />
       
       <main className="flex-1 py-6 sm:py-8 px-4 sm:px-6 lg:px-8">
         <div className="max-w-4xl mx-auto">

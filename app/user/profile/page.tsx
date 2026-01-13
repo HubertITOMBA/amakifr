@@ -3,7 +3,7 @@
 import { useState, useEffect, useMemo, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
-import { Navbar } from "@/components/home/Navbar";
+import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -73,7 +73,6 @@ import {
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUserProfile } from "@/hooks/use-user-profile";
-import { useElectoralMenu } from "@/hooks/use-electoral-menu";
 import { updateUserData, getUserCandidatures, getUserVotes, getAllCandidatesForProfile } from "@/actions/user";
 import { downloadPasseportPDF } from "@/actions/passeport";
 import { differenceInYears, differenceInMonths } from "date-fns";
@@ -842,7 +841,6 @@ function UserProfilePageContent() {
   const searchParams = useSearchParams();
   const user = useCurrentUser();
   const { userProfile, loading: profileLoading, error: profileError } = useUserProfile();
-  const { enabled: electoralMenuEnabled } = useElectoralMenu();
   
   // Initialiser activeSection depuis les paramètres d'URL ou par défaut 'profile'
   const sectionFromUrl = searchParams.get('section') as MenuSection | null;
@@ -1171,7 +1169,7 @@ function UserProfilePageContent() {
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-        <Navbar />
+        <DynamicNavbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <div className="text-center">
             <p className="text-gray-600 dark:text-gray-300">Veuillez vous connecter pour voir votre profil</p>
@@ -1531,16 +1529,9 @@ function UserProfilePageContent() {
     }
   ];
 
-  // Filtrer les menus selon le paramètre electoral_menu_enabled
-  const menuItems = useMemo(() => {
-    return allMenuItems.filter(item => {
-      // Si c'est un menu électoral et que les menus électoraux sont désactivés
-      if (item.electoral && !electoralMenuEnabled) {
-        return false;
-      }
-      return true;
-    });
-  }, [electoralMenuEnabled]);
+  // Les menus sont maintenant affichés en fonction de leur propriété 'electoral'
+  // Pour désactiver les menus électoraux, utilisez /admin/settings
+  const menuItems = allMenuItems;
 
   // Fonction pour rendre le contenu de chaque section
   const renderSectionContent = () => {
@@ -4745,7 +4736,7 @@ function UserProfilePageContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-      <Navbar />
+      <DynamicNavbar />
       
       {/* Hero Section */}
       <section className="relative py-3 sm:py-4 md:py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white">

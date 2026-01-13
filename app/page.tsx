@@ -2,7 +2,7 @@
 
 import { Hero } from "@/components/home/Hero";
 import Emblacarousel from "@/components/home/Home-carousel";
-import { Navbar } from "@/components/home/Navbar";
+import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { AboutSection } from "@/components/home/AboutSection";
 import { ValuesSection } from "@/components/home/ValuesSection";
 import { EventsSection } from "@/components/home/EventsSection";
@@ -117,7 +117,7 @@ export default function Home() {
           <AutoOpenLoginModal />
         </Suspense>
         
-        <Navbar />
+        <DynamicNavbar />
         
         {/* Hero Section with decorative frame */}
         <motion.div

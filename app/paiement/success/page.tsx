@@ -10,7 +10,7 @@ import { getStripeSession } from "@/actions/paiements/stripe";
 import { generateReceiptPDF } from "@/actions/paiements/receipt";
 import { toast } from "sonner";
 import Link from "next/link";
-import { Navbar } from "@/components/home/Navbar";
+import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Footer } from "@/components/home/Footer";
 
 export default function PaymentSuccessPage() {
@@ -88,7 +88,7 @@ export default function PaymentSuccessPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-        <Navbar />
+        <DynamicNavbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
         </div>
@@ -99,7 +99,7 @@ export default function PaymentSuccessPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-      <Navbar />
+      <DynamicNavbar />
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-12">
         <Card className="border-green-200 dark:border-green-800 shadow-xl">
           <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-t-lg">

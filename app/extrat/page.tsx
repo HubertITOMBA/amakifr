@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { Navbar } from "@/components/home/Navbar";
+import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Footer } from "@/components/home/Footer";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -24,7 +24,7 @@ export default function EvenementsPage() {
   const isAuthenticated = mounted && status === "authenticated" && !!session?.user && !!session.user.id;
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-blue-100 dark:from-slate-800 dark:to-slate-700">
-      <Navbar />
+      <DynamicNavbar />
       
       {/* Hero Section - Élections en avant */}
       <section className="relative py-24 bg-gradient-to-r from-blue-500 via-blue-600 to-indigo-600 text-white">

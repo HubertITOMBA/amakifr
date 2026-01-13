@@ -3,7 +3,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import '@/lib/env-init';
 import "react-toastify/dist/ReactToastify.css";
-import { Navbar } from "@/components/home/Navbar";
+import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Hero } from "@/components/home/Hero";
 
 import { ThemeProvider } from "next-themes";

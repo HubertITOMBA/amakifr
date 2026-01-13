@@ -19,7 +19,7 @@ import { createPaymentSession } from "@/actions/paiements/create-payment-session
 import { toast } from "sonner";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { Navbar } from "@/components/home/Navbar";
+import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Footer } from "@/components/home/Footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -144,7 +144,7 @@ export default function PaymentPage() {
   if (status === "loading" || !paymentInfo) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-        <Navbar />
+        <DynamicNavbar />
         <div className="flex items-center justify-center min-h-[60vh]">
           <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
         </div>
@@ -155,7 +155,7 @@ export default function PaymentPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-      <Navbar />
+      <DynamicNavbar />
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-6">
         <Card className="border-blue-200 dark:border-blue-800 shadow-xl !py-0">
           <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg pb-3 pt-3 px-4 sm:px-6">

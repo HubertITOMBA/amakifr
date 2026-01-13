@@ -19,6 +19,23 @@ enum UserRole {
   Invite
 }
 
+enum MenuRole {
+  ADMIN // Administrateur
+  PRESID // Président
+  VICEPR // Vice-Président
+  SECRET // Secrétaire
+  VICESE // Vice-Secrétaire
+  COMCPT // Comptable/Trésorier
+  MEMBRE // Membre simple
+  INVITE // Invité
+  VISITEUR // Visiteur non connecté
+}
+
+enum MenuNiveau {
+  NAVBAR // 0 - Menu dans la barre de navigation
+  SIDEBAR // 1 - Menu dans le menu latéral
+}
+
 enum UserStatus {
   Actif
   Inactif
@@ -210,6 +227,7 @@ model User {
   mediaGalerieCrees           MediaGalerie[]               @relation("MediaGalerieCreatedBy") // Médias de galerie créés
   rapportsReunionCrees        RapportReunion[]             @relation("RapportReunionCreatedBy") // Rapports de réunion créés
   rapportsReunionModifies     RapportReunion[]             @relation("RapportReunionUpdatedBy") // Rapports de réunion modifiés
+  menusCreated                Menu[]                       @relation("MenuCreatedBy") // Menus créés
 
   lastLogin DateTime? @updatedAt
   createdAt DateTime  @default(now())
@@ -1326,13 +1344,13 @@ model RapportReunion {
   titre       String   @db.VarChar(255) // Titre du rapport (ex: "Réunion mensuelle - Janvier 2024")
   dateReunion DateTime // Date de la réunion
   contenu     String   @db.Text // Contenu du rapport (markdown ou texte)
-  createdBy   String   // Admin qui a créé le rapport
-  updatedBy   String?  // Admin qui a modifié le rapport
+  createdBy   String // Admin qui a créé le rapport
+  updatedBy   String? // Admin qui a modifié le rapport
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  CreatedBy User @relation("RapportReunionCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  CreatedBy User  @relation("RapportReunionCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
   UpdatedBy User? @relation("RapportReunionUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
 
   @@index([dateReunion])
@@ -1608,4 +1626,29 @@ model AppSettings {
   @@index([key])
   @@index([category])
   @@map("app_settings")
+}
+
+model Menu {
+  id          String     @id @default(cuid())
+  libelle     String     @db.VarChar(100) // Texte affiché (ex: "Admin", "Élections")
+  description String?    @db.VarChar(500) // Description du menu
+  lien        String     @db.VarChar(255) // URL du lien (ex: "/admin", "/elections")
+  niveau      MenuNiveau // 0=NAVBAR, 1=SIDEBAR
+  roles       String[] // Array de rôles (ex: ["ADMIN", "PRESID"])
+  icone       String?    @db.VarChar(100) // Nom de l'icône Lucide (ex: "Shield", "Calendar")
+  statut      Boolean    @default(true) // true=actif, false=inactif
+  ordre       Int        @default(0) // Ordre d'affichage
+  parent      String? // ID du menu parent (pour sous-menus)
+  electoral   Boolean    @default(false) // Si true, soumis au paramètre electoral_menu_enabled
+  createdBy   String? // ID de l'utilisateur qui a créé
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  CreatedBy User? @relation("MenuCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([niveau])
+  @@index([statut])
+  @@index([ordre])
+  @@index([electoral])
+  @@map("menus")
 }
