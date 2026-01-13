@@ -280,6 +280,8 @@ export default function AdminSettingsPage() {
             toast.error(electoralMenuResult.error || "Erreur lors de la sauvegarde des menus électoraux");
             return;
           }
+          // Mettre à jour le cache localStorage pour éviter le flash
+          localStorage.setItem("electoral-menu-enabled", displaySettings.electoralMenuEnabled.toString());
           toast.success("Paramètres sauvegardés avec succès");
           break;
       }
