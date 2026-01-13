@@ -56,17 +56,20 @@ async function seedMenus() {
         statut: true,
         ordre: 1,
         electoral: false,
+        parent: null,
       },
+      // Menu parent "Scrutin" pour regrouper les menus électoraux
       {
-        libelle: "Election",
-        description: "Informations sur les élections",
-        lien: "/extrat",
+        libelle: "Scrutin",
+        description: "Élections et résultats",
+        lien: "#", // Pas de lien direct, c'est un menu dropdown
         niveau: "NAVBAR" as const,
         roles: ["ADMIN", "MEMBRE", "INVITE", "VISITEUR"],
         icone: "Vote",
         statut: true,
         ordre: 2,
-        electoral: true, // Menu électoral
+        electoral: true, // Menu électoral (avec ses enfants)
+        parent: null,
       },
       {
         libelle: "Evénements",
@@ -78,6 +81,7 @@ async function seedMenus() {
         statut: true,
         ordre: 3,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Galerie",
@@ -89,6 +93,7 @@ async function seedMenus() {
         statut: true,
         ordre: 4,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Contact",
@@ -100,17 +105,7 @@ async function seedMenus() {
         statut: true,
         ordre: 5,
         electoral: false,
-      },
-      {
-        libelle: "Résultats",
-        description: "Résultats des élections",
-        lien: "/resultats",
-        niveau: "NAVBAR" as const,
-        roles: ["ADMIN", "MEMBRE", "INVITE", "VISITEUR"],
-        icone: "Award",
-        statut: true,
-        ordre: 6,
-        electoral: true, // Menu électoral
+        parent: null,
       },
       {
         libelle: "Messages",
@@ -120,8 +115,9 @@ async function seedMenus() {
         roles: ["ADMIN", "PRESID", "VICEPR", "SECRET", "VICESE", "COMCPT", "MEMBRE"],
         icone: "MessageSquare",
         statut: true,
-        ordre: 7,
+        ordre: 6,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Admin",
@@ -131,8 +127,37 @@ async function seedMenus() {
         roles: ["ADMIN"], // Réservé aux admins
         icone: "Shield",
         statut: true,
-        ordre: 8,
+        ordre: 7,
         electoral: false,
+        parent: null,
+      },
+    ];
+
+    // Sous-menus électoraux (NAVBAR) - seront créés après le menu parent
+    const navbarElectoralSubmenus = [
+      {
+        libelle: "Informations",
+        description: "Informations sur les élections",
+        lien: "/extrat",
+        niveau: "NAVBAR" as const,
+        roles: ["ADMIN", "MEMBRE", "INVITE", "VISITEUR"],
+        icone: "Info",
+        statut: true,
+        ordre: 1,
+        electoral: true,
+        parentLibelle: "Scrutin", // Référence au parent
+      },
+      {
+        libelle: "Résultats",
+        description: "Résultats des élections",
+        lien: "/resultats",
+        niveau: "NAVBAR" as const,
+        roles: ["ADMIN", "MEMBRE", "INVITE", "VISITEUR"],
+        icone: "Award",
+        statut: true,
+        ordre: 2,
+        electoral: true,
+        parentLibelle: "Scrutin", // Référence au parent
       },
     ];
 
@@ -426,32 +451,60 @@ async function seedMenus() {
       },
     ];
 
-    // Créer tous les menus
-    const allMenus = [...navbarMenus, ...sidebarMenus];
+    // Créer d'abord les menus parents (navbar et sidebar)
+    const allParentMenus = [...navbarMenus, ...sidebarMenus];
     
-    console.log(`\n📝 Création de ${allMenus.length} menus...`);
+    console.log(`\n📝 Création de ${allParentMenus.length} menus parents...`);
     
-    for (const menu of allMenus) {
-      await prisma.menu.create({
+    const createdMenus: Record<string, string> = {}; // Map libelle -> id
+    
+    for (const menu of allParentMenus) {
+      const created = await prisma.menu.create({
         data: {
           ...menu,
           createdBy: null, // Pas de créateur pour les menus par défaut
         },
       });
+      createdMenus[menu.libelle] = created.id;
       console.log(`✅ Menu créé: ${menu.libelle} (${menu.niveau})`);
     }
 
-    console.log(`\n🎉 ${allMenus.length} menus créés avec succès!`);
+    // Créer les sous-menus électoraux en les liant à leur parent
+    console.log(`\n📝 Création de ${navbarElectoralSubmenus.length} sous-menus électoraux...`);
+    
+    for (const submenu of navbarElectoralSubmenus) {
+      const { parentLibelle, ...submenuData } = submenu;
+      const parentId = createdMenus[parentLibelle];
+      
+      if (!parentId) {
+        console.error(`❌ Parent "${parentLibelle}" introuvable pour le sous-menu "${submenu.libelle}"`);
+        continue;
+      }
+
+      await prisma.menu.create({
+        data: {
+          ...submenuData,
+          parent: parentId,
+          createdBy: null,
+        },
+      });
+      console.log(`✅ Sous-menu créé: ${submenu.libelle} (parent: ${parentLibelle})`);
+    }
+
+    const totalMenus = allParentMenus.length + navbarElectoralSubmenus.length;
+    console.log(`\n🎉 ${totalMenus} menus créés avec succès!`);
     
     // Afficher un résumé
     const navbarCount = await prisma.menu.count({ where: { niveau: "NAVBAR" } });
     const sidebarCount = await prisma.menu.count({ where: { niveau: "SIDEBAR" } });
     const electoralCount = await prisma.menu.count({ where: { electoral: true } });
+    const submenuCount = await prisma.menu.count({ where: { parent: { not: null } } });
     
     console.log("\n📊 Résumé:");
     console.log(`- Menus NAVBAR: ${navbarCount}`);
     console.log(`- Menus SIDEBAR: ${sidebarCount}`);
     console.log(`- Menus électoraux: ${electoralCount}`);
+    console.log(`- Sous-menus: ${submenuCount}`);
     
   } catch (error) {
     console.error("❌ Erreur lors du seed:", error);
