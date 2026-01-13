@@ -1,6 +1,16 @@
 import { PrismaClient } from "@prisma/client";
 
-const prisma = new PrismaClient();
+// Créer le client Prisma avec gestion d'erreur
+let prisma: PrismaClient;
+
+try {
+  prisma = new PrismaClient({
+    log: ['error', 'warn'],
+  });
+} catch (error) {
+  console.error("❌ Erreur lors de l'initialisation du client Prisma:", error);
+  process.exit(1);
+}
 
 /**
  * Script pour peupler la table menus avec les menus actuels de l'application
@@ -9,7 +19,13 @@ async function seedMenus() {
   console.log("🌱 Démarrage du seed des menus...");
 
   try {
+    // Tester la connexion à la base de données
+    console.log("🔌 Test de connexion à la base de données...");
+    await prisma.$connect();
+    console.log("✅ Connexion à la base de données réussie");
+
     // Vérifier si des menus existent déjà
+    console.log("🔍 Vérification des menus existants...");
     const existingMenusCount = await prisma.menu.count();
     
     if (existingMenusCount > 0) {
