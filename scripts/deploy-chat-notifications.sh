@@ -2,6 +2,7 @@
 
 # Script de déploiement complet pour le système de chat avec notifications
 # Usage: bash scripts/deploy-chat-notifications.sh
+# Note: NE PAS utiliser sudo - exécuter en tant qu'utilisateur normal
 
 set -e
 
@@ -12,13 +13,32 @@ echo ""
 GREEN='\033[0;32m'
 RED='\033[0;31m'
 YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
 NC='\033[0m'
+
+# Vérifier si exécuté avec sudo
+if [ "$EUID" -eq 0 ]; then 
+    echo -e "${RED}❌ Erreur: Ne pas exécuter ce script avec sudo${NC}"
+    echo "Exécutez simplement: bash scripts/deploy-chat-notifications.sh"
+    exit 1
+fi
 
 if [ ! -f "package.json" ]; then
     echo -e "${RED}❌ Erreur: package.json non trouvé${NC}"
     echo "Veuillez exécuter ce script depuis /sites/amakifr"
     exit 1
 fi
+
+# Détecter le chemin de npx
+NPX_PATH=$(which npx 2>/dev/null || echo "")
+if [ -z "$NPX_PATH" ]; then
+    echo -e "${RED}❌ Erreur: npx non trouvé dans le PATH${NC}"
+    echo "Installez Node.js et npm, puis réessayez"
+    exit 1
+fi
+
+echo -e "${GREEN}✅ npx trouvé: $NPX_PATH${NC}"
+echo ""
 
 echo -e "${BLUE}1️⃣  Génération du client Prisma${NC}"
 echo "-------------------------------------------"

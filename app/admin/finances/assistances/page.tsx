@@ -576,7 +576,7 @@ export default function AdminAssistancesPage() {
                 placeholder="Rechercher..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-11"
               />
             </div>
             <Select value={typeFilter} onValueChange={setTypeFilter}>

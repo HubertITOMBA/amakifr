@@ -8,6 +8,9 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Checkbox } from "@/components/ui/checkbox";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
   DropdownMenu,
@@ -31,7 +34,9 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
-  MoreHorizontal
+  MoreHorizontal,
+  X,
+  User
 } from "lucide-react";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -183,8 +188,9 @@ export default function AdminBadgesPage() {
   const [showAttribuerDialog, setShowAttribuerDialog] = useState(false);
   const [selectedBadge, setSelectedBadge] = useState<any>(null);
   const [users, setUsers] = useState<any[]>([]);
-  const [selectedUserId, setSelectedUserId] = useState<string>("");
+  const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]); // Changé en tableau pour sélection multiple
   const [raisonAttribution, setRaisonAttribution] = useState("");
+  const [userSearch, setUserSearch] = useState(""); // Recherche d'adhérents
 
   // Form data
   const [formData, setFormData] = useState({
@@ -316,27 +322,88 @@ export default function AdminBadgesPage() {
     }
   };
 
+  const handleToggleUser = (userId: string) => {
+    setSelectedUserIds((prev) =>
+      prev.includes(userId)
+        ? prev.filter((id) => id !== userId)
+        : [...prev, userId]
+    );
+  };
+
+  const handleSelectAllFiltered = () => {
+    // Filtrer les utilisateurs selon la recherche actuelle
+    const filteredUsers = users.filter((user) => {
+      if (!userSearch.trim()) return true;
+      const searchLower = userSearch.toLowerCase();
+      const displayName = user.adherent
+        ? `${user.adherent.firstname} ${user.adherent.lastname}`.toLowerCase()
+        : (user.name || user.email || "").toLowerCase();
+      return (
+        displayName.includes(searchLower) ||
+        user.email?.toLowerCase().includes(searchLower)
+      );
+    });
+
+    const filteredUserIds = filteredUsers.map(u => u.id);
+    
+    // Si tous les utilisateurs filtrés sont déjà sélectionnés, les désélectionner tous
+    const allFilteredSelected = filteredUserIds.every(id => selectedUserIds.includes(id));
+    
+    if (allFilteredSelected) {
+      // Désélectionner tous les utilisateurs filtrés
+      setSelectedUserIds(prev => prev.filter(id => !filteredUserIds.includes(id)));
+      toast.info(`${filteredUserIds.length} adhérent${filteredUserIds.length > 1 ? "s" : ""} désélectionné${filteredUserIds.length > 1 ? "s" : ""}`);
+    } else {
+      // Sélectionner tous les utilisateurs filtrés
+      setSelectedUserIds(prev => {
+        const newSelection = [...prev];
+        filteredUserIds.forEach(id => {
+          if (!newSelection.includes(id)) {
+            newSelection.push(id);
+          }
+        });
+        return newSelection;
+      });
+      toast.success(`${filteredUserIds.length} adhérent${filteredUserIds.length > 1 ? "s" : ""} sélectionné${filteredUserIds.length > 1 ? "s" : ""}`);
+    }
+  };
+
   const handleAttribuer = async () => {
-    if (!selectedBadge || !selectedUserId) {
-      toast.error("Veuillez sélectionner un utilisateur");
+    if (!selectedBadge || selectedUserIds.length === 0) {
+      toast.error("Veuillez sélectionner au moins un adhérent");
       return;
     }
 
     try {
-      const result = await attribuerBadge({
-        badgeId: selectedBadge.id,
-        userId: selectedUserId,
-        raison: raisonAttribution || undefined,
-      });
-      if (result.success) {
-        toast.success(result.message || "Badge attribué avec succès");
-        setShowAttribuerDialog(false);
-        setSelectedUserId("");
-        setRaisonAttribution("");
-        loadBadges();
-      } else {
-        toast.error(result.error || "Erreur lors de l'attribution");
+      let successCount = 0;
+      let errorCount = 0;
+
+      // Attribuer le badge à tous les utilisateurs sélectionnés
+      for (const userId of selectedUserIds) {
+        const result = await attribuerBadge({
+          badgeId: selectedBadge.id,
+          userId: userId,
+          raison: raisonAttribution || undefined,
+        });
+        if (result.success) {
+          successCount++;
+        } else {
+          errorCount++;
+        }
       }
+
+      if (successCount > 0) {
+        toast.success(`Badge attribué à ${successCount} adhérent${successCount > 1 ? "s" : ""}`);
+      }
+      if (errorCount > 0) {
+        toast.error(`Échec pour ${errorCount} adhérent${errorCount > 1 ? "s" : ""}`);
+      }
+
+      setShowAttribuerDialog(false);
+      setSelectedUserIds([]);
+      setRaisonAttribution("");
+      setUserSearch("");
+      loadBadges();
     } catch (error) {
       console.error("Erreur:", error);
       toast.error("Erreur lors de l'attribution du badge");
@@ -360,8 +427,9 @@ export default function AdminBadgesPage() {
 
   const openAttribuerDialog = (badge: any) => {
     setSelectedBadge(badge);
-    setSelectedUserId("");
+    setSelectedUserIds([]);
     setRaisonAttribution("");
+    setUserSearch("");
     setShowAttribuerDialog(true);
   };
 
@@ -614,7 +682,7 @@ export default function AdminBadgesPage() {
                   placeholder="Rechercher un badge..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-11"
                 />
               </div>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -962,48 +1030,204 @@ export default function AdminBadgesPage() {
 
       {/* Dialog Attribuer */}
       <Dialog open={showAttribuerDialog} onOpenChange={setShowAttribuerDialog}>
-        <DialogContent>
+        <DialogContent className="max-w-2xl max-h-[90vh] flex flex-col">
           <DialogHeader>
-            <DialogTitle>Attribuer le badge "{selectedBadge?.nom}"</DialogTitle>
+            <DialogTitle className="flex items-center gap-2">
+              <div className="p-2 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg">
+                <UserPlus className="h-5 w-5 text-white" />
+              </div>
+              Attribuer le badge "{selectedBadge?.nom}"
+            </DialogTitle>
             <DialogDescription>
-              Sélectionnez un utilisateur pour attribuer ce badge
+              Sélectionnez un ou plusieurs adhérents pour attribuer ce badge
             </DialogDescription>
           </DialogHeader>
-          <div className="space-y-4">
+          
+          <div className="flex-1 overflow-auto space-y-4">
+            {/* Champ de recherche des adhérents */}
             <div className="space-y-2">
-              <Label htmlFor="user">Utilisateur *</Label>
-              <Select value={selectedUserId} onValueChange={setSelectedUserId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Sélectionner un utilisateur" />
-                </SelectTrigger>
-                <SelectContent>
-                  {users.map((user) => (
-                    <SelectItem key={user.id} value={user.id}>
-                      {user.adherent 
-                        ? `${user.adherent.firstname} ${user.adherent.lastname} (${user.email})`
-                        : user.name || user.email || user.id}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <Label>Rechercher des adhérents</Label>
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400 dark:text-gray-500" />
+                <Input
+                  placeholder="Rechercher par nom, email..."
+                  value={userSearch}
+                  onChange={(e) => setUserSearch(e.target.value)}
+                  className="pl-11 pr-10"
+                />
+                {userSearch && (
+                  <button
+                    onClick={() => setUserSearch("")}
+                    className="absolute right-3 top-2.5 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                    title="Effacer la recherche"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
+
+            {/* Indicateur et actions de sélection */}
+            <div className="flex items-center justify-between">
+              {userSearch && (
+                <p className="text-xs text-muted-foreground">
+                  {(() => {
+                    const filteredCount = users.filter((user) => {
+                      const searchLower = userSearch.toLowerCase();
+                      const displayName = user.adherent
+                        ? `${user.adherent.firstname} ${user.adherent.lastname}`.toLowerCase()
+                        : (user.name || user.email || "").toLowerCase();
+                      return (
+                        displayName.includes(searchLower) ||
+                        user.email?.toLowerCase().includes(searchLower)
+                      );
+                    }).length;
+                    return `${filteredCount} adhérent${filteredCount > 1 ? "s" : ""} trouvé${filteredCount > 1 ? "s" : ""}`;
+                  })()}
+                </p>
+              )}
+              
+              {users.length > 0 && (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSelectAllFiltered}
+                  className="text-xs h-7 px-2 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:text-blue-400 dark:hover:bg-blue-900/20"
+                >
+                  {(() => {
+                    const filteredUsers = users.filter((user) => {
+                      if (!userSearch.trim()) return true;
+                      const searchLower = userSearch.toLowerCase();
+                      const displayName = user.adherent
+                        ? `${user.adherent.firstname} ${user.adherent.lastname}`.toLowerCase()
+                        : (user.name || user.email || "").toLowerCase();
+                      return (
+                        displayName.includes(searchLower) ||
+                        user.email?.toLowerCase().includes(searchLower)
+                      );
+                    });
+                    const allSelected = filteredUsers.every(u => selectedUserIds.includes(u.id));
+                    return allSelected ? "Tout désélectionner" : "Tout sélectionner";
+                  })()}
+                </Button>
+              )}
+            </div>
+
+            {/* Liste des adhérents */}
             <div className="space-y-2">
-              <Label htmlFor="raison">Raison (optionnel)</Label>
+              <Label>
+                Adhérents ({selectedUserIds.length} sélectionné{selectedUserIds.length > 1 ? "s" : ""})
+              </Label>
+              <ScrollArea className="h-[300px] border rounded-md p-4 bg-gray-50/50 dark:bg-gray-900/50">
+                <div className="space-y-2">
+                  {users.length === 0 ? (
+                    <p className="text-sm text-muted-foreground text-center py-4">
+                      Aucun adhérent disponible
+                    </p>
+                  ) : (() => {
+                    // Filtrer les utilisateurs selon la recherche
+                    const filteredUsers = users.filter((user) => {
+                      if (!userSearch.trim()) return true;
+                      const searchLower = userSearch.toLowerCase();
+                      const displayName = user.adherent
+                        ? `${user.adherent.firstname} ${user.adherent.lastname}`.toLowerCase()
+                        : (user.name || user.email || "").toLowerCase();
+                      return (
+                        displayName.includes(searchLower) ||
+                        user.email?.toLowerCase().includes(searchLower)
+                      );
+                    });
+
+                    if (filteredUsers.length === 0) {
+                      return (
+                        <p className="text-sm text-muted-foreground text-center py-4">
+                          Aucun adhérent trouvé pour "{userSearch}"
+                        </p>
+                      );
+                    }
+
+                    return filteredUsers.map((user) => {
+                      const displayName = user.adherent
+                        ? `${user.adherent.firstname} ${user.adherent.lastname}`
+                        : user.name || user.email || "Utilisateur sans nom";
+                      
+                      return (
+                        <div
+                          key={user.id}
+                          className="flex items-center space-x-3 p-2 rounded-md hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer transition-colors"
+                          onClick={() => handleToggleUser(user.id)}
+                        >
+                          <Checkbox
+                            checked={selectedUserIds.includes(user.id)}
+                            onCheckedChange={() => handleToggleUser(user.id)}
+                          />
+                          <Avatar className="h-8 w-8">
+                            <AvatarImage src={user.image || undefined} />
+                            <AvatarFallback>
+                              {displayName.charAt(0).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{displayName}</p>
+                            {user.email && (
+                              <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                            )}
+                          </div>
+                          <Badge variant="secondary" className="text-xs flex-shrink-0">
+                            {user.role}
+                          </Badge>
+                        </div>
+                      );
+                    });
+                  })()}
+                </div>
+              </ScrollArea>
+            </div>
+
+            {/* Compteur de sélection */}
+            {selectedUserIds.length > 0 && (
+              <div className="p-3 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
+                <p className="text-sm font-medium text-green-800 dark:text-green-300 flex items-center gap-2">
+                  <CheckCircle className="h-4 w-4" />
+                  {selectedUserIds.length} adhérent{selectedUserIds.length > 1 ? "s" : ""} sélectionné{selectedUserIds.length > 1 ? "s" : ""}
+                </p>
+              </div>
+            )}
+
+            {/* Raison de l'attribution */}
+            <div className="space-y-2">
+              <Label htmlFor="raison">Raison de l'attribution (optionnel)</Label>
               <Textarea
                 id="raison"
                 value={raisonAttribution}
                 onChange={(e) => setRaisonAttribution(e.target.value)}
-                placeholder="Raison de l'attribution..."
+                placeholder="Ex: Excellence académique 2025, Bonne conduite, Participation exceptionnelle..."
                 rows={3}
+                className="resize-none"
               />
             </div>
           </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAttribuerDialog(false)}>
+
+          <DialogFooter className="gap-2">
+            <Button 
+              variant="outline" 
+              onClick={() => {
+                setShowAttribuerDialog(false);
+                setSelectedUserIds([]);
+                setUserSearch("");
+                setRaisonAttribution("");
+              }}
+            >
               Annuler
             </Button>
-            <Button onClick={handleAttribuer}>
-              Attribuer
+            <Button 
+              onClick={handleAttribuer}
+              disabled={selectedUserIds.length === 0}
+              className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700"
+            >
+              <UserPlus className="h-4 w-4 mr-2" />
+              Attribuer à {selectedUserIds.length} adhérent{selectedUserIds.length > 1 ? "s" : ""}
             </Button>
           </DialogFooter>
         </DialogContent>

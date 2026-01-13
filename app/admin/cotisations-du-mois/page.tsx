@@ -591,7 +591,7 @@ export default function AdminCotisationsDuMois() {
                 placeholder="Rechercher par période, type, description..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-11"
               />
             </div>
             <ColumnVisibilityToggle 

@@ -425,7 +425,7 @@ export default function AdminNotificationsPage() {
                     placeholder="Rechercher par titre, message, utilisateur..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-10 text-sm h-9 sm:h-10"
+                    className="pl-11 text-sm h-9 sm:h-10"
                   />
                 </div>
                 <Select value={filterType} onValueChange={setFilterType}>

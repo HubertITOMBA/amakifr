@@ -288,14 +288,14 @@ export default function ChatPage() {
                   <Plus className="h-4 w-4" />
                 </Button>
               </div>
-              <div className="mt-4">
+              <div className="mt-4 mb-2">
                 <div className="relative">
                   <Search className="absolute left-3 top-2.5 h-4 w-4 text-white/70" />
                   <Input
-                    placeholder="Rechercher..."
+                    placeholder="    Rechercher..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 bg-white/20 border-white/30 text-white placeholder:text-white/70 focus:bg-white/30"
+                    className="mt-0 pl-11 bg-white/20 border-white/30 text-white placeholder:text-white/70 focus:bg-white/30"
                   />
                 </div>
               </div>
@@ -342,7 +342,7 @@ export default function ChatPage() {
 
         {/* Zone principale - Sélectionnez une conversation */}
         <Card className="flex-1 flex items-center justify-center shadow-xl border-0 bg-gradient-to-br from-white via-blue-50/30 to-purple-50/30 dark:from-gray-800 dark:via-gray-800 dark:to-gray-800">
-          <CardContent className="text-center p-8">
+          <CardContent className="text-center p-8 pb-12">
             <div className="relative">
               <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-600 opacity-20 blur-3xl rounded-full"></div>
               <MessageSquare className="relative h-20 w-20 mx-auto mb-6 text-blue-500 dark:text-blue-400" />
@@ -478,7 +478,7 @@ export default function ChatPage() {
                       placeholder="Rechercher un participant..."
                       value={participantSearch}
                       onChange={(e) => setParticipantSearch(e.target.value)}
-                      className="pl-10 pr-10 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                      className="pl-11 pr-10 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                     />
                     {participantSearch && (
                       <button

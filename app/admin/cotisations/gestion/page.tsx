@@ -779,7 +779,7 @@ export default function AdminCotisationManagement() {
                 placeholder="Rechercher un adhérent..."
                 value={globalFilter as string}
                 onChange={(e) => setGlobalFilter(e.target.value)}
-                className="pl-10 border-gray-300 dark:border-gray-600"
+                className="pl-11 border-gray-300 dark:border-gray-600"
               />
             </div>
             <Select

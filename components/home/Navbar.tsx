@@ -54,11 +54,8 @@ export function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 mr-8 lg:mr-12">
-            <Image src={Logo} alt="Logo" className="size-10" />
-            <h3 className="text-2xl font-semibold">
-              Ama<span className="text-3xl text-red-500 font-semibold">K</span>i
-            </h3>
+          <Link href="/" className="flex flex-col items-center justify-center gap-0 mr-8 lg:mr-12 -space-y-1">
+            <Image src={Logo} alt="Logo" className="size-8" />
           </Link>
 
           {/* Navigation Desktop */}

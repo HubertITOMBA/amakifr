@@ -1,0 +1,172 @@
+╔══════════════════════════════════════════════════════════════════════╗
+║     INSTRUCTIONS DE DÉPLOIEMENT - MENUS HIÉRARCHIQUES               ║
+║                    Version 1.0.0 - 2026-01-13                        ║
+╚══════════════════════════════════════════════════════════════════════╝
+
+📋 RÉSUMÉ
+─────────
+Cette mise à jour implémente un système de menus hiérarchiques avec dropdown
+pour regrouper les options électorales sous un menu parent "Scrutin".
+
+✅ Avantages:
+  • Scroll horizontal éliminé dans la navbar
+  • Interface plus professionnelle avec dropdown Radix UI
+  • Meilleure organisation thématique des menus
+  • Aucun breaking change (100% rétrocompatible)
+
+
+🚀 DÉPLOIEMENT AUTOMATIQUE (RECOMMANDÉ)
+────────────────────────────────────────
+
+Connexion SSH au serveur:
+  ssh votre_user@serveur-production
+  cd /sites/amakifr
+
+Exécution du script automatisé:
+  bash scripts/deploy-menus-hierarchiques.sh
+
+Le script effectue automatiquement:
+  ✓ Installation des dépendances
+  ✓ Génération du client Prisma
+  ✓ Sauvegarde des menus actuels
+  ✓ Re-seeding des menus avec hiérarchie
+  ✓ Build de l'application
+  ✓ Redémarrage PM2
+  ✓ Vérifications post-déploiement
+
+Durée estimée: 5-10 minutes
+
+
+📋 DÉPLOIEMENT MANUEL (SI BESOIN)
+──────────────────────────────────
+
+1. Pull du code:
+   cd /sites/amakifr
+   git pull origin main
+
+2. Installation:
+   npm install
+
+3. Prisma:
+   npx prisma generate
+
+4. Re-seed des menus:
+   bash scripts/seed-menus-auto.sh
+   
+   ⚠️ IMPORTANT: Ceci va supprimer et recréer tous les menus
+   
+   Résultat attendu:
+   ✅ 35 menus créés (7 NAVBAR parents + 2 enfants + 26 SIDEBAR)
+   ✅ 2 sous-menus électoraux (Informations, Résultats)
+
+5. Build:
+   npm run build
+
+6. Redémarrage:
+   pm2 restart amakifr
+
+
+🧪 TESTS POST-DÉPLOIEMENT
+──────────────────────────
+
+1. Vérifier le démarrage:
+   pm2 logs amakifr --lines 50
+   → Chercher "✓ Ready in XXms"
+
+2. Tester la navbar (Desktop):
+   • Ouvrir https://www.amaki.fr/
+   • Vérifier le menu "Scrutin" avec chevron (▼)
+   • Survoler "Scrutin" → Le dropdown s'ouvre
+   • Cliquer sur "Informations" → Redirige vers /extrat
+   • Cliquer sur "Résultats" → Redirige vers /resultats
+   • Vérifier qu'il n'y a PAS de scroll horizontal
+
+3. Tester le menu mobile:
+   • Ouvrir le menu burger (☰)
+   • Vérifier "Scrutin" en gris (non cliquable)
+   • Vérifier "Informations" et "Résultats" indentés
+   • Cliquer sur un sous-menu → Le menu se ferme
+
+4. Tester le filtrage électoral:
+   • Aller dans /admin/settings
+   • Désactiver "Menus électoraux"
+   • Retourner sur la page d'accueil
+   • Vérifier que "Scrutin" n'apparaît plus
+
+
+⚠️ RÉSOLUTION DE PROBLÈMES
+───────────────────────────
+
+❌ Erreur: "Cannot find module '@radix-ui/react-dropdown-menu'"
+   Solution:
+   npm install @radix-ui/react-dropdown-menu
+   npm run build
+   pm2 restart amakifr
+
+❌ Les sous-menus n'apparaissent pas
+   Diagnostic:
+   psql -h localhost -U postgres -d amakifr -c \
+     "SELECT COUNT(*) FROM menus WHERE parent IS NOT NULL;"
+   
+   Si résultat = 0:
+   bash scripts/seed-menus-auto.sh
+
+❌ Le dropdown ne s'ouvre pas
+   Solution:
+   1. Vider le cache du navigateur (Ctrl+Shift+R)
+   2. Rebuild: rm -rf .next && npm run build && pm2 restart amakifr
+
+❌ Application ne démarre pas
+   Vérifier les logs:
+   pm2 logs amakifr --lines 100 --err
+
+
+🔄 ROLLBACK (SI NÉCESSAIRE)
+────────────────────────────
+
+Retour au commit précédent:
+  cd /sites/amakifr
+  git log --oneline -5
+  git checkout fb0bc73  # Commit avant menus hiérarchiques
+  npm install
+  npm run build
+  pm2 restart amakifr
+
+Restaurer les menus depuis la sauvegarde:
+  psql -h localhost -U postgres -d amakifr -c "DELETE FROM menus;"
+  psql -h localhost -U postgres -d amakifr < /tmp/menus_backup_*.sql
+
+
+📚 DOCUMENTATION COMPLÈTE
+──────────────────────────
+
+Pour plus de détails, consulter:
+  • docs/MENUS_HIERARCHIQUES.md (Guide technique)
+  • docs/DEPLOIEMENT_MENUS_HIERARCHIQUES.md (Procédure détaillée)
+  • CHANGELOG_MENUS_HIERARCHIQUES.md (Historique)
+
+
+✅ CHECKLIST FINALE
+────────────────────
+
+□ Code pulé depuis main
+□ Script deploy-menus-hierarchiques.sh exécuté
+□ Tests desktop (dropdown fonctionne)
+□ Tests mobile (indentation visible)
+□ Vérification logs PM2 (pas d'erreur)
+□ Scroll horizontal éliminé
+□ Performance stable (< 2s temps de chargement)
+
+
+📞 SUPPORT
+───────────
+
+En cas de problème:
+  1. Consulter docs/DEPLOIEMENT_MENUS_HIERARCHIQUES.md
+  2. Vérifier pm2 logs amakifr
+  3. Contacter l'équipe technique
+
+
+═══════════════════════════════════════════════════════════════════════
+                        FIN DES INSTRUCTIONS
+═══════════════════════════════════════════════════════════════════════

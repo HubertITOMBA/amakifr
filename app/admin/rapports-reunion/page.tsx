@@ -489,7 +489,7 @@ export default function AdminRapportsReunionPage() {
                 placeholder="Rechercher un rapport..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-11"
               />
             </div>
           </div>
