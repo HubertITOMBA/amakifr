@@ -842,6 +842,7 @@ function UserProfilePageContent() {
   const searchParams = useSearchParams();
   const user = useCurrentUser();
   const { userProfile, loading: profileLoading, error: profileError } = useUserProfile();
+  const { enabled: electoralMenuEnabled } = useElectoralMenu();
   
   // Initialiser activeSection depuis les paramètres d'URL ou par défaut 'profile'
   const sectionFromUrl = searchParams.get('section') as MenuSection | null;
@@ -1427,9 +1428,6 @@ function UserProfilePageContent() {
   const userRole = (user as any)?.role || 'Membre';
   const userCreatedAt = (user as any)?.createdAt || new Date().toISOString();
   const userLastLogin = (user as any)?.lastLogin || null;
-  
-  // Hook pour récupérer l'état d'activation des menus électoraux
-  const { enabled: electoralMenuEnabled } = useElectoralMenu();
 
   // Menu latéral - tous les menus
   const allMenuItems = [
