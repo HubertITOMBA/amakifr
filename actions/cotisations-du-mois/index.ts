@@ -135,6 +135,10 @@ export async function createCotisationDuMois(formData: FormData) {
       data: {
         ...newCotisation,
         montantBase: Number(newCotisation.montantBase),
+        TypeCotisation: {
+          ...newCotisation.TypeCotisation,
+          montant: Number(newCotisation.TypeCotisation.montant),
+        },
       },
     };
   } catch (error) {
@@ -334,6 +338,15 @@ export async function updateCotisationDuMois(formData: FormData) {
       data: {
         ...updated,
         montantBase: Number(updated.montantBase),
+        TypeCotisation: {
+          ...updated.TypeCotisation,
+          montant: Number(updated.TypeCotisation.montant),
+        },
+        CotisationsMensuelles: updated.CotisationsMensuelles?.map((cm: any) => ({
+          ...cm,
+          montantAttendu: Number(cm.montantAttendu),
+          montantPaye: Number(cm.montantPaye),
+        })),
       },
     };
   } catch (error) {
