@@ -260,7 +260,7 @@ export default function ConversationPage() {
   return (
     <div className="container mx-auto p-6 max-w-7xl">
       {loading ? (
-        <Card>
+        <Card className="!py-0">
           <CardContent className="p-6">
             <div className="flex items-center justify-center py-12">
               <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
@@ -268,7 +268,7 @@ export default function ConversationPage() {
           </CardContent>
         </Card>
       ) : !conversation ? (
-        <Card>
+        <Card className="!py-0">
           <CardContent className="p-6 text-center">
             <p className="text-muted-foreground">Conversation non trouvée</p>
           </CardContent>
@@ -276,33 +276,34 @@ export default function ConversationPage() {
       ) : (
         <div className="flex flex-col h-[calc(100vh-8rem)]">
           {/* En-tête */}
-          <Card className="mb-4">
-            <CardHeader>
+          <Card className="mb-4 border-blue-200 shadow-md !py-0">
+            <CardHeader className="bg-gradient-to-r from-blue-500 to-purple-600 text-white rounded-t-lg py-5">
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
                   <Link href="/chat">
                     <Button
                       variant="ghost"
                       size="sm"
+                      className="text-white hover:bg-white/20"
                     >
                       <ArrowLeft className="h-4 w-4 mr-2" />
                       Retour
                     </Button>
                   </Link>
                   <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
+                    <Avatar className="h-10 w-10 ring-2 ring-white/50">
                       {otherParticipants.length === 1 && otherParticipants[0].User.image ? (
                         <AvatarImage src={otherParticipants[0].User.image} />
                       ) : (
-                        <AvatarFallback>
-                          <Users className="h-5 w-5" />
+                        <AvatarFallback className="bg-white/20">
+                          <Users className="h-5 w-5 text-white" />
                         </AvatarFallback>
                       )}
                     </Avatar>
                     <div>
-                      <CardTitle className="text-lg">{displayName}</CardTitle>
+                      <CardTitle className="text-lg text-white">{displayName}</CardTitle>
                     {conversation.type === "Groupe" && (
-                      <p className="text-sm text-muted-foreground">
+                      <p className="text-sm text-white/80">
                         {(conversation as any).Participants?.length || 0} participants
                       </p>
                     )}
@@ -310,7 +311,7 @@ export default function ConversationPage() {
                 </div>
               </div>
               {(conversation as any).Evenement && (
-                <Badge variant="secondary">
+                <Badge variant="secondary" className="bg-white/20 text-white border-white/30 mt-2">
                   <Calendar className="h-3 w-3 mr-1" />
                   {(conversation as any).Evenement.titre}
                 </Badge>
@@ -320,11 +321,11 @@ export default function ConversationPage() {
         </Card>
 
         {/* Zone des messages */}
-        <Card className="flex-1 flex flex-col">
+        <Card className="flex-1 flex flex-col border-blue-200 shadow-md !py-0">
           {/* Barre de recherche */}
-          <div className="px-4 py-2 border-b flex items-center gap-2">
+          <div className="px-4 py-3 border-b border-blue-100 bg-gradient-to-r from-blue-50 to-purple-50 flex items-center gap-2">
             <div className="relative flex-1">
-              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Search className="absolute left-3 top-2.5 h-4 w-4 text-blue-500" />
               <Input
                 placeholder="Rechercher dans l'historique..."
                 value={searchQuery}
@@ -334,7 +335,7 @@ export default function ConversationPage() {
                     handleSearch();
                   }
                 }}
-                className="pl-8"
+                className="pl-10 border-blue-200 focus:border-blue-400 focus:ring-blue-400"
               />
             </div>
             {searchQuery && (
@@ -342,12 +343,13 @@ export default function ConversationPage() {
                 variant="ghost"
                 size="sm"
                 onClick={handleClearSearch}
+                className="text-blue-600 hover:bg-blue-100"
               >
                 <X className="h-4 w-4" />
               </Button>
             )}
             {searchMode && (
-              <Badge variant="secondary" className="text-xs">
+              <Badge variant="secondary" className="text-xs bg-blue-100 text-blue-700">
                 <History className="h-3 w-3 mr-1" />
                 {totalMessages} résultat{totalMessages > 1 ? "s" : ""}
               </Badge>
@@ -364,6 +366,7 @@ export default function ConversationPage() {
                     size="sm"
                     onClick={loadMoreMessages}
                     disabled={loadingMore}
+                    className="bg-gradient-to-r from-blue-50 to-purple-50 border-blue-300 text-blue-700 hover:from-blue-100 hover:to-purple-100 shadow-sm"
                   >
                     {loadingMore ? (
                       <>
@@ -409,7 +412,7 @@ export default function ConversationPage() {
                       <div key={message.id}>
                         {showDateSeparator && (
                           <div className="flex items-center justify-center my-4">
-                            <div className="flex items-center gap-2 bg-muted px-3 py-1 rounded-full">
+                            <div className="flex items-center gap-2 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white px-4 py-1.5 rounded-full shadow-lg border border-white/20">
                               <Calendar className="h-3 w-3" />
                               <span className="text-xs font-medium">
                                 {format(messageDate, "EEEE d MMMM yyyy", { locale: fr })}
@@ -448,13 +451,13 @@ export default function ConversationPage() {
 
             {/* Zone de réponse */}
             {replyingTo && (
-              <div className="px-4 py-2 bg-muted/50 flex items-center justify-between">
+              <div className="px-4 py-2 bg-gradient-to-r from-blue-50 to-purple-50 border-l-4 border-blue-500 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Reply className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">
-                    Réponse à <span className="font-medium">{replyingTo.User.name}</span>
+                  <Reply className="h-4 w-4 text-blue-600" />
+                  <span className="text-sm text-gray-700">
+                    Réponse à <span className="font-medium text-blue-600">{replyingTo.User.name}</span>
                   </span>
-                  <span className="text-xs text-muted-foreground truncate max-w-xs">
+                  <span className="text-xs text-gray-600 truncate max-w-xs">
                     {replyingTo.content}
                   </span>
                 </div>
@@ -462,6 +465,7 @@ export default function ConversationPage() {
                   variant="ghost"
                   size="sm"
                   onClick={() => setReplyingTo(null)}
+                  className="text-blue-600 hover:bg-blue-100"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -469,10 +473,10 @@ export default function ConversationPage() {
             )}
 
             {editingMessage && (
-              <div className="px-4 py-2 bg-muted/50 flex items-center justify-between">
+              <div className="px-4 py-2 bg-gradient-to-r from-amber-50 to-orange-50 border-l-4 border-amber-500 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <Edit className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm text-muted-foreground">Modification du message</span>
+                  <Edit className="h-4 w-4 text-amber-600" />
+                  <span className="text-sm text-gray-700 font-medium">Modification du message</span>
                 </div>
                 <Button
                   variant="ghost"
@@ -481,6 +485,7 @@ export default function ConversationPage() {
                     setEditingMessage(null);
                     setMessageContent("");
                   }}
+                  className="text-amber-600 hover:bg-amber-100"
                 >
                   <X className="h-4 w-4" />
                 </Button>
@@ -488,7 +493,7 @@ export default function ConversationPage() {
             )}
 
             {/* Zone de saisie */}
-            <div className="p-4 border-t">
+            <div className="p-4 border-t border-blue-100 bg-gradient-to-r from-gray-50 to-blue-50/30">
               <div className="flex gap-2">
                 <Textarea
                   ref={inputRef}
@@ -496,7 +501,7 @@ export default function ConversationPage() {
                   onChange={(e) => setMessageContent(e.target.value)}
                   onKeyPress={handleKeyPress}
                   placeholder={editingMessage ? "Modifier le message..." : "Tapez votre message..."}
-                  className="min-h-[60px] resize-none"
+                  className="min-h-[60px] resize-none border-blue-200 focus:border-blue-400 focus:ring-blue-400"
                   rows={1}
                 />
                 <div className="flex flex-col gap-2">
@@ -504,12 +509,14 @@ export default function ConversationPage() {
                     variant="ghost"
                     size="sm"
                     onClick={() => setShowEmojiPicker(!showEmojiPicker)}
+                    className="text-amber-500 hover:bg-amber-50 hover:text-amber-600"
                   >
                     <Smile className="h-5 w-5" />
                   </Button>
                   <Button
                     onClick={editingMessage ? () => handleEditMessage(editingMessage) : handleSendMessage}
                     disabled={!messageContent.trim()}
+                    className="bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white shadow-md"
                   >
                     <Send className="h-4 w-4" />
                   </Button>
@@ -556,7 +563,7 @@ function MessageBubble({
       onMouseLeave={() => setShowActions(false)}
     >
       {!isCurrentUser && showAvatar && (
-        <Avatar className="h-8 w-8 flex-shrink-0">
+        <Avatar className="h-8 w-8 shrink-0">
           <AvatarImage src={message.User.image || undefined} />
           <AvatarFallback>
             {message.User.name?.charAt(0).toUpperCase() || "?"}
@@ -576,16 +583,20 @@ function MessageBubble({
         )}
 
         {message.ReplyTo && (
-          <div className="text-xs text-muted-foreground mb-1 px-2 py-1 bg-muted rounded border-l-2 border-primary">
+          <div className={`text-xs mb-1 px-2 py-1 rounded border-l-2 ${
+            isCurrentUser 
+              ? "bg-blue-100 text-blue-800 border-blue-400" 
+              : "bg-gray-100 text-gray-800 border-gray-400"
+          }`}>
             Réponse à {message.ReplyTo.User.name}: {message.ReplyTo.content}
           </div>
         )}
 
         <div
-          className={`rounded-lg px-4 py-2 ${
+          className={`rounded-lg px-4 py-2 shadow-sm ${
             isCurrentUser
-              ? "bg-primary text-primary-foreground"
-              : "bg-muted"
+              ? "bg-gradient-to-br from-blue-500 to-purple-600 text-white"
+              : "bg-gradient-to-br from-gray-100 to-gray-200 text-gray-900"
           }`}
         >
           <p className="whitespace-pre-wrap break-words">{message.content}</p>
@@ -605,7 +616,7 @@ function MessageBubble({
               <Badge
                 key={reaction}
                 variant="secondary"
-                className="text-xs cursor-pointer hover:bg-muted-foreground/20"
+                className="text-xs cursor-pointer bg-gradient-to-r from-yellow-100 to-amber-100 hover:from-yellow-200 hover:to-amber-200 text-gray-800 border border-yellow-300 shadow-sm"
                 onClick={() => onAddReaction(reaction)}
               >
                 {reaction} {users.length}
@@ -621,12 +632,12 @@ function MessageBubble({
         )}
 
         {showActions && (
-          <div className="flex gap-1 mt-1">
+          <div className="flex gap-1 mt-1 flex-wrap">
             <Button
               variant="ghost"
               size="sm"
               onClick={onReply}
-              className="h-6 px-2 text-xs"
+              className="h-6 px-2 text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200"
             >
               <Reply className="h-3 w-3 mr-1" />
               Répondre
@@ -637,7 +648,7 @@ function MessageBubble({
                   variant="ghost"
                   size="sm"
                   onClick={onEdit}
-                  className="h-6 px-2 text-xs"
+                  className="h-6 px-2 text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200"
                 >
                   <Edit className="h-3 w-3 mr-1" />
                   Modifier
@@ -646,7 +657,7 @@ function MessageBubble({
                   variant="ghost"
                   size="sm"
                   onClick={onDelete}
-                  className="h-6 px-2 text-xs text-destructive"
+                  className="h-6 px-2 text-xs bg-red-50 hover:bg-red-100 text-red-700 border border-red-200"
                 >
                   <Trash2 className="h-3 w-3 mr-1" />
                   Supprimer
@@ -660,7 +671,7 @@ function MessageBubble({
                   variant="ghost"
                   size="sm"
                   onClick={() => onAddReaction(reaction)}
-                  className="h-6 w-6 p-0"
+                  className="h-6 w-6 p-0 hover:bg-yellow-100 hover:scale-125 transition-transform"
                 >
                   {reaction}
                 </Button>
@@ -672,7 +683,7 @@ function MessageBubble({
 
       {isCurrentUser && !showAvatar && <div className="w-8" />}
       {isCurrentUser && showAvatar && (
-        <Avatar className="h-8 w-8 flex-shrink-0">
+        <Avatar className="h-8 w-8 shrink-0">
           <AvatarImage src={message.User.image || undefined} />
           <AvatarFallback>
             {message.User.name?.charAt(0).toUpperCase() || "?"}
