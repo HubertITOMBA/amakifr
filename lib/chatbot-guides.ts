@@ -218,18 +218,83 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
-    keywords: ['notification', 'notifications', 'alerte', 'alertes', 'préférences notification', 'gérer notifications'],
+    keywords: ['notification', 'notifications', 'alerte', 'alertes', 'préférences notification', 'gérer notifications', 'voir notifications', 'mes notifications', 'cloche notification'],
     title: 'Comment gérer mes notifications',
     steps: [
+      '🔔 Les notifications vous permettent de rester informé des activités de l\'association',
+      '',
+      '📱 Pour voir vos notifications :',
+      'Cliquez sur l\'icône de cloche (🔔) en haut à droite de la page',
+      'ou',
       'Allez dans "Mon Profil" > "Notifications"',
-      'Vous verrez vos préférences de notifications',
+      '',
+      'Vous verrez toutes vos notifications non lues et lues',
+      'Les notifications peuvent concerner :',
+      '  • De nouveaux messages dans le chat',
+      '  • Des événements à venir',
+      '  • Des cotisations à payer',
+      '  • Des mises à jour sur vos idées',
+      '  • Des informations importantes de l\'association',
+      '',
+      '⚙️ Pour gérer vos préférences :',
+      'Allez dans "Mon Profil" > "Notifications"',
       'Activez ou désactivez les types de notifications que vous souhaitez recevoir',
       'Vous pouvez choisir de recevoir des notifications par email, SMS, ou dans l\'application',
       'Sauvegardez vos préférences',
-      'Vous recevrez les notifications selon vos préférences'
+      '',
+      '💡 Conseil : Gardez les notifications importantes activées pour ne rien manquer'
     ],
     actions: [
-      { label: 'Gérer mes notifications', action: 'open_notifications', href: '/user/profile?section=notifications' }
+      { label: 'Voir mes notifications', action: 'open_notifications', href: '/notifications' },
+      { label: 'Gérer mes préférences', action: 'open_notifications_prefs', href: '/user/profile?section=notifications' }
+    ]
+  },
+  {
+    keywords: ['chat', 'messagerie', 'message', 'messages', 'conversation', 'conversations', 'discuter', 'discussion', 'envoyer message', 'nouveau message', 'chat interne', 'messagerie interne'],
+    title: 'Comment utiliser la messagerie interne',
+    steps: [
+      '💬 La messagerie interne permet d\'échanger avec les autres adhérents de l\'association',
+      '',
+      '📋 Pour accéder à la messagerie :',
+      'Cliquez sur "Messages" dans le menu principal (icône 💬)',
+      'ou',
+      'Allez directement sur /chat',
+      '',
+      '📝 Pour créer une nouvelle conversation :',
+      'Cliquez sur le bouton "Nouvelle conversation" (icône +)',
+      'Choisissez le type de conversation :',
+      '  • Conversation privée : Discussion entre 2 personnes',
+      '  • Groupe : Discussion avec plusieurs participants',
+      '  • Événement : Discussion liée à un événement spécifique',
+      '',
+      '👥 Pour une conversation de groupe :',
+      'Recherchez et sélectionnez les participants',
+      'Si vous sélectionnez un seul participant, le titre sera généré automatiquement',
+      'Si plusieurs participants, entrez un titre pour la conversation',
+      'Cliquez sur "Créer la conversation"',
+      '',
+      '💬 Pour envoyer un message :',
+      'Sélectionnez une conversation dans la liste de gauche',
+      'Tapez votre message dans la zone de saisie en bas',
+      'Vous pouvez :',
+      '  • Répondre à un message spécifique (cliquez sur "Répondre")',
+      '  • Ajouter une réaction (emoji)',
+      '  • Modifier ou supprimer vos propres messages',
+      'Appuyez sur Entrée pour envoyer',
+      '',
+      '🔍 Pour rechercher dans vos conversations :',
+      'Utilisez la barre de recherche en haut de la liste des conversations',
+      'Vous pouvez rechercher par nom de conversation ou nom de participant',
+      '',
+      '🔔 Notifications :',
+      'Vous recevrez une notification (cloche) quand vous recevez un nouveau message',
+      'Le nombre de messages non lus s\'affiche à côté de "Messages" dans le menu',
+      '',
+      '💡 Conseil : Utilisez les conversations de groupe pour organiser des discussions avec plusieurs personnes',
+      '💡 Conseil : Les conversations liées à un événement permettent de communiquer avec les participants'
+    ],
+    actions: [
+      { label: 'Ouvrir la messagerie', action: 'open_chat', href: '/chat' }
     ]
   },
   {
@@ -388,6 +453,7 @@ export const chatbotGuides: Guide[] = [
       '• Comment participer à un événement',
       '• Comment consulter les rapports de réunion',
       '• Comment gérer vos notifications',
+      '• Comment utiliser la messagerie interne',
       '• Comment proposer une idée dans la boîte à idées',
       '• [ADMIN] Comment encaisser une cotisation manuelle',
       '• [ADMIN] Comment créer une cotisation mensuelle',
@@ -396,6 +462,8 @@ export const chatbotGuides: Guide[] = [
       '• [ADMIN] Comment ajouter un élément dans la galerie',
       '• [ADMIN] Comment envoyer une notification',
       '• [ADMIN] Comment envoyer un email aux adhérents',
+      '• [ADMIN] Comment créer et gérer une dépense',
+      '• [ADMIN] Comment gérer les types de dépenses',
       'Tapez simplement votre question et je vous guiderai étape par étape !'
     ]
   },
@@ -634,6 +702,116 @@ export const chatbotGuides: Guide[] = [
     ],
     actions: [
       { label: 'Gestion des notifications', action: 'open_admin_notifications', href: '/admin/notifications' }
+    ]
+  },
+  {
+    keywords: ['dépense', 'dépenses', 'créer dépense', 'ajouter dépense', 'nouvelle dépense', 'enregistrer dépense', 'admin dépense', 'gérer dépenses', 'gestion dépenses', 'dépense association'],
+    title: '[ADMIN] Comment créer et gérer une dépense',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Allez dans "Admin" > "Gestion des Finances" > "Dépenses"',
+      'ou',
+      'Allez directement sur /admin/depenses',
+      '',
+      '➕ Pour créer une nouvelle dépense :',
+      'Cliquez sur le bouton "Nouvelle dépense" ou "Créer une dépense"',
+      'Remplissez le formulaire :',
+      '',
+      '📝 Informations obligatoires :',
+      '  • Libellé : Description courte de la dépense',
+      '  • Montant : Montant de la dépense (en euros)',
+      '  • Date de dépense : Date à laquelle la dépense a été effectuée',
+      '',
+      '📋 Informations optionnelles :',
+      '  • Type de dépense : Sélectionnez un type prédéfini (si disponible)',
+      '  • Catégorie : Catégorie de la dépense (Fournitures, Transport, Communication, etc.)',
+      '  • Description : Description détaillée de la dépense',
+      '  • Justificatif : Upload d\'un fichier justificatif (facture, reçu, etc.)',
+      '',
+      '✅ Validation :',
+      'Vérifiez toutes les informations',
+      'Cliquez sur "Créer la dépense"',
+      '',
+      '📊 Statuts des dépenses :',
+      '  • En attente : Dépense créée, en attente de validation',
+      '  • Validée : Dépense approuvée par un administrateur',
+      '  • Rejetée : Dépense refusée (avec raison)',
+      '',
+      '🔍 Pour gérer les dépenses existantes :',
+      'Dans la liste des dépenses, vous pouvez :',
+      '  • Voir les détails d\'une dépense',
+      '  • Modifier une dépense (si elle n\'est pas encore validée)',
+      '  • Valider une dépense',
+      '  • Rejeter une dépense',
+      '  • Supprimer une dépense (si elle n\'est pas validée)',
+      '',
+      '📎 Justificatifs :',
+      'Pour chaque dépense, vous pouvez uploader des justificatifs :',
+      '  • Formats acceptés : PDF, JPG, PNG, GIF, WEBP, BMP',
+      '  • Taille maximale : 10 Mo par fichier',
+      '  • Vous pouvez ajouter plusieurs justificatifs par dépense',
+      '',
+      '📈 Statistiques :',
+      'La page affiche des statistiques :',
+      '  • Total des dépenses',
+      '  • Dépenses du mois',
+      '  • Dépenses en attente',
+      '  • Montant total du mois',
+      '  • Montant total global',
+      '',
+      '💡 Conseil : Ajoutez toujours un justificatif pour faciliter la traçabilité',
+      '💡 Conseil : Validez les dépenses régulièrement pour maintenir une comptabilité à jour',
+      '⚠️ Important : Une dépense validée ou rejetée ne peut plus être modifiée'
+    ],
+    actions: [
+      { label: 'Gestion des dépenses', action: 'open_admin_depenses', href: '/admin/depenses' }
+    ]
+  },
+  {
+    keywords: ['type dépense', 'types dépense', 'type de dépense', 'types de dépense', 'créer type dépense', 'gérer types dépense', 'admin type dépense', 'catégorie dépense', 'catégories dépense'],
+    title: '[ADMIN] Comment gérer les types de dépenses',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Les types de dépenses permettent de catégoriser et organiser les dépenses de l\'association',
+      '',
+      '🔍 Pour accéder à la gestion des types :',
+      'Allez dans "Admin" > "Gestion des Finances" > "Types de Dépenses"',
+      'ou',
+      'Allez directement sur /admin/types-depense',
+      '',
+      '➕ Pour créer un nouveau type de dépense :',
+      'Cliquez sur le bouton "Nouveau type" ou "Créer un type"',
+      'Remplissez le formulaire :',
+      '',
+      '📝 Informations requises :',
+      '  • Titre : Nom du type de dépense (ex: "Fournitures de bureau", "Transport", "Communication")',
+      '  • Description : Description détaillée du type (optionnel)',
+      '  • Statut : Actif ou Inactif',
+      '',
+      '✅ Validation :',
+      'Vérifiez les informations',
+      'Cliquez sur "Créer le type"',
+      '',
+      '📋 Pour gérer les types existants :',
+      'Dans la liste, vous pouvez :',
+      '  • Voir les détails d\'un type',
+      '  • Modifier un type (titre, description, statut)',
+      '  • Activer/Désactiver un type',
+      '  • Supprimer un type (si aucune dépense ne l\'utilise)',
+      '',
+      '🔍 Utilisation :',
+      'Lors de la création d\'une dépense, vous pouvez sélectionner un type',
+      'Cela permet de :',
+      '  • Organiser les dépenses par catégorie',
+      '  • Générer des rapports par type',
+      '  • Faciliter la comptabilité',
+      '',
+      '💡 Conseil : Créez des types clairs et spécifiques pour une meilleure organisation',
+      '💡 Conseil : Désactivez plutôt que supprimer les types non utilisés pour garder l\'historique',
+      '⚠️ Important : Un type utilisé par des dépenses ne peut pas être supprimé'
+    ],
+    actions: [
+      { label: 'Gestion des types de dépenses', action: 'open_admin_types_depense', href: '/admin/types-depense' }
     ]
   },
   {
@@ -914,7 +1092,7 @@ export function generateBotResponse(question: string): { message: string; guide?
   // Validation de type pour éviter les erreurs
   if (typeof question !== 'string' || !question || !question.trim()) {
     return {
-      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Ajouter un événement\n• Ajouter un élément dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents`
+      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Ajouter un événement\n• Ajouter un élément dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses`
     };
   }
   
@@ -931,7 +1109,7 @@ export function generateBotResponse(question: string): { message: string; guide?
   
   // Réponse par défaut avec suggestions
   return {
-    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Ajouter un événement\n• Ajouter un élément dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n\nPosez-moi une question plus précise en utilisant des mots-clés et je vous guiderai étape par étape !`
+    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Ajouter un événement\n• Ajouter un élément dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses\n\nPosez-moi une question plus précise en utilisant des mots-clés et je vous guiderai étape par étape !`
   };
 }
 
@@ -966,8 +1144,12 @@ export const quickQuestions = [
   "Comment consulter les rapports ?",
   "Comment ajouter une idée ?",
   "Comment modifier mon profil ?",
+  "Comment utiliser la messagerie ?",
+  "Comment voir mes notifications ?",
   "[ADMIN] Comment encaisser une cotisation ?",
   "[ADMIN] Comment créer la cotisation mensuelle ?",
   "[ADMIN] Comment ajouter un événement ?",
-  "[ADMIN] Comment envoyer une notification ?"
+  "[ADMIN] Comment envoyer une notification ?",
+  "[ADMIN] Comment créer une dépense ?",
+  "[ADMIN] Comment gérer les types de dépenses ?"
 ];

@@ -56,7 +56,7 @@ export default function GestionDepensesPage() {
     try {
       const res = await createDepense({
         ...form,
-        typeDepenseId: form.typeDepenseId || null,
+        typeDepenseId: form.typeDepenseId || undefined,
       });
       if (res.success) {
         toast.success("Dépense créée");

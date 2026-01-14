@@ -7,15 +7,21 @@ import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 
+// Fonction helper pour transformer null/empty en undefined
+const nullishToString = z.preprocess(
+  (val) => (val === null || val === "" || val === undefined ? undefined : val),
+  z.string().optional()
+);
+
 // Schémas de validation
 const CreateDepenseSchema = z.object({
   libelle: z.string().min(1, "Le libellé est requis"),
   montant: z.number().min(0, "Le montant doit être positif"),
   dateDepense: z.string().min(1, "La date est requise"),
-  typeDepenseId: z.string().optional(), // ID du type de dépense
-  categorie: z.string().optional(), // Conservé pour compatibilité
-  description: z.string().optional(),
-  justificatif: z.string().optional(), // URL du fichier uploadé
+  typeDepenseId: nullishToString, // ID du type de dépense
+  categorie: nullishToString, // Conservé pour compatibilité
+  description: nullishToString,
+  justificatif: nullishToString, // URL du fichier uploadé
   statut: z.enum(["EnAttente", "Valide", "Rejete"]).default("EnAttente"),
 });
 
