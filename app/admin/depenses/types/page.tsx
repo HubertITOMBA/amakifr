@@ -305,14 +305,16 @@ export default function AdminTypesDepense() {
         {/* Modal de création/édition */}
         {showForm && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-              <CardHeader className="bg-gradient-to-r from-orange-500/90 to-orange-600/90 dark:from-orange-600/90 dark:to-orange-700/90 text-white rounded-t-lg">
-                <CardTitle>
-                  {editingType ? "Modifier le Type" : "Nouveau Type de Dépense"}
-                </CardTitle>
-                <CardDescription className="text-orange-100 dark:text-orange-200">
-                  {editingType ? "Modifier les paramètres du type" : "Créer un nouveau type de dépense"}
-                </CardDescription>
+            <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto !pt-0">
+              <CardHeader className="!pt-0 bg-gradient-to-r from-orange-500/90 to-orange-600/90 dark:from-orange-600/90 dark:to-orange-700/90 text-white rounded-t-lg">
+                <div className="pt-4">
+                  <CardTitle>
+                    {editingType ? "Modifier le Type" : "Nouveau Type de Dépense"}
+                  </CardTitle>
+                  <CardDescription className="text-orange-100 dark:text-orange-200">
+                    {editingType ? "Modifier les paramètres du type" : "Créer un nouveau type de dépense"}
+                  </CardDescription>
+                </div>
               </CardHeader>
               <CardContent className="p-6">
                 <form onSubmit={handleSubmit} className="space-y-4">

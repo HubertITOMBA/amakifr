@@ -732,16 +732,18 @@ export default function AdminCotisationsDuMois() {
 
       {/* Dialog de création/édition */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="!py-0 max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="!py-0 pb-3">
-            <DialogTitle className="text-lg">
-              {editingCotisation ? "Modifier la cotisation du mois" : "Nouvelle cotisation du mois"}
-            </DialogTitle>
-            <DialogDescription className="text-xs">
-              {editingCotisation 
-                ? "Modifiez les informations de la cotisation du mois"
-                : "Créez une nouvelle cotisation pour un mois et une année donnés"}
-            </DialogDescription>
+        <DialogContent className="!py-0 !pt-0 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="!py-0 !pt-0 pb-3">
+            <div className="pt-4">
+              <DialogTitle className="text-lg">
+                {editingCotisation ? "Modifier la cotisation du mois" : "Nouvelle cotisation du mois"}
+              </DialogTitle>
+              <DialogDescription className="text-xs">
+                {editingCotisation 
+                  ? "Modifiez les informations de la cotisation du mois"
+                  : "Créez une nouvelle cotisation pour un mois et une année donnés"}
+              </DialogDescription>
+            </div>
           </DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-3">
             <div className="grid grid-cols-2 gap-3">
