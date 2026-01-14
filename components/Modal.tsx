@@ -77,17 +77,17 @@ export function Modal ({
         return (
             <Dialog defaultOpen={true} open={true} onOpenChange={handleOpenChange}>
                 <DialogOverlay className="bg-black/50" />
-                <DialogContent className={contentClass}>
-                    <div className="flex items-center justify-between px-4 py-3 border-b bg-slate-50/80 dark:bg-slate-900/60 backdrop-blur">
+                <DialogContent className={`${contentClass} !pt-0`}>
+                    <div className="flex items-center justify-between px-4 !pt-0 pb-3 border-b bg-slate-50/80 dark:bg-slate-900/60 backdrop-blur rounded-t-lg">
                         {title ? (
-                          <DialogTitle className="text-lg md:text-xl font-bold text-slate-900 dark:text-slate-100 truncate m-0">
+                          <DialogTitle className="text-lg md:text-xl font-bold text-slate-900 dark:text-slate-100 truncate m-0 pt-3">
                               {title}
                           </DialogTitle>
                         ) : (
                           <DialogTitle className="sr-only">Modal</DialogTitle>
                         )}
                         {showClose && (
-                          <button type="button" aria-label="Fermer" className="p-2 rounded hover:bg-muted" onClick={tryClose}>
+                          <button type="button" aria-label="Fermer" className="p-2 rounded hover:bg-muted mt-3" onClick={tryClose}>
                               <X className="h-5 w-5" />
                           </button>
                         )}
@@ -96,7 +96,7 @@ export function Modal ({
                         {children}
                     </div>
                     {showFooter && (
-                        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t bg-slate-50/60 dark:bg-slate-900/50 flex-shrink-0">
+                        <div className="flex items-center justify-end gap-2 px-4 py-3 border-t bg-slate-50/60 dark:bg-slate-900/50 shrink-0">
                             <Button variant="outline" onClick={tryClose}>
                                 {cancelLabel || "Annuler"}
                             </Button>
