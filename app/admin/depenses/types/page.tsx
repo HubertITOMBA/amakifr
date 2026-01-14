@@ -228,9 +228,9 @@ export default function AdminTypesDepense() {
         {/* Liste des types */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
           {typesDepense.map((type) => (
-            <Card key={type.id} className="!py-0 border-orange-200 dark:border-orange-800 shadow-md hover:shadow-lg transition-shadow">
-              <CardHeader className="bg-gradient-to-r from-orange-500/90 to-orange-600/90 dark:from-orange-600/90 dark:to-orange-700/90 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6">
-                <div className="flex items-center justify-between">
+            <Card key={type.id} className="!py-0 !pt-0 border-orange-200 dark:border-orange-800 shadow-md hover:shadow-lg transition-shadow">
+              <CardHeader className="!pt-0 bg-gradient-to-r from-orange-500/90 to-orange-600/90 dark:from-orange-600/90 dark:to-orange-700/90 text-white rounded-t-lg pb-3 sm:pb-4 px-4 sm:px-6">
+                <div className="flex items-center justify-between pt-3 sm:pt-4">
                   <CardTitle className="text-lg sm:text-xl font-bold text-white flex items-center gap-2">
                     <Receipt className="h-5 w-5" />
                     {type.titre}

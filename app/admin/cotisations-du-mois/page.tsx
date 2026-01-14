@@ -550,8 +550,8 @@ export default function AdminCotisationsDuMois() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4">
-      <Card className="mx-auto max-w-7xl shadow-lg border-blue-200">
-        <CardHeader className="!py-0 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+      <Card className="mx-auto max-w-7xl shadow-lg border-blue-200 !pt-0">
+        <CardHeader className="!py-0 !pt-0 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
           <div className="flex items-center justify-between py-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Calendar className="h-4 w-4" />

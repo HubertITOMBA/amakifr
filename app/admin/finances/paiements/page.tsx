@@ -22,9 +22,11 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  ArrowLeft
 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 import { 
   getAllPaiements, 
   createPaiement,
@@ -430,6 +432,14 @@ export default function AdminPaiementsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50">
       <div className="p-4 sm:p-6">
+        <div className="mb-4">
+          <Link href="/admin/finances">
+            <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300">
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Retour
+            </Button>
+          </Link>
+        </div>
         <Card className="mx-auto max-w-7xl shadow-lg border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900 !py-0">
           <CardHeader className="bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">

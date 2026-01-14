@@ -48,8 +48,10 @@ import {
   ChevronRight,
   ChevronsLeft,
   ChevronsRight,
+  ArrowLeft,
 } from "lucide-react";
 import { toast } from "sonner";
+import Link from "next/link";
 import {
   getConfigurationFraisAdhesion,
   updateConfigurationFraisAdhesion,
@@ -574,6 +576,15 @@ export default function FraisAdhesionPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:to-slate-800">
       <div className="container mx-auto py-4 sm:py-6 px-4 sm:px-6">
         <div className="space-y-4 sm:space-y-6">
+          {/* Bouton Retour */}
+          <div>
+            <Link href="/admin/finances">
+              <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300">
+                <ArrowLeft className="h-4 w-4 mr-2" />
+                Retour
+              </Button>
+            </Link>
+          </div>
           {/* Titre */}
           <div className="flex items-center justify-between">
             <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">

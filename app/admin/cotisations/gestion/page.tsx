@@ -218,7 +218,7 @@ export default function AdminCotisationManagement() {
           const mois = adherent.moisDeRetard;
           return (
             <div className="flex items-center space-x-2">
-              <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center flex-shrink-0">
+              <div className="h-8 w-8 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
                 <span className="text-xs font-medium text-blue-600 dark:text-blue-300">
                   {adherent.firstname[0]}{adherent.lastname[0]}
                 </span>
@@ -510,11 +510,22 @@ export default function AdminCotisationManagement() {
         console.error("Erreur lors de la sauvegarde des préférences:", error);
       }
     },
-    state: {
-      sorting,
-      columnFilters,
-      globalFilter,
-      columnVisibility,
+    globalFilterFn: (row, columnId, filterValue) => {
+      const searchValue = filterValue.toLowerCase().trim();
+      if (!searchValue) return true;
+      
+      const adherent = row.original;
+      const searchableText = [
+        adherent.firstname || "",
+        adherent.lastname || "",
+        `${adherent.firstname} ${adherent.lastname}`,
+        adherent.email || "",
+        adherent.User?.email || "",
+        adherent.totalDette?.toFixed(2) || "",
+        adherent.civility || "",
+      ].join(" ").toLowerCase();
+      
+      return searchableText.includes(searchValue);
     },
     state: {
       sorting,
