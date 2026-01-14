@@ -805,8 +805,8 @@ export default function AdminCotisationManagement() {
               <table className="w-full min-w-0 md:min-w-[800px]">
               <thead>
                 {table.getHeaderGroups().map((headerGroup) => (
-                  <tr key={headerGroup.id} className="border-b bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700">
-                    {headerGroup.headers.map((header) => {
+                  <tr key={headerGroup.id} className="border-b-2 border-gray-300 dark:border-gray-600 bg-gradient-to-r from-gray-100 to-gray-50 dark:from-gray-800 dark:to-gray-700">
+                    {headerGroup.headers.map((header, headerIndex) => {
                       const columnId = header.column.id;
                       const isVisible = header.column.getIsVisible();
                       // Masquer certaines colonnes sur mobile
@@ -817,7 +817,7 @@ export default function AdminCotisationManagement() {
                       return (
                         <th
                           key={header.id}
-                          className={`px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
+                          className={`px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 ${headerIndex === headerGroup.headers.length - 1 ? 'border-r-0' : ''} ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
                         >
                           {header.isPlaceholder
                             ? null
@@ -836,6 +836,7 @@ export default function AdminCotisationManagement() {
                   <tr 
                     key={row.id} 
                     className={`
+                      border-b border-gray-200 dark:border-gray-700
                       ${index % 2 === 0 
                         ? 'bg-white dark:bg-gray-900' 
                         : 'bg-gray-50/50 dark:bg-gray-800/30'
@@ -846,7 +847,7 @@ export default function AdminCotisationManagement() {
                       cursor-pointer
                     `}
                   >
-                    {row.getVisibleCells().map((cell) => {
+                    {row.getVisibleCells().map((cell, cellIndex) => {
                       const columnId = cell.column.id;
                       const isVisible = cell.column.getIsVisible();
                       // Masquer certaines colonnes sur mobile
@@ -854,10 +855,13 @@ export default function AdminCotisationManagement() {
                       
                       if (!isVisible) return null;
                       
+                      const visibleCells = row.getVisibleCells().filter(c => c.column.getIsVisible());
+                      const isLastCell = cellIndex === visibleCells.length - 1;
+                      
                       return (
                         <td 
                           key={cell.id} 
-                          className={`px-2 sm:px-3 py-2 text-xs sm:text-sm whitespace-nowrap text-gray-900 dark:text-gray-100 ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
+                          className={`px-2 sm:px-3 py-2 text-xs sm:text-sm whitespace-nowrap text-gray-900 dark:text-gray-100 border-r border-gray-200 dark:border-gray-700 ${isLastCell ? 'border-r-0' : ''} ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
                         >
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>

@@ -173,6 +173,7 @@ async function seedMenus() {
         statut: true,
         ordre: 1,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Analytics",
@@ -184,6 +185,7 @@ async function seedMenus() {
         statut: true,
         ordre: 2,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Adhérents",
@@ -195,6 +197,19 @@ async function seedMenus() {
         statut: true,
         ordre: 3,
         electoral: false,
+        parent: null,
+      },
+      {
+        libelle: "Gestion des Finances",
+        description: "Gestion financière complète (cotisations, paiements, dettes, assistances)",
+        lien: "/admin/finances",
+        niveau: "SIDEBAR" as const,
+        roles: ["ADMIN"],
+        icone: "Euro",
+        statut: true,
+        ordre: 4,
+        electoral: false,
+        parent: null,
       },
       {
         libelle: "Cotisations",
@@ -204,8 +219,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Euro",
         statut: true,
-        ordre: 4,
+        ordre: 5,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Gestion des Cotisations",
@@ -215,8 +231,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Euro",
         statut: true,
-        ordre: 5,
+        ordre: 6,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Cotisations du Mois",
@@ -226,8 +243,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Calendar",
         statut: true,
-        ordre: 6,
+        ordre: 7,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Depenses",
@@ -237,8 +255,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Euro",
         statut: true,
-        ordre: 7,
+        ordre: 8,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Événements",
@@ -248,8 +267,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Calendar",
         statut: true,
-        ordre: 8,
+        ordre: 9,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Bureau",
@@ -259,8 +279,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Building2",
         statut: true,
-        ordre: 9,
+        ordre: 10,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Postes",
@@ -270,8 +291,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Award",
         statut: true,
-        ordre: 10,
+        ordre: 11,
         electoral: true, // Menu électoral
+        parent: null,
       },
       {
         libelle: "Réservations",
@@ -281,8 +303,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Calendar",
         statut: true,
-        ordre: 11,
+        ordre: 12,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Boîte à idées",
@@ -292,8 +315,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Lightbulb",
         statut: true,
-        ordre: 12,
+        ordre: 13,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Notifications",
@@ -303,8 +327,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Mail",
         statut: true,
-        ordre: 13,
+        ordre: 14,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Emails",
@@ -314,8 +339,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Mail",
         statut: true,
-        ordre: 14,
+        ordre: 15,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Rappels Automatiques",
@@ -325,8 +351,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Bell",
         statut: true,
-        ordre: 15,
+        ordre: 16,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Documents",
@@ -336,8 +363,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "FileText",
         statut: true,
-        ordre: 16,
+        ordre: 17,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Rapports de Réunion",
@@ -347,8 +375,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "FileText",
         statut: true,
-        ordre: 17,
+        ordre: 18,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Exports",
@@ -358,8 +387,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "FileText",
         statut: true,
-        ordre: 18,
+        ordre: 19,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Galerie",
@@ -369,8 +399,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Camera",
         statut: true,
-        ordre: 19,
+        ordre: 20,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Élections",
@@ -380,8 +411,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Vote",
         statut: true,
-        ordre: 20,
+        ordre: 21,
         electoral: true, // Menu électoral
+        parent: null,
       },
       {
         libelle: "Votes",
@@ -391,8 +423,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Award",
         statut: true,
-        ordre: 21,
+        ordre: 22,
         electoral: true, // Menu électoral
+        parent: null,
       },
       {
         libelle: "Candidatures",
@@ -402,8 +435,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Users",
         statut: true,
-        ordre: 22,
+        ordre: 23,
         electoral: true, // Menu électoral
+        parent: null,
       },
       {
         libelle: "Badges",
@@ -413,8 +447,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Award",
         statut: true,
-        ordre: 23,
+        ordre: 24,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Chat",
@@ -424,8 +459,9 @@ async function seedMenus() {
         roles: ["ADMIN", "PRESID", "VICEPR", "SECRET", "VICESE", "COMCPT", "MEMBRE"],
         icone: "MessageSquare",
         statut: true,
-        ordre: 24,
+        ordre: 25,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Gestion des Menus",
@@ -435,8 +471,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Menu",
         statut: true,
-        ordre: 25,
+        ordre: 26,
         electoral: false,
+        parent: null,
       },
       {
         libelle: "Paramètres",
@@ -446,8 +483,9 @@ async function seedMenus() {
         roles: ["ADMIN"],
         icone: "Settings",
         statut: true,
-        ordre: 26,
+        ordre: 27,
         electoral: false,
+        parent: null,
       },
     ];
 
@@ -469,8 +507,8 @@ async function seedMenus() {
       console.log(`✅ Menu créé: ${menu.libelle} (${menu.niveau})`);
     }
 
-    // Créer les sous-menus électoraux en les liant à leur parent
-    console.log(`\n📝 Création de ${navbarElectoralSubmenus.length} sous-menus électoraux...`);
+    // Créer les sous-menus électoraux (NAVBAR) en les liant à leur parent
+    console.log(`\n📝 Création de ${navbarElectoralSubmenus.length} sous-menus électoraux (NAVBAR)...`);
     
     for (const submenu of navbarElectoralSubmenus) {
       const { parentLibelle, ...submenuData } = submenu;

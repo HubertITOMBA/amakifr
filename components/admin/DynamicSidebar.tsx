@@ -32,6 +32,10 @@ export function DynamicSidebar() {
       if (menu.electoral && !electoralMenuEnabled) {
         return false;
       }
+      // Ne pas afficher les sous-menus dans la sidebar (ils sont gérés par leur parent)
+      if (menu.parent) {
+        return false;
+      }
       return true;
     });
   }, [menus, electoralMenuEnabled]);
@@ -40,7 +44,7 @@ export function DynamicSidebar() {
   const getIcon = (iconName: string | null) => {
     if (!iconName) return null;
     const IconComponent = (LucideIcons as any)[iconName];
-    return IconComponent ? <IconComponent className="h-5 w-5 flex-shrink-0" /> : null;
+    return IconComponent ? <IconComponent className="h-5 w-5 shrink-0" /> : null;
   };
 
   if (loading) {

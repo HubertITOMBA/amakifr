@@ -84,14 +84,38 @@ export function ChatBot() {
     }
   }, [isOpen]);
 
-  // Scroll automatique vers le bas quand de nouveaux messages arrivent
+  // Scroll automatique vers le début de la réponse du bot quand une nouvelle réponse arrive
   useEffect(() => {
     if (scrollAreaRef.current && messages.length > 0) {
       // Utiliser requestAnimationFrame pour s'assurer que le DOM est mis à jour
       requestAnimationFrame(() => {
         const scrollContainer = scrollAreaRef.current?.querySelector('[data-slot="scroll-area-viewport"]') as HTMLElement;
         if (scrollContainer) {
-          scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          // Trouver le dernier message du bot
+          const lastBotMessage = messages[messages.length - 1];
+          if (lastBotMessage && lastBotMessage.type === 'bot') {
+            // Trouver l'élément du dernier message bot dans le DOM
+            const messageElements = scrollContainer.querySelectorAll('[data-message-id]');
+            if (messageElements.length > 0) {
+              const lastBotMessageElement = Array.from(messageElements).find((el) => {
+                return el.getAttribute('data-message-id') === lastBotMessage.id;
+              }) as HTMLElement;
+              
+              if (lastBotMessageElement) {
+                // Scroller vers le début du message bot (avec un petit offset pour la lisibilité)
+                lastBotMessageElement.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              } else {
+                // Fallback : scroller vers le haut si l'élément n'est pas trouvé
+                scrollContainer.scrollTop = 0;
+              }
+            } else {
+              // Fallback : scroller vers le haut
+              scrollContainer.scrollTop = 0;
+            }
+          } else {
+            // Pour les messages utilisateur, scroller vers le bas
+            scrollContainer.scrollTop = scrollContainer.scrollHeight;
+          }
         }
       });
     }
@@ -242,6 +266,7 @@ export function ChatBot() {
                   {messages.map((message) => (
                     <div
                       key={message.id}
+                      data-message-id={message.id}
                       className={`flex gap-3 ${
                         message.type === 'user' ? 'justify-end' : 'justify-start'
                       }`}
