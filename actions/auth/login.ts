@@ -23,7 +23,10 @@ export const login = async (
 
     const { email, password } = validatedFields.data
 
-    const existingUser = await getUserByEmail(email)
+    // Normaliser l'email pour la recherche case-insensitive
+    const normalizedEmail = normalizeEmail(email);
+
+    const existingUser = await getUserByEmail(normalizedEmail)
 
     if(!existingUser || !existingUser.password || !existingUser.email) {
         return { error: "L'e-mail n'existe pas !"}

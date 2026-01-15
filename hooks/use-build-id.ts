@@ -31,7 +31,14 @@ export function useBuildId(checkInterval: number = 30000) {
       });
       
       if (!response.ok) {
-        console.warn('Impossible de récupérer le build ID');
+        console.warn('Impossible de récupérer le build ID:', response.status);
+        return false;
+      }
+
+      // Vérifier que la réponse est bien du JSON
+      const contentType = response.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        console.warn('La réponse du build ID n\'est pas du JSON:', contentType);
         return false;
       }
 
