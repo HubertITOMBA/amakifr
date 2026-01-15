@@ -447,10 +447,10 @@ export default function AdminAssistancesPage() {
           </Link>
         </div>
         <Card className="mx-auto max-w-7xl shadow-lg border-2 border-violet-200 dark:border-violet-800/50 bg-white dark:bg-gray-900 !py-0">
-          <CardHeader className="bg-gradient-to-r from-violet-100 to-violet-50 dark:from-violet-900/30 dark:to-violet-800/20 pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+          <CardHeader className="bg-gradient-to-r from-purple-500/90 via-pink-400/80 to-purple-500/90 dark:from-purple-700/50 dark:via-pink-600/40 dark:to-purple-700/50 text-white pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0 shadow-md">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl text-gray-700 dark:text-gray-200">
-                <HandHeart className="h-5 w-5 text-violet-500 dark:text-violet-400" />
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold text-white">
+                <HandHeart className="h-5 w-5 text-white" />
                 Assistances ({filteredData.length})
               </CardTitle>
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -623,7 +623,7 @@ export default function AdminAssistancesPage() {
               <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
                 {filteredData.length} assistance(s) trouvée(s)
               </div>
-              <DataTable table={table} emptyMessage="Aucune assistance trouvée" compact={true} />
+              <DataTable table={table} emptyMessage="Aucune assistance trouvée" compact={true} headerColor="purple" />
               
               {/* Pagination */}
               <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">

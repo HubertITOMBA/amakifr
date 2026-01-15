@@ -587,8 +587,8 @@ export default function FraisAdhesionPage() {
           </div>
           {/* Titre */}
           <div className="flex items-center justify-between">
-            <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-              <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600 dark:text-blue-400" />
+            <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-500 dark:from-indigo-400 dark:via-blue-400 dark:to-indigo-300 text-transparent bg-clip-text flex items-center gap-2">
+              <FileText className="h-6 w-6 sm:h-8 sm:w-8 text-indigo-600 dark:text-indigo-400" />
               Gestion des Frais d'Adhésion
             </h1>
           </div>
@@ -657,11 +657,11 @@ export default function FraisAdhesionPage() {
           </div>
 
           {/* Configuration */}
-          <Card className="!py-0 border-blue-200 dark:border-blue-800">
-            <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white pb-2 pt-3 px-3 sm:px-4">
+          <Card className="!py-0 border-indigo-200 dark:border-indigo-800">
+            <CardHeader className="bg-gradient-to-r from-indigo-500/90 via-blue-500/80 to-indigo-500/90 dark:from-indigo-700/50 dark:via-blue-600/40 dark:to-indigo-700/50 text-white pb-2 pt-3 px-3 sm:px-4 shadow-md">
               <div className="flex items-center justify-between">
-                <CardTitle className="text-base sm:text-lg font-bold flex items-center gap-2">
-                  <Settings className="h-5 w-5" />
+                <CardTitle className="text-base sm:text-lg font-bold text-white flex items-center gap-2">
+                  <Settings className="h-5 w-5 text-white" />
                   Configuration des Frais d'Adhésion
                 </CardTitle>
                 <Dialog open={showConfigDialog} onOpenChange={setShowConfigDialog}>
@@ -797,7 +797,7 @@ export default function FraisAdhesionPage() {
                   <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
                     {filteredData.length} adhérent(s) trouvé(s)
                   </div>
-                  <DataTable table={table} emptyMessage="Aucun adhérent trouvé" compact={true} />
+                  <DataTable table={table} emptyMessage="Aucun adhérent trouvé" compact={true} headerColor="indigo" />
                   
                   {/* Pagination */}
                   <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-3 sm:py-5 px-3 sm:px-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">

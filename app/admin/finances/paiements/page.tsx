@@ -441,10 +441,10 @@ export default function AdminPaiementsPage() {
           </Link>
         </div>
         <Card className="mx-auto max-w-7xl shadow-lg border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900 !py-0">
-          <CardHeader className="bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+          <CardHeader className="bg-gradient-to-r from-green-500/90 via-emerald-400/80 to-green-500/90 dark:from-green-700/50 dark:via-emerald-600/40 dark:to-green-700/50 text-white pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0 shadow-md">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl text-gray-700 dark:text-gray-200">
-                <Receipt className="h-5 w-5 text-emerald-500 dark:text-emerald-400" />
+              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold text-white">
+                <Receipt className="h-5 w-5 text-white" />
                 Paiements ({filteredData.length})
               </CardTitle>
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -686,7 +686,7 @@ export default function AdminPaiementsPage() {
               <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
                 {filteredData.length} paiement(s) trouvé(s)
               </div>
-              <DataTable table={table} emptyMessage="Aucun paiement trouvé" compact={true} />
+              <DataTable table={table} emptyMessage="Aucun paiement trouvé" compact={true} headerColor="green" />
               
               {/* Pagination */}
               <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
