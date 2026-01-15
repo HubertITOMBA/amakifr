@@ -15,6 +15,7 @@ import SessionAutoSignout from "@/components/SessionAutoSignout";
 import { ReactToastifyProvider } from "@/components/providers/react-toastify-provider";
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ChatBotProvider } from "@/components/user/ChatBotProvider";
+import { BuildIdChecker } from "@/components/BuildIdChecker";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -89,6 +90,7 @@ export default function RootLayout({
             {/* <SessionAutoSignout /> */}
             <InstallPrompt />
             <ChatBotProvider />
+            <BuildIdChecker />
           </ThemeProvider>
         </AuthSessionProvider>
       </body>

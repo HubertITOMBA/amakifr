@@ -56,4 +56,7 @@ public/fallback-*.js.map
 
 # Prisma schema hash (pour optimiser les builds)
 .prisma-schema-hash
+
+# Build ID (généré automatiquement à chaque build)
+public/build-id.json
 /private/

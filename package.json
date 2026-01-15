@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 9052",
-    "build": "next build",
+    "build": "node scripts/generate-build-id.js && next build",
     "start": "next start -H 192.168.1.49 -p 9060",
     "lint": "next lint",
     "db:seed": "tsx scripts/create-test-users.ts",
