@@ -6,6 +6,8 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
 import { Civilities, TypeTelephone, TypeAdhesion, UserRole, UserStatus } from "@prisma/client";
+import { normalizeEmail } from "@/lib/utils";
+import { getUserByEmail } from "@/actions/auth";
 
 /**
  * Schéma Zod pour la création d'un adhérent par un administrateur
@@ -106,10 +108,11 @@ export async function adminCreateAdherent(formData: FormData) {
     // Valider les données
     const validatedData = CreateAdherentSchema.parse(rawData);
 
-    // Vérifier si l'email existe déjà
-    const existingUser = await db.user.findUnique({
-      where: { email: validatedData.email },
-    });
+    // Normaliser l'email en minuscules pour éviter les doublons case-insensitive
+    const normalizedEmail = normalizeEmail(validatedData.email);
+
+    // Vérifier si l'email existe déjà (recherche case-insensitive)
+    const existingUser = await getUserByEmail(normalizedEmail);
 
     if (existingUser) {
       return { success: false, error: "Cet email est déjà utilisé par un autre utilisateur." };
@@ -134,10 +137,10 @@ export async function adminCreateAdherent(formData: FormData) {
 
     // Créer l'utilisateur et l'adhérent dans une transaction
     const result = await db.$transaction(async (tx) => {
-      // Créer l'utilisateur
+      // Créer l'utilisateur avec l'email normalisé
       const user = await tx.user.create({
         data: {
-          email: validatedData.email,
+          email: normalizedEmail, // Utiliser l'email normalisé
           name: validatedData.name && validatedData.name.trim() !== "" ? validatedData.name : null,
           password: hashedPassword,
           role: validatedData.role || UserRole.Membre,
@@ -224,7 +227,7 @@ export async function adminCreateAdherent(formData: FormData) {
 
     return {
       success: true,
-      message: `Adhérent ${validatedData.firstname} ${validatedData.lastname} créé avec succès. Un email de bienvenue a été envoyé à ${validatedData.email}.`,
+      message: `Adhérent ${validatedData.firstname} ${validatedData.lastname} créé avec succès. Un email de bienvenue a été envoyé à ${normalizedEmail}.`,
       id: result.user.id,
     };
   } catch (error) {

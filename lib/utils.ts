@@ -41,3 +41,19 @@ export function cleanUrl(url: string | undefined | null): string | undefined {
     .replace(/;+$/, '')
     .trim();
 }
+
+/**
+ * Normalise un email en minuscules et supprime les espaces
+ * Assure l'unicité case-insensitive des emails dans la base de données
+ * 
+ * @param email - L'email à normaliser
+ * @returns L'email normalisé en minuscules et sans espaces
+ * 
+ * @example
+ * normalizeEmail('  Matumonamusanda@yahoo.fr  ') // "matumonamusanda@yahoo.fr"
+ * normalizeEmail('Matumonamusanda@yahoo.fr') // "matumonamusanda@yahoo.fr"
+ */
+export function normalizeEmail(email: string | null | undefined): string {
+  if (!email) return '';
+  return email.trim().toLowerCase();
+}

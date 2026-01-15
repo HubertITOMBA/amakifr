@@ -2,8 +2,9 @@ import Image from "next/image";
 import Link from "next/link";
 import HeroImage from "@/public/images/amakifav.jpeg";
 import { RegisterButton } from "../auth/register-button";
+import { LoginButton } from "../auth/login-button";
 import { Button } from "@/components/ui/button";
-import { ArrowRight, Users, Calendar, Award } from "lucide-react";
+import { ArrowRight, Users, Calendar, Award, LogIn } from "lucide-react";
 
 export function Hero() {
   return (
@@ -50,6 +51,17 @@ export function Hero() {
                   <ArrowRight className="ml-2 h-5 w-5" />
                 </Button>
               </RegisterButton>
+              
+              <LoginButton mode="modal">
+                <Button 
+                  variant="outline" 
+                  size="lg" 
+                  className="border-2 border-white text-white bg-white/10 hover:bg-white hover:text-blue-700 font-semibold px-8 py-4 rounded-xl backdrop-blur-lg transition-all duration-300 shadow-lg"
+                >
+                  <LogIn className="mr-2 h-5 w-5" />
+                  Se connecter
+                </Button>
+              </LoginButton>
               
               <Link href="/evenements">
                 <Button 

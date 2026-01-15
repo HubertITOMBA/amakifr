@@ -7,6 +7,7 @@ import { getUserByEmail, getUserById } from ".";
 import { generatePasswordResetToken } from "@/lib/token";
 import { sendPasswordResetToken } from "@/lib/mail";
 import { headers } from "next/headers";
+import { normalizeEmail } from "@/lib/utils";
 
 
 export const reset = async(
@@ -21,13 +22,16 @@ export const reset = async(
 
     const { email } = validatedFields.data;
 
-    const existingUser = await getUserByEmail(email)
+    // Normaliser l'email pour la recherche case-insensitive
+    const normalizedEmail = normalizeEmail(email);
+
+    const existingUser = await getUserByEmail(normalizedEmail)
 
     if(!existingUser){
         return { error: "Email non trouvé !"}
     }
 
-    const passwordResetToken = await generatePasswordResetToken(email)
+    const passwordResetToken = await generatePasswordResetToken(normalizedEmail)
 
     try {
       // Prioriser NEXT_PUBLIC_APP_URL pour les liens dans les emails (plus fiable en production)

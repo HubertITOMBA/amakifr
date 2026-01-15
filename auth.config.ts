@@ -8,6 +8,7 @@ import Credentials from "next-auth/providers/credentials";
 
 import { LoginSchema } from "@/schemas";
 import { getUserByEmail } from "@/actions/auth/index";
+import { normalizeEmail } from "@/lib/utils";
 
 export default {
 	secret: process.env.AUTH_SECRET,
@@ -39,7 +40,9 @@ export default {
 					}
 
 					const { email, password } = validatedFields.data;
-					const user = await getUserByEmail(email);
+					// Normaliser l'email pour la recherche case-insensitive
+					const normalizedEmail = normalizeEmail(email);
+					const user = await getUserByEmail(normalizedEmail);
 
 					if (!user) {
 						console.error("[auth] Utilisateur non trouvé:", email);

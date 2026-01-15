@@ -7,6 +7,7 @@ import { db } from "@/lib/db"
 import { getUserByEmail, getUserByName } from "."
 import { sendTwoFactorTokenEmail, sendNewUserNotificationEmail, sendUserRegistrationThankYouEmail } from "@/lib/mail"
 import { generateVerificationToken } from "@/lib/token"
+import { normalizeEmail } from "@/lib/utils"
 
 
 export const register = async (
@@ -19,9 +20,13 @@ export const register = async (
     }
 
     const { email, password, name, anneePromotion, pays, ville } = validatedFields.data
+    
+    // Normaliser l'email en minuscules pour éviter les doublons case-insensitive
+    const normalizedEmail = normalizeEmail(email);
+    
     const hashPassword = await bcrypt.hash(password, 10)
 
-    const existingUser = await getUserByEmail(email)
+    const existingUser = await getUserByEmail(normalizedEmail)
     if (existingUser) {
         return { error : "Cet email est déjà utilisé !"}
     }
@@ -38,7 +43,7 @@ export const register = async (
         const user = await db.user.create({
             data: {
                 name,
-                email,
+                email: normalizedEmail, // Utiliser l'email normalisé
                 password: hashPassword
             }
         })
@@ -72,17 +77,17 @@ export const register = async (
 
         // Envoyer les emails de notification et de remerciement
         try {
-            // Email aux administrateurs
-            await sendNewUserNotificationEmail(email, name);
+            // Email aux administrateurs (utiliser l'email normalisé)
+            await sendNewUserNotificationEmail(normalizedEmail, name);
             
-            // Email de remerciement à l'utilisateur
-            await sendUserRegistrationThankYouEmail(email, name);
+            // Email de remerciement à l'utilisateur (utiliser l'email normalisé)
+            await sendUserRegistrationThankYouEmail(normalizedEmail, name);
         } catch (error) {
             console.error("Erreur lors de l'envoi des emails:", error);
             // Ne pas bloquer l'inscription si l'envoi d'email échoue
         }
        
-        const verificationToken = await generateVerificationToken(email)
+        const verificationToken = await generateVerificationToken(normalizedEmail)
         await sendTwoFactorTokenEmail(
             verificationToken.email,
             verificationToken.token,

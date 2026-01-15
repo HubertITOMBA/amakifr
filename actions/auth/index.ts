@@ -1,18 +1,53 @@
 "use server"
 
 import { db } from "@/lib/db"
+import { normalizeEmail } from "@/lib/utils"
 
-
-
+/**
+ * Récupère un utilisateur par son email (recherche case-insensitive)
+ * 
+ * @param email - L'email de l'utilisateur (sera normalisé en minuscules)
+ * @returns L'utilisateur trouvé ou null
+ */
 export const getUserByEmail = async (email: string) => {
     try {
-        const user = await db.user.findUnique({
+        // Normaliser l'email en minuscules pour la recherche case-insensitive
+        const normalizedEmail = normalizeEmail(email);
+        
+        // D'abord, essayer de trouver avec l'email normalisé (si la base est déjà normalisée)
+        let user = await db.user.findUnique({
             where: {
-                email
+                email: normalizedEmail
             }
-        })
+        });
 
-        return user
+        // Si pas trouvé, essayer avec mode insensitive (pour les emails non normalisés en base)
+        if (!user) {
+            user = await db.user.findFirst({
+                where: {
+                    email: {
+                        equals: normalizedEmail,
+                        mode: 'insensitive'
+                    }
+                }
+            });
+        }
+
+        // Dernier recours: chercher tous les utilisateurs et filtrer en mémoire
+        // (pour gérer les cas où la base n'est pas encore normalisée)
+        if (!user) {
+            const allUsers = await db.user.findMany({
+                where: {
+                    email: {
+                        not: null
+                    }
+                }
+            });
+            
+            user = allUsers.find(u => u.email && normalizeEmail(u.email) === normalizedEmail) || null;
+        }
+
+        return user;
     } catch (error) {
         return null
     }

@@ -8,6 +8,7 @@ import { sendTwoFactorTokenEmail } from "@/lib/mail"
 import { DEFAULT_LOGIN_REDIRECT } from "@/routes"
 import { AuthError } from "next-auth"
 import { signIn } from "@/auth"
+import { normalizeEmail } from "@/lib/utils"
 
 export const login = async (
     values: z.infer<typeof LoginSchema>,
@@ -45,7 +46,7 @@ export const login = async (
         const result = await signIn(
             "credentials",
             {
-                email,
+                email: normalizedEmail, // Utiliser l'email normalisé
                 password,
                 redirect: false, // Ne pas rediriger automatiquement
             }
