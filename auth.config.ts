@@ -61,6 +61,14 @@ export default {
 						return null;
 					}
 
+					// Vérifier si le compte est inactif
+					if (user.status === 'Inactif') {
+						console.error("[auth] Tentative de connexion avec un compte inactif:", email);
+						// Retourner null pour bloquer la connexion
+						// Le message d'erreur sera géré dans login.ts
+						return null;
+					}
+
 					// Retourner l'utilisateur si tout est correct
 					return user;
 				} catch (error) {

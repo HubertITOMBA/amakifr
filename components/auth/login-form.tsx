@@ -25,6 +25,7 @@ import { login } from '@/actions/auth/login';
 import { useSession } from "next-auth/react";
 import { RegisterButton } from "@/components/auth/register-button";
 import { ResetButton } from "@/components/auth/reset-button";
+import { toast } from 'react-toastify';
 
 
 const LoginForm = () => {
@@ -58,6 +59,13 @@ const LoginForm = () => {
           
           if (result?.error) {
             setError(result.error);
+            // Afficher un toast pour les erreurs importantes (compte désactivé)
+            if (result.error.includes('désactivé') || result.error.includes('désactivé')) {
+              toast.error(result.error, {
+                position: "top-center",
+                autoClose: 5000,
+              });
+            }
             form.reset();
           } else if (result?.success) {
             // Si twoFactor est activé, rediriger vers la page de vérification
