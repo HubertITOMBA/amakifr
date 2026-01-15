@@ -18,7 +18,7 @@ export const login = async (
     const validatedFields = LoginSchema.safeParse(values)
 
     if(!validatedFields.success) {
-        return { error: "Champs non valides !" }
+        return { error: "Champs non valides !" }
     }
 
     const { email, password } = validatedFields.data
@@ -29,7 +29,14 @@ export const login = async (
     const existingUser = await getUserByEmail(normalizedEmail)
 
     if(!existingUser || !existingUser.password || !existingUser.email) {
-        return { error: "L'e-mail n'existe pas !"}
+        return { error: "L'e-mail n'existe pas !"}
+    }
+
+    // Vérifier si le compte est inactif
+    if(existingUser.status === 'Inactif') {
+        return { 
+            error: "Votre compte est désactivé. Veuillez contacter le bureau de l'association pour plus d'informations." 
+        }
     }
 
     if(!existingUser.emailVerified) {
@@ -40,7 +47,7 @@ export const login = async (
             verificationToken.token
         )
 
-        return { twoFactor: true, success: "Code OTP envoyé !" }
+        return { twoFactor: true, success: "Code OTP envoyé !" }
     }
 
     try {
