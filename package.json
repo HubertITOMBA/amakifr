@@ -44,7 +44,8 @@
     "db:compare": "tsx scripts/compare-db-schemas.ts",
     "db:check": "tsx scripts/check-missing-tables.ts",
     "test:sync-assistances": "tsx scripts/test-synchronisation-assistances.ts",
-    "db:recalculer-cotisations": "tsx scripts/recalculer-cotisations-mensuelles.ts"
+    "db:recalculer-cotisations": "tsx scripts/recalculer-cotisations-mensuelles.ts",
+    "db:insert-test-adherents": "tsx scripts/insert-test-adherents.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",
