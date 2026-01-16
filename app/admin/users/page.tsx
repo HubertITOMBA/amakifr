@@ -172,6 +172,7 @@ export default function AdminUsersPage() {
   const [selectedUserIds, setSelectedUserIds] = useState<string[]>([]);
   const [isEmailModalOpen, setIsEmailModalOpen] = useState(false);
   const [postes, setPostes] = useState<Array<{ id: string; libelle: string; code: string }>>([]);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState<{ userId: string; userName: string; userEmail: string | null } | null>(null);
   const abortControllerRef = useRef<AbortController | null>(null);
   
   // Visibilité des colonnes - charger depuis localStorage
@@ -756,16 +757,17 @@ export default function AdminUsersPage() {
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
-                  asChild
-                  className="focus:bg-red-50 dark:focus:bg-red-900/20"
+                  onClick={() => {
+                    setDeleteDialogOpen({
+                      userId: user.id,
+                      userName: user.adherent ? `${user.adherent.firstname} ${user.adherent.lastname}` : user.name || "Utilisateur",
+                      userEmail: user.email
+                    });
+                  }}
+                  className="focus:bg-red-50 dark:focus:bg-red-900/20 text-red-600 dark:text-red-400 cursor-pointer"
                 >
-                  <div>
-                    <DeleteAdherentDialog
-                      userId={user.id}
-                      userName={user.adherent ? `${user.adherent.firstname} ${user.adherent.lastname}` : user.name || "Utilisateur"}
-                      userEmail={user.email}
-                    />
-                  </div>
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  <span>Supprimer définitivement</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -1083,6 +1085,23 @@ export default function AdminUsersPage() {
           } : null,
         }))}
       />
+
+      {/* Dialogue de suppression d'adhérent */}
+      {deleteDialogOpen && (
+        <DeleteAdherentDialog
+          userId={deleteDialogOpen.userId}
+          userName={deleteDialogOpen.userName}
+          userEmail={deleteDialogOpen.userEmail}
+          open={!!deleteDialogOpen}
+          onOpenChange={(open) => {
+            if (!open) {
+              setDeleteDialogOpen(null);
+              // Recharger les données après fermeture
+              loadAll();
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

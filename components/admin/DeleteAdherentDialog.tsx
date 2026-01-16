@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import {
   AlertDialog,
@@ -32,6 +32,9 @@ interface DeleteAdherentDialogProps {
   userId: string;
   userName: string;
   userEmail?: string | null;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  trigger?: React.ReactNode;
 }
 
 /**
@@ -46,19 +49,40 @@ interface DeleteAdherentDialogProps {
  * @param userId - L'ID de l'utilisateur à supprimer
  * @param userName - Le nom de l'utilisateur
  * @param userEmail - L'email de l'utilisateur (pour l'envoi de notification)
+ * @param open - État contrôlé pour l'ouverture du dialogue (optionnel)
+ * @param onOpenChange - Callback pour gérer les changements d'état (optionnel)
+ * @param trigger - Élément personnalisé pour déclencher le dialogue (optionnel)
  */
 export function DeleteAdherentDialog({ 
   userId, 
   userName, 
-  userEmail 
+  userEmail,
+  open: controlledOpen,
+  onOpenChange: controlledOnOpenChange,
+  trigger
 }: DeleteAdherentDialogProps) {
   const router = useRouter();
-  const [open, setOpen] = useState(false);
+  const [internalOpen, setInternalOpen] = useState(false);
+  
+  // Utiliser l'état contrôlé si fourni, sinon utiliser l'état interne
+  const open = controlledOpen !== undefined ? controlledOpen : internalOpen;
+  const setOpen = controlledOnOpenChange || setInternalOpen;
   const [isDeleting, setIsDeleting] = useState(false);
   const [confirmed, setConfirmed] = useState(false);
   const [notifyUser, setNotifyUser] = useState(true);
   const [reasonType, setReasonType] = useState<string>("custom");
   const [customReason, setCustomReason] = useState("");
+
+  // Réinitialiser l'état quand le dialogue se ferme
+  useEffect(() => {
+    if (!open) {
+      setConfirmed(false);
+      setCustomReason("");
+      setReasonType("custom");
+      setNotifyUser(true);
+      setIsDeleting(false);
+    }
+  }, [open]);
 
   const predefinedReasons = [
     { value: "rgpd", label: "Demande RGPD - Droit à l'oubli" },
@@ -102,6 +126,11 @@ export function DeleteAdherentDialog({
       if (result.success) {
         toast.success(result.message);
         setOpen(false);
+        // Réinitialiser l'état interne
+        setConfirmed(false);
+        setCustomReason("");
+        setReasonType("custom");
+        setNotifyUser(true);
         router.refresh();
       } else {
         toast.error(result.error || "Erreur lors de la suppression");
@@ -116,16 +145,22 @@ export function DeleteAdherentDialog({
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
-      <AlertDialogTrigger asChild>
-        <Button
-          variant="ghost"
-          size="sm"
-          className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20"
-          title="Supprimer définitivement"
-        >
-          <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
-        </Button>
-      </AlertDialogTrigger>
+      {trigger ? (
+        <AlertDialogTrigger asChild>
+          {trigger}
+        </AlertDialogTrigger>
+      ) : (
+        <AlertDialogTrigger asChild>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 w-8 p-0 hover:bg-red-50 dark:hover:bg-red-900/20"
+            title="Supprimer définitivement"
+          >
+            <Trash2 className="h-4 w-4 text-red-600 dark:text-red-400" />
+          </Button>
+        </AlertDialogTrigger>
+      )}
       <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <AlertDialogHeader>
           <AlertDialogTitle className="flex items-center gap-2 text-red-600">
