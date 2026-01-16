@@ -83,12 +83,24 @@ export async function adminDeleteAdherent(
         await sendAccountDeletionEmail(userEmail, userName, reason);
       } catch (emailError) {
         console.error("Erreur lors de l'envoi de l'email de notification:", emailError);
+        // En développement, on ignore l'erreur d'email (credentials non configurées)
+        // En production, on log mais on continue quand même la suppression
+        if (process.env.NODE_ENV === "production") {
+          console.warn("⚠️ Email de notification non envoyé, mais suppression continuée");
+        }
         // On continue quand même la suppression
       }
     }
 
     // 7. Historiser la suppression AVANT de supprimer l'utilisateur
-    await db.suppressionAdherent.create({
+    try {
+      // Vérifier que le modèle existe dans le client Prisma
+      if (!('suppressionAdherent' in db)) {
+        console.error("❌ Le modèle SuppressionAdherent n'est pas disponible dans le client Prisma. Veuillez redémarrer le serveur.");
+        // On continue quand même la suppression, mais sans historisation
+        console.warn("⚠️ Suppression effectuée sans historisation (client Prisma obsolète)");
+      } else {
+        await db.suppressionAdherent.create({
       data: {
         userId: userId,
         userName: userName,
@@ -98,11 +110,18 @@ export async function adminDeleteAdherent(
         adherentLastName: userToDelete.adherent?.lastname || null,
         reason: reason,
         notifyUser: notifyUser,
-        deletedBy: session.user.id,
-        deletedByName: session.user.name || "Admin",
-        deletedByEmail: session.user.email || null,
-      },
-    });
+          deletedBy: session.user.id,
+          deletedByName: session.user.name || "Admin",
+          deletedByEmail: session.user.email || null,
+        },
+        });
+        console.log("✅ Suppression historisée avec succès");
+      }
+    } catch (historyError) {
+      console.error("❌ Erreur lors de l'historisation de la suppression:", historyError);
+      // On continue quand même la suppression même si l'historisation échoue
+      console.warn("⚠️ Suppression effectuée sans historisation (erreur d'enregistrement)");
+    }
 
     // 8. Supprimer l'utilisateur (Prisma gère la cascade automatiquement)
     // Grâce aux relations onDelete: Cascade, tout sera supprimé :

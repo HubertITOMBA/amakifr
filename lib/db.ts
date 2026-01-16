@@ -9,12 +9,18 @@ declare global {
 function getPrismaClient(): PrismaClient {
     // Vérifier si un client existe déjà
     if (globalThis.prisma) {
-        // En développement, vérifier que le client existant a le modèle appSettings
-        if (process.env.NODE_ENV !== "production" && !('appSettings' in globalThis.prisma)) {
-            console.warn('⚠️ Client Prisma obsolète détecté, recréation...');
-            // Déconnecter l'ancien client
-            globalThis.prisma.$disconnect().catch(() => {});
-            globalThis.prisma = undefined;
+        // En développement, vérifier que le client existant a les modèles nécessaires
+        if (process.env.NODE_ENV !== "production") {
+            const requiredModels = ['appSettings', 'suppressionAdherent'];
+            const missingModels = requiredModels.filter(model => !(model in globalThis.prisma));
+            if (missingModels.length > 0) {
+                console.warn(`⚠️ Client Prisma obsolète détecté (modèles manquants: ${missingModels.join(', ')}), recréation...`);
+                // Déconnecter l'ancien client
+                globalThis.prisma.$disconnect().catch(() => {});
+                globalThis.prisma = undefined;
+            } else {
+                return globalThis.prisma;
+            }
         } else {
             return globalThis.prisma;
         }
