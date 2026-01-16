@@ -340,9 +340,9 @@ export default function AdminSuppressionsPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:to-slate-800">
       <div className="container mx-auto py-6 px-4 sm:px-6 lg:px-8">
-        <Card className="mx-auto max-w-7xl shadow-lg border-blue-200 dark:border-gray-700">
-          <CardHeader className="bg-gradient-to-r from-red-500/90 via-red-400/80 to-red-500/90 dark:from-red-700/50 dark:via-red-600/40 dark:to-red-700/50 text-white">
-            <div className="flex items-center justify-between">
+        <Card className="mx-auto max-w-7xl shadow-lg border-blue-200 dark:border-gray-700 !pt-0">
+          <CardHeader className="bg-gradient-to-r from-red-500/90 via-red-400/80 to-red-500/90 dark:from-red-700/50 dark:via-red-600/40 dark:to-red-700/50 text-white !pt-0 rounded-t-lg">
+            <div className="flex items-center justify-between pt-4 sm:pt-6">
               <CardTitle className="flex items-center gap-2">
                 <Trash2 className="h-5 w-5" />
                 Historique des suppressions d'adhérents ({total})
