@@ -279,16 +279,18 @@ export function DeleteAdherentDialog({
                     id="confirm-delete"
                     checked={confirmed}
                     onCheckedChange={(checked) => setConfirmed(checked as boolean)}
-                    className="mt-0.5"
+                    className="mt-0.5 shrink-0"
                   />
-                  <Label
-                    htmlFor="confirm-delete"
-                    className="text-sm font-medium cursor-pointer text-yellow-900 dark:text-yellow-100"
-                  >
-                    ✅ Je comprends que cette action est <strong>irréversible</strong> et
-                    supprimera <strong>définitivement</strong> toutes les données de{" "}
-                    <strong>{userName}</strong>
-                  </Label>
+                  <div className="flex-1">
+                    <Label
+                      htmlFor="confirm-delete"
+                      className="text-sm font-medium cursor-pointer text-yellow-900 dark:text-yellow-100 block leading-relaxed"
+                    >
+                      ✅ Je comprends que cette action est <strong>irréversible</strong> et
+                      supprimera <strong>définitivement</strong> toutes les données de{" "}
+                      <strong>{userName}</strong>
+                    </Label>
+                  </div>
                 </div>
               </div>
             </div>
