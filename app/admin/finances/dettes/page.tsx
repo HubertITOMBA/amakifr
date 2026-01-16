@@ -482,16 +482,22 @@ export default function AdminDettesPage() {
                     Nouvelle dette
                   </Button>
                 </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Créer une dette initiale</DialogTitle>
-                    <DialogDescription>
+                <DialogContent className="max-w-2xl p-0 overflow-hidden">
+                  <DialogHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 dark:from-blue-700/50 dark:via-blue-600/40 dark:to-blue-700/50 text-white px-6 pt-6 pb-4 rounded-t-lg">
+                    <DialogTitle className="text-white text-lg font-bold flex items-center gap-2">
+                      <FileText className="h-5 w-5 text-white" />
+                      Créer une dette initiale
+                    </DialogTitle>
+                    <DialogDescription className="text-blue-50 dark:text-blue-100 text-sm">
                       Enregistrez une dette initiale pour un adhérent (ex: 2024, 2025)
                     </DialogDescription>
                   </DialogHeader>
-                  <div className="space-y-4">
+                  <div className="space-y-4 p-6 bg-white dark:bg-gray-900">
                     <div>
-                      <Label htmlFor="adherent">Adhérent *</Label>
+                      <Label htmlFor="adherent" className="text-sm font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                        <User className="h-4 w-4" />
+                        Adhérent *
+                      </Label>
                       <div className="flex items-center gap-2">
                         <Button
                           type="button"
@@ -533,7 +539,10 @@ export default function AdminDettesPage() {
                       />
                     </div>
                     <div>
-                      <Label htmlFor="annee">Année *</Label>
+                      <Label htmlFor="annee" className="text-sm font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                        <Calendar className="h-4 w-4" />
+                        Année *
+                      </Label>
                       <Input
                         id="annee"
                         type="number"
@@ -541,10 +550,14 @@ export default function AdminDettesPage() {
                         max="2100"
                         value={formData.annee}
                         onChange={(e) => setFormData({ ...formData, annee: parseInt(e.target.value) || new Date().getFullYear() })}
+                        className="mt-1.5 border-blue-200 dark:border-blue-700 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/20"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="montant">Montant (€) *</Label>
+                      <Label htmlFor="montant" className="text-sm font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                        <Euro className="h-4 w-4" />
+                        Montant (€) *
+                      </Label>
                       <Input
                         id="montant"
                         type="number"
@@ -553,23 +566,36 @@ export default function AdminDettesPage() {
                         value={formData.montant}
                         onChange={(e) => setFormData({ ...formData, montant: e.target.value })}
                         placeholder="0.00"
+                        className="mt-1.5 border-blue-200 dark:border-blue-700 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/20"
                       />
                     </div>
                     <div>
-                      <Label htmlFor="description">Description</Label>
+                      <Label htmlFor="description" className="text-sm font-semibold text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                        <FileText className="h-4 w-4" />
+                        Description
+                      </Label>
                       <Textarea
                         id="description"
                         value={formData.description}
                         onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                         placeholder="Description optionnelle"
                         rows={3}
+                        className="mt-1.5 border-blue-200 dark:border-blue-700 focus:border-blue-500 dark:focus:border-blue-400 focus:ring-blue-500/20"
                       />
                     </div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
+                    <div className="flex justify-end gap-2 pt-2">
+                      <Button 
+                        variant="outline" 
+                        onClick={() => setCreateDialogOpen(false)}
+                        className="border-gray-300 dark:border-gray-600 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
                         Annuler
                       </Button>
-                      <Button onClick={handleCreate}>
+                      <Button 
+                        onClick={handleCreate}
+                        className="bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white shadow-md hover:shadow-lg transition-all"
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
                         Créer
                       </Button>
                     </div>
