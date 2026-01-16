@@ -87,7 +87,24 @@ export async function adminDeleteAdherent(
       }
     }
 
-    // 7. Supprimer l'utilisateur (Prisma gère la cascade automatiquement)
+    // 7. Historiser la suppression AVANT de supprimer l'utilisateur
+    await db.suppressionAdherent.create({
+      data: {
+        userId: userId,
+        userName: userName,
+        userEmail: userEmail || null,
+        userRole: userToDelete.role,
+        adherentFirstName: userToDelete.adherent?.firstname || null,
+        adherentLastName: userToDelete.adherent?.lastname || null,
+        reason: reason,
+        notifyUser: notifyUser,
+        deletedBy: session.user.id,
+        deletedByName: session.user.name || "Admin",
+        deletedByEmail: session.user.email || null,
+      },
+    });
+
+    // 8. Supprimer l'utilisateur (Prisma gère la cascade automatiquement)
     // Grâce aux relations onDelete: Cascade, tout sera supprimé :
     // - Account, Session
     // - Adherent et toutes ses relations (Adresse, Telephone, Cotisations, etc.)
@@ -96,7 +113,7 @@ export async function adminDeleteAdherent(
       where: { id: userId }
     });
 
-    // 8. Logger l'action (audit trail)
+    // 9. Logger l'action (audit trail supplémentaire dans la console)
     console.log(`
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🗑️  SUPPRESSION D'ADHÉRENT - AUDIT LOG

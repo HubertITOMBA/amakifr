@@ -220,6 +220,7 @@ model User {
   notifications               Notification[] // Notifications reçues
   emailsReceived              Email[]                      @relation("EmailRecipient") // Emails reçus
   emailsSent                  Email[]                      @relation("EmailCreatedBy") // Emails envoyés
+  suppressionsEffectuees      SuppressionAdherent[]        @relation("SuppressionDeletedBy") // Suppressions d'adhérents effectuées
   documents                   Document[] // Documents uploadés
   badgesAttribues             BadgeAttribution[] // Badges attribués à cet utilisateur
   ressourcesCreees            Ressource[]                  @relation("RessourceCreatedBy") // Ressources créées
@@ -1311,6 +1312,32 @@ model Email {
   @@index([createdAt])
   @@index([sent])
   @@map("emails")
+}
+
+// Modèle pour l'historique des suppressions d'adhérents
+model SuppressionAdherent {
+  id                String   @id @default(cuid())
+  userId            String // ID de l'utilisateur supprimé (conservé pour référence)
+  userName          String   @db.VarChar(255) // Nom de l'utilisateur au moment de la suppression
+  userEmail         String?  @db.VarChar(255) // Email de l'utilisateur au moment de la suppression
+  userRole          UserRole // Rôle de l'utilisateur au moment de la suppression
+  adherentFirstName String?  @db.VarChar(100) // Prénom de l'adhérent si existait
+  adherentLastName  String?  @db.VarChar(100) // Nom de l'adhérent si existait
+  reason            String   @db.Text // Raison de la suppression
+  notifyUser        Boolean  @default(false) // Si un email de notification a été envoyé
+  deletedBy         String // ID de l'admin qui a effectué la suppression
+  deletedByName    String   @db.VarChar(255) // Nom de l'admin au moment de la suppression
+  deletedByEmail   String?  @db.VarChar(255) // Email de l'admin au moment de la suppression
+  createdAt         DateTime @default(now())
+
+  // Relations
+  DeletedBy User @relation("SuppressionDeletedBy", fields: [deletedBy], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([deletedBy])
+  @@index([createdAt])
+  @@index([userEmail])
+  @@map("suppressions_adherent")
 }
 
 // Modèle pour les documents uploadés

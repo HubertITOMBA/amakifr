@@ -862,6 +862,15 @@ export default function AdminUsersPage() {
               <span>Ajouter un adhérent</span>
             </Button>
           </Link>
+          <Link href="/admin/users/suppressions" className="w-full sm:w-auto">
+            <Button 
+              variant="outline" 
+              className="w-full sm:w-auto flex items-center justify-center space-x-2 border-red-300 hover:bg-red-50 dark:border-red-700 dark:hover:bg-red-900/20"
+            >
+              <Trash2 className="h-4 w-4" />
+              <span>Historique suppressions</span>
+            </Button>
+          </Link>
         </div>
       </div>
 
