@@ -221,6 +221,11 @@ model User {
   emailsReceived              Email[]                      @relation("EmailRecipient") // Emails reçus
   emailsSent                  Email[]                      @relation("EmailCreatedBy") // Emails envoyés
   suppressionsEffectuees      SuppressionAdherent[]        @relation("SuppressionDeletedBy") // Suppressions d'adhérents effectuées
+  dataDeletionRequests        DataDeletionRequest[]        @relation("DataDeletionRequestUser") // Demandes de suppression de données
+  dataDeletionRequestsVerified DataDeletionRequest[]       @relation("DataDeletionRequestVerifiedBy") // Demandes vérifiées
+  dataDeletionRequestsApproved DataDeletionRequest[]      @relation("DataDeletionRequestApprovedBy") // Demandes approuvées
+  dataDeletionRequestsRejected DataDeletionRequest[]       @relation("DataDeletionRequestRejectedBy") // Demandes rejetées
+  dataDeletionRequestsCompleted DataDeletionRequest[]     @relation("DataDeletionRequestCompletedBy") // Demandes complétées
   documents                   Document[] // Documents uploadés
   badgesAttribues             BadgeAttribution[] // Badges attribués à cet utilisateur
   ressourcesCreees            Ressource[]                  @relation("RessourceCreatedBy") // Ressources créées
@@ -1123,6 +1128,15 @@ enum StatutIdee {
   DevenueProjet
 }
 
+enum StatutDemandeSuppression {
+  EnAttente      // Demande reçue, en attente de vérification
+  EnVerification // Vérification d'identité en cours
+  Approuvee      // Demande approuvée, suppression programmée
+  Rejetee        // Demande rejetée (identité non vérifiée, etc.)
+  Completee      // Suppression effectuée
+  Annulee        // Demande annulée par l'utilisateur ou l'admin
+}
+
 enum TypeNotification {
   Systeme
   Email
@@ -1338,6 +1352,48 @@ model SuppressionAdherent {
   @@index([createdAt])
   @@index([userEmail])
   @@map("suppressions_adherent")
+}
+
+// Modèle pour les demandes de suppression de données (RGPD)
+model DataDeletionRequest {
+  id                String                  @id @default(cuid())
+  userId            String                  // ID de l'utilisateur qui fait la demande
+  userEmail         String                  @db.VarChar(255) // Email de l'utilisateur
+  userName          String?                 @db.VarChar(255) // Nom de l'utilisateur au moment de la demande
+  message           String?                 @db.Text // Message optionnel de l'utilisateur
+  statut            StatutDemandeSuppression @default(EnAttente)
+  verifiedAt       DateTime?               // Date de vérification d'identité
+  verifiedBy        String?                 // ID de l'admin qui a vérifié
+  verifiedByName    String?                 @db.VarChar(255) // Nom de l'admin qui a vérifié
+  approvedAt        DateTime?               // Date d'approbation
+  approvedBy        String?                 // ID de l'admin qui a approuvé
+  approvedByName    String?                 @db.VarChar(255) // Nom de l'admin qui a approuvé
+  rejectedAt        DateTime?               // Date de rejet
+  rejectedBy        String?                 // ID de l'admin qui a rejeté
+  rejectedByName    String?                 @db.VarChar(255) // Nom de l'admin qui a rejeté
+  rejectionReason   String?                 @db.Text // Raison du rejet
+  completedAt       DateTime?               // Date de suppression effective
+  completedBy       String?                 // ID de l'admin qui a effectué la suppression
+  completedByName   String?                 @db.VarChar(255) // Nom de l'admin qui a effectué la suppression
+  dataExported      Boolean                 @default(false) // Si les données ont été exportées avant suppression
+  exportPath        String?                 @db.VarChar(500) // Chemin du fichier d'export si exporté
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  // Relations
+  User              User                    @relation("DataDeletionRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  VerifiedBy        User?                   @relation("DataDeletionRequestVerifiedBy", fields: [verifiedBy], references: [id], onDelete: SetNull)
+  ApprovedBy        User?                   @relation("DataDeletionRequestApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  RejectedBy        User?                   @relation("DataDeletionRequestRejectedBy", fields: [rejectedBy], references: [id], onDelete: SetNull)
+  CompletedBy       User?                   @relation("DataDeletionRequestCompletedBy", fields: [completedBy], references: [id], onDelete: SetNull)
+
+  @@index([userId])
+  @@index([userEmail])
+  @@index([statut])
+  @@index([createdAt])
+  @@index([verifiedBy])
+  @@index([approvedBy])
+  @@map("data_deletion_requests")
 }
 
 // Modèle pour les documents uploadés

@@ -42,6 +42,44 @@ export async function submitDataDeletionRequest(formData: FormData) {
       };
     }
 
+    // Vérifier s'il existe déjà une demande en attente pour cet utilisateur
+    let existingRequest = null;
+    if ('dataDeletionRequest' in db) {
+      existingRequest = await (db as any).dataDeletionRequest.findFirst({
+      where: {
+        userId: user.id,
+        statut: {
+          in: ['EnAttente', 'EnVerification', 'Approuvee'],
+        },
+      },
+      });
+    }
+
+    if (existingRequest) {
+      return {
+        success: false,
+        error: "Une demande de suppression est déjà en cours pour ce compte. Veuillez attendre le traitement de votre demande précédente.",
+      };
+    }
+
+    // Créer la demande de suppression dans la base de données
+    // Vérifier que le modèle existe dans le client Prisma
+    let deletionRequest;
+    if ('dataDeletionRequest' in db) {
+      deletionRequest = await (db as any).dataDeletionRequest.create({
+        data: {
+          userId: user.id,
+          userEmail: validatedData.email,
+          userName: user.name || (user.adherent ? `${user.adherent.firstname} ${user.adherent.lastname}` : null),
+          message: validatedData.message || null,
+          statut: 'EnAttente',
+        },
+      });
+    } else {
+      console.warn("⚠️ Le modèle dataDeletionRequest n'est pas disponible. Veuillez redémarrer le serveur après la migration.");
+      // On continue quand même pour ne pas bloquer la demande
+    }
+
     // Envoyer un email de confirmation à l'utilisateur
     try {
       await sendEmail({
@@ -97,6 +135,14 @@ export async function submitDataDeletionRequest(formData: FormData) {
             <p style="margin-top: 20px; padding: 15px; background-color: #fee2e2; border-left: 4px solid #dc2626;">
               <strong>Action requise :</strong> Vérifier l'identité de l'utilisateur et procéder à la suppression des données dans les 30 jours.
             </p>
+            ${deletionRequest ? `
+            <p style="margin-top: 15px;">
+              <strong>ID de la demande :</strong> ${deletionRequest.id}<br>
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin/rgpd/demandes" style="color: #1e40af; text-decoration: underline;">
+                Gérer cette demande
+              </a>
+            </p>
+            ` : ''}
           </div>
         `,
       });

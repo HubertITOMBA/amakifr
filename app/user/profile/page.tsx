@@ -3975,6 +3975,129 @@ function UserProfilePageContent() {
               </CardContent>
             </Card>
 
+            {/* Règlement intérieur */}
+            <Card className="!py-0 border-2 border-purple-200 dark:border-purple-800 shadow-lg bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/30 dark:to-violet-900/30">
+              <CardHeader className="py-3 sm:py-4 bg-gradient-to-r from-purple-100 to-violet-100 dark:from-purple-900/50 dark:to-violet-900/50 border-b-2 border-purple-200 dark:border-purple-800">
+                <CardTitle className="text-base sm:text-lg text-purple-900 dark:text-purple-100 flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
+                  Règlement d'Ordre Intérieur
+                </CardTitle>
+                
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 space-y-3">
+                {/* Article 1 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 1 – Objet du règlement intérieur
+                  </h4>
+                  <p className="text-xs text-purple-800 dark:text-purple-200 leading-relaxed">
+                    Le présent règlement intérieur a pour objet de préciser les règles de fonctionnement de l'association, conformément aux statuts. Il s'impose à tous les membres.
+                  </p>
+                </div>
+
+                {/* Article 2 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 2 – Cotisation
+                  </h4>
+                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
+                    <p className="leading-relaxed">
+                      <strong>1.</strong> Le montant de la cotisation est fixé à <strong>15 € par mois</strong>, soit <strong>180 € par an</strong>.
+                    </p>
+                    <p className="leading-relaxed">
+                      <strong>2.</strong> La cotisation est due par tous les membres actifs.
+                    </p>
+                    <p className="leading-relaxed">
+                      <strong>3.</strong> Tout retard de cotisation supérieur ou égal à trois (3) mois entraîne :
+                    </p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li>la perte du droit d'assistance financière de l'association ;</li>
+                      <li>la suspension du droit de vote jusqu'à régularisation.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Article 3 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 3 – Perte de la qualité de membre
+                  </h4>
+                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
+                    <p className="leading-relaxed mb-2">
+                      La qualité de membre se perd automatiquement dans les cas suivants :
+                    </p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li>Retard de cotisation de trois (3) mois ou plus non régularisé malgré relance ;</li>
+                      <li>Absence prolongée et injustifiée aux activités de l'association ;</li>
+                      <li>Indiscipline grave ou faute portant préjudice moral ou matériel à l'association.</li>
+                    </ul>
+                    <p className="leading-relaxed mt-2">
+                      La radiation est prononcée conformément aux statuts, après audition éventuelle du membre concerné.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Article 4 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 4 – Assistance financière et solidarité
+                  </h4>
+                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
+                    <p className="leading-relaxed">
+                      L'association peut accorder une aide financière ou matérielle aux membres en difficulté. Toutefois, cette aide est réservée exclusivement aux membres :
+                    </p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li>À jour de leurs cotisations ;</li>
+                      <li>Ayant une participation active et régulière à la vie de l'association ;</li>
+                      <li>Respectueux du règlement intérieur et du code de conduite.</li>
+                    </ul>
+                    <p className="leading-relaxed mt-2 font-semibold">
+                      Aucun membre en retard de cotisation de trois (3) mois ou plus ne pourra bénéficier d'une assistance.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Article 5 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 5 – Discipline et sanctions
+                  </h4>
+                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
+                    <p className="leading-relaxed">
+                      <strong>1.</strong> Les membres doivent observer une attitude respectueuse vis-à-vis des autres membres et des organes dirigeants.
+                    </p>
+                    <p className="leading-relaxed">
+                      <strong>2.</strong> Tout comportement indiscipliné, violent, diffamatoire ou portant atteinte à l'image de l'association est interdit.
+                    </p>
+                    <p className="leading-relaxed">
+                      <strong>3.</strong> Les sanctions applicables sont :
+                    </p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li>Avertissement ;</li>
+                      <li>Suspension temporaire ;</li>
+                      <li>Exclusion définitive (radiation).</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Article 6 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 6 – Application et modification
+                  </h4>
+                  <p className="text-xs text-purple-800 dark:text-purple-200 leading-relaxed">
+                    Le présent règlement intérieur entre en vigueur dès son adoption par l'Assemblée Générale. Il peut être modifié par décision de l'Assemblée Générale sur proposition du Conseil d'Administration.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
             {/* Informations complémentaires */}
             <Card className="!py-0 border-2 border-blue-200 dark:border-blue-800 shadow-lg bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/30 dark:to-indigo-900/30">
               <CardHeader className="py-3 sm:py-4 bg-gradient-to-r from-blue-100 to-indigo-100 dark:from-blue-900/50 dark:to-indigo-900/50 border-b-2 border-blue-200 dark:border-blue-800">
