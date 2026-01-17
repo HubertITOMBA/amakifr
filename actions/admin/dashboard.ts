@@ -406,3 +406,217 @@ export async function getUpcomingEvents(limit: number = 5) {
   }
 }
 
+/**
+ * Récupère les alertes et notifications importantes pour le dashboard admin
+ * 
+ * @returns Un objet avec success (boolean), alerts (array) en cas de succès, 
+ *          ou error (string) en cas d'échec
+ */
+export async function getDashboardAlerts() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== "Admin") {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const alerts: Array<{
+      id: string;
+      type: "warning" | "info" | "error" | "success";
+      title: string;
+      message: string;
+      count: number;
+      link?: string;
+    }> = [];
+
+    // Demandes RGPD en attente
+    if ('dataDeletionRequest' in db) {
+      try {
+        const rgpdPending = await (db as any).dataDeletionRequest.count({
+          where: {
+            statut: { in: ["EnAttente", "EnVerification"] },
+          },
+        });
+        if (rgpdPending > 0) {
+          alerts.push({
+            id: "rgpd-pending",
+            type: "warning",
+            title: "Demandes RGPD en attente",
+            message: `${rgpdPending} demande(s) de suppression de données nécessitent votre attention`,
+            count: rgpdPending,
+            link: "/admin/rgpd/demandes",
+          });
+        }
+      } catch (error) {
+        // Ignorer si le modèle n'existe pas encore
+      }
+    }
+
+    // Cotisations en retard
+    const cotisationsEnRetard = await db.adherent.count({
+      where: {
+        ObligationsCotisation: {
+          some: {
+            statut: "EnRetard",
+          },
+        },
+      },
+    });
+    if (cotisationsEnRetard > 0) {
+      alerts.push({
+        id: "cotisations-retard",
+        type: "error",
+        title: "Cotisations en retard",
+        message: `${cotisationsEnRetard} adhérent(s) ont des cotisations en retard`,
+        count: cotisationsEnRetard,
+        link: "/admin/cotisations/gestion",
+      });
+    }
+
+    // Assistances en attente
+    const assistancesEnAttente = await db.assistance.count({
+      where: {
+        statut: "EnAttente",
+      },
+    });
+    if (assistancesEnAttente > 0) {
+      alerts.push({
+        id: "assistances-pending",
+        type: "info",
+        title: "Assistances en attente",
+        message: `${assistancesEnAttente} demande(s) d'assistance nécessitent un traitement`,
+        count: assistancesEnAttente,
+        link: "/admin/finances/assistances",
+      });
+    }
+
+    // Événements à venir (dans les 7 prochains jours)
+    const now = new Date();
+    const in7Days = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000);
+    const evenementsProchains = await db.evenement.count({
+      where: {
+        dateDebut: {
+          gte: now,
+          lte: in7Days,
+        },
+        statut: "Publie",
+      },
+    });
+    if (evenementsProchains > 0) {
+      alerts.push({
+        id: "evenements-prochains",
+        type: "info",
+        title: "Événements à venir",
+        message: `${evenementsProchains} événement(s) prévu(s) dans les 7 prochains jours`,
+        count: evenementsProchains,
+        link: "/admin/evenements/gestion",
+      });
+    }
+
+    return {
+      success: true,
+      alerts,
+    };
+  } catch (error) {
+    console.error("Erreur lors de la récupération des alertes:", error);
+    return { success: false, error: "Erreur lors de la récupération des alertes" };
+  }
+}
+
+/**
+ * Récupère les statistiques financières pour le dashboard admin
+ * 
+ * @returns Un objet avec success (boolean), financialStats (object) en cas de succès, 
+ *          ou error (string) en cas d'échec
+ */
+export async function getDashboardFinancialStats() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== "Admin") {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const now = new Date();
+    const startOfCurrentMonth = startOfMonth(now);
+    const endOfCurrentMonth = endOfMonth(now);
+    const startOfLastMonth = startOfMonth(subMonths(now, 1));
+    const endOfLastMonth = endOfMonth(subMonths(now, 1));
+
+    // Total des dettes initiales
+    const totalDettesInitiales = await db.detteInitiale.aggregate({
+      _sum: {
+        montantRestant: true,
+      },
+    });
+
+    // Total des paiements ce mois
+    const [paiementsCeMois, paiementsMoisDernier] = await Promise.all([
+      db.paiementCotisation.aggregate({
+        where: {
+          statut: "Valide",
+          datePaiement: {
+            gte: startOfCurrentMonth,
+            lte: endOfCurrentMonth,
+          },
+        },
+        _sum: {
+          montant: true,
+        },
+      }),
+      db.paiementCotisation.aggregate({
+        where: {
+          statut: "Valide",
+          datePaiement: {
+            gte: startOfLastMonth,
+            lte: endOfLastMonth,
+          },
+        },
+        _sum: {
+          montant: true,
+        },
+      }),
+    ]);
+
+    // Total des assistances en attente
+    const assistancesEnAttente = await db.assistance.aggregate({
+      where: {
+        statut: "EnAttente",
+      },
+      _sum: {
+        montantRestant: true,
+      },
+    });
+
+    const totalDettes = Number(totalDettesInitiales._sum.montantRestant || 0);
+    const totalPaiementsMois = Number(paiementsCeMois._sum.montant || 0);
+    const totalPaiementsMoisDernier = Number(paiementsMoisDernier._sum.montant || 0);
+    const totalAssistances = Number(assistancesEnAttente._sum.montantRestant || 0);
+
+    const evolutionPaiements = totalPaiementsMoisDernier > 0
+      ? Math.round(((totalPaiementsMois - totalPaiementsMoisDernier) / totalPaiementsMoisDernier) * 100)
+      : totalPaiementsMois > 0 ? 100 : 0;
+
+    return {
+      success: true,
+      financialStats: {
+        totalDettes: {
+          value: totalDettes.toFixed(2),
+          formatted: `${totalDettes.toFixed(2)} €`,
+        },
+        totalPaiementsMois: {
+          value: totalPaiementsMois.toFixed(2),
+          formatted: `${totalPaiementsMois.toFixed(2)} €`,
+          change: evolutionPaiements >= 0 ? `+${evolutionPaiements}%` : `${evolutionPaiements}%`,
+          changeType: evolutionPaiements >= 0 ? "positive" : "negative",
+        },
+        totalAssistances: {
+          value: totalAssistances.toFixed(2),
+          formatted: `${totalAssistances.toFixed(2)} €`,
+        },
+      },
+    };
+  } catch (error) {
+    console.error("Erreur lors de la récupération des statistiques financières:", error);
+    return { success: false, error: "Erreur lors de la récupération des statistiques financières" };
+  }
+}
+

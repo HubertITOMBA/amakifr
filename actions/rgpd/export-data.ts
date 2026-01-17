@@ -60,7 +60,7 @@ export async function exportUserData(userId: string) {
                 candidacy: true,
               },
             },
-            Documents: true,
+            documents: true,
             BadgesAttribues: {
               include: {
                 badge: true,
@@ -135,7 +135,7 @@ export async function exportUserData(userId: string) {
       assistances: user.adherent?.Assistances || [],
       candidatures: user.adherent?.Candidatures || [],
       votes: user.adherent?.Votes || [],
-      documents: user.adherent?.Documents || [],
+      documents: user.adherent?.documents || [],
       badges: user.adherent?.BadgesAttribues || [],
       messages: user.messages || [],
       conversations: user.conversations || [],

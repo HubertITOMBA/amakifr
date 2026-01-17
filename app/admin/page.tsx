@@ -15,10 +15,21 @@ import {
   MessageSquare,
   Activity,
   ArrowUpRight,
-  ArrowDownRight
+  ArrowDownRight,
+  Euro,
+  AlertTriangle,
+  Shield,
+  FileText,
+  DollarSign,
+  HandHeart,
+  Receipt,
+  BarChart3,
+  Settings,
+  Database
 } from "lucide-react";
-import { getDashboardStats, getRecentActivities, getUpcomingEvents } from "@/actions/admin/dashboard";
+import { getDashboardStats, getRecentActivities, getUpcomingEvents, getDashboardAlerts, getDashboardFinancialStats } from "@/actions/admin/dashboard";
 import { toast } from "react-toastify";
+import Link from "next/link";
 
 // Couleurs pastel pour les cards
 const cardColors = {
@@ -88,6 +99,19 @@ export default function AdminDashboard() {
     attendees: number;
     status: "confirmed" | "pending";
   }>>([]);
+  const [alerts, setAlerts] = useState<Array<{
+    id: string;
+    type: "warning" | "info" | "error" | "success";
+    title: string;
+    message: string;
+    count: number;
+    link?: string;
+  }>>([]);
+  const [financialStats, setFinancialStats] = useState<{
+    totalDettes: { value: string; formatted: string };
+    totalPaiementsMois: { value: string; formatted: string; change: string; changeType: "positive" | "negative" };
+    totalAssistances: { value: string; formatted: string };
+  } | null>(null);
 
   useEffect(() => {
     loadDashboardData();
@@ -97,10 +121,12 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       
-      const [statsResult, activitiesResult, eventsResult] = await Promise.all([
+      const [statsResult, activitiesResult, eventsResult, alertsResult, financialResult] = await Promise.all([
         getDashboardStats(),
         getRecentActivities(10),
         getUpcomingEvents(5),
+        getDashboardAlerts(),
+        getDashboardFinancialStats(),
       ]);
 
       if (statsResult.success && statsResult.stats) {
@@ -161,6 +187,14 @@ export default function AdminDashboard() {
       } else {
         toast.error(eventsResult.error || "Erreur lors du chargement des événements");
       }
+
+      if (alertsResult.success && alertsResult.alerts) {
+        setAlerts(alertsResult.alerts);
+      }
+
+      if (financialResult.success && financialResult.financialStats) {
+        setFinancialStats(financialResult.financialStats);
+      }
     } catch (error) {
       console.error("Erreur lors du chargement du dashboard:", error);
       toast.error("Erreur lors du chargement des données");
@@ -188,6 +222,68 @@ export default function AdminDashboard() {
           Gestion administrative de l'association
         </p>
       </div>
+
+      {/* Alertes */}
+      {alerts.length > 0 && (
+        <Card className="!py-0 border-2 border-red-200 dark:border-red-800/50 bg-white dark:bg-gray-900">
+          <CardHeader className="pt-4 px-4 sm:px-6 pb-3 bg-gradient-to-r from-red-50 to-red-100 dark:from-red-900/30 dark:to-red-800/20 rounded-t-lg">
+            <CardTitle className="flex items-center space-x-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+              <AlertTriangle className="h-4 w-4 sm:h-5 sm:w-5 text-red-500 dark:text-red-400" />
+              <span>Alertes et notifications</span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+            <div className="space-y-3">
+              {alerts.map((alert) => {
+                const getAlertColor = () => {
+                  switch (alert.type) {
+                    case "error":
+                      return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-800";
+                    case "warning":
+                      return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200 dark:border-amber-800";
+                    case "info":
+                      return "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 border-blue-200 dark:border-blue-800";
+                    default:
+                      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300 border-gray-200 dark:border-gray-700";
+                  }
+                };
+
+                return (
+                  <div
+                    key={alert.id}
+                    className={`flex items-center justify-between p-3 rounded-lg border ${getAlertColor()} ${
+                      alert.link ? "cursor-pointer hover:opacity-90 transition-opacity" : ""
+                    }`}
+                    onClick={() => {
+                      if (alert.link) {
+                        router.push(alert.link);
+                      }
+                    }}
+                  >
+                    <div className="flex-1">
+                      <h4 className="text-sm font-semibold">{alert.title}</h4>
+                      <p className="text-xs mt-1">{alert.message}</p>
+                    </div>
+                    {alert.link && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="ml-3"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          router.push(alert.link!);
+                        }}
+                      >
+                        Voir
+                      </Button>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -224,6 +320,74 @@ export default function AdminDashboard() {
           );
         })}
       </div>
+
+      {/* Statistiques financières */}
+      {financialStats && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+          <Card className="!py-0 border-2 border-red-200 dark:border-red-800/50 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4 sm:px-6 ${cardColors.pink.header} rounded-t-lg`}>
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200">
+                Dettes totales
+              </CardTitle>
+              <DollarSign className={`h-4 w-4 sm:h-5 sm:w-5 ${cardColors.pink.icon}`} />
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+              <div className={`text-xl sm:text-2xl font-bold ${cardColors.pink.accent}`}>
+                {financialStats.totalDettes.formatted}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Montant total des dettes
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card className="!py-0 border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4 sm:px-6 bg-gradient-to-r from-emerald-100 to-emerald-50 dark:from-emerald-900/30 dark:to-emerald-800/20 rounded-t-lg`}>
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200">
+                Paiements ce mois
+              </CardTitle>
+              <Euro className="h-4 w-4 sm:h-5 sm:w-5 text-emerald-500 dark:text-emerald-400" />
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+              <div className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400">
+                {financialStats.totalPaiementsMois.formatted}
+              </div>
+              <div className="flex items-center space-x-2 mt-2">
+                <div className={`flex items-center space-x-1 ${
+                  financialStats.totalPaiementsMois.changeType === "positive" ? "text-emerald-600 dark:text-emerald-400" : "text-rose-600 dark:text-rose-400"
+                }`}>
+                  {financialStats.totalPaiementsMois.changeType === "positive" ? (
+                    <ArrowUpRight className="h-3 w-3" />
+                  ) : (
+                    <ArrowDownRight className="h-3 w-3" />
+                  )}
+                  <span className="text-xs font-medium">{financialStats.totalPaiementsMois.change}</span>
+                </div>
+                <span className="text-xs text-gray-500 dark:text-gray-400">
+                  vs mois dernier
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="!py-0 border-2 border-blue-200 dark:border-blue-800/50 bg-white dark:bg-gray-900 hover:shadow-lg transition-shadow">
+            <CardHeader className={`flex flex-row items-center justify-between space-y-0 pb-2 pt-4 px-4 sm:px-6 ${cardColors.blue.header} rounded-t-lg`}>
+              <CardTitle className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200">
+                Assistances en attente
+              </CardTitle>
+              <HandHeart className={`h-4 w-4 sm:h-5 sm:w-5 ${cardColors.blue.icon}`} />
+            </CardHeader>
+            <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
+              <div className={`text-xl sm:text-2xl font-bold ${cardColors.blue.accent}`}>
+                {financialStats.totalAssistances.formatted}
+              </div>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                Montant total en attente
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
         {/* Activités récentes */}
@@ -366,6 +530,78 @@ export default function AdminDashboard() {
               <div className="text-left flex-1 space-y-1">
                 <div className="font-medium leading-tight">Envoyer notification</div>
                 <div className="text-xs sm:text-sm opacity-80 leading-tight">Communiquer avec les membres</div>
+              </div>
+            </Button>
+
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/admin/finances')}
+              className="flex items-center justify-start gap-3 h-auto px-4 py-4 sm:px-5 sm:py-5 text-xs sm:text-sm hover:shadow-md transition-shadow"
+            >
+              <Euro className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <div className="text-left flex-1 space-y-1">
+                <div className="font-medium leading-tight">Gestion finances</div>
+                <div className="text-xs sm:text-sm opacity-80 leading-tight">Dettes, paiements, assistances</div>
+              </div>
+            </Button>
+
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/admin/cotisations/gestion')}
+              className="flex items-center justify-start gap-3 h-auto px-4 py-4 sm:px-5 sm:py-5 text-xs sm:text-sm hover:shadow-md transition-shadow"
+            >
+              <Receipt className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <div className="text-left flex-1 space-y-1">
+                <div className="font-medium leading-tight">Cotisations</div>
+                <div className="text-xs sm:text-sm opacity-80 leading-tight">Gérer les cotisations</div>
+              </div>
+            </Button>
+
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/admin/rgpd/demandes')}
+              className="flex items-center justify-start gap-3 h-auto px-4 py-4 sm:px-5 sm:py-5 text-xs sm:text-sm hover:shadow-md transition-shadow"
+            >
+              <Shield className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <div className="text-left flex-1 space-y-1">
+                <div className="font-medium leading-tight">Demandes RGPD</div>
+                <div className="text-xs sm:text-sm opacity-80 leading-tight">Gérer les suppressions</div>
+              </div>
+            </Button>
+
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/admin/analytics')}
+              className="flex items-center justify-start gap-3 h-auto px-4 py-4 sm:px-5 sm:py-5 text-xs sm:text-sm hover:shadow-md transition-shadow"
+            >
+              <BarChart3 className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <div className="text-left flex-1 space-y-1">
+                <div className="font-medium leading-tight">Analytics</div>
+                <div className="text-xs sm:text-sm opacity-80 leading-tight">Statistiques détaillées</div>
+              </div>
+            </Button>
+
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/admin/exports')}
+              className="flex items-center justify-start gap-3 h-auto px-4 py-4 sm:px-5 sm:py-5 text-xs sm:text-sm hover:shadow-md transition-shadow"
+            >
+              <Database className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <div className="text-left flex-1 space-y-1">
+                <div className="font-medium leading-tight">Exports</div>
+                <div className="text-xs sm:text-sm opacity-80 leading-tight">Exporter les données</div>
+              </div>
+            </Button>
+
+            <Button 
+              variant="outline" 
+              onClick={() => router.push('/admin/settings')}
+              className="flex items-center justify-start gap-3 h-auto px-4 py-4 sm:px-5 sm:py-5 text-xs sm:text-sm hover:shadow-md transition-shadow"
+            >
+              <Settings className="h-5 w-5 sm:h-6 sm:w-6 flex-shrink-0" />
+              <div className="text-left flex-1 space-y-1">
+                <div className="font-medium leading-tight">Paramètres</div>
+                <div className="text-xs sm:text-sm opacity-80 leading-tight">Configuration</div>
               </div>
             </Button>
           </div>

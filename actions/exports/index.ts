@@ -35,7 +35,7 @@ export async function getAdherentsForExport() {
           select: {
             ObligationsCotisation: true,
             CotisationsMensuelles: true,
-            Documents: true,
+            documents: true,
           },
         },
       },
@@ -63,7 +63,7 @@ export async function getAdherentsForExport() {
       "Type téléphone": adh.Telephones[0]?.type || "",
       "Nombre obligations": adh._count.ObligationsCotisation,
       "Nombre cotisations mensuelles": adh._count.CotisationsMensuelles,
-      "Nombre documents": adh._count.Documents,
+      "Nombre documents": adh._count.documents,
       "Date création compte": adh.User?.createdAt ? format(new Date(adh.User.createdAt), "dd/MM/yyyy HH:mm") : "",
     }));
 
