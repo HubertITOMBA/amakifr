@@ -114,7 +114,7 @@ import {
 } from "@tanstack/react-table";
 
 // Types pour les sections du menu
-type MenuSection = 'profile' | 'statistiques' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'idees' | 'documents' | 'badges' | 'enfants' | 'passeport' | 'notifications' | 'settings' | 'rapports';
+type MenuSection = 'profile' | 'statistiques' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'idees' | 'documents' | 'badges' | 'enfants' | 'passeport' | 'notifications' | 'settings' | 'rapports' | 'taches';
 
 // Type pour les dettes initiales
 interface DetteInitiale {
@@ -846,14 +846,14 @@ function UserProfilePageContent() {
   // Initialiser activeSection depuis les paramètres d'URL ou par défaut 'profile'
   const sectionFromUrl = searchParams.get('section') as MenuSection | null;
   const [activeSection, setActiveSection] = useState<MenuSection>(
-    (sectionFromUrl && ['profile', 'statistiques', 'cotisations', 'candidatures', 'votes', 'candidates', 'idees', 'documents', 'badges', 'enfants', 'passeport', 'notifications', 'settings', 'rapports'].includes(sectionFromUrl))
+    (sectionFromUrl && ['profile', 'statistiques', 'cotisations', 'candidatures', 'votes', 'candidates', 'idees', 'documents', 'badges', 'enfants', 'passeport', 'notifications', 'settings', 'rapports', 'taches'].includes(sectionFromUrl))
       ? sectionFromUrl
       : 'profile'
   );
 
   // Mettre à jour activeSection si le paramètre d'URL change
   useEffect(() => {
-    if (sectionFromUrl && ['profile', 'statistiques', 'cotisations', 'candidatures', 'votes', 'candidates', 'idees', 'documents', 'badges', 'enfants', 'passeport', 'notifications', 'settings', 'rapports'].includes(sectionFromUrl)) {
+    if (sectionFromUrl && ['profile', 'statistiques', 'cotisations', 'candidatures', 'votes', 'candidates', 'idees', 'documents', 'badges', 'enfants', 'passeport', 'notifications', 'settings', 'rapports', 'taches'].includes(sectionFromUrl)) {
       setActiveSection(sectionFromUrl);
     }
   }, [sectionFromUrl]);
@@ -1445,6 +1445,13 @@ function UserProfilePageContent() {
       electoral: false
     },
     {
+      id: 'taches' as MenuSection,
+      label: 'Mes Tâches',
+      icon: FileText,
+      description: 'Voir et suivre mes tâches assignées',
+      electoral: false
+    },
+    {
       id: 'documents' as MenuSection,
       label: 'Mes Documents',
       icon: FileText,
@@ -1532,6 +1539,7 @@ function UserProfilePageContent() {
 
   // Les menus sont maintenant affichés en fonction de leur propriété 'electoral'
   // Pour désactiver les menus électoraux, utilisez /admin/settings
+  // Le menu "taches" est visible pour tous - la vérification du profil adhérent se fera dans la section elle-même
   const menuItems = allMenuItems;
 
   // Fonction pour rendre le contenu de chaque section
@@ -4850,6 +4858,94 @@ function UserProfilePageContent() {
                 </div>
               </DialogContent>
             </Dialog>
+          </div>
+        );
+
+      case 'taches':
+        // Vérifier si l'utilisateur a un profil adhérent
+        if (profileLoading) {
+          return (
+            <div className="flex items-center justify-center py-12">
+              <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
+            </div>
+          );
+        }
+        
+        // Vérifier si l'utilisateur est un adhérent
+        const hasAdherentProfile = userProfile?.adherent && userProfile.adherent.id;
+        const userRole = user?.role || userProfile?.role;
+        const isAdmin = userRole === 'Admin';
+        
+        // Si pas de profil adhérent et pas admin, afficher un message
+        if (!hasAdherentProfile) {
+          if (isAdmin) {
+            return (
+              <div className="space-y-6">
+                <Card>
+                  <CardContent className="p-6">
+                    <div className="text-center py-8">
+                      <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                      <p className="text-gray-600 dark:text-gray-400 mb-4">
+                        En tant qu'administrateur, vous pouvez gérer les projets depuis la section Admin.
+                      </p>
+                      <Link href="/admin/projets">
+                        <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                          <FileText className="h-4 w-4 mr-2" />
+                          Gérer les projets
+                        </Button>
+                      </Link>
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            );
+          }
+          
+          return (
+            <div className="space-y-6">
+              <Card>
+                <CardContent className="p-6">
+                  <div className="text-center py-8">
+                    <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                    <p className="text-gray-600 dark:text-gray-400 mb-4">
+                      Vous devez être un adhérent pour voir vos tâches assignées.
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          );
+        }
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Mes Tâches</h2>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Voir et suivre mes tâches assignées</p>
+              </div>
+              <Link href="/user/taches">
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <FileText className="h-4 w-4 mr-2" />
+                  Voir toutes mes tâches
+                </Button>
+              </Link>
+            </div>
+            <Card>
+              <CardContent className="p-6">
+                <div className="text-center py-8">
+                  <FileText className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Pour voir vos tâches en détail et les commenter, visitez la page dédiée.
+                  </p>
+                  <Link href="/user/taches">
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <FileText className="h-4 w-4 mr-2" />
+                      Accéder à mes tâches
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         );
 

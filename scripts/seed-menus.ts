@@ -511,6 +511,18 @@ async function seedMenus() {
         electoral: false,
         parent: null,
       },
+      {
+        libelle: "Projets",
+        description: "Gestion des projets et tâches",
+        lien: "/admin/projets",
+        niveau: "SIDEBAR" as const,
+        roles: ["ADMIN"],
+        icone: "FolderKanban",
+        statut: true,
+        ordre: 30,
+        electoral: false,
+        parent: null,
+      },
     ];
 
     // Créer d'abord les menus parents (navbar et sidebar)

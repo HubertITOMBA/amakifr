@@ -30,10 +30,18 @@ export async function GET() {
     });
   } catch (error) {
     console.error('Erreur lors de la récupération du build ID:', error);
+    // En cas d'erreur, retourner un build ID par défaut plutôt qu'une erreur 500
+    // Cela évite les erreurs 502 en cascade après un redémarrage
     return NextResponse.json({
-      buildId: 'error',
+      buildId: 'unknown',
       timestamp: new Date().toISOString(),
       version: '0.1.0',
-    }, { status: 500 });
+    }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    });
   }
 }

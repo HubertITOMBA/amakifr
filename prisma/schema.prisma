@@ -189,52 +189,53 @@ model Session {
 }
 
 model User {
-  id                          String                       @id @default(cuid())
-  name                        String?                      @unique
-  email                       String?                      @unique
-  emailVerified               DateTime?                    @map("email_verified")
-  password                    String?
-  image                       String?
-  accounts                    Account[]
-  sessions                    Session[]
-  adherent                    Adherent?
-  role                        UserRole                     @default(Membre)
-  status                      UserStatus                   @default(Inactif)
-  depenses                    Depense[]                    @relation("DepenseCreatedBy") // Relation avec les dépenses
-  typesDepenseCrees           TypeDepense[]                @relation("TypeDepenseCreatedBy") // Types de dépense créés
-  justificatifsUploades       JustificatifDepense[]        @relation("JustificatifUploadedBy") // Justificatifs uploadés
-  typesCotisationMensuelle    TypeCotisationMensuelle[] // Types de cotisation créés
-  cotisationsDuMoisCreees     CotisationDuMois[]           @relation("CotisationDuMoisCreatedBy") // Cotisations du mois créées
-  cotisationsMensuelles       CotisationMensuelle[] // Cotisations mensuelles créées
-  relancesCotisationMensuelle RelanceCotisationMensuelle[] // Relances créées
-  dettesInitialesCreees       DetteInitiale[]              @relation("DetteInitialeCreatedBy") // Dettes initiales créées
-  paiementsCreees             PaiementCotisation[]         @relation("PaiementCreatedBy") // Paiements créés
-  assistancesCreees           Assistance[]                 @relation("AssistanceCreatedBy") // Assistances créées
-  evenements                  Evenement[] // Événements créés
-  conversations               Conversation[] // Conversations créées
-  conversationParticipants    ConversationParticipant[] // Participations aux conversations
-  messages                    Message[] // Messages envoyés
-  postesTemplates             PosteTemplate[] // Postes créés
-  messageReactions            MessageReaction[] // Réactions aux messages
-  configurationsFraisAdhesion ConfigurationFraisAdhesion[] @relation("ConfigurationFraisAdhesionCreatedBy") // Configurations de frais d'adhésion créées
-  notifications               Notification[] // Notifications reçues
-  emailsReceived              Email[]                      @relation("EmailRecipient") // Emails reçus
-  emailsSent                  Email[]                      @relation("EmailCreatedBy") // Emails envoyés
-  suppressionsEffectuees      SuppressionAdherent[]        @relation("SuppressionDeletedBy") // Suppressions d'adhérents effectuées
-  dataDeletionRequests        DataDeletionRequest[]        @relation("DataDeletionRequestUser") // Demandes de suppression de données
-  dataDeletionRequestsVerified DataDeletionRequest[]       @relation("DataDeletionRequestVerifiedBy") // Demandes vérifiées
-  dataDeletionRequestsApproved DataDeletionRequest[]      @relation("DataDeletionRequestApprovedBy") // Demandes approuvées
-  dataDeletionRequestsRejected DataDeletionRequest[]       @relation("DataDeletionRequestRejectedBy") // Demandes rejetées
-  dataDeletionRequestsCompleted DataDeletionRequest[]     @relation("DataDeletionRequestCompletedBy") // Demandes complétées
-  documents                   Document[] // Documents uploadés
-  badgesAttribues             BadgeAttribution[] // Badges attribués à cet utilisateur
-  ressourcesCreees            Ressource[]                  @relation("RessourceCreatedBy") // Ressources créées
-  reservationsConfirmees      Reservation[]                @relation("ReservationConfirmeePar") // Réservations confirmées
-  mediaGalerieCrees           MediaGalerie[]               @relation("MediaGalerieCreatedBy") // Médias de galerie créés
-  rapportsReunionCrees        RapportReunion[]             @relation("RapportReunionCreatedBy") // Rapports de réunion créés
-  rapportsReunionModifies     RapportReunion[]             @relation("RapportReunionUpdatedBy") // Rapports de réunion modifiés
-  menusCreated                Menu[]                       @relation("MenuCreatedBy") // Menus créés
-  activities                  UserActivity[]               @relation("UserActivities") // Activités de l'utilisateur
+  id                            String                       @id @default(cuid())
+  name                          String?                      @unique
+  email                         String?                      @unique
+  emailVerified                 DateTime?                    @map("email_verified")
+  password                      String?
+  image                         String?
+  accounts                      Account[]
+  sessions                      Session[]
+  adherent                      Adherent?
+  role                          UserRole                     @default(Membre)
+  status                        UserStatus                   @default(Inactif)
+  depenses                      Depense[]                    @relation("DepenseCreatedBy") // Relation avec les dépenses
+  typesDepenseCrees             TypeDepense[]                @relation("TypeDepenseCreatedBy") // Types de dépense créés
+  justificatifsUploades         JustificatifDepense[]        @relation("JustificatifUploadedBy") // Justificatifs uploadés
+  typesCotisationMensuelle      TypeCotisationMensuelle[] // Types de cotisation créés
+  cotisationsDuMoisCreees       CotisationDuMois[]           @relation("CotisationDuMoisCreatedBy") // Cotisations du mois créées
+  cotisationsMensuelles         CotisationMensuelle[] // Cotisations mensuelles créées
+  relancesCotisationMensuelle   RelanceCotisationMensuelle[] // Relances créées
+  dettesInitialesCreees         DetteInitiale[]              @relation("DetteInitialeCreatedBy") // Dettes initiales créées
+  paiementsCreees               PaiementCotisation[]         @relation("PaiementCreatedBy") // Paiements créés
+  assistancesCreees             Assistance[]                 @relation("AssistanceCreatedBy") // Assistances créées
+  evenements                    Evenement[] // Événements créés
+  conversations                 Conversation[] // Conversations créées
+  conversationParticipants      ConversationParticipant[] // Participations aux conversations
+  messages                      Message[] // Messages envoyés
+  postesTemplates               PosteTemplate[] // Postes créés
+  messageReactions              MessageReaction[] // Réactions aux messages
+  configurationsFraisAdhesion   ConfigurationFraisAdhesion[] @relation("ConfigurationFraisAdhesionCreatedBy") // Configurations de frais d'adhésion créées
+  notifications                 Notification[] // Notifications reçues
+  emailsReceived                Email[]                      @relation("EmailRecipient") // Emails reçus
+  emailsSent                    Email[]                      @relation("EmailCreatedBy") // Emails envoyés
+  suppressionsEffectuees        SuppressionAdherent[]        @relation("SuppressionDeletedBy") // Suppressions d'adhérents effectuées
+  dataDeletionRequests          DataDeletionRequest[]        @relation("DataDeletionRequestUser") // Demandes de suppression de données
+  dataDeletionRequestsVerified  DataDeletionRequest[]        @relation("DataDeletionRequestVerifiedBy") // Demandes vérifiées
+  dataDeletionRequestsApproved  DataDeletionRequest[]        @relation("DataDeletionRequestApprovedBy") // Demandes approuvées
+  dataDeletionRequestsRejected  DataDeletionRequest[]        @relation("DataDeletionRequestRejectedBy") // Demandes rejetées
+  dataDeletionRequestsCompleted DataDeletionRequest[]        @relation("DataDeletionRequestCompletedBy") // Demandes complétées
+  documents                     Document[] // Documents uploadés
+  badgesAttribues               BadgeAttribution[] // Badges attribués à cet utilisateur
+  ressourcesCreees              Ressource[]                  @relation("RessourceCreatedBy") // Ressources créées
+  reservationsConfirmees        Reservation[]                @relation("ReservationConfirmeePar") // Réservations confirmées
+  mediaGalerieCrees             MediaGalerie[]               @relation("MediaGalerieCreatedBy") // Médias de galerie créés
+  rapportsReunionCrees          RapportReunion[]             @relation("RapportReunionCreatedBy") // Rapports de réunion créés
+  rapportsReunionModifies       RapportReunion[]             @relation("RapportReunionUpdatedBy") // Rapports de réunion modifiés
+  menusCreated                  Menu[]                       @relation("MenuCreatedBy") // Menus créés
+  activities                    UserActivity[]               @relation("UserActivities") // Activités de l'utilisateur
+  projetsCrees                  Projet[]                     @relation("ProjetCreatedBy") // Projets créés
 
   lastLogin DateTime? @updatedAt
   createdAt DateTime  @default(now())
@@ -332,6 +333,8 @@ model Adherent {
   Avoirs                        Avoir[] // Avoirs (excédents de paiement)
   documents                     Document[]                   @relation("DocumentAdherent") // Documents liés à l'adhérent
   Reservations                  Reservation[] // Réservations effectuées
+  affectationsSousProjets       AffectationSousProjet[] // Affectations aux sous-projets/tâches
+  commentairesTaches            CommentaireTache[] // Commentaires sur les tâches
   created_at                    DateTime?                    @db.Timestamp(0)
   updated_at                    DateTime?                    @db.Timestamp(0)
   userId                        String                       @unique
@@ -1130,12 +1133,12 @@ enum StatutIdee {
 }
 
 enum StatutDemandeSuppression {
-  EnAttente      // Demande reçue, en attente de vérification
+  EnAttente // Demande reçue, en attente de vérification
   EnVerification // Vérification d'identité en cours
-  Approuvee      // Demande approuvée, suppression programmée
-  Rejetee        // Demande rejetée (identité non vérifiée, etc.)
-  Completee      // Suppression effectuée
-  Annulee        // Demande annulée par l'utilisateur ou l'admin
+  Approuvee // Demande approuvée, suppression programmée
+  Rejetee // Demande rejetée (identité non vérifiée, etc.)
+  Completee // Suppression effectuée
+  Annulee // Demande annulée par l'utilisateur ou l'admin
 }
 
 enum TypeNotification {
@@ -1341,8 +1344,8 @@ model SuppressionAdherent {
   reason            String   @db.Text // Raison de la suppression
   notifyUser        Boolean  @default(false) // Si un email de notification a été envoyé
   deletedBy         String // ID de l'admin qui a effectué la suppression
-  deletedByName    String   @db.VarChar(255) // Nom de l'admin au moment de la suppression
-  deletedByEmail   String?  @db.VarChar(255) // Email de l'admin au moment de la suppression
+  deletedByName     String   @db.VarChar(255) // Nom de l'admin au moment de la suppression
+  deletedByEmail    String?  @db.VarChar(255) // Email de l'admin au moment de la suppression
   createdAt         DateTime @default(now())
 
   // Relations
@@ -1357,36 +1360,36 @@ model SuppressionAdherent {
 
 // Modèle pour les demandes de suppression de données (RGPD)
 model DataDeletionRequest {
-  id                String                  @id @default(cuid())
-  userId            String                  // ID de l'utilisateur qui fait la demande
-  userEmail         String                  @db.VarChar(255) // Email de l'utilisateur
-  userName          String?                 @db.VarChar(255) // Nom de l'utilisateur au moment de la demande
-  message           String?                 @db.Text // Message optionnel de l'utilisateur
-  statut            StatutDemandeSuppression @default(EnAttente)
-  verifiedAt       DateTime?               // Date de vérification d'identité
-  verifiedBy        String?                 // ID de l'admin qui a vérifié
-  verifiedByName    String?                 @db.VarChar(255) // Nom de l'admin qui a vérifié
-  approvedAt        DateTime?               // Date d'approbation
-  approvedBy        String?                 // ID de l'admin qui a approuvé
-  approvedByName    String?                 @db.VarChar(255) // Nom de l'admin qui a approuvé
-  rejectedAt        DateTime?               // Date de rejet
-  rejectedBy        String?                 // ID de l'admin qui a rejeté
-  rejectedByName    String?                 @db.VarChar(255) // Nom de l'admin qui a rejeté
-  rejectionReason   String?                 @db.Text // Raison du rejet
-  completedAt       DateTime?               // Date de suppression effective
-  completedBy       String?                 // ID de l'admin qui a effectué la suppression
-  completedByName   String?                 @db.VarChar(255) // Nom de l'admin qui a effectué la suppression
-  dataExported      Boolean                 @default(false) // Si les données ont été exportées avant suppression
-  exportPath        String?                 @db.VarChar(500) // Chemin du fichier d'export si exporté
-  createdAt         DateTime                @default(now())
-  updatedAt         DateTime                @updatedAt
+  id              String                   @id @default(cuid())
+  userId          String // ID de l'utilisateur qui fait la demande
+  userEmail       String                   @db.VarChar(255) // Email de l'utilisateur
+  userName        String?                  @db.VarChar(255) // Nom de l'utilisateur au moment de la demande
+  message         String?                  @db.Text // Message optionnel de l'utilisateur
+  statut          StatutDemandeSuppression @default(EnAttente)
+  verifiedAt      DateTime? // Date de vérification d'identité
+  verifiedBy      String? // ID de l'admin qui a vérifié
+  verifiedByName  String?                  @db.VarChar(255) // Nom de l'admin qui a vérifié
+  approvedAt      DateTime? // Date d'approbation
+  approvedBy      String? // ID de l'admin qui a approuvé
+  approvedByName  String?                  @db.VarChar(255) // Nom de l'admin qui a approuvé
+  rejectedAt      DateTime? // Date de rejet
+  rejectedBy      String? // ID de l'admin qui a rejeté
+  rejectedByName  String?                  @db.VarChar(255) // Nom de l'admin qui a rejeté
+  rejectionReason String?                  @db.Text // Raison du rejet
+  completedAt     DateTime? // Date de suppression effective
+  completedBy     String? // ID de l'admin qui a effectué la suppression
+  completedByName String?                  @db.VarChar(255) // Nom de l'admin qui a effectué la suppression
+  dataExported    Boolean                  @default(false) // Si les données ont été exportées avant suppression
+  exportPath      String?                  @db.VarChar(500) // Chemin du fichier d'export si exporté
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
 
   // Relations
-  User              User                    @relation("DataDeletionRequestUser", fields: [userId], references: [id], onDelete: Cascade)
-  VerifiedBy        User?                   @relation("DataDeletionRequestVerifiedBy", fields: [verifiedBy], references: [id], onDelete: SetNull)
-  ApprovedBy        User?                   @relation("DataDeletionRequestApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
-  RejectedBy        User?                   @relation("DataDeletionRequestRejectedBy", fields: [rejectedBy], references: [id], onDelete: SetNull)
-  CompletedBy       User?                   @relation("DataDeletionRequestCompletedBy", fields: [completedBy], references: [id], onDelete: SetNull)
+  User        User  @relation("DataDeletionRequestUser", fields: [userId], references: [id], onDelete: Cascade)
+  VerifiedBy  User? @relation("DataDeletionRequestVerifiedBy", fields: [verifiedBy], references: [id], onDelete: SetNull)
+  ApprovedBy  User? @relation("DataDeletionRequestApprovedBy", fields: [approvedBy], references: [id], onDelete: SetNull)
+  RejectedBy  User? @relation("DataDeletionRequestRejectedBy", fields: [rejectedBy], references: [id], onDelete: SetNull)
+  CompletedBy User? @relation("DataDeletionRequestCompletedBy", fields: [completedBy], references: [id], onDelete: SetNull)
 
   @@index([userId])
   @@index([userEmail])
@@ -1755,24 +1758,24 @@ enum TypeActivite {
 
 // Table pour tracer les activités des utilisateurs
 model UserActivity {
-  id              String       @id @default(cuid())
-  userId          String // ID de l'utilisateur qui a effectué l'action
-  userName        String?       @db.VarChar(255) // Nom de l'utilisateur au moment de l'action
-  userEmail       String?       @db.VarChar(255) // Email de l'utilisateur au moment de l'action
-  type            TypeActivite // Type d'activité
-  action          String       @db.VarChar(255) // Description de l'action (ex: "Création d'un événement")
-  entityType      String?      @db.VarChar(100) // Type d'entité concernée (ex: "Evenement", "User", "Cotisation")
-  entityId       String?      @db.VarChar(255) // ID de l'entité concernée
-  details         Json? // Détails supplémentaires de l'action (JSON)
-  ipAddress       String?      @db.VarChar(45) // Adresse IP de l'utilisateur
-  userAgent       String?      @db.VarChar(500) // User Agent du navigateur
-  url             String?      @db.VarChar(500) // URL de la page où l'action a été effectuée
-  success         Boolean      @default(true) // Si l'action a réussi
-  errorMessage    String?      @db.Text // Message d'erreur si l'action a échoué
-  createdAt       DateTime     @default(now())
+  id           String       @id @default(cuid())
+  userId       String // ID de l'utilisateur qui a effectué l'action
+  userName     String?      @db.VarChar(255) // Nom de l'utilisateur au moment de l'action
+  userEmail    String?      @db.VarChar(255) // Email de l'utilisateur au moment de l'action
+  type         TypeActivite // Type d'activité
+  action       String       @db.VarChar(255) // Description de l'action (ex: "Création d'un événement")
+  entityType   String?      @db.VarChar(100) // Type d'entité concernée (ex: "Evenement", "User", "Cotisation")
+  entityId     String?      @db.VarChar(255) // ID de l'entité concernée
+  details      Json? // Détails supplémentaires de l'action (JSON)
+  ipAddress    String?      @db.VarChar(45) // Adresse IP de l'utilisateur
+  userAgent    String?      @db.VarChar(500) // User Agent du navigateur
+  url          String?      @db.VarChar(500) // URL de la page où l'action a été effectuée
+  success      Boolean      @default(true) // Si l'action a réussi
+  errorMessage String?      @db.Text // Message d'erreur si l'action a échoué
+  createdAt    DateTime     @default(now())
 
   // Relations
-  User            User         @relation("UserActivities", fields: [userId], references: [id], onDelete: Cascade)
+  User User @relation("UserActivities", fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([type])
@@ -1781,4 +1784,122 @@ model UserActivity {
   @@index([createdAt])
   @@index([success])
   @@map("user_activities")
+}
+
+// Enum pour le statut d'un projet
+enum StatutProjet {
+  Planifie // Projet planifié, pas encore démarré
+  EnCours // Projet en cours d'exécution
+  EnPause // Projet mis en pause temporairement
+  Termine // Projet terminé
+  Annule // Projet annulé
+}
+
+// Enum pour le statut d'un sous-projet/tâche
+enum StatutSousProjet {
+  APlanifier // Tâche à planifier
+  EnAttente // Tâche en attente de démarrage
+  EnCours // Tâche en cours d'exécution
+  EnPause // Tâche mise en pause
+  Terminee // Tâche terminée
+  Annulee // Tâche annulée
+}
+
+// Table pour les projets de l'association
+model Projet {
+  id            String       @id @default(cuid())
+  titre         String       @db.VarChar(255) // Titre du projet
+  description   String       @db.Text // Description détaillée du projet
+  statut        StatutProjet @default(Planifie)
+  dateDebut     DateTime? // Date de début prévue ou effective
+  dateFin       DateTime? // Date de fin prévue ou effective
+  dateFinReelle DateTime? // Date de fin réelle (si terminé)
+  createdBy     String // ID de l'admin qui a créé le projet
+
+  // Relations
+  CreatedBy   User         @relation("ProjetCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  SousProjets SousProjet[] // Sous-projets/tâches du projet
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([statut])
+  @@index([createdBy])
+  @@index([dateDebut])
+  @@index([dateFin])
+  @@map("projets")
+}
+
+// Table pour les sous-projets/tâches
+model SousProjet {
+  id            String           @id @default(cuid())
+  projetId      String // Référence au projet parent
+  titre         String           @db.VarChar(255) // Titre de la tâche
+  description   String           @db.Text // Description détaillée de la tâche
+  statut        StatutSousProjet @default(APlanifier)
+  ordre         Int              @default(0) // Ordre d'affichage dans la liste
+  dateDebut     DateTime? // Date de début prévue ou effective
+  dateFin       DateTime? // Date de fin prévue ou effective
+  dateFinReelle DateTime? // Date de fin réelle (si terminée)
+
+  // Relations
+  Projet       Projet                  @relation(fields: [projetId], references: [id], onDelete: Cascade)
+  Affectations AffectationSousProjet[] // Adhérents affectés à cette tâche
+  Commentaires CommentaireTache[] // Commentaires sur l'évolution de la tâche
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([projetId])
+  @@index([statut])
+  @@index([ordre])
+  @@map("sous_projets")
+}
+
+// Table de liaison pour les affectations (many-to-many entre SousProjet et Adherent)
+model AffectationSousProjet {
+  id                 String    @id @default(cuid())
+  sousProjetId       String // Référence au sous-projet/tâche
+  adherentId         String // Référence à l'adhérent affecté
+  dateAffectation    DateTime  @default(now()) // Date d'affectation
+  dateFinAffectation DateTime? // Date de fin d'affectation (si l'adhérent est retiré avant la fin du projet)
+  responsable        Boolean   @default(false) // Si true, l'adhérent est responsable de cette tâche
+
+  // Relations
+  SousProjet SousProjet @relation(fields: [sousProjetId], references: [id], onDelete: Cascade)
+  Adherent   Adherent   @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([sousProjetId, adherentId]) // Un adhérent ne peut être affecté qu'une fois à une tâche
+  @@index([sousProjetId])
+  @@index([adherentId])
+  @@index([dateAffectation])
+  @@map("affectations_sous_projets")
+}
+
+// Table pour les commentaires sur l'évolution des tâches
+model CommentaireTache {
+  id                    String @id @default(cuid())
+  sousProjetId          String // Référence au sous-projet/tâche
+  adherentId            String // Adhérent qui a fait le commentaire
+  contenu               String @db.Text // Contenu du commentaire
+  pourcentageAvancement Int? // Pourcentage d'avancement (0-100) si l'adhérent le précise
+
+  // Relations
+  SousProjet SousProjet @relation(fields: [sousProjetId], references: [id], onDelete: Cascade)
+  Adherent   Adherent   @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+
+  // Métadonnées
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([sousProjetId])
+  @@index([adherentId])
+  @@index([createdAt])
+  @@map("commentaires_taches")
 }

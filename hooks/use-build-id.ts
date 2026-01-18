@@ -31,6 +31,12 @@ export function useBuildId(checkInterval: number = 30000) {
       });
       
       if (!response.ok) {
+        // Si c'est un 502, le serveur n'est peut-être pas encore prêt après un redémarrage
+        if (response.status === 502) {
+          console.warn('⚠️ Serveur non disponible (502), le serveur est peut-être en cours de redémarrage...');
+          // Ne pas recharger immédiatement, attendre la prochaine vérification
+          return false;
+        }
         console.warn('Impossible de récupérer le build ID:', response.status);
         return false;
       }
@@ -38,6 +44,11 @@ export function useBuildId(checkInterval: number = 30000) {
       // Vérifier que la réponse est bien du JSON
       const contentType = response.headers.get('content-type');
       if (!contentType || !contentType.includes('application/json')) {
+        // Si c'est du HTML, c'est probablement une page d'erreur 502
+        if (contentType?.includes('text/html')) {
+          console.warn('⚠️ Le serveur retourne du HTML au lieu de JSON (502 Bad Gateway), le serveur est peut-être en cours de redémarrage...');
+          return false;
+        }
         console.warn('La réponse du build ID n\'est pas du JSON:', contentType);
         return false;
       }
@@ -61,7 +72,12 @@ export function useBuildId(checkInterval: number = 30000) {
       }
       
       return false;
-    } catch (error) {
+    } catch (error: any) {
+      // Gérer les erreurs réseau (502, etc.) gracieusement
+      if (error?.message?.includes('502') || error?.message?.includes('Bad Gateway')) {
+        console.warn('⚠️ Erreur réseau lors de la vérification du build ID (502), le serveur est peut-être en cours de redémarrage...');
+        return false;
+      }
       console.error('Erreur lors de la vérification du build ID:', error);
       return false;
     } finally {

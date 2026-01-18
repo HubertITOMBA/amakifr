@@ -16,6 +16,7 @@ import { ReactToastifyProvider } from "@/components/providers/react-toastify-pro
 import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ChatBotProvider } from "@/components/user/ChatBotProvider";
 import { BuildIdChecker } from "@/components/BuildIdChecker";
+import { ChunkErrorHandler } from "@/components/ChunkErrorHandler";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -91,6 +92,7 @@ export default function RootLayout({
             <InstallPrompt />
             <ChatBotProvider />
             <BuildIdChecker />
+            <ChunkErrorHandler />
           </ThemeProvider>
         </AuthSessionProvider>
       </body>
