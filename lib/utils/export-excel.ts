@@ -214,3 +214,162 @@ export function formatAmountForExport(amount: number | string | null | undefined
   return num.toFixed(2).replace(".", ",");
 }
 
+/**
+ * Exporte des données en format PDF
+ * Nécessite l'import dynamique de jsPDF côté client
+ */
+export async function exportToPDF(
+  data: any[],
+  options: ExportOptions = {}
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    if (!data || data.length === 0) {
+      return { success: false, error: "Aucune donnée à exporter" };
+    }
+
+    // Import dynamique de jsPDF et des helpers
+    const { default: jsPDF } = await import("jspdf");
+    const { addPDFHeader, addPDFFooter } = await import("@/lib/pdf-helpers-client");
+    const { format } = await import("date-fns");
+    const { fr } = await import("date-fns/locale");
+
+    const { filename = "export", sheetName = "Données", columns } = options;
+
+    // Créer le document PDF en format paysage pour plus d'espace
+    const doc = new jsPDF("l", "mm", "a4");
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const margin = 20;
+    const startY = 60; // Après l'en-tête
+    let yPos = startY;
+
+    // Ajouter l'en-tête
+    await addPDFHeader(doc, sheetName);
+
+    // Date de génération
+    doc.setFontSize(9);
+    doc.setTextColor(100, 100, 100);
+    doc.setFont("helvetica", "normal");
+    doc.text(
+      `Généré le ${format(new Date(), "dd MMMM yyyy à HH:mm", { locale: fr })}`,
+      pageWidth - margin,
+      yPos,
+      { align: "right" }
+    );
+    yPos += 10;
+
+    // Préparer les données
+    let exportData: any[];
+    let headers: string[];
+
+    if (columns && columns.length > 0) {
+      headers = columns.map((col) => col.label);
+      exportData = data.map((row) => {
+        const exportRow: any = {};
+        columns.forEach((col) => {
+          const value = row[col.key];
+          exportRow[col.label] = col.format ? col.format(value) : value ?? "";
+        });
+        return exportRow;
+      });
+    } else {
+      headers = Object.keys(data[0]);
+      exportData = data;
+    }
+
+    // Calculer la largeur des colonnes
+    const numColumns = headers.length;
+    const availableWidth = pageWidth - 2 * margin;
+    const columnWidth = availableWidth / numColumns;
+    const maxColumnWidth = 50; // Largeur maximale par colonne
+    const actualColumnWidth = Math.min(columnWidth, maxColumnWidth);
+
+    // Fonction pour vérifier si on doit ajouter une nouvelle page
+    const checkPageBreak = (requiredHeight: number = 10) => {
+      if (yPos + requiredHeight > pageHeight - 30) {
+        doc.addPage();
+        yPos = margin + 10;
+        return true;
+      }
+      return false;
+    };
+
+    // En-têtes du tableau
+    doc.setFontSize(9);
+    doc.setFont("helvetica", "bold");
+    doc.setFillColor(9, 61, 181); // Bleu AMAKI
+    doc.setDrawColor(255, 255, 255);
+    doc.setTextColor(255, 255, 255);
+
+    checkPageBreak(8);
+    let xPos = margin;
+    headers.forEach((header, index) => {
+      // Rectangle avec fond bleu
+      doc.rect(xPos, yPos - 6, actualColumnWidth, 8, "F");
+      // Texte de l'en-tête (tronqué si trop long)
+      const headerText = header.length > 20 ? header.substring(0, 17) + "..." : header;
+      doc.text(headerText, xPos + 2, yPos - 1, {
+        maxWidth: actualColumnWidth - 4,
+        align: "left",
+      });
+      xPos += actualColumnWidth;
+    });
+    yPos += 2;
+
+    // Lignes de données
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(8);
+    doc.setTextColor(0, 0, 0);
+    doc.setFillColor(255, 255, 255);
+
+    exportData.forEach((row, rowIndex) => {
+      checkPageBreak(6);
+
+      // Alternance de couleurs pour les lignes
+      if (rowIndex % 2 === 0) {
+        doc.setFillColor(245, 247, 250);
+        doc.rect(margin, yPos - 5, availableWidth, 6, "F");
+      } else {
+        doc.setFillColor(255, 255, 255);
+        doc.rect(margin, yPos - 5, availableWidth, 6, "F");
+      }
+
+      xPos = margin;
+      headers.forEach((header) => {
+        const key = columns
+          ? columns.find((col) => col.label === header)?.key || header
+          : header;
+        const value = String(row[key] ?? "");
+        // Tronquer le texte si trop long
+        const displayValue = value.length > 25 ? value.substring(0, 22) + "..." : value;
+        doc.text(displayValue, xPos + 2, yPos, {
+          maxWidth: actualColumnWidth - 4,
+          align: "left",
+        });
+        xPos += actualColumnWidth;
+      });
+
+      yPos += 6;
+
+      // Ligne de séparation
+      doc.setDrawColor(200, 200, 200);
+      doc.line(margin, yPos - 1, pageWidth - margin, yPos - 1);
+    });
+
+    // Ajouter le pied de page
+    addPDFFooter(doc);
+
+    // Télécharger le PDF
+    const fileName = `${filename}_${format(new Date(), "yyyy-MM-dd")}.pdf`;
+    doc.save(fileName);
+
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur lors de l'export PDF:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erreur inconnue",
+    };
+  }
+}
+

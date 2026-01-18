@@ -159,7 +159,7 @@ export default function ExportsPage() {
             Exports de Données
           </h1>
           <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mt-2">
-            Exportez toutes les données de l'association au format Excel ou CSV
+            Exportez toutes les données de l'association au format Excel, CSV ou PDF
           </p>
         </div>
 
@@ -249,6 +249,10 @@ export default function ExportsPage() {
               <p>
                 <strong>Format CSV (.csv)</strong> : Format texte simple, compatible avec tous les tableurs. Les
                 valeurs sont séparées par des points-virgules (;).
+              </p>
+              <p>
+                <strong>Format PDF (.pdf)</strong> : Format document imprimable avec mise en page professionnelle,
+                en-têtes et pieds de page. Idéal pour l'archivage et l'impression.
               </p>
               <p className="mt-4 text-xs text-gray-500 dark:text-gray-400">
                 <strong>Note</strong> : Les exports incluent toutes les données disponibles. Pour filtrer les données,

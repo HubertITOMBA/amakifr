@@ -468,6 +468,9 @@ export async function updateUserData(
       return { success: false, message: "Non autorisé" };
     }
 
+    // Importer le logger
+    const { logModification } = await import("@/lib/activity-logger");
+
     // Vérifier l'unicité du nom si le nom est modifié
     if (userData.name) {
       const existingUserByName = await prisma.user.findUnique({
@@ -706,6 +709,24 @@ export async function updateUserData(
           });
         }
       }
+    }
+
+    // Logger l'activité
+    try {
+      await logModification(
+        "Modification du profil utilisateur",
+        "User",
+        session.user.id,
+        {
+          hasAdherentData: !!adherentData,
+          hasAdresseData: !!adresseData,
+          telephonesCount: telephonesData?.length || 0,
+          enfantsCount: enfantsData?.length || 0,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
     }
 
     return { 
@@ -1309,6 +1330,23 @@ export async function adminUpdateUserStatus(userId: string, status: "Actif" | "I
       data: { status }
     });
 
+    // Logger l'activité
+    try {
+      const { logModification } = await import("@/lib/activity-logger");
+      await logModification(
+        `Modification du statut de l'utilisateur ${targetUser.name || targetUser.email || userId}: ${targetUser.status} → ${status}`,
+        "User",
+        userId,
+        {
+          oldStatus: targetUser.status,
+          newStatus: status,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
+    }
+
     // Envoyer un email si le statut a changé
     if (statusChanged && targetUser.email) {
       try {
@@ -1384,6 +1422,22 @@ export async function adminUpdateUser(userId: string, data: { name?: string; ema
       }
     });
 
+    // Logger l'activité
+    try {
+      const { logModification } = await import("@/lib/activity-logger");
+      await logModification(
+        `Modification des informations utilisateur ${userId}`,
+        "User",
+        userId,
+        {
+          fieldsUpdated: Object.keys(data),
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
+    }
+
     return { success: true, user: updated };
   } catch (e: any) {
     console.error("Erreur adminUpdateUser:", e);
@@ -1450,6 +1504,25 @@ export async function adminUpdateAdherentPoste(
         posteTemplateId: posteTemplateId || null,
       },
     });
+
+    // Logger l'activité
+    try {
+      const { logModification } = await import("@/lib/activity-logger");
+      await logModification(
+        posteTemplateId
+          ? `Mise à jour du poste de l'adhérent ${adherent.firstname} ${adherent.lastname}`
+          : `Retrait du poste de l'adhérent ${adherent.firstname} ${adherent.lastname}`,
+        "Adherent",
+        adherentId,
+        {
+          posteTemplateId: posteTemplateId || null,
+          adherentName: `${adherent.firstname} ${adherent.lastname}`,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
+    }
 
     revalidatePath("/admin/users");
     revalidatePath(`/admin/users/${adherent.userId}/consultation`);

@@ -5,6 +5,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { UserRole, TypeCotisation, MoyenPaiement } from "@prisma/client";
+import { logCreation } from "@/lib/activity-logger";
 
 // Schémas de validation
 const CreateMonthlyCotisationSchema = z.object({
@@ -155,6 +156,24 @@ export async function createManualCotisation(data: z.infer<typeof CreateCotisati
       ...cotisation,
       montant: Number(cotisation.montant)
     };
+
+    // Logger l'activité
+    try {
+      await logCreation(
+        `Création d'une cotisation manuelle de ${validatedData.montant}€ (${validatedData.type})`,
+        "Cotisation",
+        cotisation.id,
+        {
+          type: validatedData.type,
+          montant: validatedData.montant,
+          moyenPaiement: validatedData.moyenPaiement,
+          adherentId: validatedData.adherentId,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la création si le logging échoue
+    }
 
     // Mettre à jour l'obligation correspondante si elle existe
     const obligation = await prisma.obligationCotisation.findFirst({

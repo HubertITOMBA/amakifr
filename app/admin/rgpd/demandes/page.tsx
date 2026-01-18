@@ -39,6 +39,7 @@ import { getAllDataDeletionRequests, verifyDataDeletionRequest, approveDataDelet
 import { ensureRGPDMenu } from "@/actions/menus/ensure-rgpd-menu";
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+import { useActivityLogger } from "@/hooks/use-activity-logger";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -154,6 +155,9 @@ export default function AdminRGPDDemandesPage() {
       console.error("Erreur lors de la vérification du menu RGPD:", error);
     });
   }, [loadData]);
+
+  // Logger la consultation de la page
+  useActivityLogger("Demandes RGPD", "DataDeletionRequest");
 
   const filteredData = useMemo(() => {
     return requests.filter((item) => {

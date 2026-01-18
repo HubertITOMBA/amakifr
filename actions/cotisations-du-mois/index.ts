@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
+import { logCreation, logModification } from "@/lib/activity-logger";
 import { calculerCotisationMensuelle } from "@/lib/utils/cotisations";
 
 // Schémas de validation
@@ -127,6 +128,23 @@ export async function createCotisationDuMois(formData: FormData) {
         },
       },
     });
+
+    // Logger l'activité
+    try {
+      await logCreation(
+        `Création de la cotisation du mois ${periode}`,
+        "CotisationDuMois",
+        newCotisation.id,
+        {
+          periode,
+          typeCotisation: newCotisation.TypeCotisation.libelle,
+          montantBase: Number(newCotisation.montantBase),
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la création si le logging échoue
+    }
 
     return { 
       success: true, 
@@ -330,6 +348,22 @@ export async function updateCotisationDuMois(formData: FormData) {
         // Ne pas faire échouer la mise à jour de la cotisation du mois si la synchronisation échoue
         console.error("[updateCotisationDuMois] ❌ Erreur lors de la synchronisation avec les cotisations mensuelles:", syncError);
       }
+    }
+
+    // Logger l'activité
+    try {
+      await logModification(
+        `Modification de la cotisation du mois ${existing.periode}`,
+        "CotisationDuMois",
+        validatedData.id,
+        {
+          periode: existing.periode,
+          fieldsUpdated: Object.keys(updateData),
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
     }
 
     return { 

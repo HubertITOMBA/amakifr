@@ -3,6 +3,7 @@
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
+import { logDeletion } from "@/lib/activity-logger";
 
 /**
  * Supprime définitivement un adhérent et toutes ses données associées
@@ -153,6 +154,23 @@ Notification envoyée: ${notifyUser ? 'OUI' : 'NON'}
 ⚠️  SUPPRESSION IRRÉVERSIBLE - TOUTES LES DONNÉES ONT ÉTÉ SUPPRIMÉES
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
     `);
+
+    // Logger l'activité dans la base de données
+    try {
+      await logDeletion(
+        `Suppression de l'adhérent ${userName}`,
+        "User",
+        userId,
+        {
+          reason,
+          notifyUser,
+          userRole: userToDelete.role,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la suppression si le logging échoue
+    }
 
     return {
       success: true,

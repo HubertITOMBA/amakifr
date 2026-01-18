@@ -67,6 +67,7 @@ import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 import { SendEmailModal } from "@/components/admin/SendEmailModal";
 import { Checkbox } from "@/components/ui/checkbox";
+import { useActivityLogger } from "@/hooks/use-activity-logger";
 
 type UserData = {
   id: string;
@@ -283,7 +284,12 @@ export default function AdminUsersPage() {
 
   useEffect(() => {
     loadAll();
-    
+  }, [loadAll]);
+
+  // Logger la consultation de la page
+  useActivityLogger("Gestion des utilisateurs", "User");
+
+  useEffect(() => {
     // Nettoyer lors du démontage du composant
     return () => {
       if (abortControllerRef.current) {

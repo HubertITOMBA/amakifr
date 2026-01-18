@@ -225,6 +225,23 @@ export async function adminCreateAdherent(formData: FormData) {
       // Ne pas bloquer la création si l'envoi d'email échoue
     }
 
+    // Logger l'activité
+    try {
+      await logCreation(
+        `Création de l'adhérent ${validatedData.firstname} ${validatedData.lastname}`,
+        "Adherent",
+        result.adherent.id,
+        {
+          email: normalizedEmail,
+          role: validatedData.role || UserRole.Membre,
+          status: validatedData.status || UserStatus.Actif,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la création si le logging échoue
+    }
+
     return {
       success: true,
       message: `Adhérent ${validatedData.firstname} ${validatedData.lastname} créé avec succès. Un email de bienvenue a été envoyé à ${normalizedEmail}.`,

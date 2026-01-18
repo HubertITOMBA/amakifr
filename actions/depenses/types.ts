@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { logCreation, logModification } from "@/lib/activity-logger";
 
 // Schémas de validation
 const CreateTypeDepenseSchema = z.object({
@@ -142,6 +143,22 @@ export async function updateTypeDepense(data: z.infer<typeof UpdateTypeDepenseSc
         }
       }
     });
+
+    // Logger l'activité
+    try {
+      await logModification(
+        `Modification du type de dépense: ${validatedData.titre || validatedData.id}`,
+        "TypeDepense",
+        validatedData.id,
+        {
+          fieldsUpdated: Object.keys(validatedData).filter(key => key !== 'id'),
+          actif: validatedData.actif,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
+    }
 
     revalidatePath("/admin/depenses");
     revalidatePath("/admin/depenses/types");

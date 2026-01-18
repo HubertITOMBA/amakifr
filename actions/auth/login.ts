@@ -9,6 +9,7 @@ import { DEFAULT_LOGIN_REDIRECT } from "@/routes"
 import { AuthError } from "next-auth"
 import { signIn } from "@/auth"
 import { normalizeEmail } from "@/lib/utils"
+import { logUserActivity, TypeActivite } from "@/lib/activity-logger"
 
 export const login = async (
     values: z.infer<typeof LoginSchema>,
@@ -71,6 +72,23 @@ export const login = async (
         // Vérifier si result est undefined ou null (peut arriver avec redirect: false)
         if (!result || result.error) {
             return { error: "Identifiants non valides!" };
+        }
+        
+        // Logger la connexion
+        try {
+            await logUserActivity(
+                TypeActivite.Connexion,
+                `Connexion de l'utilisateur ${normalizedEmail}`,
+                "User",
+                existingUser.id,
+                {
+                    email: normalizedEmail,
+                    role: existingUser.role,
+                }
+            );
+        } catch (logError) {
+            console.error("Erreur lors du logging de la connexion:", logError);
+            // Ne pas bloquer la connexion si le logging échoue
         }
         
         return { success: "Connexion réussie !" }

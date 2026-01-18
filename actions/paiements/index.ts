@@ -62,6 +62,23 @@ export async function createDetteInitiale(data: z.infer<typeof CreateDetteInitia
       },
     });
 
+    // Logger l'activité
+    try {
+      await logCreation(
+        `Création d'une dette initiale de ${validatedData.montant}€ pour ${validatedData.annee}`,
+        "DetteInitiale",
+        dette.id,
+        {
+          annee: validatedData.annee,
+          montant: validatedData.montant,
+          adherentId: validatedData.adherentId,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la création si le logging échoue
+    }
+
     return {
       success: true,
       message: `Dette initiale de ${validatedData.montant}€ créée pour ${validatedData.annee}`,
@@ -332,6 +349,27 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
           statut: "Disponible",
         },
       });
+    }
+
+    // Logger l'activité
+    try {
+      await logCreation(
+        `Enregistrement d'un paiement de ${montantPaiement.toFixed(2)}€`,
+        "PaiementCotisation",
+        paiement.id,
+        {
+          montant: Number(montantPaiement),
+          moyenPaiement: validatedData.moyenPaiement,
+          adherentId: validatedData.adherentId,
+          type: validatedData.cotisationMensuelleId ? "cotisationMensuelle" : 
+                validatedData.assistanceId ? "assistance" :
+                validatedData.detteInitialeId ? "detteInitiale" : "general",
+          avoirCree: !!avoirCree,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer le paiement si le logging échoue
     }
 
     let message = `Paiement de ${montantPaiement.toFixed(2)}€ enregistré avec succès`;
@@ -1026,6 +1064,22 @@ export async function updateDetteInitiale(data: z.infer<typeof UpdateDetteInitia
       },
     });
 
+    // Logger l'activité
+    try {
+      await logModification(
+        `Modification de la dette initiale ${validatedData.id}`,
+        "DetteInitiale",
+        validatedData.id,
+        {
+          annee: validatedData.annee,
+          montant: validatedData.montant,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
+    }
+
     return {
       success: true,
       message: `Dette initiale mise à jour avec succès`,
@@ -1606,6 +1660,23 @@ export async function updateAssistance(data: z.infer<typeof UpdateAssistanceSche
       session.user.id,
       periode
     );
+
+    // Logger l'activité
+    try {
+      await logModification(
+        `Modification de l'assistance ${validatedData.id}`,
+        "Assistance",
+        validatedData.id,
+        {
+          fieldsUpdated: Object.keys(updateData),
+          type: type,
+          montant: montant,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
+    }
 
     // Revalider les pages
     revalidatePath("/user/profile");

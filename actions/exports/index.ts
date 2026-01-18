@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
 import { format } from "date-fns";
+import { logExport } from "@/lib/activity-logger";
 
 /**
  * Récupère toutes les données des adhérents pour export
@@ -66,6 +67,21 @@ export async function getAdherentsForExport() {
       "Nombre documents": adh._count.documents,
       "Date création compte": adh.User?.createdAt ? format(new Date(adh.User.createdAt), "dd/MM/yyyy HH:mm") : "",
     }));
+
+    // Logger l'export
+    try {
+      await logExport(
+        `Export de la liste des adhérents (${adherents.length} adhérents)`,
+        "Adherent",
+        {
+          count: adherents.length,
+          format: "xlsx/csv/pdf",
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'export:", logError);
+      // Ne pas bloquer l'export si le logging échoue
+    }
 
     return { success: true, data: exportData };
   } catch (error) {

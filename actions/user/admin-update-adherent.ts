@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/auth";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
+import { logModification } from "@/lib/activity-logger";
 
 /**
  * Schéma de validation pour la mise à jour d'un adhérent par un admin
@@ -114,6 +115,21 @@ export async function adminUpdateAdherent(
       where: { id: adherentId },
       data: updateData,
     });
+
+    // Logger l'activité
+    try {
+      await logModification(
+        `Modification de l'adhérent ${adherent.firstname} ${adherent.lastname}`,
+        "Adherent",
+        adherentId,
+        {
+          fieldsUpdated: Object.keys(updateData),
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
+    }
 
     revalidatePath("/admin/users");
     revalidatePath(`/admin/users/${adherent.userId}/consultation`);

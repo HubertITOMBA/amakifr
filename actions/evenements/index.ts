@@ -8,6 +8,7 @@ import { writeFile, mkdirSync, existsSync } from "fs";
 import { writeFile as writeFilePromise } from "fs/promises";
 import { join } from "path";
 import { sendVisiteurInscriptionEmail, sendAdherentInscriptionConfirmationEmail, sendVisiteurInscriptionConfirmationEmail } from "@/lib/mail";
+import { logCreation, logModification, logDeletion } from "@/lib/activity-logger";
 
 // Schémas de validation
 const EvenementSchema = z.object({
@@ -175,6 +176,24 @@ export async function createEvenement(data: z.infer<typeof EvenementSchema>) {
     revalidatePath("/evenements");
     revalidatePath("/agenda");
 
+    // Logger l'activité
+    try {
+      await logCreation(
+        `Création de l'événement "${validatedData.titre}"`,
+        "Evenement",
+        evenement.id,
+        {
+          categorie: validatedData.categorie,
+          statut: validatedData.statut,
+          estPublic: validatedData.estPublic,
+          inscriptionRequis: validatedData.inscriptionRequis,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la création si le logging échoue
+    }
+
     // Conversion des Decimal vers Number pour le client
     const evenementFormatted = {
       ...evenement,
@@ -270,6 +289,22 @@ export async function updateEvenement(id: string, data: z.infer<typeof Evenement
     revalidatePath("/evenements");
     revalidatePath("/agenda");
 
+    // Logger l'activité
+    try {
+      await logModification(
+        `Modification de l'événement "${validatedData.titre}"`,
+        "Evenement",
+        id,
+        {
+          categorie: validatedData.categorie,
+          statut: validatedData.statut,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
+    }
+
     // Conversion des Decimal vers Number pour le client
     const evenementFormatted = {
       ...evenement,
@@ -300,9 +335,27 @@ export async function deleteEvenement(id: string) {
       return { success: false, error: "Seuls les administrateurs peuvent supprimer des événements" };
     }
 
+    // Récupérer l'événement avant suppression pour le logging
+    const evenement = await prisma.evenement.findUnique({
+      where: { id },
+      select: { titre: true },
+    });
+
     await prisma.evenement.delete({
       where: { id },
     });
+
+    // Logger l'activité
+    try {
+      await logDeletion(
+        `Suppression de l'événement "${evenement?.titre || id}"`,
+        "Evenement",
+        id
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la suppression si le logging échoue
+    }
 
     revalidatePath("/admin/evenements");
     revalidatePath("/evenements");

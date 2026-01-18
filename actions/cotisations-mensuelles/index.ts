@@ -7,6 +7,7 @@ import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { calculerCotisationMensuelle } from "@/lib/utils/cotisations";
+import { logCreation } from "@/lib/activity-logger";
 
 // Schémas de validation
 const CreateTypeCotisationSchema = z.object({
@@ -440,6 +441,26 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
     let message = `${createdCount} cotisation(s) mensuelle(s) créées pour ${adherents.length} adhérent(s). Chaque cotisation inclut le forfait mensuel + les assistances du mois.`;
     if (avoirsAppliques > 0) {
       message += ` ${avoirsAppliques} cotisation(s) ont été partiellement ou totalement payées avec des avoirs disponibles.`;
+    }
+
+    // Logger l'activité
+    try {
+      await logCreation(
+        `Création de ${createdCount} cotisation(s) mensuelle(s) pour la période ${periode}`,
+        "CotisationMensuelle",
+        periode,
+        {
+          periode,
+          annee: validatedData.annee,
+          mois: validatedData.mois,
+          count: createdCount,
+          totalAdherents: adherents.length,
+          avoirsAppliques,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la création si le logging échoue
     }
 
     // Revalider les pages des adhérents et de gestion

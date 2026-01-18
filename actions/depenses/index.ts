@@ -6,6 +6,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+import { logCreation, logModification } from "@/lib/activity-logger";
 
 // Fonction helper pour transformer null/empty en undefined
 const nullishToString = z.preprocess(
@@ -84,6 +85,23 @@ export async function createDepense(data: z.infer<typeof CreateDepenseSchema>) {
 
     revalidatePath("/admin/depenses");
     revalidatePath("/admin/depenses/gestion");
+
+    // Logger l'activité
+    try {
+      await logCreation(
+        `Création de la dépense: ${validatedData.libelle}`,
+        "Depense",
+        depense.id,
+        {
+          montant: validatedData.montant,
+          statut: validatedData.statut,
+          typeDepenseId: validatedData.typeDepenseId,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la création si le logging échoue
+    }
 
     return { success: true, data: depenseConverted };
 
@@ -195,6 +213,22 @@ export async function updateDepense(data: z.infer<typeof UpdateDepenseSchema>) {
       montant: Number(depense.montant)
     };
 
+    // Logger l'activité
+    try {
+      await logModification(
+        `Modification de la dépense: ${validatedData.libelle || existingDepense.statut}`,
+        "Depense",
+        validatedData.id,
+        {
+          fieldsUpdated: Object.keys(validatedData).filter(key => key !== 'id'),
+          statut: validatedData.statut || existingDepense.statut,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la mise à jour si le logging échoue
+    }
+
     revalidatePath("/admin/depenses");
 
     return { success: true, data: depenseConverted };
@@ -227,9 +261,31 @@ export async function deleteDepense(id: string) {
       return { success: false, error: "Une dépense validée ou rejetée ne peut plus être supprimée" };
     }
 
+    // Récupérer les informations de la dépense avant suppression pour le logging
+    const depenseInfo = await prisma.depense.findUnique({
+      where: { id },
+      select: { libelle: true, montant: true },
+    });
+
     await prisma.depense.delete({
       where: { id }
     });
+
+    // Logger l'activité
+    try {
+      await logDeletion(
+        `Suppression de la dépense: ${depenseInfo?.libelle || id}`,
+        "Depense",
+        id,
+        {
+          libelle: depenseInfo?.libelle,
+          montant: depenseInfo?.montant ? Number(depenseInfo.montant) : null,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la suppression si le logging échoue
+    }
 
     revalidatePath("/admin/depenses");
 

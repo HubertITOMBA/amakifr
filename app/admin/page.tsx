@@ -25,11 +25,19 @@ import {
   Receipt,
   BarChart3,
   Settings,
-  Database
+  Database,
+  Edit,
+  Download,
+  Eye,
+  Trash2,
+  CheckCircle2
 } from "lucide-react";
 import { getDashboardStats, getRecentActivities, getUpcomingEvents, getDashboardAlerts, getDashboardFinancialStats } from "@/actions/admin/dashboard";
+import { getRecentActivitiesForDashboard } from "@/actions/admin/activities";
 import { toast } from "react-toastify";
 import Link from "next/link";
+import { formatDistanceToNow } from "date-fns";
+import { fr } from "date-fns/locale";
 
 // Couleurs pastel pour les cards
 const cardColors = {
@@ -91,6 +99,15 @@ export default function AdminDashboard() {
     time: string;
     status: "success" | "info" | "warning";
   }>>([]);
+  const [userActivities, setUserActivities] = useState<Array<{
+    id: string;
+    type: string;
+    action: string;
+    userName: string | null;
+    userEmail: string | null;
+    createdAt: Date;
+    success: boolean;
+  }>>([]);
   const [upcomingEvents, setUpcomingEvents] = useState<Array<{
     id: string;
     title: string;
@@ -121,12 +138,13 @@ export default function AdminDashboard() {
     try {
       setLoading(true);
       
-      const [statsResult, activitiesResult, eventsResult, alertsResult, financialResult] = await Promise.all([
+      const [statsResult, activitiesResult, eventsResult, alertsResult, financialResult, userActivitiesResult] = await Promise.all([
         getDashboardStats(),
         getRecentActivities(10),
         getUpcomingEvents(5),
         getDashboardAlerts(),
         getDashboardFinancialStats(),
+        getRecentActivitiesForDashboard(10),
       ]);
 
       if (statsResult.success && statsResult.stats) {
@@ -194,6 +212,10 @@ export default function AdminDashboard() {
 
       if (financialResult.success && financialResult.financialStats) {
         setFinancialStats(financialResult.financialStats);
+      }
+
+      if (userActivitiesResult.success && userActivitiesResult.activities) {
+        setUserActivities(userActivitiesResult.activities);
       }
     } catch (error) {
       console.error("Erreur lors du chargement du dashboard:", error);
@@ -390,57 +412,80 @@ export default function AdminDashboard() {
       )}
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
-        {/* Activités récentes */}
+        {/* Activités utilisateurs récentes */}
         <Card className="!py-0 border-2 border-indigo-200 dark:border-indigo-800/50 bg-white dark:bg-gray-900">
           <CardHeader className={`pt-4 px-4 sm:px-6 pb-3 ${cardColors.indigo.header} rounded-t-lg`}>
-            <CardTitle className="flex items-center space-x-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
-              <Activity className={`h-4 w-4 sm:h-5 sm:w-5 ${cardColors.indigo.icon}`} />
-              <span>Activités récentes</span>
-            </CardTitle>
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center space-x-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                <Activity className={`h-4 w-4 sm:h-5 sm:w-5 ${cardColors.indigo.icon}`} />
+                <span>Activités utilisateurs</span>
+              </CardTitle>
+              <Link href="/admin/activities">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="bg-white/10 hover:bg-white/20 border-white/30 text-white hover:text-white text-xs"
+                >
+                  Voir tout
+                </Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent className="px-4 sm:px-6 pb-4 sm:pb-6">
             <div className="space-y-3 sm:space-y-4">
-              {recentActivities.map((activity) => {
-                const getIcon = () => {
-                  switch (activity.type) {
-                    case "user":
-                      return <UserPlus className="h-4 w-4" />;
-                    case "event":
-                      return <Calendar className="h-4 w-4" />;
-                    case "newsletter":
-                      return <Mail className="h-4 w-4" />;
-                    default:
-                      return <MessageSquare className="h-4 w-4" />;
-                  }
-                };
+              {userActivities.length > 0 ? (
+                userActivities.map((activity) => {
+                  const getIcon = () => {
+                    switch (activity.type) {
+                      case "Creation":
+                        return <FileText className="h-4 w-4 text-green-600" />;
+                      case "Modification":
+                        return <Edit className="h-4 w-4 text-blue-600" />;
+                      case "Suppression":
+                        return <Trash2 className="h-4 w-4 text-red-600" />;
+                      case "Consultation":
+                        return <Eye className="h-4 w-4 text-purple-600" />;
+                      case "Export":
+                        return <Download className="h-4 w-4 text-indigo-600" />;
+                      case "Connexion":
+                        return <CheckCircle2 className="h-4 w-4 text-emerald-600" />;
+                      default:
+                        return <Activity className="h-4 w-4 text-gray-600" />;
+                    }
+                  };
 
-                const getStatusColor = () => {
-                  switch (activity.status) {
-                    case "success":
-                      return "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300";
-                    case "info":
-                      return "bg-sky-100 text-sky-700 dark:bg-sky-900/30 dark:text-sky-300";
-                    default:
-                      return "bg-gray-100 text-gray-700 dark:bg-gray-800 dark:text-gray-300";
-                  }
-                };
+                  const getStatusColor = () => {
+                    return activity.success
+                      ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300"
+                      : "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300";
+                  };
 
-                return (
-                  <div key={activity.id} className="flex items-center space-x-3">
-                    <div className={`p-2 rounded-full ${getStatusColor()}`}>
-                      {getIcon()}
+                  const timeAgo = formatDistanceToNow(new Date(activity.createdAt), {
+                    addSuffix: true,
+                    locale: fr,
+                  });
+
+                  return (
+                    <div key={activity.id} className="flex items-center space-x-3">
+                      <div className={`p-2 rounded-full ${getStatusColor()}`}>
+                        {getIcon()}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
+                          {activity.action}
+                        </p>
+                        <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
+                          {activity.userName || activity.userEmail || "Utilisateur"} • {timeAgo}
+                        </p>
+                      </div>
                     </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white">
-                        {activity.action}
-                      </p>
-                      <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400">
-                        {activity.user} • {activity.time}
-                      </p>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })
+              ) : (
+                <p className="text-sm text-gray-500 dark:text-gray-400 text-center py-4">
+                  Aucune activité récente
+                </p>
+              )}
             </div>
           </CardContent>
         </Card>

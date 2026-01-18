@@ -499,6 +499,18 @@ async function seedMenus() {
         electoral: false,
         parent: null,
       },
+      {
+        libelle: "Activités utilisateurs",
+        description: "Consulter les activités et actions des utilisateurs",
+        lien: "/admin/activities",
+        niveau: "SIDEBAR" as const,
+        roles: ["ADMIN"],
+        icone: "Activity",
+        statut: true,
+        ordre: 29,
+        electoral: false,
+        parent: null,
+      },
     ];
 
     // Créer d'abord les menus parents (navbar et sidebar)
