@@ -2,7 +2,8 @@
 
 import { signOut } from "@/auth"
 import { auth } from "@/auth"
-import { logUserActivity, TypeActivite } from "@/lib/activity-logger"
+import { logUserActivity } from "@/lib/activity-logger"
+import { TypeActivite } from "@prisma/client"
 
 export const logOut = async () => {
     try {

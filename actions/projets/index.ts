@@ -4,7 +4,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
-import { StatutProjet, StatutSousProjet } from "@prisma/client";
+import { StatutProjet, StatutSousProjet, TypeNotification } from "@prisma/client";
 import { logCreation, logModification, logDeletion } from "@/lib/activity-logger";
 
 // Schémas de validation
@@ -578,13 +578,45 @@ export async function affecterSousProjet(formData: FormData) {
       return { success: false, error: "Aucun adhérent sélectionné" };
     }
 
-    const adherentIds = JSON.parse(adherentIdsStr) as string[];
+    let adherentIds: string[];
+    try {
+      const parsed = JSON.parse(adherentIdsStr);
+      if (!Array.isArray(parsed)) {
+        return { success: false, error: "Liste d'adhérents invalide" };
+      }
+      adherentIds = parsed as string[];
+    } catch {
+      return { success: false, error: "Liste d'adhérents invalide" };
+    }
+
+    // Sécuriser : supprimer les doublons éventuels (évite une erreur côté DB)
+    const uniqueAdherentIds = Array.from(new Set(adherentIds.filter(Boolean)));
+    const hadDuplicates = uniqueAdherentIds.length !== adherentIds.length;
 
     const validatedData = AffecterSousProjetSchema.parse({
       sousProjetId,
-      adherentIds,
+      adherentIds: uniqueAdherentIds,
       responsable,
     });
+
+    // Récupérer les anciennes affectations pour notifier uniquement les nouveaux affectés
+    const previousAffectations = await db.affectationSousProjet.findMany({
+      where: { sousProjetId: validatedData.sousProjetId },
+      select: { adherentId: true, responsable: true },
+    });
+    const previousAdherentIds = new Set(previousAffectations.map((a) => a.adherentId));
+    const newlyAssignedAdherentIds = validatedData.adherentIds.filter((id) => !previousAdherentIds.has(id));
+    const removedAdherentIds = previousAffectations
+      .map((a) => a.adherentId)
+      .filter((id) => !validatedData.adherentIds.includes(id));
+
+    // Détecter un changement de responsable (ancien vs nouveau)
+    const previousResponsibleAdherentId =
+      previousAffectations.find((a) => a.responsable)?.adherentId || null;
+    const nextResponsibleAdherentId =
+      validatedData.responsable && validatedData.adherentIds.length > 0
+        ? validatedData.adherentIds[0]
+        : null;
 
     // Vérifier que le sous-projet existe
     const sousProjet = await db.sousProjet.findUnique({
@@ -592,6 +624,7 @@ export async function affecterSousProjet(formData: FormData) {
       include: {
         Projet: {
           select: {
+            id: true,
             titre: true,
           },
         },
@@ -602,33 +635,141 @@ export async function affecterSousProjet(formData: FormData) {
       return { success: false, error: "Tâche non trouvée" };
     }
 
-    // Supprimer les affectations existantes pour cette tâche
-    await db.affectationSousProjet.deleteMany({
-      where: { sousProjetId: validatedData.sousProjetId },
-    });
+    // Préparer les notifications (nouveaux affectés / retirés / changement de responsable)
+    const adherentsToNotify = [...new Set([...newlyAssignedAdherentIds, ...removedAdherentIds])]
+      .filter((id) => id !== previousResponsibleAdherentId && id !== nextResponsibleAdherentId);
 
-    // Créer les nouvelles affectations
-    const affectations = await Promise.all(
-      validatedData.adherentIds.map((adherentId) =>
-        db.affectationSousProjet.create({
-          data: {
+    const adherentsForAddRemove = adherentsToNotify.length
+      ? await db.adherent.findMany({
+          where: { id: { in: adherentsToNotify } },
+          select: { id: true, userId: true },
+        })
+      : [];
+
+    const notificationPayloads: Array<{
+      userId: string;
+      type: TypeNotification;
+      titre: string;
+      message: string;
+      lien: string | null;
+      lue: boolean;
+    }> = [];
+
+    // Notifications "ajoutés"
+    const addedUserIds = newlyAssignedAdherentIds.length
+      ? await db.adherent.findMany({
+          where: { id: { in: newlyAssignedAdherentIds } },
+          select: { userId: true },
+        })
+      : [];
+    for (const a of addedUserIds) {
+      if (!a.userId) continue;
+      notificationPayloads.push({
+        userId: a.userId,
+        type: TypeNotification.Action,
+        titre: "Nouvelle tâche affectée",
+        message: `Vous avez été affecté à la tâche "${sousProjet.titre}" du projet "${sousProjet.Projet.titre}".`,
+        lien: "/user/taches",
+        lue: false,
+      });
+    }
+
+    // Notifications "retirés"
+    const removedUserIds = removedAdherentIds.length
+      ? await db.adherent.findMany({
+          where: { id: { in: removedAdherentIds } },
+          select: { userId: true },
+        })
+      : [];
+    for (const a of removedUserIds) {
+      if (!a.userId) continue;
+      notificationPayloads.push({
+        userId: a.userId,
+        type: TypeNotification.Action,
+        titre: "Affectation retirée",
+        message: `Vous avez été retiré de la tâche "${sousProjet.titre}" du projet "${sousProjet.Projet.titre}".`,
+        lien: "/user/taches",
+        lue: false,
+      });
+    }
+
+    // Notifications "changement de responsable"
+    if (previousResponsibleAdherentId !== nextResponsibleAdherentId) {
+      const responsibleAdherents = await db.adherent.findMany({
+        where: {
+          id: {
+            in: [previousResponsibleAdherentId, nextResponsibleAdherentId].filter(Boolean) as string[],
+          },
+        },
+        select: { id: true, userId: true },
+      });
+      const byId = new Map(responsibleAdherents.map((a) => [a.id, a.userId]));
+
+      const previousUserId = previousResponsibleAdherentId ? byId.get(previousResponsibleAdherentId) : null;
+      const nextUserId = nextResponsibleAdherentId ? byId.get(nextResponsibleAdherentId) : null;
+
+      if (previousUserId) {
+        notificationPayloads.push({
+          userId: previousUserId,
+          type: TypeNotification.Action,
+          titre: "Changement de responsable",
+          message: `Vous n'êtes plus responsable de la tâche "${sousProjet.titre}" (projet "${sousProjet.Projet.titre}").`,
+          lien: "/user/taches",
+          lue: false,
+        });
+      }
+
+      if (nextUserId) {
+        notificationPayloads.push({
+          userId: nextUserId,
+          type: TypeNotification.Action,
+          titre: "Changement de responsable",
+          message: `Vous êtes maintenant responsable de la tâche "${sousProjet.titre}" (projet "${sousProjet.Projet.titre}").`,
+          lien: "/user/taches",
+          lue: false,
+        });
+      }
+    }
+
+    // Mettre à jour les affectations + créer les notifications dans une transaction
+    await db.$transaction(async (tx) => {
+      // Supprimer les affectations existantes pour cette tâche
+      await tx.affectationSousProjet.deleteMany({
+        where: { sousProjetId: validatedData.sousProjetId },
+      });
+
+      // Créer les nouvelles affectations
+      if (validatedData.adherentIds.length > 0) {
+        await tx.affectationSousProjet.createMany({
+          data: validatedData.adherentIds.map((adherentId, index) => ({
             sousProjetId: validatedData.sousProjetId,
             adherentId,
-            responsable: validatedData.responsable && adherentId === validatedData.adherentIds[0], // Le premier est responsable si flag activé
-          },
-        })
-      )
-    );
+            responsable: validatedData.responsable && index === 0, // Le premier est responsable si flag activé
+          })),
+        });
+      }
+
+      // Créer les notifications
+      if (notificationPayloads.length > 0) {
+        await tx.notification.createMany({
+          data: notificationPayloads,
+        });
+      }
+    });
 
     // Logger l'activité
     try {
       await logModification(
-        `Affectation de ${affectations.length} adhérent(s) à la tâche "${sousProjet.titre}"`,
+        `Affectation de ${validatedData.adherentIds.length} adhérent(s) à la tâche "${sousProjet.titre}"`,
         "SousProjet",
         validatedData.sousProjetId,
         {
           adherentIds: validatedData.adherentIds,
-          nombreAffectations: affectations.length,
+          nombreAffectations: validatedData.adherentIds.length,
+          notifiedUserCount: notificationPayloads.length,
+          newlyAssignedCount: newlyAssignedAdherentIds.length,
+          removedCount: removedAdherentIds.length,
+          responsableChanged: previousResponsibleAdherentId !== nextResponsibleAdherentId,
         }
       );
     } catch (logError) {
@@ -637,9 +778,13 @@ export async function affecterSousProjet(formData: FormData) {
 
     revalidatePath("/admin/projets");
     revalidatePath(`/admin/projets/${sousProjet.Projet.id}`);
+    revalidatePath("/notifications");
+    revalidatePath("/user/taches");
     return {
       success: true,
-      message: `${affectations.length} adhérent(s) affecté(s) à la tâche avec succès`,
+      message: hadDuplicates
+        ? `${validatedData.adherentIds.length} adhérent(s) affecté(s) à la tâche avec succès (doublons ignorés)`
+        : `${validatedData.adherentIds.length} adhérent(s) affecté(s) à la tâche avec succès`,
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -668,12 +813,18 @@ export async function retirerAffectation(affectationId: string) {
           select: {
             titre: true,
             projetId: true,
+            Projet: {
+              select: {
+                titre: true,
+              },
+            },
           },
         },
         Adherent: {
           select: {
             firstname: true,
             lastname: true,
+            userId: true,
           },
         },
       },
@@ -686,6 +837,24 @@ export async function retirerAffectation(affectationId: string) {
     await db.affectationSousProjet.delete({
       where: { id: affectationId },
     });
+
+    // Notifier l'adhérent retiré (si lié à un utilisateur)
+    if (affectation.Adherent.userId) {
+      try {
+        await db.notification.create({
+          data: {
+            userId: affectation.Adherent.userId,
+            type: TypeNotification.Action,
+            titre: "Affectation retirée",
+            message: `Vous avez été retiré de la tâche "${affectation.SousProjet.titre}" du projet "${affectation.SousProjet.Projet.titre}".`,
+            lien: "/user/taches",
+            lue: false,
+          },
+        });
+      } catch (notifyError) {
+        console.error("Erreur lors de la création de la notification de retrait:", notifyError);
+      }
+    }
 
     // Logger l'activité
     try {
@@ -703,6 +872,8 @@ export async function retirerAffectation(affectationId: string) {
 
     revalidatePath("/admin/projets");
     revalidatePath(`/admin/projets/${affectation.SousProjet.projetId}`);
+    revalidatePath("/notifications");
+    revalidatePath("/user/taches");
     return {
       success: true,
       message: `Adhérent retiré de la tâche avec succès`,

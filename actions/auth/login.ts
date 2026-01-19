@@ -9,7 +9,8 @@ import { DEFAULT_LOGIN_REDIRECT } from "@/routes"
 import { AuthError } from "next-auth"
 import { signIn } from "@/auth"
 import { normalizeEmail } from "@/lib/utils"
-import { logUserActivity, TypeActivite } from "@/lib/activity-logger"
+import { logUserActivity } from "@/lib/activity-logger"
+import { TypeActivite } from "@prisma/client"
 
 export const login = async (
     values: z.infer<typeof LoginSchema>,
