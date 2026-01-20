@@ -122,7 +122,7 @@ export function Hero() {
                 
                 {/* Badge flottant */}
                 <div className="absolute -top-4 -right-4 bg-gradient-to-r from-amber-400/90 to-orange-400/90 dark:from-amber-500/70 dark:to-orange-500/70 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg backdrop-blur-sm">
-                  Depuis 2016
+                  Depuis {anneeCreation}
                 </div>
               </div>
             </div>
