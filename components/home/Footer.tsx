@@ -47,6 +47,11 @@ function HighlightedText({ text, highlightIndex }: { text: string; highlightInde
 }
 
 export function Footer() {
+  // Année de création de l'association (utilisée pour afficher un compteur dynamique)
+  const anneeCreation = 2011;
+  const anneesExistence = Math.max(1, new Date().getFullYear() - anneeCreation);
+  const anneeCourante = new Date().getFullYear();
+
   const quickLinks = [
     { name: "Accueil", href: "/", icon: Heart },
     { name: "L'Amicale", href: "/amicale", icon: Users },
@@ -74,7 +79,7 @@ export function Footer() {
     { label: "Membres Actifs", value: "150+", icon: Users },
     { label: "Événements", value: "25+", icon: Calendar },
     { label: "Pays", value: "3", icon: Globe },
-    { label: "Années", value: "5+", icon: Award }
+    { label: "Années", value: `${anneesExistence}+`, icon: Award }
   ];
 
   return (
@@ -309,7 +314,7 @@ export function Footer() {
                   <HighlightedText text="AMAKI France" highlightIndex={3} />
                 </span> - Amicale des Anciens Élèves de Kipaku en France
               </p>
-              <p>© 2026 Tous droits réservés. Fait avec ❤️ pour notre communauté.</p>
+              <p>© {anneeCourante} Tous droits réservés. Fait avec ❤️ pour notre communauté.</p>
             </motion.div>
             
             <motion.div
