@@ -7,6 +7,10 @@ import { Button } from "@/components/ui/button";
 import { ArrowRight, Users, Calendar, Award, LogIn } from "lucide-react";
 
 export function Hero() {
+  // Année de création de l'association (utilisée pour afficher un compteur dynamique)
+  const anneeCreation = 2011;
+  const anneesExistence = Math.max(1, new Date().getFullYear() - anneeCreation);
+
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
       {/* Background avec dégradé - plus doux en mode sombre */}
@@ -80,7 +84,7 @@ export function Hero() {
                 <div className="flex items-center justify-center w-12 h-12 bg-white/10 rounded-lg mx-auto mb-2">
                   <Users className="h-6 w-6 text-white" />
                 </div>
-                <div className="text-2xl font-bold text-white">120+</div>
+                <div className="text-2xl font-bold text-white">50+</div>
                 <div className="text-sm text-blue-100 dark:text-slate-400">Membres Actifs</div>
               </div>
               
@@ -88,7 +92,7 @@ export function Hero() {
                 <div className="flex items-center justify-center w-12 h-12 bg-white/10 rounded-lg mx-auto mb-2">
                   <Calendar className="h-6 w-6 text-white" />
                 </div>
-                <div className="text-2xl font-bold text-white">10+</div>
+                <div className="text-2xl font-bold text-white">{anneesExistence}+</div>
                 <div className="text-sm text-blue-100 dark:text-slate-400">Années d'Existence</div>
               </div>
               

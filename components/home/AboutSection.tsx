@@ -5,6 +5,11 @@ import { Users, Calendar, Heart, Award, Handshake, Shield, Users2 } from "lucide
 import { motion } from "framer-motion";
 
 export function AboutSection() {
+  // Année de création de l'association (utilisée pour afficher un compteur dynamique)
+  // Ex: si création en 2011 et année courante 2026 => 15 ans
+  const anneeCreation = 2011;
+  const anneesExistence = Math.max(1, new Date().getFullYear() - anneeCreation);
+
   return (
     <section className="py-20 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 relative overflow-hidden">
       {/* Decorative background elements - opacité réduite */}
