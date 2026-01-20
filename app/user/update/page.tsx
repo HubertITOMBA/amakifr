@@ -419,25 +419,12 @@ export default function UpdateUserPage() {
                     const { addPDFHeader, addPDFFooter } = await import('@/lib/pdf-helpers-client');
                     const doc = new jsPDF();
                     
-                    // Ajouter l'en-tête avec logo (sans titre pour éviter la duplication)
-                    await addPDFHeader(doc);
+                    // Ajouter l'en-tête avec logo et titre
+                    await addPDFHeader(doc, 'FICHE D\'ADHÉSION');
                     
-                    let yPos = 40; // Réduit de 70 à 40 car l'en-tête est plus petit
+                    let yPos = 40; // Réduit car l'en-tête est plus petit
                     
-                    // Titre principal
-                    doc.setFontSize(16);
-                    doc.setTextColor(37, 99, 235); // blue-600
-                    doc.setFont('helvetica', 'bold');
-                    doc.text('FICHE D\'ADHÉSION', 105, yPos, { align: 'center' });
-                    yPos += 10;
-                    
-                    // Ligne de séparation
-                    doc.setDrawColor(200, 200, 200);
-                    doc.setLineWidth(0.5);
-                    doc.line(20, yPos, 190, yPos);
-                    yPos += 8;
-                    
-                    // 1. Informations personnelles
+                    // 1. Informations personnelles (sans espace ni ligne de séparation)
                     doc.setFontSize(12);
                     doc.setTextColor(37, 99, 235);
                     doc.setFont('helvetica', 'bold');
@@ -677,49 +664,67 @@ export default function UpdateUserPage() {
                     doc.text('J\'accepte de recevoir les communications de l\'association', 27, yPos);
                     yPos += 12;
                     
-                    // Espace pour signature
+                    // Espace pour signature avec date sur la même ligne
                     doc.setFontSize(12);
                     doc.setTextColor(37, 99, 235);
                     doc.setFont('helvetica', 'bold');
                     doc.text('Signature de l\'adhérent', 20, yPos);
-                    yPos += 12;
+                    
+                    // Date à droite sur la même ligne
+                    doc.setFontSize(9);
+                    doc.setTextColor(100, 100, 100);
+                    doc.setFont('helvetica', 'normal');
+                    doc.text('Date: ___/___/_____', 150, yPos);
+                    yPos += 8;
                     
                     // Ligne pour signature
                     doc.setDrawColor(0, 0, 0);
                     doc.setLineWidth(0.5);
                     doc.line(20, yPos, 100, yPos);
-                    yPos += 8;
-                    doc.setFontSize(9);
-                    doc.setTextColor(100, 100, 100);
-                    doc.setFont('helvetica', 'normal');
-                    doc.text('Date: ___/___/_____', 20, yPos);
-                    yPos += 12;
+                    yPos += 6; // Espace réduit avant RGPD
                     
                     // Mention RGPD (vérifier qu'il y a assez de place, sinon nouvelle page)
                     const pageHeight = doc.internal.pageSize.getHeight();
                     const rgpdText = "Les informations recueillies sur ce formulaire sont enregistrées par l'association afin de gérer les adhésions et d'assurer l'assistance prévue dans les statuts, notamment lors des événements familiaux (naissance, mariage d'un enfant, décès, anniversaire). Les données collectées sont limitées à ce qui est strictement nécessaire. Elles sont destinées exclusivement aux membres du bureau de l'association et ne seront jamais transmises à des tiers sans votre accord. Vous pouvez exercer votre droit d'accès, de rectification ou de suppression de vos données en contactant l'association.";
                     const rgpdLines = doc.splitTextToSize(rgpdText, 170);
-                    const rgpdHeight = rgpdLines.length * 4 + 15; // Hauteur estimée du texte RGPD + titre
+                    const rgpdHeight = rgpdLines.length * 3.5 + 8; // Hauteur estimée réduite du texte RGPD + titre
                     
                     // Si pas assez de place, créer une nouvelle page
-                    if (yPos + rgpdHeight > pageHeight - 20) {
+                    if (yPos + rgpdHeight > pageHeight - 10) {
                         doc.addPage();
                         yPos = 20;
                     }
                     
-                    doc.setFontSize(10);
+                    doc.setFontSize(9);
                     doc.setTextColor(37, 99, 235);
                     doc.setFont('helvetica', 'bold');
                     doc.text('Mention d\'information RGPD', 20, yPos);
-                    yPos += 8;
+                    yPos += 5; // Espace réduit avant le texte
                     
-                    doc.setFontSize(8);
+                    doc.setFontSize(7);
                     doc.setTextColor(0, 0, 0);
                     doc.setFont('helvetica', 'normal');
                     doc.text(rgpdLines, 20, yPos);
                     
-                    // Ajouter le pied de page
-                    addPDFFooter(doc);
+                    // Ajouter le pied de page réduit pour la fiche à signer
+                    const pageCount = (doc as any).internal.getNumberOfPages();
+                    const pageWidth = doc.internal.pageSize.getWidth();
+                    const pageHeightFooter = doc.internal.pageSize.getHeight();
+                    
+                    for (let i = 1; i <= pageCount; i++) {
+                      doc.setPage(i);
+                      // Fond bleu pour le pied de page - hauteur réduite à 10px
+                      doc.setFillColor(9, 61, 181);
+                      doc.rect(0, pageHeightFooter - 10, pageWidth, 10, 'F');
+                      
+                      // Texte du copyright en blanc - taille réduite
+                      doc.setFontSize(7);
+                      doc.setTextColor(255, 255, 255);
+                      doc.setFont('helvetica', 'normal');
+                      const footerText = `© ${new Date().getFullYear()} AMAKI France - Tous droits réservés`;
+                      const footerTextWidth = doc.getTextWidth(footerText);
+                      doc.text(footerText, (pageWidth - footerTextWidth) / 2, pageHeightFooter - 4);
+                    }
                     
                     // Télécharger le PDF
                     const fileName = `fiche_adhesion_a_signer_${adherentData.firstname || 'user'}_${adherentData.lastname || 'unknown'}_${new Date().toISOString().split('T')[0]}.pdf`;
