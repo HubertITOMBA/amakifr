@@ -177,7 +177,7 @@ export default function AmicalePage() {
             </div>
           </div>
           <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-3 sm:mb-4 md:mb-6 text-white drop-shadow-lg">
-            AMA<span className=" text-orange-700 font-semibold">K</span>I  France
+            AMA<span className="bg-gradient-to-r from-yellow-300 via-amber-400 to-yellow-400 text-transparent bg-clip-text drop-shadow-[0_0_12px_rgba(251,191,36,1)] font-extrabold">K</span>I  France
             
               
              
@@ -479,7 +479,7 @@ export default function AmicalePage() {
                 Email
               </h3>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mb-3 sm:mb-4">
-                contact@amaki.fr
+                asso.amaki@gmail.com
               </p>
               <Button variant="outline" className="w-full text-xs sm:text-sm">
                 <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
@@ -497,7 +497,7 @@ export default function AmicalePage() {
                 Téléphone
               </h3>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mb-3 sm:mb-4">
-                +33 6 XX XX XX XX
+                +33 7 58 43 47 58
               </p>
               <Button variant="outline" className="w-full text-xs sm:text-sm">
                 <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />

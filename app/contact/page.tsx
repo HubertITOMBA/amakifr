@@ -69,7 +69,7 @@ export default function ContactPage() {
             </p>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {/* Horaires */}
             <Card className="p-6 hover:shadow-xl transition-all duration-300">
               <div className="flex items-center mb-4">
@@ -87,11 +87,33 @@ export default function ContactPage() {
               </div>
             </Card>
 
-            {/* Réactivité */}
+            {/* Téléphones */}
             <Card className="p-6 hover:shadow-xl transition-all duration-300">
               <div className="flex items-center mb-4">
                 <div className="p-3 bg-green-100 dark:bg-green-900 rounded-lg mr-4">
-                  <Send className="h-6 w-6 text-green-600 dark:text-green-400" />
+                  <Phone className="h-6 w-6 text-green-600 dark:text-green-400" />
+                </div>
+                <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
+                  Téléphones
+                </h3>
+              </div>
+              <div className="space-y-3 text-gray-600 dark:text-gray-300">
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">+33 7 58 43 47 58</p>
+                  <p className="text-sm">Contact association</p>
+                </div>
+                <div>
+                  <p className="font-semibold text-gray-900 dark:text-white">+33 7 51 06 62 64</p>
+                  <p className="text-sm">Admin / Webmaster</p>
+                </div>
+              </div>
+            </Card>
+
+            {/* Réactivité */}
+            <Card className="p-6 hover:shadow-xl transition-all duration-300">
+              <div className="flex items-center mb-4">
+                <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg mr-4">
+                  <Send className="h-6 w-6 text-purple-600 dark:text-purple-400" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Réactivité
@@ -107,8 +129,8 @@ export default function ContactPage() {
             {/* Événements */}
             <Card className="p-6 hover:shadow-xl transition-all duration-300">
               <div className="flex items-center mb-4">
-                <div className="p-3 bg-purple-100 dark:bg-purple-900 rounded-lg mr-4">
-                  <Users className="h-6 w-6 text-purple-600 dark:text-purple-400" />
+                <div className="p-3 bg-orange-100 dark:bg-orange-900 rounded-lg mr-4">
+                  <Users className="h-6 w-6 text-orange-600 dark:text-orange-400" />
                 </div>
                 <h3 className="text-xl font-semibold text-gray-900 dark:text-white">
                   Événements

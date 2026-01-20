@@ -34,7 +34,7 @@ function HighlightedText({ text, highlightIndex }: { text: string; highlightInde
           return (
             <span 
               key={index} 
-              className="text-red-500 text-4xl font-bold inline-block transition-all duration-300"
+              className="bg-gradient-to-r from-orange-400 via-red-500 to-orange-500 text-transparent bg-clip-text text-4xl font-extrabold inline-block transition-all duration-300 drop-shadow-[0_0_8px_rgba(239,68,68,0.9)]"
             >
               {char}
             </span>
@@ -76,7 +76,7 @@ export function Footer() {
   ];
 
   const stats = [
-    { label: "Membres Actifs", value: "150+", icon: Users },
+    { label: "Membres Actifs", value: "50+", icon: Users },
     { label: "Événements", value: "25+", icon: Calendar },
     { label: "Pays", value: "3", icon: Globe },
     { label: "Années", value: `${anneesExistence}+`, icon: Award }
@@ -274,8 +274,18 @@ export function Footer() {
                       <Phone className="h-5 w-5 text-white" />
                     </div>
                     <div>
+                      <p className="text-white font-medium">+33 7 58 43 47 58</p>
+                      <p className="text-sm text-gray-400">Contact association</p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex items-start gap-4 p-4 bg-white/5 backdrop-blur-sm rounded-xl border border-white/10 hover:bg-white/10 transition-all duration-300">
+                    <div className="p-2 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-lg">
+                      <Phone className="h-5 w-5 text-white" />
+                    </div>
+                    <div>
                       <p className="text-white font-medium">+33 7 51 06 62 64</p>
-                      <p className="text-sm text-gray-400">Téléphone</p>
+                      <p className="text-sm text-gray-400">Admin / Webmaster</p>
                     </div>
                   </div>
                   
