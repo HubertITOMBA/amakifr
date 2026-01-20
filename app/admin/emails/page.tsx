@@ -35,6 +35,7 @@ import {
 import { ViewEmailDialog } from "./ViewEmailDialog";
 import { getAllUsersForAdmin } from "@/actions/user";
 import { toast } from "sonner";
+import { ensureEmailsMenu } from "@/actions/menus/ensure-emails-menu";
 import {
   Table,
   TableBody,
@@ -90,6 +91,13 @@ export default function AdminEmailsPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  // S'assurer que le menu Emails existe dans la sidebar admin (production-safe)
+  useEffect(() => {
+    ensureEmailsMenu().catch((error) => {
+      console.error("Erreur lors de la vérification du menu Emails:", error);
+    });
+  }, []);
 
   const handleSendEmails = async () => {
     if (formData.userIds.length === 0 || !formData.subject || !formData.body) {

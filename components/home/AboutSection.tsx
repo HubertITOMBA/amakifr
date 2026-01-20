@@ -61,7 +61,7 @@ export function AboutSection() {
                   <Users className="h-6 w-6 text-blue-600 dark:text-blue-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">500+</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">75+</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Membres actifs</p>
                 </div>
               </div>
@@ -71,7 +71,7 @@ export function AboutSection() {
                   <Calendar className="h-6 w-6 text-green-600 dark:text-green-400" />
                 </div>
                 <div>
-                  <p className="text-2xl font-bold text-gray-900 dark:text-white">15+</p>
+                  <p className="text-2xl font-bold text-gray-900 dark:text-white">{anneesExistence}+</p>
                   <p className="text-sm text-gray-600 dark:text-gray-400">Années d'existence</p>
                 </div>
               </div>

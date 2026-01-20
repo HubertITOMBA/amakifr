@@ -497,6 +497,192 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
+    keywords: ['nouvelle conversation', 'créer conversation', 'créer une conversation', 'démarrer conversation', 'demarrer conversation', 'discussion privée', 'discussion privee', 'conversation privée', 'conversation privee', 'groupe', 'conversation de groupe', 'conversation événement', 'conversation evenement'],
+    title: 'Comment démarrer une nouvelle conversation (privée, groupe, événement)',
+    steps: [
+      'Allez sur /chat',
+      'Cliquez sur "Nouvelle conversation" (icône +)',
+      '',
+      '✅ Choisissez le type :',
+      '  • Privée : 1 seul participant (vous + 1 personne)',
+      '  • Groupe : plusieurs participants',
+      '  • Événement : discussion liée à un événement',
+      '',
+      '👥 Sélectionnez les participants :',
+      '  • Utilisez la recherche pour trouver rapidement un nom ou un email',
+      '  • Vous pouvez aussi sélectionner plusieurs personnes d\'un coup en groupe',
+      '',
+      '🏷️ Titre (si nécessaire) :',
+      '  • Si plusieurs participants, donnez un titre clair (ex : "Organisation réunion janvier")',
+      '',
+      'Cliquez sur "Créer la conversation"',
+      '',
+      '💡 Conseil : Utilisez "Groupe" pour les sujets collectifs (organisation, infos), et "Privée" pour un échange 1–1'
+    ],
+    actions: [
+      { label: 'Ouvrir la messagerie', action: 'open_chat', href: '/chat' }
+    ]
+  },
+  {
+    keywords: ['inviter', 'ajouter participant', 'ajouter participants', 'participants', 'sélectionner participants', 'selectionner participants', 'sélectionner tout', 'selectionner tout', 'choisir participants', 'limite conversation privée', 'limite conversation privee'],
+    title: 'Comment bien choisir les participants (et éviter les erreurs)',
+    steps: [
+      'Allez sur /chat puis "Nouvelle conversation"',
+      '',
+      '👤 Conversation privée :',
+      '  • Vous ne pouvez choisir qu\'1 participant',
+      '  • Si vous voulez discuter à plusieurs, choisissez "Conversation de groupe"',
+      '',
+      '👥 Conversation de groupe :',
+      '  • Utilisez la recherche (nom/email/rôle) pour filtrer',
+      '  • Vous pouvez sélectionner/désélectionner tous les utilisateurs filtrés',
+      '',
+      '📌 Bonnes pratiques :',
+      '  • Invitez uniquement les personnes concernées',
+      '  • Donnez un titre explicite si le groupe est > 2 personnes',
+      '  • Si le sujet concerne un événement, privilégiez "Événement" pour centraliser les échanges'
+    ],
+    actions: [
+      { label: 'Créer une conversation', action: 'open_chat_new', href: '/chat' }
+    ]
+  },
+  {
+    keywords: ['répondre', 'repondre', 'citation', 'réponse', 'reponse', 'réagir', 'reagir', 'réaction', 'reaction', 'emoji', 'éditer message', 'editer message', 'modifier message', 'supprimer message'],
+    title: 'Comment répondre et réagir dans le chat',
+    steps: [
+      'Allez sur /chat et ouvrez une conversation',
+      '',
+      '↩️ Répondre à un message :',
+      'Cliquez sur "Répondre" sur le message concerné puis envoyez votre réponse',
+      '',
+      '😊 Réagir avec un emoji :',
+      'Cliquez sur l\'icône de réaction (emoji) puis choisissez votre réaction',
+      '',
+      '✏️ Modifier / 🗑️ Supprimer :',
+      'Selon vos droits, vous pouvez modifier ou supprimer vos propres messages',
+      '',
+      '💡 Conseil : Utilisez la réponse à un message pour garder le contexte clair dans les conversations actives'
+    ],
+    actions: [
+      { label: 'Ouvrir la messagerie', action: 'open_chat', href: '/chat' }
+    ]
+  },
+  {
+    keywords: ['recherche conversation', 'rechercher conversation', 'retrouver conversation', 'trouver conversation', 'filtrer conversations', 'messages non lus', 'non lus', 'unread'],
+    title: 'Comment retrouver une conversation et vos messages non lus',
+    steps: [
+      'Allez sur /chat',
+      '',
+      '🔎 Rechercher une conversation :',
+      'Utilisez la barre de recherche en haut de la liste des conversations',
+      'Vous pouvez rechercher par :',
+      '  • Titre de conversation',
+      '  • Nom d\'un participant',
+      '  • Email d\'un participant',
+      '',
+      '📩 Messages non lus :',
+      'Un indicateur de non-lus peut apparaître sur la conversation',
+      '',
+      '💡 Conseil : Donnez des titres clairs aux groupes pour les retrouver facilement (ex : "Bureau", "Préparation événement", etc.)'
+    ],
+    actions: [
+      { label: 'Ouvrir la messagerie', action: 'open_chat', href: '/chat' }
+    ]
+  },
+  {
+    keywords: ['notification', 'envoyer notification', 'contacter', 'prévenir', 'prevenir', 'annonce', 'message important', 'info importante', 'diffuser', 'broadcast', 'quel canal', 'chat ou notification', 'notification ou chat'],
+    title: 'Chat ou notification : quel canal choisir ?',
+    steps: [
+      '✅ Utilisez le chat si :',
+      '  • Vous attendez une discussion (questions/réponses)',
+      '  • Le sujet concerne un petit groupe',
+      '  • Vous voulez échanger de façon informelle',
+      '',
+      '✅ Utilisez les notifications si :',
+      '  • C\'est une information importante à ne pas rater (rappel, annonce)',
+      '  • Vous voulez cibler plusieurs adhérents rapidement',
+      '  • Vous voulez inclure un lien direct vers une page (paiement, événement, tâches, etc.)',
+      '',
+      '💡 Conseil : Pour une annonce importante, envoyez une notification + mettez les détails dans une conversation dédiée si besoin'
+    ],
+    actions: [
+      { label: 'Voir mes notifications', action: 'open_notifications', href: '/notifications' },
+      { label: 'Ouvrir la messagerie', action: 'open_chat', href: '/chat' }
+    ]
+  },
+  {
+    keywords: ['admin notification', 'créer notification admin', 'envoyer notification admin', 'diffuser notification', 'notification à plusieurs', 'notification à tous', 'notification tous', 'annoncer', 'rappel', 'message admin'],
+    title: '[ADMIN] Comment envoyer une notification efficace aux adhérents',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Allez sur /admin/notifications',
+      'Cliquez sur "Créer une notification"',
+      '',
+      '👥 Ciblage :',
+      '  • Sélectionnez un ou plusieurs adhérents',
+      '',
+      '📝 Contenu :',
+      '  • Titre : court et explicite (ex : "Rappel cotisation", "Réunion samedi 15h")',
+      '  • Message : détaillez en 1–3 phrases',
+      '  • Lien (optionnel) : mettez une URL interne utile (ex : /evenements, /user/taches, /paiement, etc.)',
+      '',
+      '🔖 Type :',
+      'Choisissez le type le plus adapté (Système, Action, Événement, Cotisation, …)',
+      '',
+      'Cliquez sur "Créer" / "Envoyer"',
+      '',
+      '💡 Conseil : Ajoutez un lien quand l\'adhérent doit faire une action (payer, s\'inscrire, ouvrir une page)',
+      '💡 Conseil : Évitez de spammer : préférez 1 notification claire plutôt que plusieurs petites'
+    ],
+    actions: [
+      { label: 'Admin - Notifications', action: 'open_admin_notifications', href: '/admin/notifications' }
+    ]
+  },
+  {
+    keywords: [
+      'admin canal',
+      'choisir canal',
+      'chat notification email',
+      'notification ou email',
+      'chat ou email',
+      'notification vs email',
+      'diffuser info',
+      'communiquer adhérents',
+      'communiquer adherents',
+      'annonce admin',
+      'rappel admin'
+    ],
+    title: '[ADMIN] Chat vs notification vs email : quoi utiliser et quand ?',
+    steps: [
+      '📋 Cette guidance est destinée aux administrateurs',
+      '',
+      '💬 Utilisez le chat (/chat) si :',
+      '  • Vous voulez une discussion interactive (questions/réponses)',
+      '  • Le sujet concerne un petit groupe (bureau, équipe projet, participants)',
+      '  • Vous voulez centraliser l\'échange en temps réel',
+      '',
+      '🔔 Utilisez une notification (/admin/notifications) si :',
+      '  • C\'est un rappel/une annonce à voir dans l\'application',
+      '  • Vous voulez mettre un lien d\'action (ex : /evenements, /paiement, /user/taches)',
+      '  • Vous ciblez rapidement 1 ou plusieurs adhérents',
+      '',
+      '📧 Utilisez un email (/admin/emails) si :',
+      '  • Le message est long ou formel (compte rendu, information structurée)',
+      '  • Vous voulez toucher les adhérents même s\'ils ne se connectent pas',
+      '  • Vous avez besoin d\'un historique d\'envoi (succès/échec)',
+      '',
+      '✅ Bonnes pratiques :',
+      '  • Une annonce importante : notification + (optionnel) email si contenu long',
+      '  • Un sujet organisationnel : chat de groupe dédié',
+      '  • Évitez le spam : regroupez les informations et soyez concis'
+    ],
+    actions: [
+      { label: 'Ouvrir le chat', action: 'open_chat', href: '/chat' },
+      { label: 'Admin - Notifications', action: 'open_admin_notifications', href: '/admin/notifications' },
+      { label: 'Admin - Emails', action: 'open_admin_emails', href: '/admin/emails' }
+    ]
+  },
+  {
     keywords: ['idée', 'idées', 'idee', 'idees', 'proposer idée', 'soumettre idée', 'boîte à idées'],
     title: 'Comment proposer une idée',
     steps: [

@@ -32,7 +32,7 @@ export function Hero() {
               <h1 className="text-5xl lg:text-7xl font-bold leading-tight">
                 Bienvenue à 
                 <span className="block bg-gradient-to-r from-amber-300 via-yellow-300 to-orange-300 dark:from-amber-400/80 dark:via-yellow-400/80 dark:to-orange-400/80 text-transparent bg-clip-text">
-                  AMA<span className="text-red-700">K</span>I France
+                  AMA<span className="text-orange-600">K</span>I France
                 </span>
               </h1>
               
