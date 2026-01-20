@@ -32,7 +32,7 @@ export async function addPDFHeader(doc: any, title?: string): Promise<void> {
   
   // Fond bleu pour l'en-tête (#093DB5 = RGB(9, 61, 181))
   // Hauteur réduite de l'en-tête avec padding réduit
-  const headerHeight = title ? 45 : 40;
+  const headerHeight = title ? 30 : 25;
   doc.setFillColor(9, 61, 181);
   doc.rect(0, 0, pageWidth, headerHeight, 'F');
   
@@ -41,7 +41,7 @@ export async function addPDFHeader(doc: any, title?: string): Promise<void> {
     try {
       // jsPDF attend un data URI pour addImage
       const dataUri = `data:image/jpeg;base64,${logoBase64}`;
-      doc.addImage(dataUri, 'JPEG', 15, 8, 25, 25); // Position et taille réduites
+      doc.addImage(dataUri, 'JPEG', 10, 5, 15, 15); // Logo plus petit : 15x15 au lieu de 25x25
     } catch (error) {
       console.error("Erreur lors de l'ajout du logo:", error);
       // Continuer sans logo si l'ajout échoue
@@ -49,12 +49,12 @@ export async function addPDFHeader(doc: any, title?: string): Promise<void> {
   }
   
   // Texte "AMAKI France" avec "A" en rouge - taille réduite
-  doc.setFontSize(18);
+  doc.setFontSize(14);
   doc.setTextColor(255, 255, 255); // Blanc
   
   // Calculer la position du texte (après le logo)
-  const textX = logoBase64 ? 45 : 15;
-  const textY = 20;
+  const textX = logoBase64 ? 28 : 10;
+  const textY = 14;
   
   // Dessiner "A" en rouge (#FF6B6B = RGB(255, 107, 107))
   doc.setTextColor(255, 107, 107);
@@ -67,13 +67,13 @@ export async function addPDFHeader(doc: any, title?: string): Promise<void> {
   
   // Titre optionnel (si fourni) - taille et position réduites, centré
   if (title) {
-    doc.setFontSize(14);
+    doc.setFontSize(11);
     doc.setFont('helvetica', 'bold');
     doc.setTextColor(255, 255, 255); // Blanc pour être visible sur le fond bleu
     // Centrer le titre horizontalement
     const titleWidth = doc.getTextWidth(title);
     const titleX = (pageWidth - titleWidth) / 2;
-    doc.text(title, titleX, 38);
+    doc.text(title, titleX, 25);
   }
 }
 

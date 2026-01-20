@@ -38,7 +38,8 @@ import {
   ChevronsLeft,
   ChevronsRight,
   KeyRound,
-  Trash2
+  Trash2,
+  Download
 } from "lucide-react";
 import { UserRole, UserStatus } from "@prisma/client";
 import { 
@@ -56,7 +57,8 @@ import {
   getAllUsersForAdmin,
   adminUpdateUserRole,
   adminUpdateUserStatus,
-  adminUpdateAdherentPoste
+  adminUpdateAdherentPoste,
+  getUserByIdForAdmin
 } from "@/actions/user";
 import { adminResetUserPassword } from "@/actions/user/admin-reset-password";
 import { DeleteAdherentDialog } from "@/components/admin/DeleteAdherentDialog";
@@ -752,6 +754,474 @@ export default function AdminUsersPage() {
                 >
                   <Mail className="h-4 w-4" />
                   <span>Envoyer un email</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={async () => {
+                    try {
+                      toast.loading("Génération de la fiche vierge en cours...");
+                      const { default: jsPDF } = await import('jspdf');
+                      const { addPDFHeader } = await import('@/lib/pdf-helpers-client');
+                      const doc = new jsPDF();
+                      
+                      await addPDFHeader(doc, 'FICHE D\'ADHÉSION');
+                      let yPos = 40;
+                      
+                      doc.setFontSize(12);
+                      doc.setTextColor(37, 99, 235);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('1. Informations personnelles', 20, yPos);
+                      yPos += 8;
+                      
+                      doc.setFontSize(10);
+                      doc.setTextColor(0, 0, 0);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text('Civilité: ___________', 20, yPos);
+                      doc.text('Prénom: ___________', 100, yPos);
+                      doc.text('Nom: ___________', 20, yPos + 8);
+                      yPos += 16;
+                      doc.text('Date de naissance: ___/___/_____', 20, yPos);
+                      doc.text('E-mail: ___________', 120, yPos);
+                      yPos += 8;
+                      doc.text('Date d\'adhésion: ___/___/_____', 20, yPos);
+                      yPos += 10;
+                      
+                      doc.setFontSize(12);
+                      doc.setTextColor(22, 163, 74);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('2. Adresse', 20, yPos);
+                      yPos += 8;
+                      doc.setFontSize(10);
+                      doc.setTextColor(0, 0, 0);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text('Adresse: ___________', 20, yPos);
+                      yPos += 8;
+                      doc.text('Code postal: _____', 20, yPos);
+                      doc.text('Ville: ___________', 85, yPos);
+                      doc.text('Pays: ___________', 150, yPos);
+                      yPos += 10;
+                      
+                      doc.setFontSize(12);
+                      doc.setTextColor(147, 51, 234);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('3. Coordonnées téléphoniques', 20, yPos);
+                      yPos += 8;
+                      doc.setFontSize(10);
+                      doc.setTextColor(0, 0, 0);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text('Téléphone: ___________', 20, yPos);
+                      yPos += 8;
+                      doc.text('Téléphone (optionnel): ___________', 20, yPos);
+                      yPos += 12;
+                      
+                      doc.setFontSize(12);
+                      doc.setTextColor(236, 72, 153);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('4. Informations familiales', 20, yPos);
+                      yPos += 8;
+                      doc.setFontSize(10);
+                      doc.setTextColor(0, 0, 0);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text('Nombre d\'enfants: _____', 20, yPos);
+                      yPos += 8;
+                      doc.text('Événements familiaux nécessitant l\'assistance de l\'association:', 20, yPos);
+                      yPos += 8;
+                      
+                      const eventLabels = {
+                        'Naissance': 'Naissance',
+                        'MariageEnfant': 'Mariage d\'un enfant',
+                        'DecesFamille': 'Décès dans la famille',
+                        'AnniversaireSalle': 'Anniversaire organisé en salle',
+                        'Autre': 'Autre'
+                      };
+                      const allEvents = ['Naissance', 'MariageEnfant', 'DecesFamille', 'AnniversaireSalle', 'Autre'];
+                      const checkboxSize = 4;
+                      const col1X = 20;
+                      const col2X = 105;
+                      
+                      for (let i = 0; i < allEvents.length; i += 2) {
+                        const event1 = allEvents[i];
+                        const event2 = allEvents[i + 1];
+                        doc.setDrawColor(0, 0, 0);
+                        doc.setLineWidth(0.5);
+                        doc.rect(col1X, yPos - 3, checkboxSize, checkboxSize);
+                        doc.text(eventLabels[event1 as keyof typeof eventLabels] || event1, col1X + 7, yPos);
+                        if (event2) {
+                          doc.rect(col2X, yPos - 3, checkboxSize, checkboxSize);
+                          doc.text(eventLabels[event2 as keyof typeof eventLabels] || event2, col2X + 7, yPos);
+                        }
+                        yPos += 8;
+                      }
+                      yPos += 4;
+                      
+                      doc.setFontSize(12);
+                      doc.setTextColor(20, 184, 166);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('5. Autorisations et consentements', 20, yPos);
+                      yPos += 8;
+                      doc.setFontSize(10);
+                      doc.setTextColor(0, 0, 0);
+                      doc.setFont('helvetica', 'normal');
+                      doc.setDrawColor(0, 0, 0);
+                      doc.setLineWidth(0.5);
+                      doc.rect(20, yPos - 3, checkboxSize, checkboxSize);
+                      doc.text('J\'autorise l\'utilisation de mon image pour les communications de l\'association', 27, yPos);
+                      yPos += 8;
+                      doc.rect(20, yPos - 3, checkboxSize, checkboxSize);
+                      doc.text('J\'accepte de recevoir les communications de l\'association', 27, yPos);
+                      yPos += 12;
+                      
+                      doc.setFontSize(12);
+                      doc.setTextColor(37, 99, 235);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('Signature de l\'adhérent', 20, yPos);
+                      doc.setFontSize(9);
+                      doc.setTextColor(100, 100, 100);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text('Date: ___/___/_____', 150, yPos);
+                      yPos += 8;
+                      doc.setDrawColor(0, 0, 0);
+                      doc.setLineWidth(0.5);
+                      doc.line(20, yPos, 100, yPos);
+                      yPos += 4;
+                      
+                      const pageHeight = doc.internal.pageSize.getHeight();
+                      const rgpdText = "Les informations recueillies sur ce formulaire sont enregistrées par l'association afin de gérer les adhésions et d'assurer l'assistance prévue dans les statuts, notamment lors des événements familiaux (naissance, mariage d'un enfant, décès, anniversaire). Les données collectées sont limitées à ce qui est strictement nécessaire. Elles sont destinées exclusivement aux membres du bureau de l'association et ne seront jamais transmises à des tiers sans votre accord. Vous pouvez exercer votre droit d'accès, de rectification ou de suppression de vos données en contactant l'association.";
+                      const rgpdLines = doc.splitTextToSize(rgpdText, 170);
+                      const rgpdHeight = rgpdLines.length * 3.5 + 8;
+                      
+                      if (yPos + rgpdHeight > pageHeight - 10) {
+                        doc.addPage();
+                        yPos = 20;
+                      }
+                      
+                      doc.setFontSize(9);
+                      doc.setTextColor(37, 99, 235);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('Mention d\'information RGPD', 20, yPos);
+                      yPos += 5;
+                      doc.setFontSize(7);
+                      doc.setTextColor(0, 0, 0);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text(rgpdLines, 20, yPos);
+                      
+                      const pageCount = (doc as any).internal.getNumberOfPages();
+                      const pageWidth = doc.internal.pageSize.getWidth();
+                      const pageHeightFooter = doc.internal.pageSize.getHeight();
+                      
+                      for (let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i);
+                        doc.setFillColor(9, 61, 181);
+                        doc.rect(0, pageHeightFooter - 10, pageWidth, 10, 'F');
+                        doc.setFontSize(7);
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFont('helvetica', 'normal');
+                        const footerText = `© ${new Date().getFullYear()} AMAKI France - Tous droits réservés`;
+                        const footerTextWidth = doc.getTextWidth(footerText);
+                        doc.text(footerText, (pageWidth - footerTextWidth) / 2, pageHeightFooter - 4);
+                      }
+                      
+                      const fileName = `fiche_adhesion_vierge_${new Date().toISOString().split('T')[0]}.pdf`;
+                      doc.save(fileName);
+                      toast.dismiss();
+                      toast.success("Fiche vierge générée avec succès");
+                    } catch (error) {
+                      console.error("Erreur lors de la génération du PDF:", error);
+                      toast.dismiss();
+                      toast.error("Erreur lors de la génération du PDF");
+                    }
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Fiche vierge</span>
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={async () => {
+                    try {
+                      toast.loading("Génération du PDF en cours...");
+                      const result = await getUserByIdForAdmin(user.id);
+                      if (!result.success || !result.user) {
+                        toast.dismiss();
+                        toast.error("Erreur lors de la récupération des données");
+                        return;
+                      }
+                      
+                      const userData = result.user;
+                      const adherentData = userData.adherent;
+                      
+                      if (!adherentData) {
+                        toast.dismiss();
+                        toast.error("Cet utilisateur n'a pas de profil adhérent");
+                        return;
+                      }
+                      
+                      const { default: jsPDF } = await import('jspdf');
+                      const { addPDFHeader } = await import('@/lib/pdf-helpers-client');
+                      const doc = new jsPDF();
+                      
+                      await addPDFHeader(doc, 'FICHE D\'ADHÉSION');
+                      let yPos = 40;
+                      
+                      doc.setFontSize(9);
+                      doc.setTextColor(100, 100, 100);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text(`Date de génération: ${new Date().toLocaleDateString('fr-FR')}`, 20, yPos);
+                      yPos += 8;
+                      
+                      doc.setFontSize(14);
+                      doc.setTextColor(37, 99, 235);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('1. Informations personnelles', 20, yPos);
+                      yPos += 8;
+                      
+                      doc.setFontSize(10);
+                      doc.setTextColor(0, 0, 0);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text(`Civilité: ${adherentData.civility || 'Non renseigné'}`, 20, yPos);
+                      doc.text(`Prénom: ${adherentData.firstname || 'Non renseigné'}`, 100, yPos);
+                      doc.text(`Nom: ${adherentData.lastname || 'Non renseigné'}`, 20, yPos + 6);
+                      yPos += 12;
+                      
+                      if (adherentData.dateNaissance) {
+                        doc.text(`Date de naissance: ${new Date(adherentData.dateNaissance).toLocaleDateString('fr-FR')}`, 20, yPos);
+                      } else {
+                        doc.text('Date de naissance: Non renseigné', 20, yPos);
+                      }
+                      doc.text(`E-mail: ${userData.email || 'Non renseigné'}`, 120, yPos);
+                      yPos += 6;
+                      
+                      if (adherentData.datePremiereAdhesion) {
+                        doc.text(`Date d'adhésion: ${new Date(adherentData.datePremiereAdhesion).toLocaleDateString('fr-FR')}`, 20, yPos);
+                        yPos += 6;
+                      }
+                      yPos += 4;
+                      
+                      const adresse = adherentData.Adresse?.[0];
+                      if (adresse) {
+                        doc.setFontSize(14);
+                        doc.setTextColor(22, 163, 74);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('2. Adresse', 20, yPos);
+                        yPos += 8;
+                        doc.setFontSize(10);
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                        const adresseParts = [];
+                        if (adresse.streetnum) adresseParts.push(adresse.streetnum);
+                        if (adresse.street1) adresseParts.push(adresse.street1);
+                        if (adresse.street2) adresseParts.push(adresse.street2);
+                        if (adresseParts.length > 0) {
+                          doc.text(adresseParts.join(' '), 20, yPos);
+                          yPos += 6;
+                        }
+                        const cpVillePays = [];
+                        if (adresse.codepost) cpVillePays.push(`Code postal: ${adresse.codepost}`);
+                        if (adresse.city) cpVillePays.push(`Ville: ${adresse.city}`);
+                        if (adresse.country) cpVillePays.push(`Pays: ${adresse.country}`);
+                        if (cpVillePays.length > 0) {
+                          doc.text(cpVillePays.join(' | '), 20, yPos);
+                          yPos += 6;
+                        }
+                        yPos += 4;
+                      }
+                      
+                      const telephones = adherentData.Telephones || [];
+                      if (telephones.length > 0) {
+                        doc.setFontSize(14);
+                        doc.setTextColor(147, 51, 234);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('3. Téléphones', 20, yPos);
+                        yPos += 8;
+                        doc.setFontSize(10);
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                        telephones.forEach((tel: any, index: number) => {
+                          if (yPos > 250) {
+                            doc.addPage();
+                            yPos = 20;
+                          }
+                          const principal = tel.estPrincipal ? ' (Principal)' : '';
+                          doc.text(`${index + 1}. ${tel.numero || 'Non renseigné'} - ${tel.type}${principal}`, 20, yPos);
+                          yPos += 6;
+                        });
+                        yPos += 4;
+                      }
+                      
+                      if (adherentData.typeAdhesion) {
+                        doc.setFontSize(14);
+                        doc.setTextColor(249, 115, 22);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('4. Type d\'adhésion', 20, yPos);
+                        yPos += 8;
+                        doc.setFontSize(10);
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                        const typeLabels: Record<string, string> = {
+                          'AdhesionAnnuelle': 'Adhésion annuelle',
+                          'Renouvellement': 'Renouvellement',
+                          'Autre': 'Autre'
+                        };
+                        doc.text(`Type: ${typeLabels[adherentData.typeAdhesion] || adherentData.typeAdhesion}`, 20, yPos);
+                        yPos += 10;
+                      }
+                      
+                      doc.setFontSize(14);
+                      doc.setTextColor(236, 72, 153);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('5. Informations familiales', 20, yPos);
+                      yPos += 8;
+                      doc.setFontSize(10);
+                      doc.setTextColor(0, 0, 0);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text(`Nombre d'enfants: ${adherentData.nombreEnfants || 0}`, 20, yPos);
+                      yPos += 6;
+                      
+                      const evenementsFamiliaux = adherentData.evenementsFamiliaux 
+                        ? (typeof adherentData.evenementsFamiliaux === 'string' 
+                            ? JSON.parse(adherentData.evenementsFamiliaux) 
+                            : adherentData.evenementsFamiliaux)
+                        : [];
+                      
+                      if (evenementsFamiliaux.length > 0) {
+                        doc.text('Événements familiaux nécessitant l\'assistance de l\'association:', 20, yPos);
+                        yPos += 8;
+                        
+                        const eventLabels: Record<string, string> = {
+                          'Naissance': 'Naissance',
+                          'MariageEnfant': 'Mariage d\'un enfant',
+                          'DecesFamille': 'Décès dans la famille',
+                          'AnniversaireSalle': 'Anniversaire organisé en salle',
+                          'Autre': 'Autre'
+                        };
+                        const allEvents = ['Naissance', 'MariageEnfant', 'DecesFamille', 'AnniversaireSalle', 'Autre'];
+                        const checkboxSize = 4;
+                        const col1X = 20;
+                        const col2X = 105;
+                        
+                        for (let i = 0; i < allEvents.length; i += 2) {
+                          const event1 = allEvents[i];
+                          const event2 = allEvents[i + 1];
+                          doc.setDrawColor(0, 0, 0);
+                          doc.setLineWidth(0.5);
+                          doc.rect(col1X, yPos - 3, checkboxSize, checkboxSize);
+                          const isChecked1 = evenementsFamiliaux.includes(event1);
+                          if (isChecked1) {
+                            doc.setFont('helvetica', 'bold');
+                            doc.setFontSize(8);
+                            doc.text('✓', col1X + 1.5, yPos);
+                            doc.setFontSize(10);
+                          }
+                          doc.setFont('helvetica', 'normal');
+                          doc.text(eventLabels[event1] || event1, col1X + 7, yPos);
+                          
+                          if (event2) {
+                            doc.rect(col2X, yPos - 3, checkboxSize, checkboxSize);
+                            const isChecked2 = evenementsFamiliaux.includes(event2);
+                            if (isChecked2) {
+                              doc.setFont('helvetica', 'bold');
+                              doc.setFontSize(8);
+                              doc.text('✓', col2X + 1.5, yPos);
+                              doc.setFontSize(10);
+                            }
+                            doc.setFont('helvetica', 'normal');
+                            doc.text(eventLabels[event2] || event2, col2X + 7, yPos);
+                          }
+                          yPos += 8;
+                        }
+                        yPos += 4;
+                      }
+                      
+                      if (adherentData.profession || adherentData.centresInteret) {
+                        doc.setFontSize(14);
+                        doc.setTextColor(99, 102, 241);
+                        doc.setFont('helvetica', 'bold');
+                        doc.text('6. Informations complémentaires', 20, yPos);
+                        yPos += 8;
+                        doc.setFontSize(10);
+                        doc.setTextColor(0, 0, 0);
+                        doc.setFont('helvetica', 'normal');
+                        if (adherentData.profession) {
+                          doc.text(`Profession: ${adherentData.profession}`, 20, yPos);
+                          yPos += 6;
+                        }
+                        if (adherentData.centresInteret) {
+                          const centresLines = doc.splitTextToSize(`Centres d'intérêt: ${adherentData.centresInteret}`, 170);
+                          doc.text(centresLines, 20, yPos);
+                          yPos += centresLines.length * 5;
+                        }
+                        yPos += 4;
+                      }
+                      
+                      doc.setFontSize(14);
+                      doc.setTextColor(20, 184, 166);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('7. Autorisations', 20, yPos);
+                      yPos += 8;
+                      doc.setFontSize(10);
+                      doc.setTextColor(0, 0, 0);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text(`Autorisation d'image: ${adherentData.autorisationImage ? 'Oui' : 'Non'}`, 20, yPos);
+                      yPos += 6;
+                      doc.text(`Accepte les communications: ${adherentData.accepteCommunications !== false ? 'Oui' : 'Non'}`, 20, yPos);
+                      yPos += 12;
+                      
+                      doc.setFontSize(12);
+                      doc.setTextColor(37, 99, 235);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('Signature de l\'adhérent', 20, yPos);
+                      doc.setFontSize(9);
+                      doc.setTextColor(100, 100, 100);
+                      doc.setFont('helvetica', 'normal');
+                      doc.text('Date: ___/___/_____', 150, yPos);
+                      yPos += 8;
+                      doc.setDrawColor(0, 0, 0);
+                      doc.setLineWidth(0.5);
+                      doc.line(20, yPos, 100, yPos);
+                      yPos += 12;
+                      
+                      doc.setFontSize(10);
+                      doc.setTextColor(37, 99, 235);
+                      doc.setFont('helvetica', 'bold');
+                      doc.text('Mention d\'information RGPD', 20, yPos);
+                      yPos += 8;
+                      doc.setFontSize(8);
+                      doc.setTextColor(0, 0, 0);
+                      doc.setFont('helvetica', 'normal');
+                      const rgpdText = "Les informations recueillies sur ce formulaire sont enregistrées par l'association afin de gérer les adhésions et d'assurer l'assistance prévue dans les statuts, notamment lors des événements familiaux (naissance, mariage d'un enfant, décès, anniversaire). Les données collectées sont limitées à ce qui est strictement nécessaire. Elles sont destinées exclusivement aux membres du bureau de l'association et ne seront jamais transmises à des tiers sans votre accord. Vous pouvez exercer votre droit d'accès, de rectification ou de suppression de vos données en contactant l'association.";
+                      const rgpdLines = doc.splitTextToSize(rgpdText, 170);
+                      doc.text(rgpdLines, 20, yPos);
+                      
+                      const pageCount = (doc as any).internal.getNumberOfPages();
+                      const pageWidth = doc.internal.pageSize.getWidth();
+                      const pageHeightFooter = doc.internal.pageSize.getHeight();
+                      
+                      for (let i = 1; i <= pageCount; i++) {
+                        doc.setPage(i);
+                        doc.setFillColor(9, 61, 181);
+                        doc.rect(0, pageHeightFooter - 10, pageWidth, 10, 'F');
+                        doc.setFontSize(7);
+                        doc.setTextColor(255, 255, 255);
+                        doc.setFont('helvetica', 'normal');
+                        const footerText = `© ${new Date().getFullYear()} AMAKI France - Tous droits réservés`;
+                        const footerTextWidth = doc.getTextWidth(footerText);
+                        doc.text(footerText, (pageWidth - footerTextWidth) / 2, pageHeightFooter - 4);
+                      }
+                      
+                      const fileName = `fiche_adhesion_${adherentData.firstname || 'user'}_${adherentData.lastname || 'unknown'}_${new Date().toISOString().split('T')[0]}.pdf`;
+                      doc.save(fileName);
+                      toast.dismiss();
+                      toast.success("PDF exporté avec succès");
+                    } catch (error) {
+                      console.error("Erreur lors de l'export PDF:", error);
+                      toast.dismiss();
+                      toast.error("Erreur lors de l'export PDF");
+                    }
+                  }}
+                  className="flex items-center gap-2"
+                >
+                  <Download className="h-4 w-4" />
+                  <span>Exporter en PDF</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
