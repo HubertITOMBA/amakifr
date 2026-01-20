@@ -156,6 +156,10 @@ const colorClasses = {
 export default function AmicalePage() {
   const [statuOpen, setStatuOpen] = useState(false);
   const [conditionsOpen, setConditionsOpen] = useState(false);
+  
+  // Année de création de l'association (utilisée pour afficher un compteur dynamique)
+  const anneeCreation = 2011;
+  const anneesExistence = Math.max(1, new Date().getFullYear() - anneeCreation);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
@@ -173,7 +177,7 @@ export default function AmicalePage() {
             </div>
           </div>
           <h1 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-6xl font-bold mb-3 sm:mb-4 md:mb-6 text-white drop-shadow-lg">
-            AMA<span className=" text-red-500 font-semibold">K</span>I  France
+            AMA<span className=" text-orange-700 font-semibold">K</span>I  France
             
               
              
@@ -203,7 +207,7 @@ export default function AmicalePage() {
             </h2>
             <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto px-4">
               L'Amicale des Anciens Élèves de Kipaku en France (AMAKI France) est une association 
-              à but non lucratif créée en 2016 pour rassembler et accompagner les anciens élèves 
+              à but non lucratif créée en {anneeCreation} pour rassembler et accompagner les anciens élèves 
               de l'École de Kipaku établis en France.
             </p>
           </div>
@@ -216,7 +220,7 @@ export default function AmicalePage() {
                 </div>
               </div>
               <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                120+ Membres
+                50+ Membres
               </h3>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
                 Anciens élèves actifs dans toute la France
@@ -230,10 +234,10 @@ export default function AmicalePage() {
                 </div>
               </div>
               <h3 className="text-base sm:text-lg md:text-xl font-semibold text-gray-900 dark:text-white mb-2">
-                8 Ans d'Existence
+                {anneesExistence} Ans d'Existence
               </h3>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">
-                Depuis notre création en 2016
+                Depuis notre création en {anneeCreation}
               </p>
             </Card>
 
