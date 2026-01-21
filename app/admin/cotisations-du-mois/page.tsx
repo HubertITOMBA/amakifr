@@ -656,8 +656,8 @@ export default function AdminCotisationsDuMois() {
 
           <DataTable table={table} emptyMessage="Aucune cotisation du mois trouvée" />
           
-          {/* Pagination */}
-          <div className="bg-white dark:bg-gray-800 mt-3 flex items-center justify-between !py-0 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
+          {/* Pagination - Masquée sur mobile */}
+          <div className="hidden md:flex bg-white dark:bg-gray-800 mt-3 items-center justify-between !py-0 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
             <div className="ml-3 flex-1 text-xs text-muted-foreground dark:text-gray-400">
               {table.getFilteredRowModel().rows.length} ligne(s) au total
             </div>

@@ -115,7 +115,7 @@ export function StatuAmaki({ open, onOpenChange }: StatuAmakiProps) {
               </CardHeader>
               <CardContent>
                 <p className="text-sm text-gray-700 dark:text-gray-300">
-                  Le siège social est fixé au <strong>119 rue des Grands Champs 77000 LIEUSAINT</strong>. 
+                  Le siège social est fixé au <strong>119 rue des Grands Champs 77127 LIEUSAINT</strong>. 
                   Il pourra être transféré en tout autre lieu du territoire Français par décision de l'assemblée générale.
                 </p>
               </CardContent>

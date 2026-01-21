@@ -1,6 +1,7 @@
 import Image from "next/image";
 import Link from "next/link";
 import HeroImage from "@/public/images/amakifav.jpeg";
+import { ANNEE_CREATION } from "@/lib/constants/association";
 import { RegisterButton } from "../auth/register-button";
 import { LoginButton } from "../auth/login-button";
 import { Button } from "@/components/ui/button";
@@ -8,7 +9,7 @@ import { ArrowRight, Users, Calendar, Award, LogIn } from "lucide-react";
 
 export function Hero() {
   // Année de création de l'association (utilisée pour afficher un compteur dynamique)
-  const anneeCreation = 2011;
+  const anneeCreation = ANNEE_CREATION;
   const anneesExistence = Math.max(1, new Date().getFullYear() - anneeCreation);
 
   return (

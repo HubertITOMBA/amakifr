@@ -6,6 +6,14 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { 
   FileText, 
   Search, 
@@ -22,13 +30,20 @@ import {
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
-  ChevronsRight
+  ChevronsRight,
+  MoreHorizontal,
+  Edit,
+  Plus
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getAllDocuments, adminDeleteDocument } from "@/actions/documents";
 import { toast } from "sonner";
 import { TypeDocument } from "@prisma/client";
+import { useSession } from "next-auth/react";
+import { DocumentUpload } from "@/components/documents/DocumentUpload";
+import { EditDocumentDialog } from "@/components/documents/EditDocumentDialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -88,11 +103,14 @@ const formatFileSize = (bytes: number) => {
 };
 
 export default function AdminDocumentsPage() {
+  const { data: session } = useSession();
   const [documents, setDocuments] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterType, setFilterType] = useState<string>("all");
   const [filterCategory, setFilterCategory] = useState<string>("all");
+  const [showUploadDialog, setShowUploadDialog] = useState(false);
+  const [editingDocument, setEditingDocument] = useState<any | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -115,7 +133,7 @@ export default function AdminDocumentsPage() {
             taille: false,
             User: false,
             createdAt: false,
-            // Garder visible : nomOriginal, description, actions (si présente)
+            // Garder visible : description (qui inclut nom du fichier), actions
           };
         }
       } catch (error) {
@@ -201,6 +219,21 @@ export default function AdminDocumentsPage() {
     }
   };
 
+  const handleUploadSuccess = (document: any) => {
+    setDocuments((prev) => [document, ...prev]);
+    setShowUploadDialog(false);
+    loadDocuments();
+  };
+
+  const handleUpdateSuccess = () => {
+    loadDocuments();
+    setEditingDocument(null);
+  };
+
+  const isDocumentOwner = (document: any) => {
+    return session?.user?.id === document.userId;
+  };
+
   // Extraire les catégories uniques
   const categories = useMemo(() => {
     return Array.from(
@@ -240,34 +273,41 @@ export default function AdminDocumentsPage() {
   }, [documents, globalFilter, filterCategory]);
 
   const columns = useMemo(() => [
-    columnHelper.accessor("nomOriginal", {
-      header: "Nom du fichier",
+    columnHelper.accessor("description", {
+      header: "Description / Nom du fichier",
       cell: ({ row }) => {
         const document = row.original;
         const IconComponent = getDocumentIcon(document.type);
         return (
-          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className={`p-1.5 sm:p-2 rounded-lg flex-shrink-0 ${getDocumentColor(document.type)}`}>
-              <IconComponent className="h-4 w-4 sm:h-5 sm:w-5" />
+          <div className="min-w-0">
+            {document.description ? (
+              <div className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white mb-1 line-clamp-2">
+                {document.description}
+              </div>
+            ) : null}
+            <div className="flex items-center gap-1.5 sm:gap-2 min-w-0">
+              <div className={`p-1 sm:p-1.5 rounded flex-shrink-0 ${getDocumentColor(document.type)}`}>
+                <IconComponent className="h-3 w-3 sm:h-4 sm:w-4" />
+              </div>
+              <span className="text-xs text-gray-600 dark:text-gray-400 truncate">
+                {document.nomOriginal}
+              </span>
             </div>
-            <span className="text-xs sm:text-sm font-medium text-gray-900 dark:text-white truncate">
-              {document.nomOriginal}
-            </span>
           </div>
         );
       },
-      size: 250,
-      minSize: 200,
-      maxSize: 400,
+      size: 300,
+      minSize: 250,
+      maxSize: 500,
       enableResizing: true,
     }),
     columnHelper.accessor("User", {
-      header: "Utilisateur",
+      header: "Adhérent",
       cell: ({ row }) => {
         const user = row.original.User;
         const adherent = row.original.Adherent;
         return (
-          <div className="flex items-center gap-2 min-w-0">
+          <div className="flex items-center gap-1.5 min-w-0">
             <User className="h-3 w-3 sm:h-4 sm:w-4 text-gray-500 dark:text-gray-400 flex-shrink-0" />
             <div className="min-w-0">
               {adherent ? (
@@ -276,21 +316,16 @@ export default function AdminDocumentsPage() {
                 </div>
               ) : (
                 <div className="text-xs sm:text-sm text-gray-900 dark:text-white truncate">
-                  {user?.name || user?.email || "N/A"}
-                </div>
-              )}
-              {user?.email && (
-                <div className="text-xs text-gray-500 dark:text-gray-400 truncate">
-                  {user.email}
+                  {user?.name || "N/A"}
                 </div>
               )}
             </div>
           </div>
         );
       },
-      size: 200,
-      minSize: 150,
-      maxSize: 300,
+      size: 180,
+      minSize: 140,
+      maxSize: 250,
       enableResizing: true,
     }),
     columnHelper.accessor("type", {
@@ -346,60 +381,82 @@ export default function AdminDocumentsPage() {
       cell: ({ row }) => {
         const date = row.getValue("createdAt") as Date;
         return (
-          <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
+          <div className="text-xs text-gray-600 dark:text-gray-400">
             <div>{format(new Date(date), "dd/MM/yyyy", { locale: fr })}</div>
-            <div className="text-xs text-gray-500 dark:text-gray-500">
+            <div className="text-[10px] text-gray-500 dark:text-gray-500">
               {formatDistanceToNow(new Date(date), { addSuffix: true, locale: fr })}
             </div>
           </div>
         );
       },
-      size: 150,
-      minSize: 120,
-      maxSize: 180,
+      size: 130,
+      minSize: 110,
+      maxSize: 160,
       enableResizing: true,
     }),
     columnHelper.display({
       id: "actions",
-      header: "Actions",
+      header: () => <div className="text-center w-full">Actions</div>,
       meta: { forceVisible: true },
       enableResizing: false,
       cell: ({ row }) => {
         const document = row.original;
+        const canEdit = isDocumentOwner(document);
         return (
-          <div className="flex items-center gap-1 sm:gap-2">
-            <a
-              href={document.chemin}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-md border border-blue-300 dark:border-blue-600 hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-              title="Voir"
-            >
-              <Eye className="h-3 w-3 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400" />
-            </a>
-            <a
-              href={document.chemin}
-              download
-              className="h-7 w-7 sm:h-8 sm:w-8 flex items-center justify-center rounded-md border border-gray-300 dark:border-gray-600 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-              title="Télécharger"
-            >
-              <Download className="h-3 w-3 sm:h-4 sm:w-4 text-gray-600 dark:text-gray-400" />
-            </a>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => handleDelete(document.id)}
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20"
-              title="Supprimer"
-            >
-              <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
+          <div className="flex items-center justify-center">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                  title="Actions"
+                >
+                  <MoreHorizontal className="h-4 w-4" />
+                  <span className="sr-only">Ouvrir le menu</span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <a
+                    href={document.chemin}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="flex items-center gap-2 cursor-pointer"
+                  >
+                    <Eye className="h-4 w-4" />
+                    <span>Voir / Télécharger</span>
+                  </a>
+                </DropdownMenuItem>
+                {canEdit && (
+                  <>
+                    <DropdownMenuItem 
+                      onClick={() => setEditingDocument(document)}
+                      className="cursor-pointer"
+                    >
+                      <Edit className="h-4 w-4 mr-2" />
+                      <span>Modifier</span>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                  </>
+                )}
+                <DropdownMenuItem 
+                  onClick={() => handleDelete(document.id)}
+                  className="focus:bg-red-50 dark:focus:bg-red-900/20 text-red-600 dark:text-red-400 cursor-pointer"
+                >
+                  <Trash2 className="h-4 w-4 mr-2" />
+                  <span>Supprimer</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         );
       },
-      size: 150,
-      minSize: 140,
-      maxSize: 180,
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
     }),
   ], []);
 
@@ -444,11 +501,33 @@ export default function AdminDocumentsPage() {
                 <FileText className="h-5 w-5 sm:h-6 sm:w-6" />
                 Documents des adhérents ({documents.length})
               </CardTitle>
-              <div>
+              <div className="flex items-center gap-2">
                 <ColumnVisibilityToggle 
                   table={table} 
                   storageKey="admin-documents-column-visibility"
                 />
+                <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-white hover:bg-gray-100 text-blue-600 text-sm h-9 sm:h-10">
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nouveau document
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+                    <DialogHeader>
+                      <DialogTitle className="text-base sm:text-lg">Téléverser un document</DialogTitle>
+                      <DialogDescription className="text-xs sm:text-sm">
+                        Téléversez un nouveau document (max 50MB)
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DocumentUpload
+                      onUploadSuccess={handleUploadSuccess}
+                      showCategory={true}
+                      showDescription={true}
+                      showPublicToggle={true}
+                    />
+                  </DialogContent>
+                </Dialog>
               </div>
             </div>
           </CardHeader>
@@ -518,10 +597,12 @@ export default function AdminDocumentsPage() {
                 <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
                   {filteredData.length} document(s) trouvé(s)
                 </div>
-                <DataTable table={table} emptyMessage="Aucun document trouvé" compact={true} />
+                <div className="[&_td]:py-1 [&_th]:py-2">
+                  <DataTable table={table} emptyMessage="Aucun document trouvé" />
+                </div>
                 
-                {/* Pagination */}
-                <div className="bg-white dark:bg-gray-800 mt-5 flex flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4 sm:gap-0">
+                {/* Pagination - Masquée sur mobile */}
+                <div className="hidden md:flex bg-white dark:bg-gray-800 mt-5 flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4 sm:gap-0">
                   <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
                     {table.getFilteredRowModel().rows.length} ligne(s) au total
                   </div>
@@ -596,6 +677,17 @@ export default function AdminDocumentsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Dialog d'édition */}
+      {editingDocument && (
+        <EditDocumentDialog
+          document={editingDocument}
+          open={!!editingDocument}
+          onOpenChange={(open) => !open && setEditingDocument(null)}
+          onUpdateSuccess={handleUpdateSuccess}
+          isAdmin={true}
+        />
+      )}
     </div>
   );
 }

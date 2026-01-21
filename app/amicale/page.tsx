@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Footer } from "@/components/home/Footer";
+import { ANNEE_CREATION } from "@/lib/constants/association";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -158,7 +159,7 @@ export default function AmicalePage() {
   const [conditionsOpen, setConditionsOpen] = useState(false);
   
   // Année de création de l'association (utilisée pour afficher un compteur dynamique)
-  const anneeCreation = 2011;
+  const anneeCreation = ANNEE_CREATION;
   const anneesExistence = Math.max(1, new Date().getFullYear() - anneeCreation);
 
   return (

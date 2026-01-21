@@ -3,11 +3,11 @@
 import Image from "next/image";
 import { Users, Calendar, Heart, Award, Handshake, Shield, Users2 } from "lucide-react";
 import { motion } from "framer-motion";
+import { ANNEE_CREATION } from "@/lib/constants/association";
 
 export function AboutSection() {
   // Année de création de l'association (utilisée pour afficher un compteur dynamique)
-  // Ex: si création en 2011 et année courante 2026 => 15 ans
-  const anneeCreation = 2011;
+  const anneeCreation = ANNEE_CREATION;
   const anneesExistence = Math.max(1, new Date().getFullYear() - anneeCreation);
 
   return (

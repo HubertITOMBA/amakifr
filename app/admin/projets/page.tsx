@@ -445,8 +445,8 @@ export default function AdminProjetsPage() {
                 </div>
                 <DataTable table={table} emptyMessage="Aucun projet trouvé" />
                 
-                {/* Pagination */}
-                <div className="bg-white dark:bg-gray-800 mt-5 flex flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4">
+                {/* Pagination - Masquée sur mobile */}
+                <div className="hidden md:flex bg-white dark:bg-gray-800 mt-5 flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4">
                   <div className="ml-5 flex-1 text-sm text-muted-foreground dark:text-gray-400">
                     {table.getFilteredRowModel().rows.length} projet(s) au total
                   </div>

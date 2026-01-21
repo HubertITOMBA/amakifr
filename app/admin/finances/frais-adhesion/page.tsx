@@ -799,8 +799,8 @@ export default function FraisAdhesionPage() {
                   </div>
                   <DataTable table={table} emptyMessage="Aucun adhérent trouvé" compact={true} headerColor="indigo" />
                   
-                  {/* Pagination */}
-                  <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-3 sm:py-5 px-3 sm:px-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
+                  {/* Pagination - Masquée sur mobile */}
+                  <div className="hidden md:flex bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-3 sm:py-5 px-3 sm:px-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
                     <div className="text-xs sm:text-sm text-muted-foreground dark:text-gray-400 w-full sm:w-auto text-center sm:text-left">
                       {table.getFilteredRowModel().rows.length} ligne(s) au total
                     </div>

@@ -688,8 +688,8 @@ export default function AdminPaiementsPage() {
               </div>
               <DataTable table={table} emptyMessage="Aucun paiement trouvé" compact={true} headerColor="green" />
               
-              {/* Pagination */}
-              <div className="bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
+              {/* Pagination - Masquée sur mobile */}
+              <div className="hidden md:flex bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
                 <div className="flex-1 text-xs sm:text-sm text-muted-foreground dark:text-gray-400 text-center sm:text-left">
                   {table.getFilteredRowModel().rows.length} ligne(s) au total
                 </div>

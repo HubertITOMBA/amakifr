@@ -108,7 +108,7 @@ export function NewsletterSection() {
                   </div>
                   <div>
                     <p className="text-white font-semibold">WhatsApp</p>
-                    <p className="text-white/80">+07 51 06 62 64</p>
+                    <p className="text-white/80">+33 7 58 43 47 58</p>
                   </div>
                 </div>
                 
@@ -118,7 +118,7 @@ export function NewsletterSection() {
                   </div>
                   <div>
                     <p className="text-white font-semibold">119 rue des Grands Champs</p>
-                    <p className="text-white/80">77000 Lieusaint</p>
+                    <p className="text-white/80">77127 Lieusaint</p>
                   </div>
                 </div>
               </div>

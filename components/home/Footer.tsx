@@ -2,6 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
+import { ANNEE_CREATION } from "@/lib/constants/association";
 import { 
   Mail, 
   Phone, 
@@ -48,7 +49,7 @@ function HighlightedText({ text, highlightIndex }: { text: string; highlightInde
 
 export function Footer() {
   // Année de création de l'association (utilisée pour afficher un compteur dynamique)
-  const anneeCreation = 2011;
+  const anneeCreation = ANNEE_CREATION;
   const anneesExistence = Math.max(1, new Date().getFullYear() - anneeCreation);
   const anneeCourante = new Date().getFullYear();
 
@@ -295,7 +296,7 @@ export function Footer() {
                     </div>
                     <div>
                       <p className="text-white font-medium">119 rue des Grands Champs</p>
-                      <p className="text-sm text-gray-400">77000 Lieusaint, France</p>
+                      <p className="text-sm text-gray-400">77127 Lieusaint, France</p>
                     </div>
                   </div>
                 </div>

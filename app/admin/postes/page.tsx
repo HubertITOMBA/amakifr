@@ -232,7 +232,7 @@ export default function AdminPostesPage() {
               {sortedPostes.length > 0 && (() => {
                 const totalPages = Math.ceil(sortedPostes.length / pageSize);
                 return (
-                  <div className="bg-white dark:bg-gray-800 mt-5 flex flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4 sm:gap-0">
+                  <div className="hidden md:flex bg-white dark:bg-gray-800 mt-5 flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4 sm:gap-0">
                     <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
                       {sortedPostes.length} ligne(s) au total
                     </div>

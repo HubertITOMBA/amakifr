@@ -446,8 +446,8 @@ function CotisationsListTable({ cotisations, typesCotisation, loading, onEdit }:
 
       <DataTable table={table} emptyMessage="Aucune cotisation trouvée" compact={true} />
       
-      {/* Pagination */}
-      <div className="bg-white dark:bg-gray-800 mt-5 flex items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
+      {/* Pagination - Masquée sur mobile */}
+      <div className="hidden md:flex bg-white dark:bg-gray-800 mt-5 items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
         <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
           {table.getFilteredRowModel().rows.length} ligne(s) au total
         </div>

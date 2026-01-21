@@ -140,7 +140,7 @@ export function EventsSection() {
                     S'inscrire
                     <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform duration-300" />
                   </button>
-                </div>
+                </div>  15 Ans d'Existence
                 </div>
               </div>
             </motion.div>

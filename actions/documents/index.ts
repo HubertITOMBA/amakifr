@@ -70,14 +70,7 @@ export async function uploadDocument(formData: FormData) {
 
     // Validation du type de fichier
     const allowedTypes = [
-      "application/pdf",
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "video/mp4",
-      "video/quicktime",
-      "video/x-msvideo",
+      // Images
       "image/jpeg",
       "image/jpg",
       "image/png",
@@ -85,12 +78,31 @@ export async function uploadDocument(formData: FormData) {
       "image/webp",
       "image/bmp",
       "image/tiff",
+      // Vidéos
+      "video/mp4",
+      "video/quicktime",
+      "video/x-msvideo",
+      "video/avi",
+      // PDF
+      "application/pdf",
+      // Word
+      "application/msword",
+      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      // Excel
+      "application/vnd.ms-excel",
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      // CSV
+      "text/csv",
+      "application/csv",
+      // TXT
+      "text/plain",
     ];
 
     if (!allowedTypes.includes(file.type)) {
+      const fileExtension = file.name.split('.').pop()?.toUpperCase() || 'INCONNU';
       return {
         success: false,
-        error: `Type de fichier non autorisé: ${file.type}`,
+        error: `Type de fichier non pris en charge (.${fileExtension}). Types acceptés : Images (JPG, PNG, GIF, etc.), Vidéos (MP4, MOV, AVI), PDF, Word (DOC, DOCX), Excel (XLS, XLSX), CSV, TXT.`,
       };
     }
 
@@ -463,6 +475,78 @@ export async function getAllDocuments(options?: {
     return {
       success: false,
       error: "Erreur lors de la récupération des documents",
+    };
+  }
+}
+
+/**
+ * Met à jour les métadonnées d'un document (pour les administrateurs)
+ * L'admin peut modifier uniquement s'il est propriétaire du document
+ * 
+ * @param documentId - L'ID du document à mettre à jour
+ * @param data - Les nouvelles données
+ * @returns Un objet avec success (boolean), message (string) en cas de succès, 
+ *          ou error (string) en cas d'échec
+ */
+export async function adminUpdateDocument(
+  documentId: string,
+  data: {
+    categorie?: string;
+    description?: string;
+    estPublic?: boolean;
+  }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier que l'utilisateur est admin
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    if (user?.role !== "Admin") {
+      return { success: false, error: "Accès réservé aux administrateurs" };
+    }
+
+    // Vérifier que le document existe et que l'admin en est le propriétaire
+    const document = await db.document.findUnique({
+      where: { id: documentId },
+    });
+
+    if (!document) {
+      return { success: false, error: "Document non trouvé" };
+    }
+
+    if (document.userId !== session.user.id) {
+      return { success: false, error: "Vous ne pouvez modifier que vos propres documents" };
+    }
+
+    await db.document.update({
+      where: { id: documentId },
+      data: {
+        categorie: data.categorie !== undefined ? data.categorie : document.categorie,
+        description: data.description !== undefined ? data.description : document.description,
+        estPublic: data.estPublic !== undefined ? data.estPublic : document.estPublic,
+      },
+    });
+
+    revalidatePath("/admin/documents");
+    revalidatePath("/user/documents");
+    revalidatePath("/user/profile");
+
+    return {
+      success: true,
+      message: "Document mis à jour avec succès",
+    };
+  } catch (error) {
+    console.error("Erreur lors de la mise à jour du document:", error);
+    return {
+      success: false,
+      error: "Erreur lors de la mise à jour du document",
     };
   }
 }

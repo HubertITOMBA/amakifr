@@ -279,7 +279,72 @@ export const chatbotGuides: Guide[] = [
       'Vous pouvez également filtrer par type de document si nécessaire'
     ],
     actions: [
-      { label: 'Voir mes documents', action: 'open_documents', href: '/user/profile?section=documents' }
+      { label: 'Voir mes documents', action: 'open_documents', href: '/user/documents' }
+    ]
+  },
+  {
+    keywords: ['téléverser document', 'upload document', 'ajouter document', 'envoyer document', 'charger document', 'télécharger document', 'importer document', 'nouveau document', 'créer document', 'ajouter un document', 'téléverser un document', 'comment téléverser', 'comment ajouter document'],
+    title: 'Comment téléverser un document',
+    steps: [
+      '📋 Accéder à la page des documents :',
+      'Allez dans "Mon Profil" > "Mes Documents" ou directement sur /user/documents',
+      'Cliquez sur le bouton "Nouveau document" en haut à droite',
+      '',
+      '📁 Sélectionner votre fichier :',
+      'Vous pouvez soit :',
+      '  • Glisser-déposer votre fichier dans la zone prévue',
+      '  • Cliquer sur "Sélectionner un fichier" pour parcourir vos fichiers',
+      '',
+      '✅ Types de fichiers acceptés :',
+      '  • Images : JPG, JPEG, PNG, GIF, WEBP, BMP, TIFF',
+      '  • Vidéos : MP4, MOV, AVI',
+      '  • PDF : Documents PDF',
+      '  • Word : DOC, DOCX',
+      '  • Excel : XLS, XLSX',
+      '  • CSV : Fichiers CSV',
+      '  • TXT : Fichiers texte',
+      '',
+      '💾 Taille maximale :',
+      '  • Maximum 50 Mo par fichier',
+      '',
+      '📝 Renseigner les informations (optionnel) :',
+      'Une fois le fichier sélectionné, vous pouvez renseigner :',
+      '  • Catégorie : Sélectionnez une catégorie dans la liste déroulante',
+      '    Les catégories proposées dépendent du type de fichier :',
+      '    - Images : Photos, Affiches, Logos, Illustrations, Documents scannés, etc.',
+      '    - Vidéos : Événements, Tutoriels, Présentations, Interviews, etc.',
+      '    - PDF : Factures, Contrats, Rapports, Formulaires, Procès-verbaux, etc.',
+      '    - Word : Lettres, Rapports, Procès-verbaux, Correspondances, etc.',
+      '    - Excel : Tableaux, Statistiques, Budgets, Listes, etc.',
+      '    - CSV : Données, Exports, Statistiques, Listes, etc.',
+      '    - TXT : Notes, Configurations, Documentation, etc.',
+      '  • Description : Ajoutez une description pour mieux identifier votre document',
+      '  • Visibilité : Cochez "Rendre ce document public" si vous souhaitez qu\'il soit visible par les administrateurs',
+      '',
+      '✅ Finaliser le téléversement :',
+      'Vérifiez que toutes les informations sont correctes',
+      'Cliquez sur "Téléverser le document"',
+      'Une barre de progression s\'affiche pendant le téléversement',
+      'Vous recevrez une notification de succès une fois le téléversement terminé',
+      '',
+      '📊 Après le téléversement :',
+      '  • Votre document apparaît immédiatement dans la liste de vos documents',
+      '  • Vous pouvez le voir, le télécharger, le modifier ou le supprimer à tout moment',
+      '  • Si le document est public, les administrateurs pourront le voir',
+      '',
+      '💡 Conseils :',
+      '  • Utilisez des descriptions claires pour faciliter la recherche',
+      '  • Choisissez une catégorie appropriée pour mieux organiser vos documents',
+      '  • Vérifiez la taille de votre fichier avant le téléversement',
+      '  • Les types de fichiers non supportés afficheront un message d\'erreur clair',
+      '',
+      '⚠️ Important :',
+      '  • Seuls les types de fichiers listés ci-dessus sont acceptés',
+      '  • Si vous essayez de téléverser un type non supporté, vous recevrez un message d\'erreur avec la liste des types acceptés',
+      '  • Vous pouvez modifier les informations (catégorie, description, visibilité) d\'un document après l\'avoir téléversé'
+    ],
+    actions: [
+      { label: 'Téléverser un document', action: 'upload_document', href: '/user/documents' }
     ]
   },
   {
@@ -835,6 +900,7 @@ export const chatbotGuides: Guide[] = [
       '• Comment voir vos droits',
       '• Comment consulter le règlement d\'ordre intérieur',
       '• Comment accéder à vos documents',
+      '• Comment téléverser un document',
       '• Comment voir vos badges',
       '• Comment postuler à une élection',
       '• Comment voter',
@@ -1663,7 +1729,7 @@ export function generateBotResponse(question: string): { message: string; guide?
   // Validation de type pour éviter les erreurs
   if (typeof question !== 'string' || !question || !question.trim()) {
     return {
-      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses`
+      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Téléverser un document\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses`
     };
   }
   
@@ -1680,7 +1746,7 @@ export function generateBotResponse(question: string): { message: string; guide?
   
   // Réponse par défaut avec suggestions
   return {
-    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses\n\nPosez-moi une question plus précise en utilisant des mots-clés et je vous guiderai étape par étape !`
+    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Téléverser un document\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses\n\nPosez-moi une question plus précise en utilisant des mots-clés et je vous guiderai étape par étape !`
   };
 }
 

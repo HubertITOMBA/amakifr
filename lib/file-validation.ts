@@ -90,7 +90,7 @@ export async function validateFileContent(
     }
     
     // Détecter le type réel du fichier via magic bytes
-    const detectedType = await detectFileType(buffer);
+    const detectedType = await fileTypeFromBuffer(buffer);
     
     if (!detectedType) {
       // Certains types de fichiers ne sont pas détectables (ex: .txt, .csv)
