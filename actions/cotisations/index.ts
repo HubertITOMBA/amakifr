@@ -126,8 +126,15 @@ export async function createMonthlyCotisations(data: z.infer<typeof CreateMonthl
 export async function createManualCotisation(data: z.infer<typeof CreateCotisationSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    
+    // Autoriser les rôles admin qui ont accès à la gestion des cotisations
+    const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+    const normalizedRole = session.user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
+      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
     }
 
     const validatedData = CreateCotisationSchema.parse(data);
@@ -248,8 +255,15 @@ export async function createManualCotisation(data: z.infer<typeof CreateCotisati
 export async function getAdherentsWithCotisations() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    
+    // Autoriser les rôles admin qui ont accès à la gestion des cotisations
+    const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+    const normalizedRole = session.user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
+      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
     }
 
     // Dates pour le mois en cours
@@ -496,8 +510,15 @@ export async function getAdherentsWithCotisations() {
 export async function updateCotisation(data: z.infer<typeof UpdateCotisationSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    
+    // Autoriser les rôles admin qui ont accès à la gestion des cotisations
+    const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+    const normalizedRole = session.user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
+      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
     }
 
     const validatedData = UpdateCotisationSchema.parse(data);

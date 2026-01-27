@@ -48,6 +48,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { getAdherentsWithCotisations, createManualCotisation, updateCotisation } from "@/actions/cotisations";
+import { isAuthorizationError } from "@/lib/utils";
 import { createPaiementGeneral } from "@/actions/paiements";
 import { Modal } from "@/components/Modal";
 import { Label } from "@/components/ui/label";
@@ -186,7 +187,10 @@ export default function AdminCotisationManagement() {
       if (result.success && result.data) {
         setAdherents(result.data as unknown as AdherentWithCotisations[]);
       } else {
-        toast.error(result.error || "Erreur lors du chargement");
+        // Ne pas afficher de toast pour les erreurs d'autorisation
+        if (result.error && !isAuthorizationError(result.error)) {
+          toast.error(result.error || "Erreur lors du chargement");
+        }
       }
     } catch (error) {
       toast.error("Erreur lors du chargement des adhérents");
