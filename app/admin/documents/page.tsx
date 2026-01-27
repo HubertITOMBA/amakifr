@@ -522,6 +522,7 @@ export default function AdminDocumentsPage() {
                     </DialogHeader>
                     <DocumentUpload
                       onUploadSuccess={handleUploadSuccess}
+                      onClose={() => setShowUploadDialog(false)}
                       showCategory={true}
                       showDescription={true}
                       showPublicToggle={true}

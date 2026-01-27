@@ -527,7 +527,7 @@ export default function AdminPaiementsPage() {
                                     <SelectValue placeholder="Sélectionner une dette" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="none">Aucune</SelectItem>
+                                    <SelectItem key="dette-none" value="none">Aucune</SelectItem>
                                     {financialItems.dettes.map((d) => (
                                       <SelectItem key={d.id} value={d.id}>
                                         {d.label}
@@ -545,7 +545,7 @@ export default function AdminPaiementsPage() {
                                     <SelectValue placeholder="Sélectionner une cotisation" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="none">Aucune</SelectItem>
+                                    <SelectItem key="cotisation-none" value="none">Aucune</SelectItem>
                                     {financialItems.cotisations.map((c) => (
                                       <SelectItem key={c.id} value={c.id}>
                                         {c.label}
@@ -563,7 +563,7 @@ export default function AdminPaiementsPage() {
                                     <SelectValue placeholder="Sélectionner une assistance" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="none">Aucune</SelectItem>
+                                    <SelectItem key="assistance-none" value="none">Aucune</SelectItem>
                                     {financialItems.assistances.map((a) => (
                                       <SelectItem key={a.id} value={a.id}>
                                         {a.label}
@@ -611,10 +611,10 @@ export default function AdminPaiementsPage() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Especes">Espèces</SelectItem>
-                          <SelectItem value="Cheque">Chèque</SelectItem>
-                          <SelectItem value="Virement">Virement</SelectItem>
-                          <SelectItem value="CarteBancaire">Carte bancaire</SelectItem>
+                          <SelectItem key="moyen-especes" value="Especes">Espèces</SelectItem>
+                          <SelectItem key="moyen-cheque" value="Cheque">Chèque</SelectItem>
+                          <SelectItem key="moyen-virement" value="Virement">Virement</SelectItem>
+                          <SelectItem key="moyen-cartebancaire" value="CarteBancaire">Carte bancaire</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -668,11 +668,11 @@ export default function AdminPaiementsPage() {
                 <SelectValue placeholder="Filtrer par moyen" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les moyens</SelectItem>
-                <SelectItem value="Especes">Espèces</SelectItem>
-                <SelectItem value="Cheque">Chèque</SelectItem>
-                <SelectItem value="Virement">Virement</SelectItem>
-                <SelectItem value="CarteBancaire">Carte bancaire</SelectItem>
+                <SelectItem key="filter-all" value="all">Tous les moyens</SelectItem>
+                <SelectItem key="filter-especes" value="Especes">Espèces</SelectItem>
+                <SelectItem key="filter-cheque" value="Cheque">Chèque</SelectItem>
+                <SelectItem key="filter-virement" value="Virement">Virement</SelectItem>
+                <SelectItem key="filter-cartebancaire" value="CarteBancaire">Carte bancaire</SelectItem>
               </SelectContent>
             </Select>
           </div>

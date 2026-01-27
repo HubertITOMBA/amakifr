@@ -1026,7 +1026,7 @@ export default function EvenementDetailPage() {
             )}
 
             {/* Actions admin */}
-            {session?.user?.role === "Admin" && (
+            {session?.user?.role === "ADMIN" && (
               <Card>
                 <CardHeader>
                   <CardTitle>Actions Admin</CardTitle>
@@ -1081,7 +1081,7 @@ export default function EvenementDetailPage() {
             )}
 
             {/* Liste des participants (Admin) */}
-            {showParticipants && session?.user?.role === "Admin" && evenement.inscriptionRequis && (
+            {showParticipants && session?.user?.role === "ADMIN" && evenement.inscriptionRequis && (
               <Card>
                 <CardHeader>
                   <div className="flex items-center justify-between">
@@ -1394,7 +1394,7 @@ export default function EvenementDetailPage() {
       )}
 
       {/* Modal pour ajouter un participant (Admin) */}
-      {showAddParticipantModal && session?.user?.role === "Admin" && (
+      {showAddParticipantModal && session?.user?.role === "ADMIN" && (
         <Dialog open={showAddParticipantModal} onOpenChange={setShowAddParticipantModal}>
           <DialogContent className="max-w-2xl max-h-[80vh] flex flex-col">
             <DialogHeader>

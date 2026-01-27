@@ -245,7 +245,7 @@ export async function adminGeneratePasseport(formData: FormData) {
       where: { id: session.user.id },
     });
 
-    if (!user || user.role !== UserRole.Admin) {
+    if (!user || user.role !== UserRole.ADMIN) {
       return { success: false, error: "Accès réservé aux administrateurs" };
     }
 

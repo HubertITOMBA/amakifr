@@ -51,7 +51,7 @@ async function updatePostesRoles() {
         description: "Comptable de l'association",
       },
       {
-        nom: "Membre",
+        nom: "MEMBRE",
         nouveauCode: "MEMBRE",
         description: "Membre simple de l'association",
       },

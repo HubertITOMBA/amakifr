@@ -82,7 +82,7 @@ export async function updateConfigurationFraisAdhesion(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
@@ -131,7 +131,7 @@ export async function updateConfigurationFraisAdhesion(
 export async function getAdherentsFraisAdhesion() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
@@ -207,7 +207,7 @@ export async function marquerAncienAdherent(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
@@ -277,7 +277,7 @@ export async function creerObligationFraisAdhesion(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
@@ -376,7 +376,7 @@ export async function marquerFraisAdhesionPaye(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 

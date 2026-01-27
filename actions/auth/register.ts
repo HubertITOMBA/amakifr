@@ -88,12 +88,22 @@ export const register = async (
         }
        
         const verificationToken = await generateVerificationToken(normalizedEmail)
-        await sendTwoFactorTokenEmail(
+        
+        // Envoyer l'email de vérification (non bloquant)
+        const emailSent = await sendTwoFactorTokenEmail(
             verificationToken.email,
             verificationToken.token,
         )
 
-        return { success: "Code OTP envoyé !", twoFactor: true }
+        if (!emailSent) {
+            console.warn("[register] L'envoi de l'email de vérification a échoué, mais l'inscription continue");
+            // Ne pas bloquer l'inscription si l'email échoue
+        }
+
+        return { 
+            success: emailSent ? "Code OTP envoyé !" : "Inscription réussie (l'envoi de l'email a échoué, veuillez contacter l'administrateur)", 
+            twoFactor: true 
+        }
     } catch (error: any) {
         // Gérer l'erreur de contrainte unique sur le nom
         if (error?.code === 'P2002' && error?.meta?.target?.includes('name')) {

@@ -919,7 +919,7 @@ function UserProfilePageContent() {
           case 'cotisations':
             // Charger les cotisations, obligations, dettes initiales et cotisations du mois depuis le profil utilisateur
             // SAUF si l'utilisateur est admin (l'admin ne cotise ni ne bénéficie d'assistances)
-            const isAdmin = user?.role === 'Admin';
+            const isAdmin = user?.role === 'ADMIN';
             
             if (userProfile?.adherent && !isAdmin) {
               setCotisations((userProfile.adherent as any).Cotisations || []);
@@ -1194,11 +1194,11 @@ function UserProfilePageContent() {
 
   const getRoleColor = (role: string) => {
     switch (role) {
-      case 'Admin':
+      case 'ADMIN':
         return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200';
-      case 'Membre':
+      case 'MEMBRE':
         return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200';
-      case 'Invite':
+      case 'INVITE':
         return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200';
       default:
         return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
@@ -1424,7 +1424,7 @@ function UserProfilePageContent() {
 
   // Données par défaut si certaines propriétés ne sont pas disponibles
   const userStatus = (user as any)?.status || 'Actif';
-  const userRole = (user as any)?.role || 'Membre';
+  const userRole = (user as any)?.role || 'MEMBRE';
   const userCreatedAt = (user as any)?.createdAt || new Date().toISOString();
   const userLastLogin = (user as any)?.lastLogin || null;
 
@@ -4874,7 +4874,7 @@ function UserProfilePageContent() {
         // Vérifier si l'utilisateur est un adhérent
         const hasAdherentProfile = userProfile?.adherent && userProfile.adherent.id;
         const userRole = user?.role || userProfile?.role;
-        const isAdmin = userRole === 'Admin';
+        const isAdmin = userRole === 'ADMIN';
         
         // Si pas de profil adhérent et pas admin, afficher un message
         if (!hasAdherentProfile) {

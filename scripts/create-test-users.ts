@@ -9,11 +9,11 @@ const testUsers = [
     email: 'admin@amaki.fr',
     name: 'Administrateur',
     password: 'password',
-    role: 'Admin' as const,
+    role: 'ADMIN' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
-      firstname: 'Admin',
+      firstname: 'ADMIN',
       lastname: 'Système',
     }
   },
@@ -21,7 +21,7 @@ const testUsers = [
     email: 'president@amaki.fr',
     name: 'Monsieur Président',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -33,7 +33,7 @@ const testUsers = [
     email: 'vice-president@amaki.fr',
     name: 'Madame Vice-Présidente',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -45,7 +45,7 @@ const testUsers = [
     email: 'secretaire@amaki.fr',
     name: 'Monsieur Secrétaire',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -57,7 +57,7 @@ const testUsers = [
     email: 'tresorier@amaki.fr',
     name: 'Madame Trésorière',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -69,7 +69,7 @@ const testUsers = [
     email: 'membre1@amaki.fr',
     name: 'Monsieur Membre 1',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -81,7 +81,7 @@ const testUsers = [
     email: 'membre2@amaki.fr',
     name: 'Madame Membre 2',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -93,7 +93,7 @@ const testUsers = [
     email: 'membre3@amaki.fr',
     name: 'Monsieur Membre 3',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -105,7 +105,7 @@ const testUsers = [
     email: 'membre4@amaki.fr',
     name: 'Madame Membre 4',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -117,7 +117,7 @@ const testUsers = [
     email: 'membre5@amaki.fr',
     name: 'Monsieur Membre 5',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -129,7 +129,7 @@ const testUsers = [
     email: 'invite@amaki.fr',
     name: 'Monsieur Invité',
     password: 'password',
-    role: 'Invite' as const,
+    role: 'INVITE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,

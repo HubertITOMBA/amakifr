@@ -47,7 +47,7 @@ async function seedMenus() {
     // Menus pour la NAVBAR (public)
     const navbarMenus = [
       {
-        libelle: "L'amicale",
+        libelle: "Amaki",
         description: "Présentation de l'association AMAKI",
         lien: "/amicale",
         niveau: "NAVBAR" as const,
@@ -120,7 +120,7 @@ async function seedMenus() {
         parent: null,
       },
       {
-        libelle: "Admin",
+        libelle: "ADMIN",
         description: "Panneau d'administration",
         lien: "/admin",
         niveau: "NAVBAR" as const,

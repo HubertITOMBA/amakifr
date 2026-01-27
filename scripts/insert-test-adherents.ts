@@ -9,7 +9,7 @@ const testAdherents = [
     email: 'f3sbtevry@gmail.com',
     name: 'Simon',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -37,7 +37,7 @@ const testAdherents = [
     email: 'hubert.itomba@orange.fr',
     name: 'Hubert',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -65,7 +65,7 @@ const testAdherents = [
     email: 'sainthoservices@outlook.fr',
     name: 'Saintho',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -93,7 +93,7 @@ const testAdherents = [
     email: 'seraphinkisadibeba@gmail.com',
     name: 'Seraphin',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -121,7 +121,7 @@ const testAdherents = [
     email: 'jostshik@yahoo.fr',
     name: 'José',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -149,7 +149,7 @@ const testAdherents = [
     email: 'sabibine.nkashama@gmail.com',
     name: 'Miss Kinuimba',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -177,7 +177,7 @@ const testAdherents = [
     email: 'mbumba.toussaint01@gmail.com',
     name: 'Toussaint',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -205,7 +205,7 @@ const testAdherents = [
     email: 'alexisnsokimondengele@gmail.com',
     name: 'Alexis',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -233,7 +233,7 @@ const testAdherents = [
     email: 'sylvainkanza@yahoo.fr',
     name: 'Sylvain',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -261,7 +261,7 @@ const testAdherents = [
     email: 'bruno.mambulu@gmail.com',
     name: 'Bruno',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -289,7 +289,7 @@ const testAdherents = [
     email: 'Jcmvuama@yahoo.fr',
     name: 'Azalya',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -317,7 +317,7 @@ const testAdherents = [
     email: 'dimonekene2017@hotmail.com',
     name: 'Jimmy',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -345,7 +345,7 @@ const testAdherents = [
     email: 'bebe.a77@hothmail.fr',
     name: 'Bébé',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -373,7 +373,7 @@ const testAdherents = [
     email: 'mariemuilu243@gmail.com',
     name: 'Marie',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -401,7 +401,7 @@ const testAdherents = [
     email: 'bibichemampuya@yahoo.fr',
     name: 'Bibiche',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -429,7 +429,7 @@ const testAdherents = [
     email: 'gabrielbenga@yahoo.com',
     name: 'Dominique',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -457,7 +457,7 @@ const testAdherents = [
     email: 'malela@free.fr',
     name: 'Papy',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -485,7 +485,7 @@ const testAdherents = [
     email: 'yvonmatona@outlook.fr',
     name: 'Pitchou',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -513,7 +513,7 @@ const testAdherents = [
     email: 'bisubula.sidonie@gmail.com',
     name: 'Thaty',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -541,7 +541,7 @@ const testAdherents = [
     email: 'maya.thethe@gmail.com',
     name: 'Thethe',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -569,7 +569,7 @@ const testAdherents = [
     email: 'francoisenzumba43@gmail.com',
     name: 'Françoise',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -597,7 +597,7 @@ const testAdherents = [
     email: 'mayangiaugustin@gmail.com',
     name: 'Chata',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -625,7 +625,7 @@ const testAdherents = [
     email: 'eugenembongopasy@gmail.com',
     name: 'Eugène',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Monsieur' as const,
@@ -653,7 +653,7 @@ const testAdherents = [
     email: 'darlettenkula@yahoo.com',
     name: 'Dada',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -681,7 +681,7 @@ const testAdherents = [
     email: 'ekotehenriette10@gmail.com',
     name: 'Henriette',
     password: 'password',
-    role: 'Membre' as const,
+    role: 'MEMBRE' as const,
     status: 'Actif' as const,
     adherent: {
       civility: 'Madame' as const,
@@ -742,7 +742,7 @@ async function insertTestAdherents() {
       if (!posteTemplate) {
         // Récupérer un admin pour createdBy
         const admin = await prisma.user.findFirst({
-          where: { role: 'Admin' },
+          where: { role: 'ADMIN' },
         });
 
         if (!admin) {

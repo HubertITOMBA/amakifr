@@ -29,11 +29,11 @@ const adminUser = {
   email: 'admin@amaki.fr',
   name: 'Administrateur',
   password: '?Kipaku!',
-  role: 'Admin' as const,
+  role: 'ADMIN' as const,
   status: 'Actif' as const,
   adherent: {
     civility: 'Monsieur' as const,
-    firstname: 'Admin',
+    firstname: 'ADMIN',
     lastname: 'Système',
   }
 };

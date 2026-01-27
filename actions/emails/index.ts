@@ -22,7 +22,7 @@ const CreateEmailsSchema = z.object({
 export async function sendEmails(data: z.infer<typeof CreateEmailsSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
@@ -189,7 +189,7 @@ export async function getAllEmails(options?: {
 }) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
@@ -254,7 +254,7 @@ export async function getAllEmails(options?: {
 export async function deleteEmail(emailId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 

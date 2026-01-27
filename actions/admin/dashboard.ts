@@ -15,7 +15,7 @@ import { fr } from "date-fns/locale";
 export async function getDashboardStats() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -30,13 +30,13 @@ export async function getDashboardStats() {
     const [totalMembresActifs, totalMembresActifsLastMonth] = await Promise.all([
       db.user.count({
         where: {
-          role: "Membre",
+          role: "MEMBRE",
           status: "Actif",
         },
       }),
       db.user.count({
         where: {
-          role: "Membre",
+          role: "MEMBRE",
           status: "Actif",
           createdAt: { lte: endOfLastMonth },
         },
@@ -104,7 +104,7 @@ export async function getDashboardStats() {
       }),
       db.user.count({
         where: {
-          role: "Membre",
+          role: "MEMBRE",
           status: "Actif",
         },
       }),
@@ -171,7 +171,7 @@ export async function getDashboardStats() {
 export async function getRecentActivities(limit: number = 10) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -187,7 +187,7 @@ export async function getRecentActivities(limit: number = 10) {
     // Nouveaux membres (derniers 30 jours)
     const nouveauxMembres = await db.user.findMany({
       where: {
-        role: "Membre",
+        role: "MEMBRE",
         createdAt: {
           gte: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000),
         },
@@ -353,7 +353,7 @@ export async function getRecentActivities(limit: number = 10) {
 export async function getUpcomingEvents(limit: number = 5) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -415,7 +415,7 @@ export async function getUpcomingEvents(limit: number = 5) {
 export async function getDashboardAlerts() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -531,7 +531,7 @@ export async function getDashboardAlerts() {
 export async function getDashboardFinancialStats() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 

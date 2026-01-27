@@ -59,7 +59,7 @@ async function main() {
       console.error("   Éditez ADHERENTS_EMAILS dans scripts/attribuer-badges-2025.ts");
       console.error("");
       console.log("💡 Pour trouver les emails des adhérents :");
-      console.log("   psql -d amakifr_db -c \"SELECT email, name FROM users WHERE role = 'Membre' LIMIT 10;\"");
+      console.log("   psql -d amakifr_db -c \"SELECT email, name FROM users WHERE role = 'MEMBRE' LIMIT 10;\"");
       process.exit(1);
     }
 

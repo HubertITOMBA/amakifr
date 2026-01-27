@@ -342,7 +342,7 @@ export default function IdeesPage() {
                         <SelectValue placeholder="Tous les auteurs" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Tous les auteurs</SelectItem>
+                        <SelectItem key="auteur-all" value="all">Tous les auteurs</SelectItem>
                         {auteurs.map((auteur) => (
                           <SelectItem key={auteur.id} value={auteur.id}>
                             {auteur.name}
@@ -361,12 +361,12 @@ export default function IdeesPage() {
                         <SelectValue placeholder="Toutes les dates" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Toutes les dates</SelectItem>
-                        <SelectItem value="today">Aujourd'hui</SelectItem>
-                        <SelectItem value="yesterday">Hier</SelectItem>
-                        <SelectItem value="thisWeek">Cette semaine</SelectItem>
-                        <SelectItem value="thisMonth">Ce mois</SelectItem>
-                        <SelectItem value="older">Plus ancien</SelectItem>
+                        <SelectItem key="date-all" value="all">Toutes les dates</SelectItem>
+                        <SelectItem key="date-today" value="today">Aujourd'hui</SelectItem>
+                        <SelectItem key="date-yesterday" value="yesterday">Hier</SelectItem>
+                        <SelectItem key="date-thisweek" value="thisWeek">Cette semaine</SelectItem>
+                        <SelectItem key="date-thismonth" value="thisMonth">Ce mois</SelectItem>
+                        <SelectItem key="date-older" value="older">Plus ancien</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>

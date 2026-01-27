@@ -52,7 +52,7 @@ const CreateCommentaireTacheSchema = z.object({
 export async function createProjet(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -112,7 +112,7 @@ export async function createProjet(formData: FormData) {
 export async function updateProjet(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -190,7 +190,7 @@ export async function updateProjet(formData: FormData) {
 export async function deleteProjet(projetId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -236,7 +236,7 @@ export async function deleteProjet(projetId: string) {
 export async function getAllProjets() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -364,7 +364,7 @@ export async function getProjetById(projetId: string) {
 export async function createSousProjet(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -438,7 +438,7 @@ export async function createSousProjet(formData: FormData) {
 export async function updateSousProjet(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -519,7 +519,7 @@ export async function updateSousProjet(formData: FormData) {
 export async function deleteSousProjet(sousProjetId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -566,7 +566,7 @@ export async function deleteSousProjet(sousProjetId: string) {
 export async function affecterSousProjet(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -801,7 +801,7 @@ export async function affecterSousProjet(formData: FormData) {
 export async function retirerAffectation(affectationId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 

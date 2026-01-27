@@ -16,6 +16,7 @@ import {
   Database,
 } from "lucide-react";
 import { toast } from "sonner";
+import { isAuthorizationError } from "@/lib/utils";
 import {
   getAdherentsForExport,
   getCotisationsForExport,
@@ -139,11 +140,18 @@ export default function ExportsPage() {
         setData((prev) => ({ ...prev, [typeId]: result.data }));
         toast.success(`${result.data.length} élément(s) chargé(s)`);
       } else {
-        toast.error(result.error || "Erreur lors du chargement");
+        // Ne pas afficher de toast pour les erreurs d'autorisation (l'utilisateur n'a simplement pas accès à cette fonctionnalité)
+        if (result.error && !isAuthorizationError(result.error)) {
+          toast.error(result.error || "Erreur lors du chargement");
+        }
       }
     } catch (error) {
       console.error("Erreur lors du chargement:", error);
-      toast.error("Erreur lors du chargement des données");
+      // Ne pas afficher de toast pour les erreurs d'autorisation
+      const errorMessage = error instanceof Error ? error.message : "Erreur lors du chargement des données";
+      if (!isAuthorizationError(errorMessage)) {
+        toast.error("Erreur lors du chargement des données");
+      }
     } finally {
       setLoading((prev) => ({ ...prev, [typeId]: false }));
     }

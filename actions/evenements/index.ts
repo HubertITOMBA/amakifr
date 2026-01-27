@@ -105,7 +105,7 @@ export async function createEvenement(data: z.infer<typeof EvenementSchema>) {
     }
 
     // Vérifier que l'utilisateur est admin
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent créer des événements" };
     }
 
@@ -220,7 +220,7 @@ export async function updateEvenement(id: string, data: z.infer<typeof Evenement
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent modifier des événements" };
     }
 
@@ -331,7 +331,7 @@ export async function deleteEvenement(id: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent supprimer des événements" };
     }
 
@@ -377,7 +377,7 @@ export async function getAllEvenements() {
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent voir tous les événements" };
     }
 
@@ -491,7 +491,7 @@ export async function getAdherentEvenements() {
       where: { userId: session.user.id },
     });
 
-    if (!adherent && session.user.role !== "Admin") {
+    if (!adherent && session.user.role !== "ADMIN") {
       return { success: false, error: "Vous devez être adhérent pour accéder à l'agenda" };
     }
 
@@ -682,7 +682,7 @@ export async function exportAllEvenementsCalendar(dateDebut?: Date, dateFin?: Da
 export async function getEvenementById(id: string) {
   try {
     const session = await auth();
-    const isAdmin = session?.user?.role === "Admin";
+    const isAdmin = session?.user?.role === "ADMIN";
     
     const evenement = await prisma.evenement.findUnique({
       where: { id },
@@ -995,7 +995,7 @@ export async function getAdherentsForEvent() {
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent accéder à cette fonctionnalité" };
     }
 
@@ -1039,7 +1039,7 @@ export async function addParticipantToEvent(
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent ajouter des participants" };
     }
 
@@ -1234,7 +1234,7 @@ export async function removeParticipantFromEvent(inscriptionId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent supprimer des participants" };
     }
 
@@ -1284,7 +1284,7 @@ export async function uploadEvenementImage(formData: FormData): Promise<{ succes
       return { success: false, message: "Non autorisé" };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, message: "Seuls les administrateurs peuvent uploader des images" };
     }
 
@@ -1353,7 +1353,7 @@ export async function getEvenementsStats() {
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent voir les statistiques" };
     }
 

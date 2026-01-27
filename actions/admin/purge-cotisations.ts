@@ -15,7 +15,7 @@ import { UserRole } from "@prisma/client";
 export async function purgeCotisationsEtPaiements() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 

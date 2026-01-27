@@ -145,7 +145,7 @@ export default function EditionVotePage() {
                 <SelectValue placeholder={vote.candidacy?.adherent?.User?.name || "Vote blanc"} />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="none">Vote blanc</SelectItem>
+                <SelectItem key="vote-blanc" value="none">Vote blanc</SelectItem>
                 {filteredCandidacies.map(opt => (
                   <SelectItem key={opt.id} value={opt.id}>{opt.label}</SelectItem>
                 ))}
@@ -159,9 +159,9 @@ export default function EditionVotePage() {
                 <SelectValue placeholder="Choisir un statut" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="Valide">Valide</SelectItem>
-                <SelectItem value="Blanc">Blanc</SelectItem>
-                <SelectItem value="Annule">Annulé</SelectItem>
+                <SelectItem key="status-valide" value="Valide">Valide</SelectItem>
+                <SelectItem key="status-blanc" value="Blanc">Blanc</SelectItem>
+                <SelectItem key="status-annule" value="Annule">Annulé</SelectItem>
               </SelectContent>
             </Select>
           </div>

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useMemo } from "react";
+import { useMemo, useEffect, useState } from "react";
 import { useElectoralMenu } from "@/hooks/use-electoral-menu";
 import { useDynamicMenus, getUserMenuRoles } from "@/hooks/use-dynamic-menus";
 import { useCurrentUser } from "@/hooks/use-current-user";
+import { getCurrentUserAdminRoles } from "@/actions/user/admin-roles";
+import { AdminRole } from "@prisma/client";
 import * as LucideIcons from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -18,9 +20,79 @@ export function DynamicSidebar() {
   const router = useRouter();
   const user = useCurrentUser();
   const { enabled: electoralMenuEnabled } = useElectoralMenu();
+  const [adminRoles, setAdminRoles] = useState<AdminRole[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
   
-  // Déterminer les rôles de l'utilisateur (pour l'admin, toujours ADMIN)
-  const userRoles = getUserMenuRoles(user?.role, !!user);
+  // Charger les rôles d'administration de l'utilisateur
+  useEffect(() => {
+    const loadAdminRoles = async () => {
+      if (!user?.id) {
+        setLoadingRoles(false);
+        return;
+      }
+      
+      try {
+        const result = await getCurrentUserAdminRoles();
+        if (result && result.success && result.roles) {
+          setAdminRoles(result.roles);
+        } else if (result && !result.success) {
+          console.warn("[DynamicSidebar] Impossible de charger les rôles:", result.error);
+          // Continuer sans les rôles d'administration
+          setAdminRoles([]);
+        }
+      } catch (error) {
+        console.error("[DynamicSidebar] Erreur lors du chargement des rôles:", error);
+        // Continuer sans les rôles d'administration en cas d'erreur
+        setAdminRoles([]);
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    loadAdminRoles();
+  }, [user?.id]);
+  
+  // Déterminer les rôles de l'utilisateur (UserRole + AdminRole)
+  const userRoles = useMemo(() => {
+    try {
+      // Normaliser le rôle utilisateur pour être sûr qu'il est en majuscules
+      const normalizedUserRole = user?.role?.toString().trim().toUpperCase();
+      
+      // Log détaillé pour déboguer
+      console.log("[DynamicSidebar] Données utilisateur brutes:", {
+        userRole: user?.role,
+        normalizedUserRole: normalizedUserRole,
+        userRoleType: typeof user?.role,
+        userRoleValue: JSON.stringify(user?.role),
+        adminRoles: adminRoles,
+        userEmail: user?.email,
+        userId: user?.id,
+      });
+      
+      const roles = getUserMenuRoles(
+        normalizedUserRole, // Utiliser le rôle normalisé
+        !!user,
+        adminRoles.map(r => String(r)) // Convertir AdminRole en string pour correspondre à MenuRole
+      );
+      
+      // Log pour déboguer
+      console.log("[DynamicSidebar] Rôles utilisateur convertis:", {
+        userRole: user?.role,
+        normalizedUserRole: normalizedUserRole,
+        adminRoles: adminRoles,
+        menuRoles: roles,
+        userEmail: user?.email,
+        hasAdminRole: roles.includes("ADMIN"),
+      });
+      
+      return roles;
+    } catch (error) {
+      console.error("[DynamicSidebar] Erreur lors de la conversion des rôles:", error);
+      // Retourner les rôles de base en cas d'erreur
+      const normalizedUserRole = user?.role?.toString().trim().toUpperCase();
+      return getUserMenuRoles(normalizedUserRole, !!user, []);
+    }
+  }, [user?.role, user, adminRoles]);
   
   // Charger les menus depuis la DB
   const { menus, loading } = useDynamicMenus("SIDEBAR", userRoles);
@@ -39,6 +111,20 @@ export function DynamicSidebar() {
       return true;
     });
   }, [menus, electoralMenuEnabled]);
+  
+  // Log pour déboguer
+  useEffect(() => {
+    if (!loading) {
+      console.log("[DynamicSidebar] État des menus:", {
+        loading,
+        menusCount: menus.length,
+        filteredMenusCount: filteredMenus.length,
+        userRoles,
+        menus: menus.map(m => ({ libelle: m.libelle, roles: m.roles, lien: m.lien })),
+        filteredMenus: filteredMenus.map(m => ({ libelle: m.libelle, roles: m.roles, lien: m.lien })),
+      });
+    }
+  }, [menus, loading, userRoles, filteredMenus]);
 
   // Fonction pour récupérer l'icône Lucide dynamiquement
   const getIcon = (iconName: string | null) => {
@@ -47,7 +133,7 @@ export function DynamicSidebar() {
     return IconComponent ? <IconComponent className="h-5 w-5 shrink-0" /> : null;
   };
 
-  if (loading) {
+  if (loading || loadingRoles) {
     return (
       <div className="flex items-center justify-center gap-2 py-8 text-sm text-gray-500">
         <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>

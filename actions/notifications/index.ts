@@ -72,7 +72,7 @@ export async function createNotification(data: z.infer<typeof CreateNotification
 export async function createNotifications(data: z.infer<typeof CreateNotificationsSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
@@ -221,7 +221,7 @@ export async function getAllNotifications(options?: {
 }) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 

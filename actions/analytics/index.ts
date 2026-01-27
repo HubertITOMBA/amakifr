@@ -45,7 +45,7 @@ async function safeAggregate<T extends { _sum: { montant?: any } }>(
 export async function getAnalyticsDashboard(period: "week" | "month" | "quarter" | "year" = "month") {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -152,20 +152,20 @@ async function getAdherentsStats(
 ) {
   const [totalActifs, totalInactifs, nouveaux, anciens] = await Promise.all([
     prisma.user.count({
-      where: { status: "Actif", role: "Membre" },
+      where: { status: "Actif", role: "MEMBRE" },
     }),
     prisma.user.count({
-      where: { status: "Inactif", role: "Membre" },
+      where: { status: "Inactif", role: "MEMBRE" },
     }),
     prisma.user.count({
       where: {
-        role: "Membre",
+        role: "MEMBRE",
         createdAt: { gte: startDate, lte: endDate },
       },
     }),
     prisma.user.count({
       where: {
-        role: "Membre",
+        role: "MEMBRE",
         createdAt: { gte: previousStartDate, lte: previousEndDate },
       },
     }),
@@ -621,7 +621,7 @@ async function getEvolutionAdherents(months: number = 12) {
 
     const count = await prisma.user.count({
       where: {
-        role: "Membre",
+        role: "MEMBRE",
         createdAt: { lte: end },
       },
     });

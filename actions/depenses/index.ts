@@ -42,7 +42,7 @@ const UpdateDepenseSchema = z.object({
 export async function createDepense(data: z.infer<typeof CreateDepenseSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -65,6 +65,14 @@ export async function createDepense(data: z.infer<typeof CreateDepenseSchema>) {
           select: {
             id: true,
             email: true,
+            name: true,
+          }
+        },
+        ValidatedBy: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
           }
         },
         TypeDepense: {
@@ -115,7 +123,7 @@ export async function createDepense(data: z.infer<typeof CreateDepenseSchema>) {
 export async function getAllDepenses() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -125,6 +133,14 @@ export async function getAllDepenses() {
           select: {
             id: true,
             email: true,
+            name: true,
+          }
+        },
+        ValidatedBy: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
           }
         },
         TypeDepense: {
@@ -158,7 +174,7 @@ export async function getAllDepenses() {
 export async function updateDepense(data: z.infer<typeof UpdateDepenseSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -195,6 +211,14 @@ export async function updateDepense(data: z.infer<typeof UpdateDepenseSchema>) {
           select: {
             id: true,
             email: true,
+            name: true,
+          }
+        },
+        ValidatedBy: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
           }
         },
         TypeDepense: {
@@ -243,7 +267,7 @@ export async function updateDepense(data: z.infer<typeof UpdateDepenseSchema>) {
 export async function deleteDepense(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -306,14 +330,41 @@ export async function deleteDepense(id: string) {
 export async function validateDepense(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
+    // Récupérer les informations de la dépense avant la mise à jour
+    const depenseInfo = await prisma.depense.findUnique({
+      where: { id },
+      select: { libelle: true, montant: true }
+    });
+
     await prisma.depense.update({
       where: { id },
-      data: { statut: "Valide" }
+      data: { 
+        statut: "Valide",
+        validatedBy: session.user.id
+      }
     });
+
+    // Logger l'activité de validation
+    try {
+      await logModification(
+        `Validation de la dépense: ${depenseInfo?.libelle || id}`,
+        "Depense",
+        id,
+        {
+          libelle: depenseInfo?.libelle,
+          montant: depenseInfo?.montant ? Number(depenseInfo.montant) : null,
+          statut: "Valide",
+          validatedBy: session.user.id,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer la validation si le logging échoue
+    }
 
     revalidatePath("/admin/depenses");
     revalidatePath(`/admin/depenses/${id}/edition`);
@@ -336,14 +387,41 @@ export async function validateDepense(id: string) {
 export async function rejectDepense(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
+    // Récupérer les informations de la dépense avant la mise à jour
+    const depenseInfo = await prisma.depense.findUnique({
+      where: { id },
+      select: { libelle: true, montant: true }
+    });
+
     await prisma.depense.update({
       where: { id },
-      data: { statut: "Rejete" }
+      data: { 
+        statut: "Rejete",
+        validatedBy: null // Réinitialiser le validateur en cas de rejet
+      }
     });
+
+    // Logger l'activité de rejet
+    try {
+      await logModification(
+        `Rejet de la dépense: ${depenseInfo?.libelle || id}`,
+        "Depense",
+        id,
+        {
+          libelle: depenseInfo?.libelle,
+          montant: depenseInfo?.montant ? Number(depenseInfo.montant) : null,
+          statut: "Rejete",
+          rejectedBy: session.user.id,
+        }
+      );
+    } catch (logError) {
+      console.error("Erreur lors du logging de l'activité:", logError);
+      // Ne pas bloquer le rejet si le logging échoue
+    }
 
     revalidatePath("/admin/depenses");
     revalidatePath(`/admin/depenses/${id}/edition`);
@@ -366,13 +444,16 @@ export async function rejectDepense(id: string) {
 export async function suspendDepense(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
     await prisma.depense.update({
       where: { id },
-      data: { statut: "EnAttente" }
+      data: { 
+        statut: "EnAttente",
+        validatedBy: null // Réinitialiser le validateur quand on remet en attente
+      }
     });
 
     revalidatePath("/admin/depenses");
@@ -391,7 +472,7 @@ export async function suspendDepense(id: string) {
 export async function getDepenseStats() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -463,7 +544,7 @@ export async function getDepenseStats() {
 export async function getDepenseById(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -474,6 +555,14 @@ export async function getDepenseById(id: string) {
           select: {
             id: true,
             email: true,
+            name: true,
+          }
+        },
+        ValidatedBy: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
           }
         },
         TypeDepense: {
@@ -530,7 +619,7 @@ export async function filterDepenses(filters: {
 }) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -569,6 +658,14 @@ export async function filterDepenses(filters: {
           select: {
             id: true,
             email: true,
+            name: true,
+          }
+        },
+        ValidatedBy: {
+          select: {
+            id: true,
+            email: true,
+            name: true,
           }
         },
         TypeDepense: {
@@ -607,7 +704,7 @@ export async function filterDepenses(filters: {
 export async function uploadJustificatif(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -724,7 +821,7 @@ export async function uploadJustificatif(formData: FormData) {
 export async function deleteJustificatif(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -776,7 +873,7 @@ export async function deleteJustificatif(id: string) {
 export async function getJustificatifsByDepense(depenseId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 

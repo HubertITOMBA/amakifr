@@ -126,7 +126,7 @@ export default function AdminRGPDDemandesPage() {
   const loadData = useCallback(async () => {
     if (sessionStatus === "loading") return;
 
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       router.push("/");
       return;
     }
@@ -639,13 +639,13 @@ export default function AdminRGPDDemandesPage() {
                   <SelectValue placeholder="Filtrer par statut" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="EnAttente">En attente</SelectItem>
-                  <SelectItem value="EnVerification">En vérification</SelectItem>
-                  <SelectItem value="Approuvee">Approuvées</SelectItem>
-                  <SelectItem value="Rejetee">Rejetées</SelectItem>
-                  <SelectItem value="Completee">Complétées</SelectItem>
-                  <SelectItem value="Annulee">Annulées</SelectItem>
+                  <SelectItem key="rgpd-all" value="all">Tous les statuts</SelectItem>
+                  <SelectItem key="rgpd-enattente" value="EnAttente">En attente</SelectItem>
+                  <SelectItem key="rgpd-enverification" value="EnVerification">En vérification</SelectItem>
+                  <SelectItem key="rgpd-approuvee" value="Approuvee">Approuvées</SelectItem>
+                  <SelectItem key="rgpd-rejetee" value="Rejetee">Rejetées</SelectItem>
+                  <SelectItem key="rgpd-completee" value="Completee">Complétées</SelectItem>
+                  <SelectItem key="rgpd-annulee" value="Annulee">Annulées</SelectItem>
                 </SelectContent>
               </Select>
               <ColumnVisibilityToggle

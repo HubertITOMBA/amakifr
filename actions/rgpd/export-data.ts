@@ -18,7 +18,7 @@ import { fr } from "date-fns/locale";
 export async function exportUserData(userId: string) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé. Seuls les administrateurs peuvent exporter les données.",
@@ -201,7 +201,7 @@ export async function exportUserData(userId: string) {
 export async function downloadExportFile(filePath: string) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé.",

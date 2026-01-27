@@ -52,7 +52,7 @@ export async function updateElectoralMenuStatus(enabled: boolean) {
       select: { role: true },
     });
 
-    if (user?.role !== "Admin") {
+    if (user?.role !== "ADMIN") {
       return { success: false, error: "Accès réservé aux administrateurs" };
     }
 

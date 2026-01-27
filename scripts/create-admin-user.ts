@@ -46,9 +46,9 @@ async function createAdminUser() {
     const newAdmin = await prisma.user.create({
       data: {
         email: 'admin@amaki.fr',
-        name: 'Admin',
+        name: 'ADMIN',
         password: hashedPassword,
-        role: UserRole.Admin,
+        role: UserRole.ADMIN,
         status: UserStatus.Actif,
         emailVerified: emailVerifiedDate,
       },

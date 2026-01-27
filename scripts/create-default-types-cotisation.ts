@@ -8,7 +8,7 @@ async function createDefaultTypesCotisationMensuelle() {
   try {
     // Trouver un admin pour créer les types
     const admin = await prisma.user.findFirst({
-      where: { role: UserRole.Admin }
+      where: { role: UserRole.ADMIN }
     });
 
     if (!admin) {

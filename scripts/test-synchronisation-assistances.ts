@@ -55,7 +55,7 @@ async function test1_CreationAssistance_CreationCotisationDuMois() {
       where: {
         User: {
           status: "Actif",
-          role: { not: "Admin" },
+          role: { not: "ADMIN" },
         },
       },
       include: { User: true },
@@ -132,7 +132,7 @@ async function test1_CreationAssistance_CreationCotisationDuMois() {
         montantRestant: new Decimal(50),
         statut: "EnAttente",
         description: "Test de synchronisation",
-        createdBy: (await prisma.user.findFirst({ where: { role: "Admin" } }))?.id || "",
+        createdBy: (await prisma.user.findFirst({ where: { role: "ADMIN" } }))?.id || "",
       },
     });
 
@@ -210,7 +210,7 @@ async function test2_UpdateAssistance_UpdateCotisationDuMois() {
       where: {
         User: {
           status: "Actif",
-          role: { not: "Admin" },
+          role: { not: "ADMIN" },
         },
       },
       include: { User: true },
@@ -252,7 +252,7 @@ async function test2_UpdateAssistance_UpdateCotisationDuMois() {
         montantRestant: new Decimal(50),
         statut: "EnAttente",
         description: "Test initial",
-        createdBy: (await prisma.user.findFirst({ where: { role: "Admin" } }))?.id || "",
+        createdBy: (await prisma.user.findFirst({ where: { role: "ADMIN" } }))?.id || "",
       },
     });
 
@@ -267,7 +267,7 @@ async function test2_UpdateAssistance_UpdateCotisationDuMois() {
         description: "Test initial",
         adherentBeneficiaireId: adherent.id,
         statut: "Planifie",
-        createdBy: (await prisma.user.findFirst({ where: { role: "Admin" } }))?.id || "",
+        createdBy: (await prisma.user.findFirst({ where: { role: "ADMIN" } }))?.id || "",
       },
     });
 
@@ -352,7 +352,7 @@ async function test3_UpdateCotisationDuMois_UpdateCotisationsMensuelles() {
       where: {
         User: {
           status: "Actif",
-          role: { not: "Admin" },
+          role: { not: "ADMIN" },
         },
       },
       include: { User: true },
@@ -401,7 +401,7 @@ async function test3_UpdateCotisationDuMois_UpdateCotisationsMensuelles() {
         dateEcheance: new Date(dateTest.getFullYear(), dateTest.getMonth(), 15),
         description: "Forfait mensuel",
         statut: "Planifie",
-        createdBy: (await prisma.user.findFirst({ where: { role: "Admin" } }))?.id || "",
+        createdBy: (await prisma.user.findFirst({ where: { role: "ADMIN" } }))?.id || "",
       },
     });
 
@@ -417,7 +417,7 @@ async function test3_UpdateCotisationDuMois_UpdateCotisationsMensuelles() {
         description: "Assistance test",
         adherentBeneficiaireId: adherent.id, // L'adhérent est bénéficiaire
         statut: "Planifie",
-        createdBy: (await prisma.user.findFirst({ where: { role: "Admin" } }))?.id || "",
+        createdBy: (await prisma.user.findFirst({ where: { role: "ADMIN" } }))?.id || "",
       },
     });
 
@@ -441,7 +441,7 @@ async function test3_UpdateCotisationDuMois_UpdateCotisationsMensuelles() {
         statut: "EnAttente",
         description: `Cotisation ${periode}: Forfait 15€ (bénéficiaire d'assistance, ne paie pas)`,
         cotisationDuMoisId: cotisationForfait.id,
-        createdBy: (await prisma.user.findFirst({ where: { role: "Admin" } }))?.id || "",
+        createdBy: (await prisma.user.findFirst({ where: { role: "ADMIN" } }))?.id || "",
       },
     });
 

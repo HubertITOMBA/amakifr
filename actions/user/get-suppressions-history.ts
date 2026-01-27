@@ -20,7 +20,7 @@ export async function getSuppressionsHistory(
   try {
     // Vérifier que l'utilisateur connecté est admin
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé. Seuls les administrateurs peuvent consulter l'historique des suppressions.",
@@ -92,7 +92,7 @@ export async function getSuppressionsStats() {
   try {
     // Vérifier que l'utilisateur connecté est admin
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé.",

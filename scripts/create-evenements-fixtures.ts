@@ -13,7 +13,7 @@ async function createEvenementsFixtures() {
 
     // Récupérer l'admin pour createdBy
     const admin = await prisma.user.findFirst({
-      where: { role: 'Admin' }
+      where: { role: 'ADMIN' }
     });
 
     if (!admin) {

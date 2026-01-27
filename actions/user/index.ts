@@ -241,7 +241,7 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
 
     // Si l'utilisateur est un administrateur, il ne doit pas voir de cotisations, assistances, dettes, etc.
     // L'admin n'est pas adhérent et ne cotise ni ne bénéficie d'assistances
-    const isAdmin = user.role === UserRole.Admin;
+    const isAdmin = user.role === UserRole.ADMIN;
 
     // Récupérer TOUTES les assistances du mois en cours (pas seulement celles de l'utilisateur)
     // Car l'utilisateur doit payer les assistances des autres adhérents
@@ -1049,7 +1049,7 @@ export async function getAdherentsLight(): Promise<{ success: boolean; adherents
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await db.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     const adherents = await db.adherent.findMany({
       include: { User: { select: { email: true } } },
@@ -1065,13 +1065,21 @@ export async function getAdherentsLight(): Promise<{ success: boolean; adherents
 }
 
 // Server Action pour récupérer tous les utilisateurs pour l'admin
+// Permet la lecture pour ADMIN, PRESID, SECRET, VICESE, TRESOR, VICEPR, VTRESO
 export async function getAllUsersForAdmin(): Promise<{ success: boolean; users?: any[]; error?: string }> {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await db.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user) return { success: false, error: "Utilisateur non trouvé" };
+    
+    // Vérifier que l'utilisateur a un rôle admin autorisé à la lecture
+    const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+    const normalizedRole = user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
+      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
+    }
 
     const users = await db.user.findMany({
       select: {
@@ -1231,7 +1239,7 @@ export async function getUserByIdForAdmin(userId: string): Promise<{ success: bo
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     const targetUser = await prisma.user.findUnique({
       where: { id: userId },
@@ -1264,13 +1272,13 @@ export async function getUserByIdForAdmin(userId: string): Promise<{ success: bo
 }
 
 // Server Action pour changer le rôle d'un utilisateur
-export async function adminUpdateUserRole(userId: string, role: "Admin" | "Membre" | "Invite"): Promise<{ success: boolean; error?: string }> {
+export async function adminUpdateUserRole(userId: string, role: "ADMIN" | "MEMBRE" | "INVITE"): Promise<{ success: boolean; error?: string }> {
   try {
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     // Empêcher de changer son propre rôle
     if (userId === session.user.id) {
@@ -1296,7 +1304,7 @@ export async function adminUpdateUserStatus(userId: string, status: "Actif" | "I
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     // Empêcher de changer son propre statut
     if (userId === session.user.id) {
@@ -1391,7 +1399,7 @@ export async function adminUpdateUser(userId: string, data: { name?: string; ema
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     // Vérifier l'unicité du nom si le nom est modifié
     if (data.name !== undefined && data.name) {
@@ -1471,7 +1479,7 @@ export async function adminUpdateAdherentPoste(
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     // Vérifier que l'adhérent existe
     const adherent = await prisma.adherent.findUnique({

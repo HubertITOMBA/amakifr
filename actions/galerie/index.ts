@@ -41,7 +41,7 @@ export async function uploadMediaGalerie(formData: FormData) {
       return { success: false, error: "Non autorisé. Vous devez être connecté." };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent ajouter des médias à la galerie." };
     }
 
@@ -305,7 +305,7 @@ export async function updateMediaGalerie(formData: FormData) {
       return { success: false, error: "Non autorisé. Vous devez être connecté." };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent modifier les médias." };
     }
 
@@ -388,7 +388,7 @@ export async function deleteMediaGalerie(id: string) {
       return { success: false, error: "Non autorisé. Vous devez être connecté." };
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent supprimer les médias." };
     }
 

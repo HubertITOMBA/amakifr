@@ -12,7 +12,7 @@ import { logExport } from "@/lib/activity-logger";
 export async function getAdherentsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -96,7 +96,7 @@ export async function getAdherentsForExport() {
 export async function getCotisationsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -139,7 +139,7 @@ export async function getCotisationsForExport() {
 export async function getPaiementsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -181,7 +181,7 @@ export async function getPaiementsForExport() {
 export async function getEvenementsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -233,7 +233,7 @@ export async function getEvenementsForExport() {
 export async function getInscriptionsEvenementsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -285,7 +285,7 @@ export async function getInscriptionsEvenementsForExport() {
 export async function getElectionsResultsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -352,7 +352,7 @@ export async function getElectionsResultsForExport() {
 export async function getDocumentsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -398,7 +398,7 @@ export async function getDocumentsForExport() {
 export async function getRelancesForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 

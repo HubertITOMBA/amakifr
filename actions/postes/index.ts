@@ -191,7 +191,7 @@ export async function createPosteTemplate(data: z.infer<typeof PosteTemplateSche
     }
 
     // Vérifier que l'utilisateur est admin
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent créer des postes" };
     }
 
@@ -264,7 +264,7 @@ export async function updatePosteTemplate(
     }
 
     // Vérifier que l'utilisateur est admin
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent modifier des postes" };
     }
 
@@ -323,7 +323,7 @@ export async function deletePosteTemplate(id: string) {
     }
 
     // Vérifier que l'utilisateur est admin
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent supprimer des postes" };
     }
 
@@ -377,7 +377,7 @@ export async function togglePosteTemplateStatus(id: string, actif: boolean) {
     }
 
     // Vérifier que l'utilisateur est admin
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent modifier le statut des postes" };
     }
 

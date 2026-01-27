@@ -36,7 +36,7 @@ const UpdateCotisationSchema = z.object({
 export async function createMonthlyCotisations(data: z.infer<typeof CreateMonthlyCotisationSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -126,7 +126,7 @@ export async function createMonthlyCotisations(data: z.infer<typeof CreateMonthl
 export async function createManualCotisation(data: z.infer<typeof CreateCotisationSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -248,7 +248,7 @@ export async function createManualCotisation(data: z.infer<typeof CreateCotisati
 export async function getAdherentsWithCotisations() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -496,7 +496,7 @@ export async function getAdherentsWithCotisations() {
 export async function updateCotisation(data: z.infer<typeof UpdateCotisationSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -536,7 +536,7 @@ export async function updateCotisation(data: z.infer<typeof UpdateCotisationSche
 export async function getCotisationStats() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -608,7 +608,7 @@ export async function getCotisationStats() {
 export async function sendAutomaticReminders() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 

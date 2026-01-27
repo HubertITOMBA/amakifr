@@ -70,7 +70,7 @@ export function Navbar() {
               </Link>
             ))}
             {/* Menu Admin - visible seulement pour les administrateurs */}
-            {user?.role === "Admin" && (
+            {user?.role === "ADMIN" && (
               <Link 
                 href="/admin"
                 className="font-title text-xl font-semibold leading-6 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-2"
@@ -124,7 +124,7 @@ export function Navbar() {
                 </Link>
               ))}
               {/* Menu Admin Mobile - visible seulement pour les administrateurs */}
-              {user?.role === "Admin" && (
+              {user?.role === "ADMIN" && (
                 <Link
                   href="/admin"
                   className="flex items-center gap-2 px-4 py-3 sm:px-3 sm:py-2 text-base font-medium text-gray-700 dark:text-gray-300 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-gray-50 dark:hover:bg-gray-800 rounded-md transition-colors min-h-[44px] sm:min-h-0 touch-manipulation"

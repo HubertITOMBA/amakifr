@@ -15,6 +15,7 @@ import { TypeDocument } from "@prisma/client";
 
 interface DocumentUploadProps {
   onUploadSuccess?: (document: any) => void;
+  onClose?: () => void;
   folder?: string;
   maxSize?: number; // en MB
   accept?: string;
@@ -181,6 +182,7 @@ const getCategoriesForDocumentType = (mimeType: string): string[] => {
 
 export function DocumentUpload({
   onUploadSuccess,
+  onClose,
   folder = "documents",
   maxSize = 50,
   accept = ACCEPT_EXTENSIONS,
@@ -561,24 +563,38 @@ export function DocumentUpload({
                       </div>
                     )}
 
-                    {/* Bouton d'upload */}
-                    <Button
-                      onClick={handleUpload}
-                      disabled={uploading}
-                      className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white text-sm h-9 sm:h-10"
-                    >
-                      {uploading ? (
-                        <>
-                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                          Téléversement en cours...
-                        </>
-                      ) : (
-                        <>
-                          <Upload className="h-4 w-4 mr-2" />
-                          Téléverser le document
-                        </>
+                    {/* Boutons d'action */}
+                    <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 justify-end">
+                      {onClose && (
+                        <Button
+                          type="button"
+                          variant="outline"
+                          onClick={onClose}
+                          disabled={uploading}
+                          className="w-full sm:w-auto border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 text-sm h-9 sm:h-10"
+                        >
+                          <X className="h-4 w-4 mr-2" />
+                          Annuler
+                        </Button>
                       )}
-                    </Button>
+                      <Button
+                        onClick={handleUpload}
+                        disabled={uploading}
+                        className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 dark:bg-blue-700 dark:hover:bg-blue-600 text-white text-sm h-9 sm:h-10"
+                      >
+                        {uploading ? (
+                          <>
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                            Téléversement en cours...
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-2" />
+                            Téléverser le document
+                          </>
+                        )}
+                      </Button>
+                    </div>
                   </div>
                 )}
               </div>

@@ -31,7 +31,7 @@ const UpdateTypeDepenseSchema = z.object({
 export async function createTypeDepense(data: z.infer<typeof CreateTypeDepenseSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -76,7 +76,7 @@ export async function createTypeDepense(data: z.infer<typeof CreateTypeDepenseSc
 export async function getAllTypesDepense() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -116,7 +116,7 @@ export async function getAllTypesDepense() {
 export async function updateTypeDepense(data: z.infer<typeof UpdateTypeDepenseSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -183,7 +183,7 @@ export async function updateTypeDepense(data: z.infer<typeof UpdateTypeDepenseSc
 export async function deleteTypeDepense(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -222,7 +222,7 @@ export async function deleteTypeDepense(id: string) {
 export async function getTypeDepenseById(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 

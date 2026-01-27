@@ -933,7 +933,7 @@ export const chatbotGuides: Guide[] = [
     title: '[ADMIN] Comment encaisser une cotisation manuelle',
     steps: [
       '📋 Cette fonction est réservée aux administrateurs',
-      'Allez dans "Admin" > "Gestion des Cotisations"',
+      'Allez dans "ADMIN" > "Gestion des Cotisations"',
       'Recherchez l\'adhérent concerné dans la liste',
       'Cliquez sur le bouton "Actions" (trois points) à côté de l\'adhérent',
       'Sélectionnez "Encaisser un paiement manuel"',
@@ -958,7 +958,7 @@ export const chatbotGuides: Guide[] = [
     title: '[ADMIN] Comment créer la cotisation mensuelle',
     steps: [
       '📋 Cette fonction est réservée aux administrateurs',
-      'Allez dans "Admin" > "Gestion des Cotisations" > "Cotisations Mensuelles"',
+      'Allez dans "ADMIN" > "Gestion des Cotisations" > "Cotisations Mensuelles"',
       'Cliquez sur le bouton "Créer la cotisation du mois"',
       'Un dialog de confirmation s\'ouvre avec les informations suivantes :',
       '  • Le mois et l\'année de la cotisation à créer',
@@ -988,7 +988,7 @@ export const chatbotGuides: Guide[] = [
       'Il existe deux types d\'assistances : ponctuelle et mensuelle récurrente',
       '',
       '🔹 Pour créer une assistance ponctuelle :',
-      'Allez dans "Admin" > "Gestion des Cotisations" > "Assistances"',
+      'Allez dans "ADMIN" > "Gestion des Cotisations" > "Assistances"',
       'Cliquez sur "Nouvelle assistance ponctuelle"',
       'Remplissez le formulaire :',
       '  • Sélectionnez le bénéficiaire (adhérent)',
@@ -999,7 +999,7 @@ export const chatbotGuides: Guide[] = [
       'Cliquez sur "Enregistrer"',
       '',
       '🔹 Pour créer une assistance mensuelle récurrente :',
-      'Allez dans "Admin" > "Gestion des Cotisations" > "Assistances Mensuelles"',
+      'Allez dans "ADMIN" > "Gestion des Cotisations" > "Assistances Mensuelles"',
       'Cliquez sur "Nouvelle assistance mensuelle"',
       'Remplissez le formulaire :',
       '  • Sélectionnez le bénéficiaire',
@@ -1024,7 +1024,7 @@ export const chatbotGuides: Guide[] = [
     title: '[ADMIN] Comment créer un événement',
     steps: [
       '📋 Cette fonction est réservée aux administrateurs',
-      'Allez dans "Admin" > "Événements" ou directement sur /admin/evenements',
+      'Allez dans "ADMIN" > "Événements" ou directement sur /admin/evenements',
       'Cliquez sur le bouton "Nouvel événement" ou "Créer un événement"',
       '',
       '📝 Informations obligatoires :',
@@ -1092,7 +1092,7 @@ export const chatbotGuides: Guide[] = [
     title: '[ADMIN] Comment créer un projet',
     steps: [
       '📋 Cette fonction est réservée aux administrateurs',
-      'Allez dans "Admin" > "Projets" ou directement sur /admin/projets',
+      'Allez dans "ADMIN" > "Projets" ou directement sur /admin/projets',
       'Cliquez sur le bouton "Nouveau projet" ou "Créer un projet"',
       '',
       '📝 Informations obligatoires :',
@@ -1130,7 +1130,7 @@ export const chatbotGuides: Guide[] = [
     title: '[ADMIN] Comment ajouter une tâche à un projet',
     steps: [
       '📋 Cette fonction est réservée aux administrateurs',
-      'Allez dans "Admin" > "Projets"',
+      'Allez dans "ADMIN" > "Projets"',
       'Cliquez sur le projet pour lequel vous voulez ajouter une tâche',
       'ou',
       'Allez directement sur /admin/projets/[id]',
@@ -1174,7 +1174,7 @@ export const chatbotGuides: Guide[] = [
     title: '[ADMIN] Comment affecter une tâche à un adhérent',
     steps: [
       '📋 Cette fonction est réservée aux administrateurs',
-      'Allez dans "Admin" > "Projets"',
+      'Allez dans "ADMIN" > "Projets"',
       'Cliquez sur le projet contenant la tâche',
       'Dans la liste des tâches, cliquez sur le bouton "Affecter" (icône 👥) à côté de la tâche',
       '',
@@ -1218,7 +1218,7 @@ export const chatbotGuides: Guide[] = [
     title: '[ADMIN] Comment créer et ajouter une photo ou une vidéo dans la galerie',
     steps: [
       '📋 Cette fonction est réservée aux administrateurs',
-      'Allez dans "Admin" > "Galerie" ou directement sur /admin/galerie',
+      'Allez dans "ADMIN" > "Galerie" ou directement sur /admin/galerie',
       'Cliquez sur le bouton "Nouveau média" ou "Ajouter un média"',
       '',
       '📤 Sélection du fichier :',
@@ -1291,7 +1291,7 @@ export const chatbotGuides: Guide[] = [
     title: '[ADMIN] Comment envoyer une notification à un ou plusieurs adhérents',
     steps: [
       '📋 Cette fonction est réservée aux administrateurs',
-      'Allez dans "Admin" > "Gestion des Notifications"',
+      'Allez dans "ADMIN" > "Gestion des Notifications"',
       'Cliquez sur "Nouvelle notification"',
       '',
       '📝 Contenu de la notification :',
@@ -1346,7 +1346,7 @@ export const chatbotGuides: Guide[] = [
     title: '[ADMIN] Comment créer et gérer une dépense',
     steps: [
       '📋 Cette fonction est réservée aux administrateurs',
-      'Allez dans "Admin" > "Gestion des Finances" > "Dépenses"',
+      'Allez dans "ADMIN" > "Gestion des Finances" > "Dépenses"',
       'ou',
       'Allez directement sur /admin/depenses',
       '',
@@ -1412,7 +1412,7 @@ export const chatbotGuides: Guide[] = [
       'Les types de dépenses permettent de catégoriser et organiser les dépenses de l\'association',
       '',
       '🔍 Pour accéder à la gestion des types :',
-      'Allez dans "Admin" > "Gestion des Finances" > "Types de Dépenses"',
+      'Allez dans "ADMIN" > "Gestion des Finances" > "Types de Dépenses"',
       'ou',
       'Allez directement sur /admin/types-depense',
       '',
@@ -1456,7 +1456,7 @@ export const chatbotGuides: Guide[] = [
     title: '[ADMIN] Comment envoyer un email à un ou plusieurs adhérents',
     steps: [
       '📋 Cette fonction est réservée aux administrateurs',
-      'Allez dans "Admin" > "Gestion des Emails"',
+      'Allez dans "ADMIN" > "Gestion des Emails"',
       'Cliquez sur "Nouvel email" ou "Composer un email"',
       '',
       '📝 Composition de l\'email :',

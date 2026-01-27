@@ -61,7 +61,7 @@ export async function generateReceiptPDF(paiementId: string): Promise<{
       return { success: false, error: "Utilisateur non trouvé" };
     }
 
-    if (user.role !== "Admin" && user.adherent?.id !== paiement.adherentId) {
+    if (user.role !== "ADMIN" && user.adherent?.id !== paiement.adherentId) {
       return { success: false, error: "Non autorisé à télécharger ce reçu" };
     }
 

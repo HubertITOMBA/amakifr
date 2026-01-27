@@ -111,7 +111,7 @@ export default function AdminSuppressionsPage() {
   const loadData = useCallback(async () => {
     if (sessionStatus === "loading") return;
 
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       router.push("/");
       return;
     }

@@ -14,7 +14,7 @@ async function createAnniversaireEvenement() {
     // Récupérer le premier admin pour createdBy
     const admin = await prisma.user.findFirst({
       where: {
-        role: "Admin",
+        role: "ADMIN",
       },
       select: {
         id: true,

@@ -38,7 +38,7 @@ const UpdateCotisationDuMoisSchema = z.object({
 export async function createCotisationDuMois(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -180,7 +180,7 @@ export async function createCotisationDuMois(formData: FormData) {
 export async function updateCotisationDuMois(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -404,7 +404,7 @@ export async function updateCotisationDuMois(formData: FormData) {
 export async function deleteCotisationDuMois(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -458,7 +458,7 @@ export async function deleteCotisationDuMois(id: string) {
 export async function getAllCotisationsDuMois() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -560,7 +560,7 @@ export async function getAllCotisationsDuMois() {
 export async function getCotisationDuMoisById(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 

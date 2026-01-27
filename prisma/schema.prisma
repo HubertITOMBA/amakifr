@@ -14,9 +14,16 @@ datasource db {
 }
 
 enum UserRole {
-  Admin
-  Membre
-  Invite
+  ADMIN
+  MEMBRE
+  INVITE
+  PRESID
+  VICEPR
+  SECRET
+  VICESE
+  COMCPT
+  TRESOR
+  VTRESO
 }
 
 enum MenuRole {
@@ -26,9 +33,24 @@ enum MenuRole {
   SECRET // Secrétaire
   VICESE // Vice-Secrétaire
   COMCPT // Comptable/Trésorier
+  TRESOR // Trésorier
+  VTRESO // Vice-Trésorier
   MEMBRE // Membre simple
   INVITE // Invité
   VISITEUR // Visiteur non connecté
+}
+
+// Rôles d'administration (peut être attribué plusieurs fois à un utilisateur)
+// Note: MEMBRE est géré par UserRole.MEMBRE, pas besoin de le dupliquer ici
+enum AdminRole {
+  ADMIN // Administrateur - a tous les droits
+  PRESID // Président - peut tout voir mais ne peut pas tout modifier
+  VICEPR // Vice-Président - peut tout voir mais ne peut pas tout modifier
+  SECRET // Secrétaire - peut tout voir mais ne peut pas tout modifier
+  VICESE // Vice-Secrétaire - peut tout voir mais ne peut pas tout modifier
+  TRESOR // Trésorier - peut tout voir mais ne peut pas tout modifier
+  VTRESO // Vice-Trésorier - peut tout voir mais ne peut pas tout modifier
+  COMCPT // Comptable/Trésorier - peut tout voir mais ne peut pas tout modifier
 }
 
 enum MenuNiveau {
@@ -198,9 +220,10 @@ model User {
   accounts                      Account[]
   sessions                      Session[]
   adherent                      Adherent?
-  role                          UserRole                     @default(Membre)
+  role                          UserRole                     @default(MEMBRE)
   status                        UserStatus                   @default(Inactif)
-  depenses                      Depense[]                    @relation("DepenseCreatedBy") // Relation avec les dépenses
+  depenses                      Depense[]                    @relation("DepenseCreatedBy") // Relation avec les dépenses créées
+  depensesValidees              Depense[]                    @relation("DepenseValidatedBy") // Relation avec les dépenses validées
   typesDepenseCrees             TypeDepense[]                @relation("TypeDepenseCreatedBy") // Types de dépense créés
   justificatifsUploades         JustificatifDepense[]        @relation("JustificatifUploadedBy") // Justificatifs uploadés
   typesCotisationMensuelle      TypeCotisationMensuelle[] // Types de cotisation créés
@@ -217,6 +240,8 @@ model User {
   postesTemplates               PosteTemplate[] // Postes créés
   messageReactions              MessageReaction[] // Réactions aux messages
   configurationsFraisAdhesion   ConfigurationFraisAdhesion[] @relation("ConfigurationFraisAdhesionCreatedBy") // Configurations de frais d'adhésion créées
+  adminRoles                    UserAdminRole[]              @relation("UserAdminRoles") // Rôles d'administration de l'utilisateur
+  adminRolesAttributed          UserAdminRole[]              @relation("UserAdminRoleCreator") // Rôles d'administration attribués par cet utilisateur
   notifications                 Notification[] // Notifications reçues
   emailsReceived                Email[]                      @relation("EmailRecipient") // Emails reçus
   emailsSent                    Email[]                      @relation("EmailCreatedBy") // Emails envoyés
@@ -662,9 +687,11 @@ model Depense {
   justificatif  String?  @db.VarChar(500) // URL du fichier uploadé (conservé pour compatibilité)
   statut        String   @default("EnAttente") // EnAttente, Valide, Rejete
   createdBy     String // ID de l'admin qui a créé la dépense
+  validatedBy   String? // ID de l'admin qui a validé la dépense (null si non validée)
 
   // Relations
   CreatedBy     User                  @relation("DepenseCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  ValidatedBy   User?                 @relation("DepenseValidatedBy", fields: [validatedBy], references: [id], onDelete: SetNull)
   TypeDepense   TypeDepense?          @relation(fields: [typeDepenseId], references: [id], onDelete: SetNull)
   Justificatifs JustificatifDepense[] // Justificatifs de la dépense
 
@@ -1902,4 +1929,25 @@ model CommentaireTache {
   @@index([adherentId])
   @@index([createdAt])
   @@map("commentaires_taches")
+}
+
+// Modèle pour les rôles d'administration des utilisateurs
+// Permet à un utilisateur d'avoir plusieurs rôles d'administration
+model UserAdminRole {
+  id        String    @id @default(cuid())
+  userId    String
+  role      AdminRole
+  createdAt DateTime  @default(now())
+  createdBy String // ID de l'admin qui a attribué ce rôle
+  updatedAt DateTime  @updatedAt
+
+  // Relations
+  user    User @relation("UserAdminRoles", fields: [userId], references: [id], onDelete: Cascade)
+  creator User @relation("UserAdminRoleCreator", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@unique([userId, role]) // Un utilisateur ne peut avoir qu'une seule instance de chaque rôle
+  @@index([userId])
+  @@index([role])
+  @@index([createdBy])
+  @@map("user_admin_roles")
 }

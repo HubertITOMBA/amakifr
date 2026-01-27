@@ -158,11 +158,20 @@ export default auth(async (req: NextRequest) => {
     }
 
     // Pour les routes admin, vérifier aussi le rôle
+    // Les rôles autorisés sont : ADMIN, PRESID, VICEPR, SECRET, VICESE, COMCPT
     const isAdminRoute = nextUrl.pathname.startsWith('/admin');
     if (isAdminRoute && isLoggedIn) {
+        // Normaliser le rôle pour gérer les cas où il pourrait être en minuscules
         const userRole = req.auth?.user?.role;
-        if (userRole !== 'Admin') {
-            // L'utilisateur est connecté mais n'est pas admin, rediriger vers la page d'accueil
+        const normalizedRole = userRole?.toString().trim().toUpperCase();
+        
+        // Liste des rôles autorisés à accéder au panel admin
+        const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+        const hasAdminAccess = normalizedRole && adminRoles.includes(normalizedRole);
+        
+        if (!hasAdminAccess) {
+            // L'utilisateur est connecté mais n'a pas un rôle admin, rediriger vers la page d'accueil
+            console.log('[Middleware] Accès admin refusé - rôle:', userRole, 'normalisé:', normalizedRole, 'email:', req.auth?.user?.email);
             try {
                 const redirectUrl = new URL('/', nextUrl);
                 const response = Response.redirect(redirectUrl);
@@ -173,6 +182,8 @@ export default auth(async (req: NextRequest) => {
                 const response = NextResponse.next();
                 return addSecurityHeaders(response, req);
             }
+        } else {
+            console.log('[Middleware] Accès admin autorisé - rôle:', userRole, 'normalisé:', normalizedRole, 'email:', req.auth?.user?.email);
         }
     }
 

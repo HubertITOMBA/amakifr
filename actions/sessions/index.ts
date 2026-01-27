@@ -26,7 +26,7 @@ export async function getAllSessions(): Promise<{
       return { success: false, error: "Non authentifié" };
     }
 
-    if (session.user.role !== UserRole.Admin) {
+    if (session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Accès refusé" };
     }
 
@@ -80,7 +80,7 @@ export async function getUserSessionsAction(userId: string): Promise<{
     }
 
     // L'utilisateur peut voir ses propres sessions, ou un admin peut voir toutes les sessions
-    if (session.user.id !== userId && session.user.role !== UserRole.Admin) {
+    if (session.user.id !== userId && session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Accès refusé" };
     }
 
@@ -107,7 +107,7 @@ export async function revokeSessionAction(
     }
 
     // L'utilisateur peut déconnecter ses propres sessions, ou un admin peut déconnecter toutes les sessions
-    if (session.user.id !== userId && session.user.role !== UserRole.Admin) {
+    if (session.user.id !== userId && session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Accès refusé" };
     }
 
@@ -138,7 +138,7 @@ export async function revokeAllUserSessionsAction(
     }
 
     // L'utilisateur peut déconnecter ses propres sessions, ou un admin peut déconnecter toutes les sessions
-    if (session.user.id !== userId && session.user.role !== UserRole.Admin) {
+    if (session.user.id !== userId && session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Accès refusé" };
     }
 

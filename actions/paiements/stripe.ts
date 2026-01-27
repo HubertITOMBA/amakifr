@@ -57,7 +57,7 @@ export async function createStripeCheckoutSession(data: {
     }
 
     // Vérifier que l'utilisateur est l'adhérent concerné ou un admin
-    if (user.role !== "Admin" && user.adherent?.id !== data.adherentId) {
+    if (user.role !== "ADMIN" && user.adherent?.id !== data.adherentId) {
       return { success: false, error: "Vous n'êtes pas autorisé à effectuer ce paiement" };
     }
 

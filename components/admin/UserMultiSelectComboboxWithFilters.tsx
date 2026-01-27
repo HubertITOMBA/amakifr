@@ -333,7 +333,7 @@ export function UserMultiSelectComboboxWithFilters({
                               {user.status}
                             </Badge>
                           )}
-                          {user.role && user.role !== "Membre" && (
+                          {user.role && user.role !== "MEMBRE" && (
                             <Badge variant="outline" className="text-xs px-1 py-0 h-4">
                               {user.role}
                             </Badge>

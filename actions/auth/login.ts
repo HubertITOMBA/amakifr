@@ -44,12 +44,18 @@ export const login = async (
     if(!existingUser.emailVerified) {
         const verificationToken = await generateVerificationToken(existingUser.email)
 
-        await sendTwoFactorTokenEmail(
+        // Envoyer l'email de vérification (non bloquant)
+        const emailSent = await sendTwoFactorTokenEmail(
             verificationToken.email,
             verificationToken.token
         )
 
-        return { twoFactor: true, success: "Code OTP envoyé !" }
+        if (!emailSent) {
+            console.warn("[login] L'envoi de l'email de vérification a échoué, mais la connexion continue");
+            // Ne pas bloquer la connexion si l'email échoue
+        }
+
+        return { twoFactor: true, success: emailSent ? "Code OTP envoyé !" : "Code OTP généré (l'envoi de l'email a échoué, veuillez contacter l'administrateur)" }
     }
 
     try {

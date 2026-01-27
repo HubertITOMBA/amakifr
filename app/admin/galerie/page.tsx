@@ -751,9 +751,9 @@ export default function AdminGaleriePage() {
                   <SelectValue placeholder="Filtrer par type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tous les types</SelectItem>
-                  <SelectItem value="image">Photos</SelectItem>
-                  <SelectItem value="video">Vidéos</SelectItem>
+                  <SelectItem key="type-all" value="all">Tous les types</SelectItem>
+                  <SelectItem key="type-image" value="image">Photos</SelectItem>
+                  <SelectItem key="type-video" value="video">Vidéos</SelectItem>
                 </SelectContent>
               </Select>
               <Select value={categorieFilter} onValueChange={setCategorieFilter}>
@@ -761,7 +761,7 @@ export default function AdminGaleriePage() {
                   <SelectValue placeholder="Filtrer par catégorie" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Toutes les catégories</SelectItem>
+                  <SelectItem key="categorie-all" value="all">Toutes les catégories</SelectItem>
                   {categories.map((cat) => (
                     <SelectItem key={cat.value} value={cat.value}>
                       {cat.label}
@@ -774,9 +774,9 @@ export default function AdminGaleriePage() {
                   <SelectValue placeholder="Filtrer par statut" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="all">Tous les statuts</SelectItem>
-                  <SelectItem value="actif">Actifs</SelectItem>
-                  <SelectItem value="inactif">Inactifs</SelectItem>
+                  <SelectItem key="statut-all" value="all">Tous les statuts</SelectItem>
+                  <SelectItem key="statut-actif" value="actif">Actifs</SelectItem>
+                  <SelectItem key="statut-inactif" value="inactif">Inactifs</SelectItem>
                 </SelectContent>
               </Select>
             </div>

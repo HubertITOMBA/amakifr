@@ -38,6 +38,7 @@ import { toast } from "react-toastify";
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
 import { fr } from "date-fns/locale";
+import { isAuthorizationError } from "@/lib/utils";
 
 // Couleurs pastel pour les cards
 const cardColors = {
@@ -188,13 +189,19 @@ export default function AdminDashboard() {
         ];
         setStats(statsData);
       } else {
-        toast.error(statsResult.error || "Erreur lors du chargement des statistiques");
+        // Ne pas afficher de toast pour les erreurs d'autorisation (l'utilisateur n'a simplement pas accès à cette fonctionnalité)
+        if (statsResult.error && !isAuthorizationError(statsResult.error)) {
+          toast.error(statsResult.error || "Erreur lors du chargement des statistiques");
+        }
       }
 
       if (activitiesResult.success && activitiesResult.activities) {
         setRecentActivities(activitiesResult.activities);
       } else {
-        toast.error(activitiesResult.error || "Erreur lors du chargement des activités");
+        // Ne pas afficher de toast pour les erreurs d'autorisation
+        if (activitiesResult.error && !isAuthorizationError(activitiesResult.error)) {
+          toast.error(activitiesResult.error || "Erreur lors du chargement des activités");
+        }
       }
 
       if (eventsResult.success && eventsResult.events) {
@@ -203,7 +210,10 @@ export default function AdminDashboard() {
           status: event.status as "confirmed" | "pending",
         })));
       } else {
-        toast.error(eventsResult.error || "Erreur lors du chargement des événements");
+        // Ne pas afficher de toast pour les erreurs d'autorisation
+        if (eventsResult.error && !isAuthorizationError(eventsResult.error)) {
+          toast.error(eventsResult.error || "Erreur lors du chargement des événements");
+        }
       }
 
       if (alertsResult.success && alertsResult.alerts) {

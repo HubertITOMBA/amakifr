@@ -1,6 +1,6 @@
 // TEMPORARY DATA
 
-export let role = "Membre";
+export let role = "MEMBRE";
 
 
 // DADS

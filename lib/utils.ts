@@ -57,3 +57,29 @@ export function normalizeEmail(email: string | null | undefined): string {
   if (!email) return '';
   return email.trim().toLowerCase();
 }
+
+/**
+ * Vérifie si une erreur est une erreur d'autorisation
+ * Les erreurs d'autorisation ne doivent pas afficher de toast à l'utilisateur
+ * car cela signifie simplement qu'il n'a pas accès à cette fonctionnalité
+ * 
+ * @param error - Le message d'erreur à vérifier
+ * @returns true si c'est une erreur d'autorisation, false sinon
+ * 
+ * @example
+ * isAuthorizationError("Non autorisé") // true
+ * isAuthorizationError("Admin requis") // true
+ * isAuthorizationError("Erreur de connexion") // false
+ */
+export function isAuthorizationError(error: string | null | undefined): boolean {
+  if (!error) return false;
+  const normalizedError = error.toLowerCase();
+  return (
+    normalizedError.includes("non autorisé") ||
+    normalizedError.includes("non autorise") ||
+    normalizedError.includes("admin requis") ||
+    normalizedError.includes("permission") ||
+    normalizedError.includes("accès refusé") ||
+    normalizedError.includes("acces refuse")
+  );
+}

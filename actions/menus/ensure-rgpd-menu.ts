@@ -14,7 +14,7 @@ import { revalidatePath } from "next/cache";
 export async function ensureRGPDMenu() {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé. Seuls les administrateurs peuvent créer des menus.",

@@ -19,16 +19,30 @@ export default function AdminLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
-    if (status === "unauthenticated") {
-      router.push("/auth/sign-in");
+    // Ne pas rediriger si le statut est "loading" - attendre que la session soit chargée
+    if (status === "loading") {
       return;
     }
     
-    if (status === "authenticated" && user?.role !== "Admin") {
-      router.push("/");
-      return;
+    // Laisser le middleware gérer la redirection vers /auth/sign-in pour éviter les boucles
+    // On vérifie seulement les rôles si l'utilisateur est authentifié
+    if (status === "authenticated") {
+      // Normaliser le rôle pour gérer les cas où il pourrait être en minuscules
+      const normalizedRole = user?.role?.toString().trim().toUpperCase();
+      console.log("[AdminLayout] Vérification accès - status:", status, "userRole:", user?.role, "normalisé:", normalizedRole, "email:", user?.email);
+      
+      // Liste des rôles autorisés à accéder au panel admin
+      const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+      const hasAdminAccess = normalizedRole && adminRoles.includes(normalizedRole);
+      
+      if (!hasAdminAccess) {
+        console.warn("[AdminLayout] Accès refusé - l'utilisateur n'a pas un rôle admin. Rôle actuel:", user?.role);
+        // Utiliser window.location.href pour éviter les problèmes de navigation React
+        window.location.href = "/";
+        return;
+      }
     }
-  }, [status, user?.role, router]);
+  }, [status, user?.role, user?.email]);
 
   if (status === "loading") {
     return (
@@ -38,8 +52,36 @@ export default function AdminLayout({
     );
   }
 
-  if (status === "unauthenticated" || user?.role !== "Admin") {
-    return null;
+  // Normaliser le rôle pour gérer les cas où il pourrait être en minuscules
+  const normalizedRole = user?.role?.toString().trim().toUpperCase();
+  // Liste des rôles autorisés à accéder au panel admin
+  const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+  const hasAdminAccess = normalizedRole && adminRoles.includes(normalizedRole);
+  
+  if (status === "unauthenticated" || !hasAdminAccess) {
+    console.log("[AdminLayout] Rendu bloqué - status:", status, "rôle:", user?.role, "normalisé:", normalizedRole, "hasAdminAccess:", hasAdminAccess, "email:", user?.email);
+    // Afficher un message d'erreur au lieu de retourner null silencieusement
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
+        <div className="text-center">
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4">
+            Accès refusé
+          </h1>
+          <p className="text-gray-600 dark:text-gray-400 mb-4">
+            Vous n'avez pas les permissions nécessaires pour accéder à cette page.
+          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-500 mb-6">
+            Rôle actuel: {user?.role || "Non défini"} (normalisé: {normalizedRole || "Non défini"})
+          </p>
+          <Link
+            href="/"
+            className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+          >
+            Retour à l'accueil
+          </Link>
+        </div>
+      </div>
+    );
   }
 
   return (

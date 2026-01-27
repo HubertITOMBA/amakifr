@@ -114,7 +114,15 @@ export const {
 				}
 
 				if (token.role && session.user) {
-					session.user.role = token.role as UserRole;
+					// Normaliser le rôle pour s'assurer qu'il est en majuscules
+					// Cela garantit la compatibilité après la migration Admin -> ADMIN
+					const normalizedRole = token.role.toString().trim().toUpperCase() as UserRole;
+					session.user.role = normalizedRole;
+					
+					// Log en développement pour déboguer
+					if (process.env.NODE_ENV === 'development') {
+						console.log("[auth] Session callback - token.role:", token.role, "normalisé:", normalizedRole, "email:", session.user.email);
+					}
 				}
 
 				// Propager des métadonnées supplémentaires à la session
@@ -163,7 +171,15 @@ export const {
 					token.jti = `session_${Date.now()}_${Math.random().toString(36).substring(2, 15)}`;
 				}
 
-				token.role = existingUser.role;
+				// Normaliser le rôle pour s'assurer qu'il est en majuscules
+				// Cela garantit la compatibilité après la migration Admin -> ADMIN
+				const normalizedRole = existingUser.role?.toString().trim().toUpperCase() as UserRole;
+				token.role = normalizedRole;
+				
+				// Log en développement pour déboguer
+				if (process.env.NODE_ENV === 'development') {
+					console.log("[auth] JWT callback - existingUser.role:", existingUser.role, "normalisé:", normalizedRole, "email:", existingUser.email);
+				}
 				// Ajouter des champs supplémentaires pour utilisation côté client
 				token.lastLogin = existingUser.lastLogin ? existingUser.lastLogin.toISOString() : undefined;
 				token.createdAt = existingUser.createdAt ? existingUser.createdAt.toISOString() : undefined;

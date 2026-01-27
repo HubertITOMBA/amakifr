@@ -44,7 +44,7 @@ const CreateReservationSchema = z.object({
 export async function createRessource(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
@@ -126,7 +126,7 @@ export async function createReservation(formData: FormData) {
 
     // Récupérer l'adhérent si connecté
     let adherentId: string | undefined;
-    if (session.user.role !== UserRole.Admin) {
+    if (session.user.role !== UserRole.ADMIN) {
       const adherent = await prisma.adherent.findUnique({
         where: { userId: session.user.id },
       });
@@ -274,7 +274,7 @@ export async function getAllReservations() {
 export async function confirmerReservation(reservationId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
@@ -328,7 +328,7 @@ export async function annulerReservation(reservationId: string) {
 
     // Seul l'admin ou le propriétaire peut annuler
     if (
-      session.user.role !== UserRole.Admin &&
+      session.user.role !== UserRole.ADMIN &&
       reservation.adherentId !== reservation.Adherent?.id
     ) {
       return { success: false, error: "Vous n'êtes pas autorisé à annuler cette réservation" };
@@ -424,7 +424,7 @@ export async function getReservationsByRessource(ressourceId: string, dateDebut?
 export async function getReservationsStats() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 

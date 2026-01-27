@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { Modal } from "@/components/Modal";
 import { Label } from "@/components/ui/label";
@@ -15,7 +15,7 @@ import { Loader2, UserPlus, Mail, Lock, User, Phone, MapPin, Briefcase, Calendar
 import { toast } from "sonner";
 import { adminCreateAdherent } from "@/actions/user/admin-create-adherent";
 import { getAllPostesTemplates } from "@/actions/postes";
-import { Civilities, TypeTelephone, TypeAdhesion, UserRole, UserStatus } from "@prisma/client";
+import { Civilities, TypeTelephone, TypeAdhesion, UserRole, UserStatus, AdminRole } from "@prisma/client";
 
 type PosteTemplate = {
   id: string;
@@ -36,7 +36,7 @@ export default function GestionUsersPage() {
     email: "",
     password: "",
     name: "",
-    role: UserRole.Membre,
+    role: UserRole.MEMBRE,
     status: UserStatus.Actif,
     
     // Adherent
@@ -66,7 +66,17 @@ export default function GestionUsersPage() {
     
     // Poste
     posteTemplateId: "",
+    
+    // Rôles d'administration
+    adminRoles: [] as AdminRole[],
   });
+
+  // Helper pour déterminer si un profil adhérent est nécessaire
+  // RÈGLE: Seuls les utilisateurs avec UserRole.MEMBRE ont droit au profil adhérent
+  // Tous les autres rôles (ADMIN, INVITE, PRESID, VICEPR, SECRET, VICESE, COMCPT) n'ont pas de profil adhérent
+  const needsAdherentProfile = useMemo(() => {
+    return formData.role === UserRole.MEMBRE;
+  }, [formData.role]);
 
   // Charger les postes templates
   useEffect(() => {
@@ -89,8 +99,15 @@ export default function GestionUsersPage() {
     e.preventDefault();
     
     // Validation simple
-    if (!formData.email || !formData.firstname || !formData.lastname) {
-      toast.error("Veuillez remplir tous les champs obligatoires (email, prénom, nom)");
+    if (!formData.email) {
+      toast.error("L'email est obligatoire");
+      return;
+    }
+
+    // Les utilisateurs avec role Admin, ADMIN ou Invité n'ont que des données dans la table User
+    // Pas besoin de profil adhérent, adresse ou téléphone pour ces rôles
+    if (needsAdherentProfile && (!formData.firstname || !formData.lastname)) {
+      toast.error("Veuillez remplir tous les champs obligatoires (prénom, nom) pour créer un profil adhérent");
       return;
     }
 
@@ -103,7 +120,12 @@ export default function GestionUsersPage() {
       // Ajouter tous les champs
       Object.entries(formData).forEach(([key, value]) => {
         if (value !== null && value !== undefined) {
-          formDataToSubmit.append(key, value.toString());
+          if (key === "adminRoles" && Array.isArray(value)) {
+            // Pour les rôles, envoyer comme JSON
+            formDataToSubmit.append(key, JSON.stringify(value));
+          } else {
+            formDataToSubmit.append(key, value.toString());
+          }
         }
       });
 
@@ -210,9 +232,16 @@ export default function GestionUsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem key="role-membre" value={UserRole.Membre}>Membre</SelectItem>
-                    <SelectItem key="role-admin" value={UserRole.Admin}>Admin</SelectItem>
-                    <SelectItem key="role-bureau" value={UserRole.Bureau}>Bureau</SelectItem>
+                    <SelectItem key="role-membre" value={UserRole.MEMBRE}>Membre</SelectItem>
+                    <SelectItem key="role-admin" value={UserRole.ADMIN}>Admin</SelectItem>
+                    <SelectItem key="role-invite" value={UserRole.INVITE}>Invité</SelectItem>
+                    <SelectItem key="role-presid" value={UserRole.PRESID}>Président</SelectItem>
+                    <SelectItem key="role-vicepr" value={UserRole.VICEPR}>Vice-Président</SelectItem>
+                    <SelectItem key="role-secret" value={UserRole.SECRET}>Secrétaire</SelectItem>
+                    <SelectItem key="role-vicese" value={UserRole.VICESE}>Vice-Secrétaire</SelectItem>
+                    <SelectItem key="role-comcpt" value={UserRole.COMCPT}>Comptable/Trésorier</SelectItem>
+                    <SelectItem key="role-tresor" value={UserRole.TRESOR}>Trésorier</SelectItem>
+                    <SelectItem key="role-vtreso" value={UserRole.VTRESO}>Vice-Trésorier</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -239,7 +268,9 @@ export default function GestionUsersPage() {
           </CardContent>
         </Card>
 
-        {/* Section Informations personnelles */}
+        {/* Section Informations personnelles - Uniquement pour les membres */}
+        {/* Les utilisateurs Admin, ADMIN ou Invité n'ont que des données dans la table User */}
+        {needsAdherentProfile && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -254,7 +285,7 @@ export default function GestionUsersPage() {
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="civility" className="text-sm font-medium">
-                  Civilité <span className="text-red-500">*</span>
+                  Civilité {needsAdherentProfile && <span className="text-red-500">*</span>}
                 </Label>
                 <Select 
                   value={formData.civility} 
@@ -274,7 +305,7 @@ export default function GestionUsersPage() {
 
               <div className="space-y-2">
                 <Label htmlFor="firstname" className="text-sm font-medium">
-                  Prénom <span className="text-red-500">*</span>
+                  Prénom {needsAdherentProfile && <span className="text-red-500">*</span>}
                 </Label>
                 <Input
                   id="firstname"
@@ -282,14 +313,14 @@ export default function GestionUsersPage() {
                   value={formData.firstname}
                   onChange={(e) => setFormData({ ...formData, firstname: e.target.value })}
                   placeholder="Prénom"
-                  required
+                  required={needsAdherentProfile}
                   className="w-full"
                 />
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="lastname" className="text-sm font-medium">
-                  Nom <span className="text-red-500">*</span>
+                  Nom {needsAdherentProfile && <span className="text-red-500">*</span>}
                 </Label>
                 <Input
                   id="lastname"
@@ -297,7 +328,7 @@ export default function GestionUsersPage() {
                   value={formData.lastname}
                   onChange={(e) => setFormData({ ...formData, lastname: e.target.value })}
                   placeholder="Nom"
-                  required
+                  required={needsAdherentProfile}
                   className="w-full"
                 />
               </div>
@@ -453,8 +484,11 @@ export default function GestionUsersPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
-        {/* Section Coordonnées */}
+        {/* Section Coordonnées - Uniquement pour les membres */}
+        {/* Les utilisateurs Admin, ADMIN ou Invité n'ont que des données dans la table User */}
+        {needsAdherentProfile && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -591,6 +625,7 @@ export default function GestionUsersPage() {
             </div>
           </CardContent>
         </Card>
+        )}
 
         {/* Boutons d'action */}
         <div className="flex justify-end gap-3 pt-4">

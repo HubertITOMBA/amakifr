@@ -23,7 +23,7 @@ const CreateDetteInitialeSchema = z.object({
 export async function createDetteInitiale(data: z.infer<typeof CreateDetteInitialeSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -182,7 +182,7 @@ export async function appliquerAvoirs(
 export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -727,7 +727,7 @@ async function syncAssistanceWithCotisationDuMois(
 export async function createAssistance(data: z.infer<typeof CreateAssistanceSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -810,7 +810,7 @@ export async function createAssistance(data: z.infer<typeof CreateAssistanceSche
 export async function checkAndSendRelances() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -912,7 +912,7 @@ export async function checkAndSendRelances() {
 export async function getAllDettesInitiales() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -968,7 +968,7 @@ const UpdateDetteInitialeSchema = z.object({
 export async function getDetteInitialeById(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1014,7 +1014,7 @@ export async function getDetteInitialeById(id: string) {
 export async function updateDetteInitiale(data: z.infer<typeof UpdateDetteInitialeSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1107,7 +1107,7 @@ export async function updateDetteInitiale(data: z.infer<typeof UpdateDetteInitia
 export async function getAllPaiements() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1177,7 +1177,7 @@ export async function getAllPaiements() {
 export async function getFinancialStats() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1227,7 +1227,7 @@ export async function getFinancialStats() {
 export async function getAdherentFinancialItems(adherentId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1303,7 +1303,7 @@ export async function createPaiementGeneral(data: {
 }) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1588,7 +1588,7 @@ const UpdateAssistanceSchema = z.object({
 export async function updateAssistance(data: z.infer<typeof UpdateAssistanceSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1713,7 +1713,7 @@ export async function updateAssistance(data: z.infer<typeof UpdateAssistanceSche
 export async function getAllAssistances() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 

@@ -36,7 +36,7 @@ async function initFraisAdhesion() {
     // Récupérer le premier utilisateur admin pour créer la configuration
     const admin = await prisma.user.findFirst({
       where: {
-        role: "Admin",
+        role: "ADMIN",
         status: "Actif",
       },
     });

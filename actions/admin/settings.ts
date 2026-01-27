@@ -52,7 +52,7 @@ export async function updateEmailProvider(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 
@@ -99,7 +99,7 @@ export async function updateEmailProvider(
 export async function getSettingsByCategory(category: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé. Admin requis." };
     }
 

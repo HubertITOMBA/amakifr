@@ -126,7 +126,7 @@ export async function createConversation(data: z.infer<typeof CreateConversation
             // Ajouter le créateur
             {
               userId: session.user.id,
-              role: "Admin",
+              role: "ADMIN",
             },
             // Ajouter les autres participants
             ...validatedData.participantIds.map((userId) => ({

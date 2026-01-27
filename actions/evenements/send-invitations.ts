@@ -28,7 +28,7 @@ export async function sendEventInvitations(
       select: { role: true },
     });
 
-    if (!user || user.role !== "Admin") {
+    if (!user || user.role !== "ADMIN") {
       return { success: false, error: "Accès non autorisé. Administrateur requis." };
     }
 
@@ -51,7 +51,7 @@ export async function sendEventInvitations(
     if (invitationData.userIds === null) {
       // Tous les membres
       const whereClause: any = {
-        role: { in: ["Membre", "Admin"] },
+        role: { in: ["MEMBRE", "ADMIN"] },
       };
 
       if (!invitationData.includeInactifs) {
@@ -180,12 +180,12 @@ export async function getEligibleUsersForInvitation(includeInactifs: boolean = f
       select: { role: true },
     });
 
-    if (!user || user.role !== "Admin") {
+    if (!user || user.role !== "ADMIN") {
       return { success: false, error: "Accès non autorisé" };
     }
 
     const whereClause: any = {
-      role: { in: ["Membre", "Admin"] },
+      role: { in: ["MEMBRE", "ADMIN"] },
     };
 
     if (!includeInactifs) {

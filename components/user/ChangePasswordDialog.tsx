@@ -12,9 +12,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Lock, Eye, EyeOff } from "lucide-react";
+import { Loader2, Lock, Eye, EyeOff, HelpCircle } from "lucide-react";
 import { changePassword } from "@/actions/user";
 import { toast } from "react-toastify";
+import { ForgotPasswordDialog } from "./ForgotPasswordDialog";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { UserRole } from "@prisma/client";
 
 interface ChangePasswordDialogProps {
   trigger?: React.ReactNode;
@@ -26,6 +29,8 @@ interface ChangePasswordDialogProps {
  * @param trigger - Élément déclencheur optionnel pour ouvrir le modal
  */
 export function ChangePasswordDialog({ trigger }: ChangePasswordDialogProps) {
+  const user = useCurrentUser();
+  const isMembre = user?.role === UserRole.MEMBRE;
   const [open, setOpen] = useState(false);
   const [loading, setLoading] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
@@ -265,6 +270,23 @@ export function ChangePasswordDialog({ trigger }: ChangePasswordDialogProps) {
               <p className="text-xs text-red-600 dark:text-red-400">{errors.confirmPassword}</p>
             )}
           </div>
+
+          {/* Lien "Mot de passe oublié" pour les non-MEMBRE */}
+          {!isMembre && (
+            <div className="flex items-center justify-end">
+              <ForgotPasswordDialog
+                trigger={
+                  <button
+                    type="button"
+                    className="text-xs text-blue-600 dark:text-blue-400 hover:underline flex items-center gap-1"
+                  >
+                    <HelpCircle className="h-3 w-3" />
+                    J'ai oublié mon mot de passe
+                  </button>
+                }
+              />
+            </div>
+          )}
 
           {/* Boutons d'action */}
           <div className="flex justify-end gap-2 pt-4">

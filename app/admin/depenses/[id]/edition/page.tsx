@@ -296,7 +296,7 @@ export default function EditionDepensePage() {
                   <SelectValue placeholder="Sélectionner un type" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="none">Aucun type</SelectItem>
+                  <SelectItem key="type-none" value="none">Aucun type</SelectItem>
                   {typesDepense.map((type) => (
                     <SelectItem key={type.id} value={type.id}>
                       {type.titre}
@@ -326,9 +326,9 @@ export default function EditionDepensePage() {
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="EnAttente">En Attente</SelectItem>
-                  <SelectItem value="Valide">Validé</SelectItem>
-                  <SelectItem value="Rejete">Rejeté</SelectItem>
+                  <SelectItem key="statut-enattente" value="EnAttente">En Attente</SelectItem>
+                  <SelectItem key="statut-valide" value="Valide">Validé</SelectItem>
+                  <SelectItem key="statut-rejete" value="Rejete">Rejeté</SelectItem>
                 </SelectContent>
               </Select>
             </div>

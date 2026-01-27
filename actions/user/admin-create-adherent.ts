@@ -5,9 +5,10 @@ import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import bcrypt from "bcryptjs";
-import { Civilities, TypeTelephone, TypeAdhesion, UserRole, UserStatus } from "@prisma/client";
+import { Civilities, TypeTelephone, TypeAdhesion, UserRole, UserStatus, AdminRole } from "@prisma/client";
 import { normalizeEmail } from "@/lib/utils";
 import { getUserByEmail } from "@/actions/auth";
+import { logCreation } from "@/lib/activity-logger";
 
 /**
  * Schéma Zod pour la création d'un adhérent par un administrateur
@@ -20,10 +21,10 @@ const CreateAdherentSchema = z.object({
   role: z.nativeEnum(UserRole, { errorMap: () => ({ message: "Rôle invalide" }) }).optional(),
   status: z.nativeEnum(UserStatus, { errorMap: () => ({ message: "Statut invalide" }) }).optional(),
   
-  // Informations personnelles (Adherent)
-  civility: z.nativeEnum(Civilities, { errorMap: () => ({ message: "Civilité invalide" }) }),
-  firstname: z.string().min(1, "Le prénom est requis").max(255),
-  lastname: z.string().min(1, "Le nom est requis").max(255),
+  // Informations personnelles (Adherent) - optionnel si role est Admin ou Invite
+  civility: z.nativeEnum(Civilities, { errorMap: () => ({ message: "Civilité invalide" }) }).optional(),
+  firstname: z.string().min(1, "Le prénom est requis").max(255).optional().or(z.literal("")),
+  lastname: z.string().min(1, "Le nom est requis").max(255).optional().or(z.literal("")),
   dateNaissance: z.string().optional().or(z.literal("")),
   typeAdhesion: z.nativeEnum(TypeAdhesion, { errorMap: () => ({ message: "Type d'adhésion invalide" }) }).optional(),
   profession: z.string().max(255).optional().or(z.literal("")),
@@ -47,6 +48,9 @@ const CreateAdherentSchema = z.object({
   
   // Poste
   posteTemplateId: z.string().optional().or(z.literal("")),
+  
+  // Rôles d'administration
+  adminRoles: z.array(z.nativeEnum(AdminRole)).optional(),
 });
 
 type CreateAdherentData = z.infer<typeof CreateAdherentSchema>;
@@ -63,7 +67,7 @@ export async function adminCreateAdherent(formData: FormData) {
   try {
     // Vérifier que l'utilisateur est authentifié et est admin
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé. Seuls les administrateurs peuvent créer des adhérents." };
     }
 
@@ -73,13 +77,13 @@ export async function adminCreateAdherent(formData: FormData) {
       email: formData.get("email") as string,
       password: formData.get("password") as string || "",
       name: formData.get("name") as string || "",
-      role: formData.get("role") as UserRole || UserRole.Membre,
+      role: formData.get("role") as UserRole || UserRole.MEMBRE,
       status: formData.get("status") as UserStatus || UserStatus.Actif,
       
-      // Adherent
-      civility: formData.get("civility") as Civilities,
-      firstname: formData.get("firstname") as string,
-      lastname: formData.get("lastname") as string,
+      // Adherent (optionnel si Admin ou Invite)
+      civility: formData.get("civility") as Civilities || undefined,
+      firstname: formData.get("firstname") as string || "",
+      lastname: formData.get("lastname") as string || "",
       dateNaissance: formData.get("dateNaissance") as string || "",
       typeAdhesion: formData.get("typeAdhesion") as TypeAdhesion || undefined,
       profession: formData.get("profession") as string || "",
@@ -103,6 +107,19 @@ export async function adminCreateAdherent(formData: FormData) {
       
       // Poste
       posteTemplateId: formData.get("posteTemplateId") as string || "",
+      
+      // Rôles d'administration
+      adminRoles: (() => {
+        const rolesStr = formData.get("adminRoles") as string;
+        if (rolesStr) {
+          try {
+            return JSON.parse(rolesStr) as AdminRole[];
+          } catch {
+            return [];
+          }
+        }
+        return [];
+      })(),
     };
 
     // Valider les données
@@ -137,103 +154,149 @@ export async function adminCreateAdherent(formData: FormData) {
 
     // Créer l'utilisateur et l'adhérent dans une transaction
     const result = await db.$transaction(async (tx) => {
+      // Déterminer si l'utilisateur doit avoir emailVerified initialisé
+      // Les comptes qui ne sont pas MEMBRE ne reçoivent pas de mail,
+      // donc on initialise emailVerified à now() pour éviter le processus de vérification
+      const isMembre = validatedData.role === UserRole.MEMBRE;
+      const shouldAutoVerifyEmail = !isMembre;
+      
       // Créer l'utilisateur avec l'email normalisé
       const user = await tx.user.create({
         data: {
           email: normalizedEmail, // Utiliser l'email normalisé
           name: validatedData.name && validatedData.name.trim() !== "" ? validatedData.name : null,
           password: hashedPassword,
-          role: validatedData.role || UserRole.Membre,
+          role: validatedData.role || UserRole.MEMBRE,
           status: validatedData.status || UserStatus.Actif,
+          // Initialiser emailVerified pour les comptes qui ne reçoivent pas de mail
+          emailVerified: shouldAutoVerifyEmail ? new Date() : null,
         },
       });
 
-      // Créer l'adhérent
-      const adherent = await tx.adherent.create({
-        data: {
-          userId: user.id,
-          civility: validatedData.civility,
-          firstname: validatedData.firstname,
-          lastname: validatedData.lastname,
-          dateNaissance: validatedData.dateNaissance && validatedData.dateNaissance.trim() !== "" 
-            ? new Date(validatedData.dateNaissance) 
-            : null,
-          typeAdhesion: validatedData.typeAdhesion || null,
-          profession: validatedData.profession && validatedData.profession.trim() !== "" ? validatedData.profession : null,
-          anneePromotion: validatedData.anneePromotion && validatedData.anneePromotion.trim() !== "" ? validatedData.anneePromotion : null,
-          centresInteret: validatedData.centresInteret && validatedData.centresInteret.trim() !== "" ? validatedData.centresInteret : null,
-          autorisationImage: validatedData.autorisationImage || false,
-          accepteCommunications: validatedData.accepteCommunications !== false,
-          nombreEnfants: validatedData.nombreEnfants || 0,
-          posteTemplateId: validatedData.posteTemplateId && validatedData.posteTemplateId.trim() !== "" 
-            ? validatedData.posteTemplateId 
-            : null,
-        },
-      });
+      // Créer l'adhérent uniquement si le rôle est MEMBRE
+      // RÈGLE: Seuls les utilisateurs avec UserRole.MEMBRE ont droit au profil adhérent
+      // Tous les autres rôles (ADMIN, INVITE, PRESID, VICEPR, SECRET, VICESE, COMCPT) n'ont pas de profil adhérent
+      const needsAdherentProfile = validatedData.role === UserRole.MEMBRE;
 
-      // Créer l'adresse si au moins un champ est rempli
-      const hasAddressData = [
-        validatedData.streetnum,
-        validatedData.street1,
-        validatedData.street2,
-        validatedData.codepost,
-        validatedData.city,
-        validatedData.country,
-      ].some(field => field && field.trim() !== "");
+      let adherent = null;
+      if (needsAdherentProfile) {
+        // Valider que les champs requis sont présents
+        if (!validatedData.firstname || !validatedData.lastname || !validatedData.civility) {
+          return { 
+            success: false, 
+            error: "Les champs prénom, nom et civilité sont requis pour créer un profil adhérent." 
+          };
+        }
 
-      if (hasAddressData) {
-        await tx.adresse.create({
+        adherent = await tx.adherent.create({
           data: {
-            adherentId: adherent.id,
-            streetnum: validatedData.streetnum || "",
-            street1: validatedData.street1 || "",
-            street2: validatedData.street2 || "",
-            codepost: validatedData.codepost || "",
-            city: validatedData.city || "",
-            country: validatedData.country || "France",
+            userId: user.id,
+            civility: validatedData.civility,
+            firstname: validatedData.firstname,
+            lastname: validatedData.lastname,
+            dateNaissance: validatedData.dateNaissance && validatedData.dateNaissance.trim() !== "" 
+              ? new Date(validatedData.dateNaissance) 
+              : null,
+            typeAdhesion: validatedData.typeAdhesion || null,
+            profession: validatedData.profession && validatedData.profession.trim() !== "" ? validatedData.profession : null,
+            anneePromotion: validatedData.anneePromotion && validatedData.anneePromotion.trim() !== "" ? validatedData.anneePromotion : null,
+            centresInteret: validatedData.centresInteret && validatedData.centresInteret.trim() !== "" ? validatedData.centresInteret : null,
+            autorisationImage: validatedData.autorisationImage || false,
+            accepteCommunications: validatedData.accepteCommunications !== false,
+            nombreEnfants: validatedData.nombreEnfants || 0,
+            posteTemplateId: validatedData.posteTemplateId && validatedData.posteTemplateId.trim() !== "" 
+              ? validatedData.posteTemplateId 
+              : null,
           },
         });
+
+        // Créer l'adresse si au moins un champ est rempli
+        const hasAddressData = [
+          validatedData.streetnum,
+          validatedData.street1,
+          validatedData.street2,
+          validatedData.codepost,
+          validatedData.city,
+          validatedData.country,
+        ].some(field => field && field.trim() !== "");
+
+        if (hasAddressData && adherent) {
+          await tx.adresse.create({
+            data: {
+              adherentId: adherent.id,
+              streetnum: validatedData.streetnum || "",
+              street1: validatedData.street1 || "",
+              street2: validatedData.street2 || "",
+              codepost: validatedData.codepost || "",
+              city: validatedData.city || "",
+              country: validatedData.country || "France",
+            },
+          });
+        }
+
+        // Créer le téléphone si fourni
+        if (validatedData.telephone && validatedData.telephone.trim() !== "" && adherent) {
+          await tx.telephone.create({
+            data: {
+              adherentId: adherent.id,
+              numero: validatedData.telephone,
+              type: validatedData.typeTelephone || TypeTelephone.Mobile,
+              estPrincipal: true,
+            },
+          });
+        }
       }
 
-      // Créer le téléphone si fourni
-      if (validatedData.telephone && validatedData.telephone.trim() !== "") {
-        await tx.telephone.create({
-          data: {
-            adherentId: adherent.id,
-            numero: validatedData.telephone,
-            type: validatedData.typeTelephone || TypeTelephone.Mobile,
-            estPrincipal: true,
-          },
+      // Créer les rôles d'administration si fournis
+      if (validatedData.adminRoles && validatedData.adminRoles.length > 0) {
+        await tx.userAdminRole.createMany({
+          data: validatedData.adminRoles.map((role) => ({
+            userId: user.id,
+            role,
+            createdBy: session.user.id,
+          })),
+          skipDuplicates: true,
         });
       }
 
       return { user, adherent };
     });
 
-    // Envoyer l'email de bienvenue à l'adhérent (non bloquant)
-    try {
-      const { sendAdminCreatedAccountEmail } = await import("@/lib/mail");
-      await sendAdminCreatedAccountEmail(
-        validatedData.email,
-        validatedData.firstname,
-        validatedData.lastname,
-        !!hashedPassword, // true si un mot de passe a été défini
-        validatedData.name && validatedData.name.trim() !== "" ? validatedData.name : null
-      );
-    } catch (emailError) {
-      console.error("Erreur lors de l'envoi de l'email de bienvenue:", emailError);
-      // Ne pas bloquer la création si l'envoi d'email échoue
+    // Envoyer l'email de bienvenue uniquement si le rôle est MEMBRE (non bloquant)
+    const userRole = validatedData.role || UserRole.MEMBRE;
+    const isMembre = userRole === UserRole.MEMBRE;
+    
+    if (isMembre) {
+      try {
+        const { sendAdminCreatedAccountEmail } = await import("@/lib/mail");
+        const userName = result.adherent 
+          ? `${validatedData.firstname || ""} ${validatedData.lastname || ""}`.trim()
+          : validatedData.name || validatedData.email;
+        await sendAdminCreatedAccountEmail(
+          validatedData.email,
+          validatedData.firstname || "",
+          validatedData.lastname || "",
+          !!hashedPassword, // true si un mot de passe a été défini
+          validatedData.name && validatedData.name.trim() !== "" ? validatedData.name : null
+        );
+      } catch (emailError) {
+        console.error("Erreur lors de l'envoi de l'email de bienvenue:", emailError);
+        // Ne pas bloquer la création si l'envoi d'email échoue
+      }
     }
 
     // Logger l'activité
     try {
+      const userName = result.adherent 
+        ? `${validatedData.firstname || ""} ${validatedData.lastname || ""}`.trim()
+        : validatedData.name || validatedData.email;
       await logCreation(
-        `Création de l'adhérent ${validatedData.firstname} ${validatedData.lastname}`,
-        "Adherent",
-        result.adherent.id,
+        `Création de l'utilisateur ${userName}`,
+        result.adherent ? "Adherent" : "User",
+        result.adherent?.id || result.user?.id || "",
         {
           email: normalizedEmail,
-          role: validatedData.role || UserRole.Membre,
+          role: userRole,
           status: validatedData.status || UserStatus.Actif,
         }
       );
@@ -242,10 +305,18 @@ export async function adminCreateAdherent(formData: FormData) {
       // Ne pas bloquer la création si le logging échoue
     }
 
+    const userName = result.adherent 
+      ? `${validatedData.firstname || ""} ${validatedData.lastname || ""}`.trim()
+      : validatedData.name || validatedData.email;
+
+    const emailMessage = isMembre 
+      ? `Un email de bienvenue a été envoyé à ${normalizedEmail}.`
+      : "";
+
     return {
       success: true,
-      message: `Adhérent ${validatedData.firstname} ${validatedData.lastname} créé avec succès. Un email de bienvenue a été envoyé à ${normalizedEmail}.`,
-      id: result.user.id,
+      message: `Utilisateur ${userName} créé avec succès.${emailMessage ? ` ${emailMessage}` : ""}`,
+      id: result.user?.id || "",
     };
   } catch (error) {
     if (error instanceof z.ZodError) {

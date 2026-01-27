@@ -404,7 +404,7 @@ async function importAnciensAdherents() {
         usersData.push({
           email: emails[i],
           name: names[i],
-          role: 'Membre' as UserRole,
+          role: 'MEMBRE' as UserRole,
           status: 'Actif' as UserStatus,
           adherent: {
             civility: validCivility as Civilities,

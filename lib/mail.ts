@@ -32,8 +32,10 @@ function cleanUrl(url: string | undefined | null): string | undefined {
  * Fonction helper pour envoyer un email via le provider configuré
  * 
  * @param options - Les options d'envoi d'email (destinataire, sujet, contenu, etc.)
+ * @param throwOnError - Si true, lance une exception en cas d'erreur. Si false, log seulement l'erreur (défaut: true)
+ * @returns true si l'email a été envoyé avec succès, false sinon
  */
-export async function sendEmail(options: EmailOptions): Promise<void> {
+export async function sendEmail(options: EmailOptions, throwOnError: boolean = true): Promise<boolean> {
   try {
     console.log("[sendEmail] Début de l'envoi d'email à:", options.to);
     console.log("[sendEmail] Sujet:", options.subject);
@@ -46,22 +48,44 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
     
     if (!result.success) {
       const errorMessage = result.error?.message || result.error || "Erreur inconnue lors de l'envoi de l'email";
+      const errorCode = result.error && typeof result.error === 'object' && 'code' in result.error ? result.error.code : null;
+      const responseCode = result.error && typeof result.error === 'object' && 'responseCode' in result.error ? result.error.responseCode : null;
+      
       console.error("[sendEmail] Erreur lors de l'envoi:", {
         error: result.error,
         errorMessage,
+        errorCode,
+        responseCode,
         to: options.to,
         subject: options.subject,
       });
       
-      // Si c'est une erreur d'authentification (401), logger plus d'informations
-      if (result.error && typeof result.error === 'object' && 'code' in result.error && result.error.code === 401) {
-        console.error("[sendEmail] EMAIL_AUTH_ERROR: Les credentials du provider email sont invalides. Vérifiez les variables d'environnement.");
+      // Détecter les erreurs d'authentification SMTP (EAUTH, 401, 535)
+      const isAuthError = 
+        errorCode === 'EAUTH' || 
+        errorCode === 401 || 
+        responseCode === 401 || 
+        responseCode === 535 ||
+        (typeof errorMessage === 'string' && (
+          errorMessage.includes('Invalid login') ||
+          errorMessage.includes('Username and Password not accepted') ||
+          errorMessage.includes('BadCredentials')
+        ));
+      
+      if (isAuthError) {
+        console.error("[sendEmail] EMAIL_AUTH_ERROR: Les credentials du provider email sont invalides. Vérifiez les variables d'environnement SMTP_EMAIL, SMTP_PASSWORD, etc.");
       }
       
-      throw new Error(errorMessage);
+      if (throwOnError) {
+        throw new Error(errorMessage);
+      } else {
+        console.warn("[sendEmail] Erreur non bloquante - l'application continue malgré l'échec de l'envoi d'email");
+        return false;
+      }
     }
     
     console.log("[sendEmail] Email envoyé avec succès à:", options.to);
+    return true;
   } catch (error: any) {
     // Logger l'erreur complète pour le débogage
     console.error("[sendEmail] Exception lors de l'envoi d'email:", {
@@ -71,7 +95,13 @@ export async function sendEmail(options: EmailOptions): Promise<void> {
       to: options.to,
       subject: options.subject,
     });
-    throw error;
+    
+    if (throwOnError) {
+      throw error;
+    } else {
+      console.warn("[sendEmail] Erreur non bloquante - l'application continue malgré l'échec de l'envoi d'email");
+      return false;
+    }
   }
 }
 
@@ -207,7 +237,7 @@ function wrapEmailContent(content: string): string {
 export const sendTwoFactorTokenEmail = async(
     email: string,
     token: string
-) => {
+): Promise<boolean> => {
     const content = `
       <div style="text-align: center;">
         <h1 style="color: #4a90e2; margin-bottom: 12px; margin-top: 0; font-size: 20px;">Authentification à deux facteurs</h1>
@@ -223,12 +253,13 @@ export const sendTwoFactorTokenEmail = async(
       </div>
     `;
 
-    await sendEmail({
+    // Ne pas bloquer l'application si l'envoi d'email échoue (erreurs SMTP, etc.)
+    return await sendEmail({
         from: "webmaster@amaki.fr",
         to: email,
         subject: "Authentification à deux facteurs",
         html: wrapEmailContent(content)
-      });
+      }, false); // throwOnError = false pour ne pas bloquer
 }
 
 

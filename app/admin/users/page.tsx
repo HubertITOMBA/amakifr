@@ -115,12 +115,26 @@ const columnHelper = createColumnHelper<UserData>();
 
 const getRoleColor = (role: UserRole) => {
   switch (role) {
-    case UserRole.Admin:
+    case UserRole.ADMIN:
       return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-    case UserRole.Membre:
+    case UserRole.MEMBRE:
       return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-    case UserRole.Invite:
+    case UserRole.INVITE:
       return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+    case UserRole.PRESID:
+      return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
+    case UserRole.VICEPR:
+      return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200";
+    case UserRole.SECRET:
+      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
+    case UserRole.VICESE:
+      return "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200";
+    case UserRole.COMCPT:
+      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
+    case UserRole.TRESOR:
+      return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
+    case UserRole.VTRESO:
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200";
     default:
       return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
   }
@@ -128,12 +142,26 @@ const getRoleColor = (role: UserRole) => {
 
 const getRoleLabel = (role: UserRole) => {
   switch (role) {
-    case UserRole.Admin:
-      return "Admin";
-    case UserRole.Membre:
-      return "Membre";
-    case UserRole.Invite:
+    case UserRole.ADMIN:
+      return "ADMIN";
+    case UserRole.MEMBRE:
+      return "MEMBRE";
+    case UserRole.INVITE:
       return "Invité";
+    case UserRole.PRESID:
+      return "Président";
+    case UserRole.VICEPR:
+      return "Vice-Président";
+    case UserRole.SECRET:
+      return "Secrétaire";
+    case UserRole.VICESE:
+      return "Vice-Secrétaire";
+    case UserRole.COMCPT:
+      return "Comptable/Trésorier";
+    case UserRole.TRESOR:
+      return "Trésorier";
+    case UserRole.VTRESO:
+      return "Vice-Trésorier";
     default:
       return role;
   }
@@ -222,9 +250,11 @@ export default function AdminUsersPage() {
       return; // Attendre que la session soit chargée
     }
 
-    // Vérifier que l'utilisateur est admin
-    if (session.user.role !== "Admin") {
-      toast.error("Accès refusé. Vous devez être administrateur.");
+    // Vérifier que l'utilisateur a un rôle admin (ADMIN, PRESID, SECRET, etc.)
+    const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+    const normalizedRole = session.user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
+      toast.error("Accès refusé. Vous devez avoir un rôle d'administration.");
       router.push("/");
       return;
     }
@@ -290,6 +320,13 @@ export default function AdminUsersPage() {
 
   // Logger la consultation de la page
   useActivityLogger("Gestion des utilisateurs", "User");
+
+  // Vérifier si l'utilisateur est ADMIN (et non seulement un autre rôle admin)
+  const isAdminOnly = useMemo(() => {
+    if (!session?.user?.role) return false;
+    const normalizedRole = session.user.role.toString().trim().toUpperCase();
+    return normalizedRole === "ADMIN";
+  }, [session?.user?.role]);
 
   useEffect(() => {
     // Nettoyer lors du démontage du composant
@@ -686,51 +723,126 @@ export default function AdminUsersPage() {
                     <span>Voir les détails</span>
                   </Link>
                 </DropdownMenuItem>
-                <DropdownMenuItem asChild>
-                  <Link href={`/admin/users/${user.id}/edition`} className="flex items-center gap-2 cursor-pointer">
-                    <Edit className="h-4 w-4" />
-                    <span>Éditer</span>
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuSub>
-                  <DropdownMenuSubTrigger className="flex items-center gap-2">
-                    <Shield className="h-4 w-4" />
-                    <span>Changer le rôle</span>
-                  </DropdownMenuSubTrigger>
+                {isAdminOnly && (
+                  <DropdownMenuItem asChild>
+                    <Link href={`/admin/users/${user.id}/edition`} className="flex items-center gap-2 cursor-pointer">
+                      <Edit className="h-4 w-4" />
+                      <span>Éditer</span>
+                    </Link>
+                  </DropdownMenuItem>
+                )}
+                {isAdminOnly && <DropdownMenuSeparator />}
+                {isAdminOnly && (
+                  <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="flex items-center gap-2">
+                      <Shield className="h-4 w-4" />
+                      <span>Changer le rôle</span>
+                    </DropdownMenuSubTrigger>
                   <DropdownMenuSubContent>
                     <DropdownMenuItem 
-                      onClick={() => handleRoleChange(user.id, UserRole.Admin)}
-                      className={role === UserRole.Admin ? "bg-red-50 dark:bg-red-900/20" : ""}
+                      onClick={() => handleRoleChange(user.id, UserRole.ADMIN)}
+                      className={role === UserRole.ADMIN ? "bg-red-50 dark:bg-red-900/20" : ""}
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-red-600 dark:text-red-400 font-bold">A</span>
                         <span>Admin</span>
-                        {role === UserRole.Admin && <span className="ml-auto text-xs">✓</span>}
+                        {role === UserRole.ADMIN && <span className="ml-auto text-xs">✓</span>}
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuItem 
-                      onClick={() => handleRoleChange(user.id, UserRole.Membre)}
-                      className={role === UserRole.Membre ? "bg-blue-50 dark:bg-blue-900/20" : ""}
+                      onClick={() => handleRoleChange(user.id, UserRole.MEMBRE)}
+                      className={role === UserRole.MEMBRE ? "bg-blue-50 dark:bg-blue-900/20" : ""}
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-blue-600 dark:text-blue-400 font-bold">M</span>
                         <span>Membre</span>
-                        {role === UserRole.Membre && <span className="ml-auto text-xs">✓</span>}
+                        {role === UserRole.MEMBRE && <span className="ml-auto text-xs">✓</span>}
                       </div>
                     </DropdownMenuItem>
                     <DropdownMenuItem 
-                      onClick={() => handleRoleChange(user.id, UserRole.Invite)}
-                      className={role === UserRole.Invite ? "bg-gray-50 dark:bg-gray-900/20" : ""}
+                      onClick={() => handleRoleChange(user.id, UserRole.INVITE)}
+                      className={role === UserRole.INVITE ? "bg-gray-50 dark:bg-gray-900/20" : ""}
                     >
                       <div className="flex items-center gap-2">
                         <span className="text-gray-600 dark:text-gray-400 font-bold">I</span>
                         <span>Invité</span>
-                        {role === UserRole.Invite && <span className="ml-auto text-xs">✓</span>}
+                        {role === UserRole.INVITE && <span className="ml-auto text-xs">✓</span>}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => handleRoleChange(user.id, UserRole.PRESID)}
+                      className={role === UserRole.PRESID ? "bg-purple-50 dark:bg-purple-900/20" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-purple-600 dark:text-purple-400 font-bold">P</span>
+                        <span>Président</span>
+                        {role === UserRole.PRESID && <span className="ml-auto text-xs">✓</span>}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleRoleChange(user.id, UserRole.VICEPR)}
+                      className={role === UserRole.VICEPR ? "bg-indigo-50 dark:bg-indigo-900/20" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-indigo-600 dark:text-indigo-400 font-bold">VP</span>
+                        <span>Vice-Président</span>
+                        {role === UserRole.VICEPR && <span className="ml-auto text-xs">✓</span>}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleRoleChange(user.id, UserRole.SECRET)}
+                      className={role === UserRole.SECRET ? "bg-green-50 dark:bg-green-900/20" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-green-600 dark:text-green-400 font-bold">S</span>
+                        <span>Secrétaire</span>
+                        {role === UserRole.SECRET && <span className="ml-auto text-xs">✓</span>}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleRoleChange(user.id, UserRole.VICESE)}
+                      className={role === UserRole.VICESE ? "bg-teal-50 dark:bg-teal-900/20" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-teal-600 dark:text-teal-400 font-bold">VS</span>
+                        <span>Vice-Secrétaire</span>
+                        {role === UserRole.VICESE && <span className="ml-auto text-xs">✓</span>}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleRoleChange(user.id, UserRole.COMCPT)}
+                      className={role === UserRole.COMCPT ? "bg-yellow-50 dark:bg-yellow-900/20" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-yellow-600 dark:text-yellow-400 font-bold">C</span>
+                        <span>Comptable/Trésorier</span>
+                        {role === UserRole.COMCPT && <span className="ml-auto text-xs">✓</span>}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleRoleChange(user.id, UserRole.TRESOR)}
+                      className={role === UserRole.TRESOR ? "bg-orange-50 dark:bg-orange-900/20" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-orange-600 dark:text-orange-400 font-bold">T</span>
+                        <span>Trésorier</span>
+                        {role === UserRole.TRESOR && <span className="ml-auto text-xs">✓</span>}
+                      </div>
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => handleRoleChange(user.id, UserRole.VTRESO)}
+                      className={role === UserRole.VTRESO ? "bg-amber-50 dark:bg-amber-900/20" : ""}
+                    >
+                      <div className="flex items-center gap-2">
+                        <span className="text-amber-600 dark:text-amber-400 font-bold">VT</span>
+                        <span>Vice-Trésorier</span>
+                        {role === UserRole.VTRESO && <span className="ml-auto text-xs">✓</span>}
                       </div>
                     </DropdownMenuItem>
                   </DropdownMenuSubContent>
-                </DropdownMenuSub>
+                  </DropdownMenuSub>
+                )}
                 <DropdownMenuItem 
                   onClick={() => handleStatusChange(user.id, getNextStatus(status))}
                   className="flex items-center gap-2"
@@ -1231,20 +1343,22 @@ export default function AdminUsersPage() {
                   <KeyRound className="h-4 w-4" />
                   <span>Réinitialiser le mot de passe</span>
                 </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={() => {
-                    setDeleteDialogOpen({
-                      userId: user.id,
-                      userName: user.adherent ? `${user.adherent.firstname} ${user.adherent.lastname}` : user.name || "Utilisateur",
-                      userEmail: user.email
-                    });
-                  }}
-                  className="focus:bg-red-50 dark:focus:bg-red-900/20 text-red-600 dark:text-red-400 cursor-pointer"
-                >
-                  <Trash2 className="h-4 w-4 mr-2" />
-                  <span>Supprimer définitivement</span>
-                </DropdownMenuItem>
+                {isAdminOnly && <DropdownMenuSeparator />}
+                {isAdminOnly && (
+                  <DropdownMenuItem 
+                    onClick={() => {
+                      setDeleteDialogOpen({
+                        userId: user.id,
+                        userName: user.adherent ? `${user.adherent.firstname} ${user.adherent.lastname}` : user.name || "Utilisateur",
+                        userEmail: user.email
+                      });
+                    }}
+                    className="focus:bg-red-50 dark:focus:bg-red-900/20 text-red-600 dark:text-red-400 cursor-pointer"
+                  >
+                    <Trash2 className="h-4 w-4 mr-2" />
+                    <span>Supprimer définitivement</span>
+                  </DropdownMenuItem>
+                )}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -1254,7 +1368,7 @@ export default function AdminUsersPage() {
       minSize: 70,
       maxSize: 100,
     }),
-  ], [handleRoleChange, handleStatusChange, handlePosteChange, handleSendEmailToUser, postes, filteredUsers]);
+  ], [handleRoleChange, handleStatusChange, handlePosteChange, handleSendEmailToUser, postes, filteredUsers, isAdminOnly]);
 
   const [rowSelection, setRowSelection] = useState<Record<string, boolean>>({});
 
@@ -1298,7 +1412,7 @@ export default function AdminUsersPage() {
   const stats = useMemo(() => {
     const total = users.length;
     const actifs = users.filter(u => u.status === UserStatus.Actif).length;
-    const admins = users.filter(u => u.role === UserRole.Admin).length;
+    const admins = users.filter(u => u.role === UserRole.ADMIN).length;
     const ceMois = users.filter(u => {
       const created = new Date(u.createdAt);
       const now = new Date();
@@ -1332,12 +1446,25 @@ export default function AdminUsersPage() {
                 : "Envoyer un email"}
             </span>
           </Button>
-          <Link href="/admin/users/gestion" className="w-full sm:w-auto">
-            <Button className="w-full sm:w-auto flex items-center justify-center space-x-2">
-              <Plus className="h-4 w-4" />
-              <span>Ajouter un adhérent</span>
-            </Button>
-          </Link>
+          {isAdminOnly && (
+            <Link href="/admin/users/gestion" className="w-full sm:w-auto">
+              <Button className="w-full sm:w-auto flex items-center justify-center space-x-2">
+                <Plus className="h-4 w-4" />
+                <span>Ajouter un adhérent</span>
+              </Button>
+            </Link>
+          )}
+          {isAdminOnly && (
+            <Link href="/admin/users/roles" className="w-full sm:w-auto">
+              <Button 
+                variant="outline" 
+                className="w-full sm:w-auto flex items-center justify-center space-x-2 border-blue-300 hover:bg-blue-50 dark:border-blue-700 dark:hover:bg-blue-900/20"
+              >
+                <Shield className="h-4 w-4" />
+                <span>Gérer les rôles</span>
+              </Button>
+            </Link>
+          )}
           <Link href="/admin/users/suppressions" className="w-full sm:w-auto">
             <Button 
               variant="outline" 
@@ -1441,9 +1568,16 @@ export default function AdminUsersPage() {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous les rôles</SelectItem>
-                <SelectItem value={UserRole.Admin}>Administrateurs</SelectItem>
-                <SelectItem value={UserRole.Membre}>Membres</SelectItem>
-                <SelectItem value={UserRole.Invite}>Invités</SelectItem>
+                <SelectItem value={UserRole.ADMIN}>Administrateurs</SelectItem>
+                <SelectItem value={UserRole.MEMBRE}>Membres</SelectItem>
+                <SelectItem value={UserRole.INVITE}>Invités</SelectItem>
+                <SelectItem value={UserRole.PRESID}>Présidents</SelectItem>
+                <SelectItem value={UserRole.VICEPR}>Vice-Présidents</SelectItem>
+                <SelectItem value={UserRole.SECRET}>Secrétaires</SelectItem>
+                <SelectItem value={UserRole.VICESE}>Vice-Secrétaires</SelectItem>
+                <SelectItem value={UserRole.COMCPT}>Comptables/Trésoriers</SelectItem>
+                <SelectItem value={UserRole.TRESOR}>Trésoriers</SelectItem>
+                <SelectItem value={UserRole.VTRESO}>Vice-Trésoriers</SelectItem>
               </SelectContent>
             </Select>
             <Select value={statusFilter} onValueChange={setStatusFilter}>

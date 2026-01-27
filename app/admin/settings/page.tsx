@@ -425,8 +425,8 @@ export default function AdminSettingsPage() {
                       <SelectValue placeholder="Sélectionner un provider" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="resend">Resend</SelectItem>
-                      <SelectItem value="smtp">SMTP (Gmail, Outlook, etc.)</SelectItem>
+                      <SelectItem key="provider-resend" value="resend">Resend</SelectItem>
+                      <SelectItem key="provider-smtp" value="smtp">SMTP (Gmail, Outlook, etc.)</SelectItem>
                     </SelectContent>
                   </Select>
                   <p className="text-sm text-gray-500 dark:text-gray-400">

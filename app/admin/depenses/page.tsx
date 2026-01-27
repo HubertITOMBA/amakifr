@@ -74,7 +74,13 @@ interface Depense {
   CreatedBy: {
     id: string;
     email: string;
+    name?: string | null;
   };
+  ValidatedBy?: {
+    id: string;
+    email: string;
+    name?: string | null;
+  } | null;
   TypeDepense?: {
     id: string;
     titre: string;
@@ -149,6 +155,8 @@ export default function AdminDepensesPage() {
             statut: false,
             description: false,
             createdAt: false,
+            CreatedBy: false,
+            ValidatedBy: false,
             // Garder visible : libelle, montant, actions (si présente)
           };
         }
@@ -545,6 +553,44 @@ export default function AdminDepensesPage() {
       maxSize: 150,
       enableResizing: true,
     }),
+    columnHelper.accessor("CreatedBy", {
+      header: "Demandeur",
+      cell: ({ row }) => {
+        const createdBy = row.original.CreatedBy;
+        return (
+          <div className="text-xs sm:text-sm text-gray-900 dark:text-gray-100">
+            {createdBy?.name || createdBy?.email || "—"}
+          </div>
+        );
+      },
+      size: 180,
+      minSize: 140,
+      maxSize: 250,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("ValidatedBy", {
+      header: "Validateur",
+      cell: ({ row }) => {
+        const validatedBy = row.original.ValidatedBy;
+        const statut = row.original.statut;
+        if (statut === "Valide" && validatedBy) {
+          return (
+            <div className="text-xs sm:text-sm text-gray-900 dark:text-gray-100">
+              {validatedBy.name || validatedBy.email}
+            </div>
+          );
+        }
+        return (
+          <div className="text-xs sm:text-sm text-gray-400 dark:text-gray-500">
+            —
+          </div>
+        );
+      },
+      size: 180,
+      minSize: 140,
+      maxSize: 250,
+      enableResizing: true,
+    }),
     columnHelper.display({
       id: "actions",
       header: () => <div className="text-center w-full">Actions</div>,
@@ -777,7 +823,7 @@ export default function AdminDepensesPage() {
                   Liste des Dépenses
                 </CardTitle>
                 <CardDescription className="text-orange-100 dark:text-orange-200 mt-1 sm:mt-2 text-sm sm:text-base">
-                  {filteredData.length} dépense(s) trouvée(s)
+                  {filteredData.length} dépense(s) trouvée(s) • Total: {filteredData.reduce((sum, d) => sum + Number(d.montant), 0).toFixed(2).replace('.', ',')} €
                 </CardDescription>
               </div>
               <div className="flex items-center space-x-2 w-full sm:w-auto">
@@ -1036,9 +1082,17 @@ export default function AdminDepensesPage() {
                       </div>
                       {selectedDepense.CreatedBy && (
                         <div className="space-y-2">
-                          <Label htmlFor="createdBy">Créé par</Label>
+                          <Label htmlFor="createdBy">Demandeur</Label>
                           <div className="p-2.5 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-900 dark:text-gray-100">
-                            {selectedDepense.CreatedBy.email}
+                            {selectedDepense.CreatedBy.name || selectedDepense.CreatedBy.email}
+                          </div>
+                        </div>
+                      )}
+                      {selectedDepense.ValidatedBy && selectedDepense.statut === "Valide" && (
+                        <div className="space-y-2">
+                          <Label htmlFor="validatedBy">Validateur</Label>
+                          <div className="p-2.5 bg-white dark:bg-gray-800 rounded-md border border-gray-200 dark:border-gray-700 text-sm font-medium text-gray-900 dark:text-gray-100">
+                            {selectedDepense.ValidatedBy.name || selectedDepense.ValidatedBy.email}
                           </div>
                         </div>
                       )}

@@ -45,7 +45,10 @@
     "db:check": "tsx scripts/check-missing-tables.ts",
     "test:sync-assistances": "tsx scripts/test-synchronisation-assistances.ts",
     "db:recalculer-cotisations": "tsx scripts/recalculer-cotisations-mensuelles.ts",
-    "db:insert-test-adherents": "tsx scripts/insert-test-adherents.ts"
+    "db:insert-test-adherents": "tsx scripts/insert-test-adherents.ts",
+    "deploy:check": "tsx scripts/verify-production-ready.ts",
+    "deploy:migrate": "prisma migrate deploy",
+    "deploy:generate": "prisma generate"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",

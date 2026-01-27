@@ -42,7 +42,7 @@ export default function EditionUserPage() {
   const [userForm, setUserForm] = useState<{ name: string; email: string; role: UserRole; status: UserStatus; image: string }>({
     name: "",
     email: "",
-    role: UserRole.Membre,
+    role: UserRole.MEMBRE,
     status: UserStatus.Inactif,
     image: "",
   });
@@ -344,9 +344,9 @@ export default function EditionUserPage() {
                     <SelectValue placeholder="Choisir un rôle" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value={UserRole.Admin}>Admin</SelectItem>
-                    <SelectItem value={UserRole.Membre}>Membre</SelectItem>
-                    <SelectItem value={UserRole.Invite}>Invité</SelectItem>
+                    <SelectItem value={UserRole.ADMIN}>Admin</SelectItem>
+                    <SelectItem value={UserRole.MEMBRE}>Membre</SelectItem>
+                    <SelectItem value={UserRole.INVITE}>Invité</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

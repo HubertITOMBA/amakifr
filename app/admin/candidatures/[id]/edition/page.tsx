@@ -168,9 +168,9 @@ export default function EditionCandidaturePage() {
               <SelectValue placeholder="Choisir un statut" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value={CandidacyStatus.EnAttente}>En attente</SelectItem>
-              <SelectItem value={CandidacyStatus.Validee}>Validée</SelectItem>
-              <SelectItem value={CandidacyStatus.Rejetee}>Rejetée</SelectItem>
+              <SelectItem key="candidacy-enattente" value={CandidacyStatus.EnAttente}>En attente</SelectItem>
+              <SelectItem key="candidacy-validee" value={CandidacyStatus.Validee}>Validée</SelectItem>
+              <SelectItem key="candidacy-rejetee" value={CandidacyStatus.Rejetee}>Rejetée</SelectItem>
             </SelectContent>
           </Select>
         </div>

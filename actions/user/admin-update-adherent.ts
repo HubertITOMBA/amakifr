@@ -41,7 +41,7 @@ export async function adminUpdateAdherent(
     }
 
     const user = await db.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") {
+    if (!user || user.role !== "ADMIN") {
       return { success: false, error: "Admin requis" };
     }
 

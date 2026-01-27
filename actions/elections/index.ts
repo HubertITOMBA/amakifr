@@ -55,7 +55,7 @@ export async function createElection(
       where: { id: session.user.id }
     });
 
-    if (!user || user.role !== "Admin") {
+    if (!user || user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent créer des élections" };
     }
 
@@ -233,7 +233,7 @@ export async function createCustomPosition(
       where: { id: session.user.id }
     });
 
-    if (!user || user.role !== "Admin") {
+    if (!user || user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent créer des postes" };
     }
 
@@ -1027,7 +1027,7 @@ export async function updateCandidacyStatus(
       select: { role: true }
     });
 
-    if (user?.role !== "Admin") {
+    if (user?.role !== "ADMIN") {
       return { success: false, error: "Accès refusé - Admin requis" };
     }
 
@@ -1113,7 +1113,7 @@ export async function closeElection(electionId: string): Promise<{ success: bool
       select: { role: true }
     });
 
-    if (user?.role !== "Admin") {
+    if (user?.role !== "ADMIN") {
       return { success: false, error: "Accès refusé - Admin requis" };
     }
 
@@ -1496,7 +1496,7 @@ export async function validateCandidacy(
       where: { id: session.user.id }
     });
 
-    if (!user || user.role !== "Admin") {
+    if (!user || user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent valider les candidatures" };
     }
 
@@ -1544,7 +1544,7 @@ export async function updateElectionStatus(
       where: { id: session.user.id }
     });
 
-    if (!user || user.role !== "Admin") {
+    if (!user || user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent modifier le statut des élections" };
     }
 
@@ -1650,7 +1650,7 @@ export async function getAllVotesForAdmin(): Promise<{ success: boolean; votes?:
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     const votes = await prisma.vote.findMany({
       include: {
@@ -1679,7 +1679,7 @@ export async function adminCreateVote(data: { electionId: string; positionId: st
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     // Vérifications de cohérence
     const election = await prisma.election.findUnique({ where: { id: data.electionId } });
@@ -1728,7 +1728,7 @@ export async function adminUpdateVote(voteId: string, data: { candidacyId?: stri
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     const current = await prisma.vote.findUnique({ where: { id: voteId } });
     if (!current) return { success: false, error: "Vote introuvable" };
@@ -1764,7 +1764,7 @@ export async function adminDeleteVote(voteId: string): Promise<{ success: boolea
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     await prisma.vote.delete({ where: { id: voteId } });
     return { success: true };
@@ -1779,7 +1779,7 @@ export async function adminUpdateVoteStatus(voteId: string, status: "Valide" | "
     const session = await auth();
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     const updated = await prisma.vote.update({
       where: { id: voteId },
@@ -1930,7 +1930,7 @@ export async function updateElection(
     }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") {
+    if (!user || user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent modifier une élection" };
     }
 
@@ -2005,7 +2005,7 @@ export async function updatePosition(
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Seuls les administrateurs peuvent modifier un poste" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Seuls les administrateurs peuvent modifier un poste" };
 
     const position = await prisma.position.update({
       where: { id: positionId },
@@ -2024,7 +2024,7 @@ export async function deletePosition(positionId: string): Promise<{ success: boo
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Seuls les administrateurs peuvent supprimer un poste" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Seuls les administrateurs peuvent supprimer un poste" };
 
     await prisma.position.delete({ where: { id: positionId } });
     return { success: true };
@@ -2068,7 +2068,7 @@ export async function adminCreateCandidacy(data: { electionId: string; positionI
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     // Vérifications de base
     const election = await prisma.election.findUnique({ where: { id: data.electionId } });
@@ -2112,7 +2112,7 @@ export async function adminUpdateCandidacy(candidacyId: string, data: { motivati
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     // Récupérer la candidature actuelle avec toutes les infos nécessaires
     const current = await prisma.candidacy.findUnique({ 
@@ -2208,7 +2208,7 @@ export async function adminDeleteCandidacy(candidacyId: string) {
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     await prisma.candidacy.delete({ where: { id: candidacyId } });
     return { success: true };
@@ -2241,7 +2241,7 @@ export async function adminDeleteElection(electionId: string): Promise<{ success
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     await prisma.election.delete({ where: { id: electionId } });
     return { success: true };
@@ -2257,7 +2257,7 @@ export async function getElectionWithDetails(electionId: string): Promise<{ succ
     if (!session?.user?.id) return { success: false, error: "Non autorisé" };
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") return { success: false, error: "Admin requis" };
+    if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
     const election = await prisma.election.findUnique({
       where: { id: electionId },
@@ -2442,7 +2442,7 @@ export async function importStaticCandidates(): Promise<{
     }
 
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
-    if (!user || user.role !== "Admin") {
+    if (!user || user.role !== "ADMIN") {
       return { success: false, error: "Seuls les administrateurs peuvent importer les candidats" };
     }
 

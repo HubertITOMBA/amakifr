@@ -292,7 +292,7 @@ export async function validerIdee(formData: FormData) {
       where: { id: session.user.id }
     });
 
-    if (!user || user.role !== UserRole.Admin) {
+    if (!user || user.role !== UserRole.ADMIN) {
       return { success: false, error: "Accès réservé aux administrateurs" };
     }
 
@@ -381,7 +381,7 @@ export async function rejeterIdee(formData: FormData) {
       where: { id: session.user.id }
     });
 
-    if (!user || user.role !== UserRole.Admin) {
+    if (!user || user.role !== UserRole.ADMIN) {
       return { success: false, error: "Accès réservé aux administrateurs" };
     }
 
@@ -473,7 +473,7 @@ export async function bloquerIdee(formData: FormData) {
       where: { id: session.user.id }
     });
 
-    if (!user || user.role !== UserRole.Admin) {
+    if (!user || user.role !== UserRole.ADMIN) {
       return { success: false, error: "Accès réservé aux administrateurs" };
     }
 
@@ -651,7 +651,7 @@ export async function supprimerCommentaire(formData: FormData) {
       where: { id: session.user.id }
     });
 
-    if (!user || user.role !== UserRole.Admin) {
+    if (!user || user.role !== UserRole.ADMIN) {
       return { success: false, error: "Accès réservé aux administrateurs" };
     }
 
@@ -949,7 +949,7 @@ export async function getIdeesByUser(userId: string) {
       where: { id: session.user.id }
     });
 
-    if (session.user.id !== userId && user?.role !== UserRole.Admin) {
+    if (session.user.id !== userId && user?.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1043,7 +1043,7 @@ export async function getAllIdeesForAdmin() {
       where: { id: session.user.id }
     });
 
-    if (!user || user.role !== UserRole.Admin) {
+    if (!user || user.role !== UserRole.ADMIN) {
       return { success: false, error: "Accès réservé aux administrateurs" };
     }
 

@@ -603,7 +603,7 @@ export default function AdminCotisationsDuMois() {
                 <SelectValue placeholder="Toutes les années" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Toutes les années</SelectItem>
+                <SelectItem key="annee-all" value="all">Toutes les années</SelectItem>
                 {anneeOptions.map(annee => (
                   <SelectItem key={annee} value={annee.toString()}>
                     {annee}
@@ -616,7 +616,7 @@ export default function AdminCotisationsDuMois() {
                 <SelectValue placeholder="Tous les mois" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Tous les mois</SelectItem>
+                <SelectItem key="mois-all" value="all">Tous les mois</SelectItem>
                 {moisOptions.map(mois => (
                   <SelectItem key={mois.value} value={mois.value.toString()}>
                     {mois.label}

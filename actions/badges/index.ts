@@ -142,7 +142,7 @@ export async function getUserBadges(userId: string) {
 export async function createBadge(data: z.infer<typeof CreateBadgeSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -169,7 +169,7 @@ export async function createBadge(data: z.infer<typeof CreateBadgeSchema>) {
 export async function updateBadge(data: z.infer<typeof UpdateBadgeSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -198,7 +198,7 @@ export async function updateBadge(data: z.infer<typeof UpdateBadgeSchema>) {
 export async function deleteBadge(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -220,7 +220,7 @@ export async function deleteBadge(id: string) {
 export async function attribuerBadge(data: z.infer<typeof AttribuerBadgeSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -297,7 +297,7 @@ export async function attribuerBadge(data: z.infer<typeof AttribuerBadgeSchema>)
 export async function retirerBadge(badgeId: string, userId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.Admin) {
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
     }
 

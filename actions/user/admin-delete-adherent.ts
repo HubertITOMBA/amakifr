@@ -31,7 +31,7 @@ export async function adminDeleteAdherent(
   try {
     // 1. Vérifier que l'utilisateur connecté est admin
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return { 
         success: false, 
         error: "Non autorisé. Seuls les administrateurs peuvent supprimer des adhérents." 
@@ -64,7 +64,7 @@ export async function adminDeleteAdherent(
     }
 
     // 4. Empêcher la suppression d'un autre admin (sécurité)
-    if (userToDelete.role === "Admin") {
+    if (userToDelete.role === "ADMIN") {
       return { 
         success: false, 
         error: "Vous ne pouvez pas supprimer un autre administrateur. Contactez le super-admin." 
@@ -112,7 +112,7 @@ export async function adminDeleteAdherent(
         reason: reason,
         notifyUser: notifyUser,
           deletedBy: session.user.id,
-          deletedByName: session.user.name || "Admin",
+          deletedByName: session.user.name || "ADMIN",
           deletedByEmail: session.user.email || null,
         },
         });

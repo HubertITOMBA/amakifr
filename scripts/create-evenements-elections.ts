@@ -15,7 +15,7 @@ async function createEvenementsElections() {
   try {
     // Récupérer un admin pour createdBy
     const admin = await prisma.user.findFirst({
-      where: { role: 'Admin' },
+      where: { role: 'ADMIN' },
       select: { id: true },
     });
 

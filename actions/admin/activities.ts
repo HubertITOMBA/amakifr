@@ -29,7 +29,7 @@ export async function getUserActivities(
 ) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -141,7 +141,7 @@ export async function getUserActivities(
 export async function getActivityStats() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -239,7 +239,7 @@ export async function getActivityStats() {
 export async function getRecentActivitiesForDashboard(limit: number = 10) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "Admin") {
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 

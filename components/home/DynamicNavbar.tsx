@@ -6,12 +6,14 @@ import Logo from "@/public/logow1.webp";
 import { UserButton } from "../auth/user-button";
 import { ThemeToggle } from "../ThemeToggle";
 import { NotificationCenter } from "../notifications/NotificationCenter";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Menu, X, ChevronDown } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useElectoralMenu } from "@/hooks/use-electoral-menu";
 import { useDynamicMenus, getUserMenuRoles, DynamicMenu } from "@/hooks/use-dynamic-menus";
 import { useUnreadMessages } from "@/hooks/use-unread-messages";
+import { getCurrentUserAdminRoles } from "@/actions/user/admin-roles";
+import { AdminRole } from "@prisma/client";
 import * as LucideIcons from "lucide-react";
 import {
   DropdownMenu,
@@ -28,12 +30,75 @@ export function DynamicNavbar() {
   const user = useCurrentUser();
   const { enabled: electoralMenuEnabled } = useElectoralMenu();
   const { count: unreadCount } = useUnreadMessages();
+  const [adminRoles, setAdminRoles] = useState<AdminRole[]>([]);
+  const [loadingRoles, setLoadingRoles] = useState(true);
   
-  // Déterminer les rôles de l'utilisateur
-  const userRoles = getUserMenuRoles(user?.role, !!user);
+  // Charger les rôles d'administration de l'utilisateur
+  useEffect(() => {
+    const loadAdminRoles = async () => {
+      if (!user?.id) {
+        setLoadingRoles(false);
+        return;
+      }
+      
+      try {
+        const result = await getCurrentUserAdminRoles();
+        if (result && result.success && result.roles) {
+          setAdminRoles(result.roles);
+        } else if (result && !result.success) {
+          console.warn("[DynamicNavbar] Impossible de charger les rôles:", result.error);
+          setAdminRoles([]);
+        }
+      } catch (error) {
+        console.error("[DynamicNavbar] Erreur lors du chargement des rôles:", error);
+        setAdminRoles([]);
+      } finally {
+        setLoadingRoles(false);
+      }
+    };
+
+    loadAdminRoles();
+  }, [user?.id]);
+  
+  // Déterminer les rôles de l'utilisateur (UserRole + AdminRole)
+  const userRoles = useMemo(() => {
+    // Normaliser le rôle utilisateur pour être sûr qu'il est en majuscules
+    const normalizedUserRole = user?.role?.toString().trim().toUpperCase();
+    
+    const roles = getUserMenuRoles(
+      normalizedUserRole, // Utiliser le rôle normalisé
+      !!user,
+      adminRoles.map(r => String(r)) // Convertir AdminRole en string pour correspondre à MenuRole
+    );
+    
+    // Log pour déboguer
+    console.log("[DynamicNavbar] Rôles utilisateur:", {
+      userRole: user?.role,
+      normalizedUserRole: normalizedUserRole,
+      adminRoles: adminRoles,
+      menuRoles: roles,
+      userEmail: user?.email,
+      hasAdminRole: roles.includes("ADMIN"),
+    });
+    
+    return roles;
+  }, [user?.role, user, adminRoles]);
   
   // Charger les menus depuis la DB
   const { menus, loading } = useDynamicMenus("NAVBAR", userRoles);
+  
+  // Log pour déboguer
+  useEffect(() => {
+    if (!loading && !loadingRoles) {
+      console.log("[DynamicNavbar] État des menus:", {
+        loading,
+        loadingRoles,
+        menusCount: menus.length,
+        userRoles,
+        menus: menus.map(m => ({ libelle: m.libelle, roles: m.roles, lien: m.lien })),
+      });
+    }
+  }, [menus, loading, loadingRoles, userRoles]);
 
   // Organiser les menus en hiérarchie parent-enfant
   const { parentMenus, submenusByParent } = useMemo(() => {
@@ -127,7 +192,14 @@ export function DynamicNavbar() {
     return (
       <Link 
         key={menu.id} 
-        href={menu.lien} 
+        href={menu.lien}
+        onClick={() => {
+          console.log("[DynamicNavbar] Clic sur le menu:", {
+            libelle: menu.libelle,
+            lien: menu.lien,
+            roles: menu.roles,
+          });
+        }}
         className="font-title text-sm xl:text-base 2xl:text-lg font-semibold leading-6 hover:text-blue-600 dark:hover:text-blue-400 transition-colors flex items-center gap-1.5 relative px-1 whitespace-nowrap shrink-0"
         title={menu.description || undefined}
       >
@@ -155,7 +227,7 @@ export function DynamicNavbar() {
 
           {/* Navigation Desktop - Prend l'espace disponible et centre son contenu */}
           <div className="hidden xl:flex xl:gap-x-3 2xl:gap-x-6 justify-center flex-1 min-w-0 items-center">
-            {loading ? (
+            {loading || loadingRoles ? (
               <div className="flex items-center gap-2 text-sm text-gray-500">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                 Chargement...
@@ -199,7 +271,7 @@ export function DynamicNavbar() {
       {isMenuOpen && (
         <div className="xl:hidden">
           <div className="px-2 pt-2 pb-3 space-y-1 bg-white dark:bg-slate-900 border-t border-gray-200 dark:border-gray-700">
-            {loading ? (
+            {loading || loadingRoles ? (
               <div className="flex items-center justify-center gap-2 py-4 text-sm text-gray-500">
                 <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-600"></div>
                 Chargement...

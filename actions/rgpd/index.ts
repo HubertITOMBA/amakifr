@@ -15,7 +15,7 @@ import { join } from "path";
 export async function getAllDataDeletionRequests() {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé. Seuls les administrateurs peuvent consulter les demandes.",
@@ -97,7 +97,7 @@ export async function getAllDataDeletionRequests() {
 export async function verifyDataDeletionRequest(requestId: string) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé.",
@@ -136,7 +136,7 @@ export async function verifyDataDeletionRequest(requestId: string) {
         statut: "EnVerification",
         verifiedAt: new Date(),
         verifiedBy: session.user.id,
-        verifiedByName: session.user.name || "Admin",
+        verifiedByName: session.user.name || "ADMIN",
       },
     });
 
@@ -182,7 +182,7 @@ export async function verifyDataDeletionRequest(requestId: string) {
 export async function approveDataDeletionRequest(requestId: string) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé.",
@@ -221,7 +221,7 @@ export async function approveDataDeletionRequest(requestId: string) {
         statut: "Approuvee",
         approvedAt: new Date(),
         approvedBy: session.user.id,
-        approvedByName: session.user.name || "Admin",
+        approvedByName: session.user.name || "ADMIN",
       },
     });
 
@@ -271,7 +271,7 @@ const RejectRequestSchema = z.object({
 export async function rejectDataDeletionRequest(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé.",
@@ -313,7 +313,7 @@ export async function rejectDataDeletionRequest(formData: FormData) {
         statut: "Rejetee",
         rejectedAt: new Date(),
         rejectedBy: session.user.id,
-        rejectedByName: session.user.name || "Admin",
+        rejectedByName: session.user.name || "ADMIN",
         rejectionReason: validatedData.reason,
       },
     });
@@ -370,7 +370,7 @@ export async function rejectDataDeletionRequest(formData: FormData) {
 export async function exportUserData(userId: string) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé.",
@@ -542,7 +542,7 @@ export async function exportUserData(userId: string) {
 export async function completeDataDeletionRequest(requestId: string) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return {
         success: false,
         error: "Non autorisé.",
@@ -591,7 +591,7 @@ export async function completeDataDeletionRequest(requestId: string) {
         statut: "Completee",
         completedAt: new Date(),
         completedBy: session.user.id,
-        completedByName: session.user.name || "Admin",
+        completedByName: session.user.name || "ADMIN",
       },
     });
 

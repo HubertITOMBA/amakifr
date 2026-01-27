@@ -25,6 +25,7 @@ import { getAnalyticsDashboard } from "@/actions/analytics";
 import { toast } from "sonner";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { isAuthorizationError } from "@/lib/utils";
 
 type Period = "week" | "month" | "quarter" | "year";
 
@@ -44,11 +45,18 @@ export default function AnalyticsDashboardPage() {
       if (result.success && result.data) {
         setData(result.data);
       } else {
-        toast.error(result.error || "Erreur lors du chargement des données");
+        // Ne pas afficher de toast pour les erreurs d'autorisation (l'utilisateur n'a simplement pas accès à cette fonctionnalité)
+        if (result.error && !isAuthorizationError(result.error)) {
+          toast.error(result.error || "Erreur lors du chargement des données");
+        }
       }
     } catch (error) {
       console.error("Erreur lors du chargement:", error);
-      toast.error("Erreur lors du chargement des données");
+      // Ne pas afficher de toast pour les erreurs d'autorisation
+      const errorMessage = error instanceof Error ? error.message : "Erreur lors du chargement des données";
+      if (!isAuthorizationError(errorMessage)) {
+        toast.error("Erreur lors du chargement des données");
+      }
     } finally {
       setLoading(false);
     }

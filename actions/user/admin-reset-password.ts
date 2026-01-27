@@ -49,7 +49,7 @@ export async function adminResetUserPassword(userId: string) {
   try {
     // Vérifier que l'utilisateur connecté est admin
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return { 
         success: false, 
         error: "Non autorisé. Seuls les administrateurs peuvent réinitialiser les mots de passe." 
@@ -78,7 +78,7 @@ export async function adminResetUserPassword(userId: string) {
     }
 
     // Empêcher la réinitialisation du mot de passe d'un autre admin (sécurité)
-    if (user.role === "Admin" && user.id !== session.user.id) {
+    if (user.role === "ADMIN" && user.id !== session.user.id) {
       return { 
         success: false, 
         error: "Vous ne pouvez pas réinitialiser le mot de passe d'un autre administrateur." 

@@ -744,7 +744,7 @@ export default function UpdateUserPage() {
               </Button>
               
               {/* Boutons "Fiche vierge" et "Export en PDF" - seulement pour les admins */}
-              {user?.role === "Admin" && (
+              {user?.role === "ADMIN" && (
                 <>
                   <Button
                     variant="outline"
@@ -995,7 +995,7 @@ export default function UpdateUserPage() {
               )}
               
               {/* Bouton "Export en PDF" - seulement pour les admins */}
-              {user?.role === "Admin" && (
+              {user?.role === "ADMIN" && (
                 <Button
                   variant="outline"
                   onClick={async () => {
@@ -1386,10 +1386,10 @@ export default function UpdateUserPage() {
                       <SelectValue placeholder="Sélectionner une civilité" />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="Monsieur">Monsieur</SelectItem>
-                      <SelectItem value="Madame">Madame</SelectItem>
-                      <SelectItem value="Mademoiselle">Mademoiselle</SelectItem>
-                      <SelectItem value="Partenaire">Partenaire</SelectItem>
+                      <SelectItem key="civility-monsieur" value="Monsieur">Monsieur</SelectItem>
+                      <SelectItem key="civility-madame" value="Madame">Madame</SelectItem>
+                      <SelectItem key="civility-mademoiselle" value="Mademoiselle">Mademoiselle</SelectItem>
+                      <SelectItem key="civility-partenaire" value="Partenaire">Partenaire</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -1608,9 +1608,9 @@ export default function UpdateUserPage() {
                           <SelectValue placeholder="Sélectionner un type" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="Mobile">Mobile</SelectItem>
-                          <SelectItem value="Fixe">Fixe</SelectItem>
-                          <SelectItem value="Professionnel">Professionnel</SelectItem>
+                          <SelectItem key="tel-mobile" value="Mobile">Mobile</SelectItem>
+                          <SelectItem key="tel-fixe" value="Fixe">Fixe</SelectItem>
+                          <SelectItem key="tel-professionnel" value="Professionnel">Professionnel</SelectItem>
                         </SelectContent>
                       </Select>
                     </div>
@@ -1660,9 +1660,9 @@ export default function UpdateUserPage() {
                     <SelectValue placeholder="Sélectionner un type d'adhésion" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="AdhesionAnnuelle">Adhésion annuelle</SelectItem>
-                    <SelectItem value="Renouvellement">Renouvellement</SelectItem>
-                    <SelectItem value="Autre">Autre</SelectItem>
+                    <SelectItem key="adhesion-annuelle" value="AdhesionAnnuelle">Adhésion annuelle</SelectItem>
+                    <SelectItem key="adhesion-renouvellement" value="Renouvellement">Renouvellement</SelectItem>
+                    <SelectItem key="adhesion-autre" value="Autre">Autre</SelectItem>
                   </SelectContent>
                 </Select>
               </div>

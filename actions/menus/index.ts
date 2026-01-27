@@ -47,9 +47,29 @@ export async function getMenusByNiveau(niveau: "NAVBAR" | "SIDEBAR", userRoles: 
       },
     });
 
-    // Filtrer par rôles
+    // Log pour déboguer
+    console.log("[getMenusByNiveau] Filtrage des menus:", {
+      niveau,
+      userRoles,
+      totalMenus: menus.length,
+      menusAvantFiltre: menus.map(m => ({ libelle: m.libelle, roles: m.roles })),
+    });
+
+    // Filtrer par rôles (normaliser pour la comparaison)
+    const normalizedUserRoles = userRoles.map(r => r.toString().trim().toUpperCase());
     const filteredMenus = menus.filter((menu) => {
-      return menu.roles.some((role) => userRoles.includes(role));
+      // Normaliser les rôles du menu pour la comparaison
+      const normalizedMenuRoles = menu.roles.map(r => r.toString().trim().toUpperCase());
+      const hasAccess = normalizedMenuRoles.some((role) => normalizedUserRoles.includes(role));
+      if (!hasAccess) {
+        console.log(`[getMenusByNiveau] Menu "${menu.libelle}" filtré - rôles menu: ${menu.roles.join(", ")} (normalisés: ${normalizedMenuRoles.join(", ")}), rôles user: ${userRoles.join(", ")} (normalisés: ${normalizedUserRoles.join(", ")})`);
+      }
+      return hasAccess;
+    });
+
+    console.log("[getMenusByNiveau] Menus après filtrage:", {
+      count: filteredMenus.length,
+      menus: filteredMenus.map(m => ({ libelle: m.libelle, roles: m.roles })),
     });
 
     return {
@@ -73,7 +93,7 @@ export async function getMenusByNiveau(niveau: "NAVBAR" | "SIDEBAR", userRoles: 
 export async function getAllMenus() {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -114,7 +134,7 @@ export async function getAllMenus() {
 export async function getMenuById(id: string) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -156,7 +176,7 @@ export async function getMenuById(id: string) {
 export async function createMenu(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -225,7 +245,7 @@ export async function createMenu(formData: FormData) {
 export async function updateMenu(id: string, formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -280,7 +300,7 @@ export async function updateMenu(id: string, formData: FormData) {
 export async function deleteMenu(id: string) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -315,7 +335,7 @@ export async function deleteMenu(id: string) {
 export async function toggleMenuStatus(id: string, statut: boolean) {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "Admin") {
+    if (!session?.user || session.user.role !== "ADMIN") {
       return { success: false, error: "Non autorisé" };
     }
 

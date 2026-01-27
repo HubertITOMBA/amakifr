@@ -16,11 +16,11 @@ import { Button } from "@/components/ui/button";
 
 const getRoleColor = (role: UserRole) => {
   switch (role) {
-    case UserRole.Admin:
+    case UserRole.ADMIN:
       return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-red-200 dark:border-red-800";
-    case UserRole.Membre:
+    case UserRole.MEMBRE:
       return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-800";
-    case UserRole.Invite:
+    case UserRole.INVITE:
       return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-800";
     default:
       return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-800";
@@ -29,11 +29,11 @@ const getRoleColor = (role: UserRole) => {
 
 const getRoleLabel = (role: UserRole) => {
   switch (role) {
-    case UserRole.Admin:
-      return "Admin";
-    case UserRole.Membre:
-      return "Membre";
-    case UserRole.Invite:
+    case UserRole.ADMIN:
+      return "ADMIN";
+    case UserRole.MEMBRE:
+      return "MEMBRE";
+    case UserRole.INVITE:
       return "Invité";
     default:
       return role;

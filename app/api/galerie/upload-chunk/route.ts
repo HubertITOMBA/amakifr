@@ -30,7 +30,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (session.user.role !== "Admin") {
+    if (session.user.role !== "ADMIN") {
       return NextResponse.json(
         { success: false, error: "Seuls les administrateurs peuvent ajouter des médias à la galerie." },
         { status: 403 }

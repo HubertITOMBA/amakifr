@@ -42,11 +42,17 @@ export function useDynamicMenus(niveau: "NAVBAR" | "SIDEBAR", userRoles: string[
           setMenus(result.data as DynamicMenu[]);
           setError(null);
         } else {
-          setError(result.error || "Erreur lors du chargement des menus");
+          // Ne pas afficher d'erreur à l'utilisateur - simplement retourner un tableau vide
+          // L'utilisateur n'a pas besoin de savoir qu'il n'est pas autorisé à voir certains menus
+          console.warn("[useDynamicMenus] Erreur lors du chargement des menus:", result.error);
+          setMenus([]);
+          setError(null);
         }
       } catch (err) {
         console.error("Erreur lors du chargement des menus:", err);
-        setError("Erreur lors du chargement des menus");
+        // Ne pas afficher d'erreur à l'utilisateur - simplement retourner un tableau vide
+        setMenus([]);
+        setError(null);
       } finally {
         setLoading(false);
       }
@@ -61,11 +67,16 @@ export function useDynamicMenus(niveau: "NAVBAR" | "SIDEBAR", userRoles: string[
 /**
  * Convertit les rôles utilisateur vers les rôles de menu
  * 
- * @param userRole - Le rôle utilisateur (Admin, Membre, Invite)
+ * @param userRole - Le rôle utilisateur (ADMIN, MEMBRE, INVITE)
  * @param isAuthenticated - Si l'utilisateur est connecté
+ * @param adminRoles - Les rôles d'administration de l'utilisateur (AdminRole[])
  * @returns Les rôles de menu correspondants
  */
-export function getUserMenuRoles(userRole?: string, isAuthenticated?: boolean): string[] {
+export function getUserMenuRoles(
+  userRole?: string, 
+  isAuthenticated?: boolean, 
+  adminRoles: string[] = []
+): string[] {
   const roles: string[] = ["VISITEUR"]; // Rôle par défaut
 
   if (!isAuthenticated) {
@@ -76,14 +87,46 @@ export function getUserMenuRoles(userRole?: string, isAuthenticated?: boolean): 
   roles.push("MEMBRE");
 
   // Mapper les rôles utilisateur
-  if (userRole === "Admin") {
+  // IMPORTANT: Si l'utilisateur a UserRole.ADMIN, il a automatiquement accès à tous les menus
+  // Mais si l'utilisateur a seulement des AdminRole (sans UserRole.ADMIN),
+  // il n'a accès qu'aux menus correspondant à ses AdminRole
+  
+  // Normaliser le rôle pour gérer les cas où il pourrait être en minuscules ou avec des espaces
+  const normalizedRole = userRole?.toString().trim().toUpperCase();
+  
+  // Liste des rôles admin qui peuvent être dans UserRole
+  const adminUserRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+  
+  if (normalizedRole === "ADMIN") {
+    // Si l'utilisateur a UserRole.ADMIN, il a le rôle ADMIN dans les menus
+    // Cela lui donne accès à tous les menus qui ont "ADMIN" dans leur liste de rôles
     roles.push("ADMIN");
-  } else if (userRole === "Invite") {
+  } else if (normalizedRole === "INVITE") {
     roles.push("INVITE");
+  } else if (normalizedRole && adminUserRoles.includes(normalizedRole)) {
+    // Si l'utilisateur a un rôle admin dans UserRole (PRESID, VICEPR, SECRET, etc.)
+    // l'ajouter aux rôles de menu
+    if (!roles.includes(normalizedRole)) {
+      roles.push(normalizedRole);
+    }
   }
 
-  // TODO: Ajouter la logique pour les rôles de postes (PRESID, SECRET, etc.)
-  // Cela nécessitera de charger le poste de l'adhérent depuis la DB
+  // Ajouter les rôles d'administration (AdminRole correspond à MenuRole)
+  // ADMIN, PRESID, VICEPR, SECRET, VICESE, COMCPT
+  // Ces rôles sont ajoutés même si l'utilisateur n'a pas UserRole.ADMIN
+  adminRoles.forEach(adminRole => {
+    const normalizedAdminRole = adminRole.toString().trim().toUpperCase();
+    if (!roles.includes(normalizedAdminRole)) {
+      roles.push(normalizedAdminRole);
+    }
+  });
+
+  // Log pour déboguer
+  console.log("[getUserMenuRoles] Conversion des rôles:", {
+    userRole,
+    adminRoles,
+    resultRoles: roles,
+  });
 
   return roles;
 }

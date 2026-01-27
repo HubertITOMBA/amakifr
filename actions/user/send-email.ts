@@ -28,7 +28,7 @@ export async function sendCustomEmailToAdherents(
       select: { role: true },
     });
 
-    if (!user || user.role !== "Admin") {
+    if (!user || user.role !== "ADMIN") {
       return { success: false, error: "Accès non autorisé. Administrateur requis." };
     }
 
