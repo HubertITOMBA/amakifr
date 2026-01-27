@@ -11,11 +11,19 @@ CREATE TYPE "UserRole" AS ENUM ('ADMIN', 'MEMBRE', 'INVITE', 'PRESID', 'VICEPR',
 ALTER TABLE "users" ALTER COLUMN "role" DROP DEFAULT;
 
 -- Mettre à jour les données existantes dans la table users
+-- Gérer les conversions depuis les anciens formats (Admin, Membre, Invite) et les nouveaux (ADMIN, MEMBRE, INVITE)
 ALTER TABLE "users" ALTER COLUMN "role" TYPE "UserRole" USING (
-  CASE "role"::text
+  CASE UPPER(TRIM("role"::text))
     WHEN 'ADMIN' THEN 'ADMIN'::"UserRole"
     WHEN 'MEMBRE' THEN 'MEMBRE'::"UserRole"
-    WHEN 'Invite' THEN 'INVITE'::"UserRole"
+    WHEN 'INVITE' THEN 'INVITE'::"UserRole"
+    WHEN 'PRESID' THEN 'PRESID'::"UserRole"
+    WHEN 'VICEPR' THEN 'VICEPR'::"UserRole"
+    WHEN 'SECRET' THEN 'SECRET'::"UserRole"
+    WHEN 'VICESE' THEN 'VICESE'::"UserRole"
+    WHEN 'COMCPT' THEN 'COMCPT'::"UserRole"
+    WHEN 'TRESOR' THEN 'TRESOR'::"UserRole"
+    WHEN 'VTRESO' THEN 'VTRESO'::"UserRole"
     ELSE 'MEMBRE'::"UserRole"
   END
 );
@@ -81,10 +89,17 @@ BEGIN
     WHERE table_name = 'suppressions_adherent' AND column_name = 'userRole'
   ) THEN
     ALTER TABLE "suppressions_adherent" ALTER COLUMN "userRole" TYPE "UserRole" USING (
-      CASE "userRole"::text
+      CASE UPPER(TRIM("userRole"::text))
         WHEN 'ADMIN' THEN 'ADMIN'::"UserRole"
         WHEN 'MEMBRE' THEN 'MEMBRE'::"UserRole"
-        WHEN 'Invite' THEN 'INVITE'::"UserRole"
+        WHEN 'INVITE' THEN 'INVITE'::"UserRole"
+        WHEN 'PRESID' THEN 'PRESID'::"UserRole"
+        WHEN 'VICEPR' THEN 'VICEPR'::"UserRole"
+        WHEN 'SECRET' THEN 'SECRET'::"UserRole"
+        WHEN 'VICESE' THEN 'VICESE'::"UserRole"
+        WHEN 'COMCPT' THEN 'COMCPT'::"UserRole"
+        WHEN 'TRESOR' THEN 'TRESOR'::"UserRole"
+        WHEN 'VTRESO' THEN 'VTRESO'::"UserRole"
         ELSE 'MEMBRE'::"UserRole"
       END
     );
