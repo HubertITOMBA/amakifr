@@ -1,3 +1,6 @@
+-- Activer l'extension PL/pgSQL si elle n'est pas déjà activée
+CREATE EXTENSION IF NOT EXISTS plpgsql;
+
 -- Inclure tous les AdminRole dans UserRole
 -- Supprimer l'ancien enum et créer le nouveau
 ALTER TYPE "UserRole" RENAME TO "UserRole_old";
