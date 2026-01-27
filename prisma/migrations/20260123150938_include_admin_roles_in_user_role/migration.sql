@@ -12,6 +12,7 @@ ALTER TABLE "users" ALTER COLUMN "role" DROP DEFAULT;
 
 -- Mettre à jour les données existantes dans la table users
 -- Gérer les conversions depuis les anciens formats (Admin, Membre, Invite) et les nouveaux (ADMIN, MEMBRE, INVITE)
+-- NOTE: TRESOR et VTRESO seront ajoutés dans la migration suivante, ne pas les inclure ici
 ALTER TABLE "users" ALTER COLUMN "role" TYPE "UserRole" USING (
   CASE UPPER(TRIM("role"::text))
     WHEN 'ADMIN' THEN 'ADMIN'::"UserRole"
@@ -22,8 +23,6 @@ ALTER TABLE "users" ALTER COLUMN "role" TYPE "UserRole" USING (
     WHEN 'SECRET' THEN 'SECRET'::"UserRole"
     WHEN 'VICESE' THEN 'VICESE'::"UserRole"
     WHEN 'COMCPT' THEN 'COMCPT'::"UserRole"
-    WHEN 'TRESOR' THEN 'TRESOR'::"UserRole"
-    WHEN 'VTRESO' THEN 'VTRESO'::"UserRole"
     ELSE 'MEMBRE'::"UserRole"
   END
 );
@@ -98,8 +97,6 @@ BEGIN
         WHEN 'SECRET' THEN 'SECRET'::"UserRole"
         WHEN 'VICESE' THEN 'VICESE'::"UserRole"
         WHEN 'COMCPT' THEN 'COMCPT'::"UserRole"
-        WHEN 'TRESOR' THEN 'TRESOR'::"UserRole"
-        WHEN 'VTRESO' THEN 'VTRESO'::"UserRole"
         ELSE 'MEMBRE'::"UserRole"
       END
     );
