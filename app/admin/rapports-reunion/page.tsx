@@ -42,6 +42,7 @@ import {
   getRapportReunionById
 } from "@/actions/rapports-reunion";
 import { toast } from "sonner";
+import { isAuthorizationError } from "@/lib/utils";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -76,13 +77,14 @@ export default function AdminRapportsReunionPage() {
             return parsed;
           }
         }
+        // Sur mobile, masquer toutes les colonnes sauf "titre" et "actions" pour éviter le scroll horizontal
         const isMobile = window.innerWidth < 768;
         if (isMobile) {
           return {
             dateReunion: false,
             createdAt: false,
             CreatedBy: false,
-            updatedAt: false,
+            // titre et actions restent visibles (non définis = visible par défaut)
           };
         }
       } catch (error) {
@@ -91,6 +93,27 @@ export default function AdminRapportsReunionPage() {
     }
     return {};
   });
+
+  // Mettre à jour la visibilité des colonnes lors du changement de taille d'écran
+  useEffect(() => {
+    const handleResize = () => {
+      const isMobile = window.innerWidth < 768;
+      if (isMobile) {
+        // En mode mobile, masquer toutes les colonnes sauf titre et actions
+        setColumnVisibility({
+          dateReunion: false,
+          createdAt: false,
+          CreatedBy: false,
+        });
+      }
+    };
+
+    window.addEventListener("resize", handleResize);
+    // Vérifier au chargement initial
+    handleResize();
+
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   // Dialogs
   const [showCreateDialog, setShowCreateDialog] = useState(false);
@@ -122,7 +145,10 @@ export default function AdminRapportsReunionPage() {
       if (result.success && result.rapports) {
         setRapports(result.rapports);
       } else {
-        toast.error(result.error || "Erreur lors du chargement");
+        // Ne pas afficher de toast pour les erreurs d'autorisation
+        if (result.error && !isAuthorizationError(result.error)) {
+          toast.error(result.error || "Erreur lors du chargement");
+        }
         setRapports([]);
       }
     } catch (error) {
@@ -325,25 +351,26 @@ export default function AdminRapportsReunionPage() {
     columnHelper.accessor("titre", {
       header: "Titre",
       cell: ({ row }) => (
-        <span className="text-sm text-gray-900 dark:text-gray-100 font-medium">
+        <span className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 font-medium break-words line-clamp-2 md:line-clamp-none block max-w-full">
           {row.getValue("titre")}
         </span>
       ),
       size: 300,
-      minSize: 200,
+      minSize: 80,
       maxSize: 400,
       enableResizing: true,
+      meta: { forceVisible: true }, // Toujours visible, même en mode mobile
     }),
     columnHelper.accessor("dateReunion", {
       header: "Date de réunion",
       cell: ({ row }) => (
-        <span className="text-sm text-gray-900 dark:text-gray-100">
+        <span className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 whitespace-nowrap">
           {format(new Date(row.getValue("dateReunion")), "dd MMM yyyy", { locale: fr })}
         </span>
       ),
-      size: 150,
-      minSize: 120,
-      maxSize: 200,
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
       enableResizing: true,
     }),
     columnHelper.accessor("CreatedBy", {
@@ -351,26 +378,26 @@ export default function AdminRapportsReunionPage() {
       cell: ({ row }) => {
         const createdBy = row.getValue("CreatedBy") as any;
         return (
-          <span className="text-sm text-gray-600 dark:text-gray-400">
+          <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 truncate max-w-[120px] sm:max-w-none">
             {createdBy?.name || createdBy?.email || "N/A"}
           </span>
         );
       },
-      size: 150,
-      minSize: 120,
-      maxSize: 200,
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
       enableResizing: true,
     }),
     columnHelper.accessor("createdAt", {
       header: "Créé le",
       cell: ({ row }) => (
-        <span className="text-sm text-gray-600 dark:text-gray-400">
+        <span className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 whitespace-nowrap">
           {format(new Date(row.getValue("createdAt")), "dd MMM yyyy", { locale: fr })}
         </span>
       ),
-      size: 120,
-      minSize: 100,
-      maxSize: 150,
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
       enableResizing: true,
     }),
     columnHelper.display({
@@ -443,7 +470,7 @@ export default function AdminRapportsReunionPage() {
     },
     initialState: {
       pagination: {
-        pageSize: 10,
+        pageSize: 20,
       },
     },
     state: { sorting, columnFilters, globalFilter, columnVisibility },
@@ -454,15 +481,19 @@ export default function AdminRapportsReunionPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
-      <Card className="mx-auto max-w-7xl shadow-lg border-blue-200 !py-0">
-        <CardHeader className="!py-0 bg-gradient-to-r from-blue-500 to-blue-600 text-white">
-          <div className="flex items-center justify-between py-4 sm:py-6">
-            <CardTitle className="flex items-center gap-2">
-              <FileText className="h-5 w-5" />
-              Rapports de Réunion ({filteredData.length})
-            </CardTitle>
-            <div className="flex items-center gap-2">
+    <div className="h-screen flex flex-col bg-gradient-to-br from-blue-50 via-white to-blue-50 overflow-hidden">
+      <Card className="mx-auto w-full max-w-[95vw] xl:max-w-[98vw] shadow-lg border-blue-200 !py-0 flex flex-col h-full flex-1 overflow-hidden">
+        <CardHeader className="!py-0 bg-gradient-to-r from-blue-500 to-blue-600 text-white flex-shrink-0">
+          <div className="flex flex-col gap-2 py-2 sm:py-3">
+            {/* Première ligne : Titre avec icône */}
+            <div className="flex items-center justify-between gap-2">
+              <CardTitle className="flex items-center gap-2 text-sm sm:text-base md:text-lg min-w-0 flex-1">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
+                <span className="truncate">Rapports de Réunion ({filteredData.length})</span>
+              </CardTitle>
+            </div>
+            {/* Deuxième ligne : Boutons (mobile) ou sur la même ligne (desktop) */}
+            <div className="flex items-center gap-2 sm:justify-end flex-wrap">
               <ColumnVisibilityToggle 
                 table={table} 
                 storageKey="admin-rapports-reunion-column-visibility"
@@ -472,55 +503,58 @@ export default function AdminRapportsReunionPage() {
                   setFormData({ titre: "", dateReunion: "", contenu: "" });
                   setShowCreateDialog(true);
                 }}
-                className="bg-white text-blue-600 hover:bg-blue-50"
+                className="bg-white text-blue-600 hover:bg-blue-50 h-8 text-xs sm:text-sm px-2 sm:px-3 flex-shrink-0"
               >
-                <Plus className="h-4 w-4 mr-2" />
-                Nouveau rapport
+                <Plus className="h-3 w-3 sm:h-4 sm:w-4 mr-1 sm:mr-2" />
+                <span className="hidden sm:inline">Nouveau rapport</span>
+                <span className="sm:hidden">Nouveau</span>
               </Button>
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="flex flex-col flex-1 overflow-hidden p-3 sm:p-4">
           {/* Filtres et recherche */}
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+          <div className="flex flex-col sm:flex-row gap-2 mb-3 flex-shrink-0">
             <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
               <Input
                 placeholder="Rechercher un rapport..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-11"
+                className="pl-8 h-8 text-sm"
               />
             </div>
           </div>
 
           {loading ? (
-            <div className="flex items-center justify-center py-8">
+            <div className="flex items-center justify-center py-8 flex-1">
               <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
             </div>
           ) : (
-            <>
-              <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+            <div className="flex flex-col flex-1 overflow-hidden min-h-0">
+              <div className="mb-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300 flex-shrink-0">
                 {filteredData.length} rapport(s) trouvé(s)
               </div>
-              <DataTable table={table} emptyMessage="Aucun rapport trouvé" compact={true} />
+              <div className="flex-1 overflow-auto min-h-0">
+                <DataTable table={table} emptyMessage="Aucun rapport trouvé" compact={true} />
+              </div>
               
               {/* Pagination - Masquée sur mobile */}
-              <div className="hidden md:flex bg-white dark:bg-gray-800 mt-5 items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
-                <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+              <div className="hidden md:flex bg-white dark:bg-gray-800 mt-2 items-center justify-between py-2 px-2 font-semibold rounded-lg shadow-sm border border-gray-200 dark:border-gray-700 flex-shrink-0">
+                <div className="ml-2 flex-1 text-xs text-muted-foreground dark:text-gray-400">
                   {table.getFilteredRowModel().rows.length} ligne(s) au total
                 </div>
 
-                <div className="flex items-center space-x-6 lg:space-x-8">
-                  <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+                <div className="flex items-center space-x-3 lg:space-x-4">
+                  <div className="flex items-center space-x-1.5">
+                    <p className="text-xs font-medium text-gray-700 dark:text-gray-300">Lignes/page</p>
                     <Select
                       value={`${table.getState().pagination.pageSize}`}
                       onValueChange={(value) => {
                         table.setPageSize(Number(value));
                       }}
                     >
-                      <SelectTrigger className="h-8 w-[70px]">
+                      <SelectTrigger className="h-7 w-[60px] text-xs">
                         <SelectValue placeholder={table.getState().pagination.pageSize} />
                       </SelectTrigger>
                       <SelectContent side="top">
@@ -533,51 +567,50 @@ export default function AdminRapportsReunionPage() {
                     </Select>
                   </div>
 
-                  <div className="flex w-[100px] items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300">
-                    Page {table.getState().pagination.pageIndex + 1} sur{" "}
-                    {table.getPageCount()}
+                  <div className="flex w-[90px] items-center justify-center text-xs font-medium text-gray-700 dark:text-gray-300">
+                    Page {table.getState().pagination.pageIndex + 1}/{table.getPageCount()}
                   </div>
-                  <div className="flex items-center space-x-2">
+                  <div className="flex items-center space-x-1">
                     <Button
                       variant="outline"
-                      className="hidden h-8 w-8 p-0 lg:flex"
+                      className="hidden h-7 w-7 p-0 lg:flex"
                       onClick={() => table.setPageIndex(0)}
                       disabled={!table.getCanPreviousPage()}
                     >
                       <span className="sr-only">Aller à la première page</span>
-                      <ChevronsLeft className="h-4 w-4" />
+                      <ChevronsLeft className="h-3 w-3" />
                     </Button>
                     <Button
                       variant="outline"
-                      className="h-8 w-8 p-0"
+                      className="h-7 w-7 p-0"
                       onClick={() => table.previousPage()}
                       disabled={!table.getCanPreviousPage()}
                     >
                       <span className="sr-only">Page précédente</span>
-                      <ChevronLeft className="h-4 w-4" />
+                      <ChevronLeft className="h-3 w-3" />
                     </Button>
                     <Button
                       variant="outline"
-                      className="h-8 w-8 p-0"
+                      className="h-7 w-7 p-0"
                       onClick={() => table.nextPage()}
                       disabled={!table.getCanNextPage()}
                     >
                       <span className="sr-only">Page suivante</span>
-                      <ChevronRight className="h-4 w-4" />
+                      <ChevronRight className="h-3 w-3" />
                     </Button>
                     <Button
                       variant="outline"
-                      className="hidden h-8 w-8 p-0 lg:flex"
+                      className="hidden h-7 w-7 p-0 lg:flex"
                       onClick={() => table.setPageIndex(table.getPageCount() - 1)}
                       disabled={!table.getCanNextPage()}
                     >
                       <span className="sr-only">Aller à la dernière page</span>
-                      <ChevronsRight className="h-4 w-4" />
+                      <ChevronsRight className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>
               </div>
-            </>
+            </div>
           )}
         </CardContent>
       </Card>

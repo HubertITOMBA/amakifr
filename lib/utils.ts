@@ -43,6 +43,19 @@ export function cleanUrl(url: string | undefined | null): string | undefined {
 }
 
 /**
+ * Vérifie si un rôle utilisateur est un rôle admin autorisé
+ * 
+ * @param role - Le rôle à vérifier (peut être string, UserRole, ou null/undefined)
+ * @returns true si le rôle est un rôle admin autorisé
+ */
+export function isAdminRole(role: string | null | undefined): boolean {
+  if (!role) return false;
+  const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+  const normalizedRole = role.toString().trim().toUpperCase();
+  return adminRoles.includes(normalizedRole);
+}
+
+/**
  * Normalise un email en minuscules et supprime les espaces
  * Assure l'unicité case-insensitive des emails dans la base de données
  * 

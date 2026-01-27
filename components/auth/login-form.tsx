@@ -59,13 +59,11 @@ const LoginForm = () => {
           
           if (result?.error) {
             setError(result.error);
-            // Afficher un toast pour les erreurs importantes (compte désactivé)
-            if (result.error.includes('désactivé') || result.error.includes('désactivé')) {
-              toast.error(result.error, {
-                position: "top-center",
-                autoClose: 5000,
-              });
-            }
+            // Afficher un toast pour les erreurs importantes
+            toast.error(result.error, {
+              position: "top-center",
+              autoClose: 5000,
+            });
             form.reset();
           } else if (result?.success) {
             // Si twoFactor est activé, rediriger vers la page de vérification

@@ -13,9 +13,10 @@ interface DataTableProps<TData> {
   estimateRowHeight?: number; // non utilisé, conservé pour compatibilité
   disableVirtualization?: boolean; // non utilisé, conservé pour compatibilité
   headerColor?: "blue" | "purple" | "green" | "orange" | "red" | "indigo" | "pink" | "teal"; // Couleur du thème pour les en-têtes
+  compact?: boolean; // Mode compact pour réduire les espacements
 }
 
-export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvée", headerColor = "blue" }: DataTableProps<TData>) {
+export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvée", headerColor = "blue", compact = false }: DataTableProps<TData>) {
   const rows = table.getRowModel().rows;
   const headers = table.getHeaderGroups();
 
@@ -91,17 +92,35 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
     );
   }
 
+  const headerPadding = compact ? "px-2 py-1.5" : "px-2 py-3 sm:px-4 sm:py-4";
+  const cellPadding = compact ? "px-2 py-1" : "px-2 py-1.5 sm:px-4 sm:py-2";
+  const headerTextSize = compact ? "text-xs" : "text-xs sm:text-sm";
+  const cellTextSize = compact ? "text-xs" : "text-xs sm:text-sm";
+  const maxHeight = compact ? "max-h-full" : "max-h-[70vh]";
+
   return (
-    <div className="overflow-x-auto -mx-4 sm:mx-0">
-      <div className="max-h-[70vh] overflow-auto">
-        <table className="w-full min-w-0 md:min-w-[640px]">
+    <div className="overflow-x-auto -mx-4 sm:mx-0 h-full">
+      <div className={`${maxHeight} overflow-auto h-full`}>
+        <table className={`w-full ${compact ? 'table-fixed' : ''} md:table-auto min-w-0 md:min-w-[640px]`} style={compact ? { tableLayout: 'fixed', width: '100%' } : {}}>
           <thead className={`${headerClasses} sticky top-0 z-10 shadow-sm`}>
             {headers.map((headerGroup) => (
               <tr key={headerGroup.id} className="border-b-2">
-                {headerGroup.headers.map((header) => (
+                {headerGroup.headers.map((header) => {
+                  const columnId = header.column.id;
+                  // Masquer certaines colonnes sur mobile pour éviter le scroll horizontal
+                  // Cette logique est spécifique aux pages avec compact=true
+                  // En mode mobile, seules "titre" et "actions" doivent être visibles
+                  const isMobileHidden = compact && ['dateReunion', 'CreatedBy', 'createdAt'].includes(columnId);
+                  
+                  return (
                   <th
                     key={header.id}
-                    className="text-left px-2 py-3 sm:px-4 sm:py-4 font-semibold text-xs sm:text-sm uppercase tracking-wider"
+                    className={`text-left ${headerPadding} font-semibold ${headerTextSize} uppercase tracking-wider ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
+                    style={compact && !isMobileHidden ? {
+                      width: columnId === 'titre' ? 'calc(100% - 70px)' : columnId === 'actions' ? '70px' : undefined,
+                      maxWidth: columnId === 'titre' ? 'calc(100% - 70px)' : undefined,
+                      minWidth: columnId === 'titre' ? '0' : columnId === 'actions' ? '70px' : undefined
+                    } : undefined}
                   >
                     {header.isPlaceholder ? null : (
                       <SortButton
@@ -116,7 +135,8 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
                       </SortButton>
                     )}
                   </th>
-                ))}
+                  );
+                })}
               </tr>
             ))}
           </thead>
@@ -134,11 +154,27 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
                   transition-colors
                 `}
               >
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-2 py-1.5 sm:px-4 sm:py-2 text-gray-900 dark:text-gray-100 text-xs sm:text-sm">
+                {row.getVisibleCells().map((cell) => {
+                  const columnId = cell.column.id;
+                  // Masquer certaines colonnes sur mobile pour éviter le scroll horizontal
+                  // Cette logique est spécifique aux pages avec compact=true
+                  // En mode mobile, seules "titre" et "actions" doivent être visibles
+                  const isMobileHidden = compact && ['dateReunion', 'CreatedBy', 'createdAt'].includes(columnId);
+                  
+                  return (
+                  <td 
+                    key={cell.id} 
+                    className={`${cellPadding} text-gray-900 dark:text-gray-100 ${cellTextSize} ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
+                    style={compact && !isMobileHidden ? {
+                      width: columnId === 'titre' ? 'calc(100% - 70px)' : columnId === 'actions' ? '70px' : undefined,
+                      maxWidth: columnId === 'titre' ? 'calc(100% - 70px)' : undefined,
+                      minWidth: columnId === 'titre' ? '0' : columnId === 'actions' ? '70px' : undefined
+                    } : undefined}
+                  >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>
-                ))}
+                  );
+                })}
               </tr>
             ))}
           </tbody>

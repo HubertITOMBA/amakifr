@@ -98,8 +98,12 @@ export const {
 				}
 				
 				// Vérifier que l'email est vérifié (emailVerified doit être une date, pas null)
+				// Note: Cette vérification est redondante avec celle dans login.ts, mais elle sert de sécurité supplémentaire
+				// Si l'email n'est pas vérifié, login.ts devrait avoir redirigé vers la page de vérification
 				if (!existingUser.emailVerified) {
 					console.warn("[auth] Tentative de connexion avec email non vérifié:", existingUser.email);
+					// Retourner false pour bloquer la connexion
+					// L'utilisateur devra vérifier son email via /auth/new-verification
 					return false;
 				}
 			}

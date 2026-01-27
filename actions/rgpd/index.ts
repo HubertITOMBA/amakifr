@@ -15,10 +15,29 @@ import { join } from "path";
 export async function getAllDataDeletionRequests() {
   try {
     const session = await auth();
-    if (!session?.user || session.user.role !== "ADMIN") {
+    if (!session?.user?.id) {
       return {
         success: false,
-        error: "Non autorisé. Seuls les administrateurs peuvent consulter les demandes.",
+        error: "Non autorisé",
+      };
+    }
+
+    // Autoriser les rôles admin qui ont accès aux demandes RGPD
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { role: true },
+    });
+
+    if (!user) {
+      return { success: false, error: "Utilisateur non trouvé" };
+    }
+
+    const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+    const normalizedRole = user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
+      return {
+        success: false,
+        error: "Accès refusé. Vous devez avoir un rôle d'administration.",
       };
     }
 

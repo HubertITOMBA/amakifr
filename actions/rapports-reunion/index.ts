@@ -216,14 +216,20 @@ export async function getAllRapportsReunion() {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que l'utilisateur est admin
+    // Autoriser les rôles admin qui ont accès aux rapports de réunion
     const user = await db.user.findUnique({
       where: { id: session.user.id },
       select: { role: true },
     });
 
-    if (user?.role !== "ADMIN") {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    if (!user) {
+      return { success: false, error: "Utilisateur non trouvé" };
+    }
+
+    const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
+    const normalizedRole = user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
+      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
     }
 
     const rapports = await db.rapportReunion.findMany({

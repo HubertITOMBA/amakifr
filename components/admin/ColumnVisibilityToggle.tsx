@@ -84,9 +84,10 @@ export function ColumnVisibilityToggle<TData>({
   return (
     <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm" className="ml-auto bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700">
-          <Columns className="mr-2 h-4 w-4" />
-          Colonnes
+        <Button variant="outline" size="sm" className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 h-8 text-xs sm:text-sm px-2 sm:px-3">
+          <Columns className="mr-1 sm:mr-2 h-3 w-3 sm:h-4 sm:w-4" />
+          <span className="hidden sm:inline">Colonnes</span>
+          <span className="sm:hidden">Col.</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-[200px] max-h-[400px] overflow-y-auto">

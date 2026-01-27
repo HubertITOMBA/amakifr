@@ -73,6 +73,10 @@ export const login = async (
         // Si on arrive ici, la connexion a réussi
         // Vérifier que result n'est pas une erreur
         if (result?.error) {
+            // Si l'erreur est liée à l'email non vérifié, donner un message plus clair
+            if (result.error.includes('email') || result.error.includes('vérifié') || result.error.includes('verified')) {
+                return { error: "Votre email n'est pas vérifié. Veuillez vérifier votre email avant de vous connecter." };
+            }
             return { error: result.error };
         }
         
