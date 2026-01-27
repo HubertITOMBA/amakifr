@@ -39,7 +39,13 @@ export async function getUserAdminRolesFromDb(userId: string): Promise<AdminRole
     }
 
     return user.adminRoles.map(r => r.role).filter((role): role is AdminRole => role !== null && role !== undefined);
-  } catch (error) {
+  } catch (error: any) {
+    // Si la table n'existe pas encore (code P2021), retourner un tableau vide
+    // Cela permet à l'application de fonctionner même si la migration n'a pas été appliquée
+    if (error?.code === 'P2021' && error?.meta?.table === 'user_admin_roles') {
+      console.warn("[getUserAdminRolesFromDb] La table user_admin_roles n'existe pas encore. Veuillez appliquer la migration.");
+      return [];
+    }
     console.error("Erreur getUserAdminRolesFromDb:", error);
     return [];
   }
