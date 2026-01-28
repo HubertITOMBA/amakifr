@@ -11,7 +11,7 @@ function getPrismaClient(): PrismaClient {
     if (globalThis.prisma) {
         // En développement, vérifier que le client existant a les modèles nécessaires
         if (process.env.NODE_ENV !== "production") {
-            const requiredModels = ['appSettings', 'suppressionAdherent', 'dataDeletionRequest'];
+            const requiredModels = ['appSettings', 'suppressionAdherent', 'dataDeletionRequest', 'permission'];
             const missingModels = requiredModels.filter(model => !(model in globalThis.prisma));
             if (missingModels.length > 0) {
                 console.warn(`⚠️ Client Prisma obsolète détecté (modèles manquants: ${missingModels.join(', ')}), recréation...`);

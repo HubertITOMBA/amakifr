@@ -37,6 +37,7 @@ import type { EmailProvider } from "@/lib/email/providers/types";
 import { getAllSessions, revokeSessionAction, revokeAllUserSessionsAction } from "@/actions/sessions";
 import type { UserSession } from "@/lib/session-tracker";
 import { getElectoralMenuStatus, updateElectoralMenuStatus } from "@/actions/settings/electoral-menu";
+import { PermissionsManager } from "@/components/admin/PermissionsManager";
 
 export default function AdminSettingsPage() {
   const { data: session } = useSession();
@@ -318,7 +319,7 @@ export default function AdminSettingsPage() {
 
       {/* Onglets */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-6">
+        <TabsList className="grid w-full grid-cols-7">
           <TabsTrigger value="general">
             <Globe className="h-4 w-4 mr-2" />
             Général
@@ -334,6 +335,10 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="display">
             <Palette className="h-4 w-4 mr-2" />
             Affichage
+          </TabsTrigger>
+          <TabsTrigger value="permissions">
+            <Shield className="h-4 w-4 mr-2" />
+            Permissions
           </TabsTrigger>
           <TabsTrigger value="system">
             <Database className="h-4 w-4 mr-2" />
@@ -718,6 +723,11 @@ export default function AdminSettingsPage() {
               </div>
             </CardContent>
           </Card>
+        </TabsContent>
+
+        {/* Onglet Permissions */}
+        <TabsContent value="permissions" className="space-y-6">
+          <PermissionsManager />
         </TabsContent>
 
         {/* Onglet Système */}

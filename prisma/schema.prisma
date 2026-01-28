@@ -259,6 +259,7 @@ model User {
   rapportsReunionCrees          RapportReunion[]             @relation("RapportReunionCreatedBy") // Rapports de réunion créés
   rapportsReunionModifies       RapportReunion[]             @relation("RapportReunionUpdatedBy") // Rapports de réunion modifiés
   menusCreated                  Menu[]                       @relation("MenuCreatedBy") // Menus créés
+  permissionsCreated            Permission[]                 @relation("PermissionCreatedBy") // Permissions créées
   activities                    UserActivity[]               @relation("UserActivities") // Activités de l'utilisateur
   projetsCrees                  Projet[]                     @relation("ProjetCreatedBy") // Projets créés
 
@@ -1950,4 +1951,39 @@ model UserAdminRole {
   @@index([role])
   @@index([createdBy])
   @@map("user_admin_roles")
+}
+
+// Enum pour les types de permissions
+enum PermissionType {
+  READ // Lecture seule
+  WRITE // Écriture (création/modification)
+  DELETE // Suppression
+  MANAGE // Gestion complète (inclut toutes les opérations)
+}
+
+// Modèle pour les permissions dynamiques basées sur la base de données
+// Permet de gérer les permissions par action/route sans rebuild de l'application
+model Permission {
+  id          String         @id @default(cuid())
+  action      String         @db.VarChar(255) // Nom de l'action Server Action (ex: "getAllDettesInitiales")
+  resource    String         @db.VarChar(100) // Ressource concernée (ex: "finances", "dettes", "paiements")
+  type        PermissionType // Type de permission (READ, WRITE, DELETE, MANAGE)
+  roles       String[] // Array de rôles autorisés (ex: ["ADMIN", "PRESID", "TRESOR"])
+  description String?        @db.VarChar(500) // Description de la permission
+  route       String?        @db.VarChar(255) // Route associée (ex: "/admin/finances/dettes")
+  enabled     Boolean        @default(true) // Si false, la permission est désactivée
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  createdBy   String? // ID de l'admin qui a créé cette permission
+
+  // Relations
+  CreatedBy User? @relation("PermissionCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@unique([action, type]) // Une action ne peut avoir qu'une seule permission par type
+  @@index([action])
+  @@index([resource])
+  @@index([type])
+  @@index([enabled])
+  @@index([route])
+  @@map("permissions")
 }

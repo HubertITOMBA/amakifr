@@ -21,9 +21,16 @@ const CreateDetteInitialeSchema = z.object({
  * Crée une dette initiale pour un adhérent
  */
 export async function createDetteInitiale(data: z.infer<typeof CreateDetteInitialeSchema>) {
-  try {
+try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier la permission dynamique
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "createDetteInitiale");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -912,7 +919,14 @@ export async function checkAndSendRelances() {
 export async function getAllDettesInitiales() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier la permission dynamique
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllDettesInitiales");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -968,7 +982,14 @@ const UpdateDetteInitialeSchema = z.object({
 export async function getDetteInitialeById(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier la permission dynamique
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getDetteInitialeById");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1014,7 +1035,14 @@ export async function getDetteInitialeById(id: string) {
 export async function updateDetteInitiale(data: z.infer<typeof UpdateDetteInitialeSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier la permission dynamique
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateDetteInitiale");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1107,7 +1135,14 @@ export async function updateDetteInitiale(data: z.infer<typeof UpdateDetteInitia
 export async function getAllPaiements() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier la permission dynamique
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllPaiements");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1177,7 +1212,14 @@ export async function getAllPaiements() {
 export async function getFinancialStats() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier la permission dynamique
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getFinancialStats");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1227,7 +1269,14 @@ export async function getFinancialStats() {
 export async function getAdherentFinancialItems(adherentId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier la permission dynamique
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAdherentFinancialItems");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1303,7 +1352,14 @@ export async function createPaiementGeneral(data: {
 }) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier la permission dynamique
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "createPaiementGeneral");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1588,7 +1644,14 @@ const UpdateAssistanceSchema = z.object({
 export async function updateAssistance(data: z.infer<typeof UpdateAssistanceSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier la permission dynamique
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateAssistance");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -1713,7 +1776,14 @@ export async function updateAssistance(data: z.infer<typeof UpdateAssistanceSche
 export async function getAllAssistances() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Vérifier la permission dynamique
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllAssistances");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
