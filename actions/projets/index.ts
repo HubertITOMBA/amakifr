@@ -52,7 +52,13 @@ const CreateCommentaireTacheSchema = z.object({
 export async function createProjet(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "createProjet");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -112,7 +118,13 @@ export async function createProjet(formData: FormData) {
 export async function updateProjet(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateProjet");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -190,7 +202,13 @@ export async function updateProjet(formData: FormData) {
 export async function deleteProjet(projetId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canDelete } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canDelete(session.user.id, "deleteProjet");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -236,7 +254,13 @@ export async function deleteProjet(projetId: string) {
 export async function getAllProjets() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllProjets");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -297,6 +321,13 @@ export async function getProjetById(projetId: string) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Permission dynamique (lecture admin)
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getProjetById");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -364,7 +395,13 @@ export async function getProjetById(projetId: string) {
 export async function createSousProjet(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "createSousProjet");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -438,7 +475,13 @@ export async function createSousProjet(formData: FormData) {
 export async function updateSousProjet(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateSousProjet");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -519,7 +562,13 @@ export async function updateSousProjet(formData: FormData) {
 export async function deleteSousProjet(sousProjetId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canDelete } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canDelete(session.user.id, "deleteSousProjet");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -566,7 +615,13 @@ export async function deleteSousProjet(sousProjetId: string) {
 export async function affecterSousProjet(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canManage } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canManage(session.user.id, "affecterSousProjet");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -801,7 +856,13 @@ export async function affecterSousProjet(formData: FormData) {
 export async function retirerAffectation(affectationId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canManage } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canManage(session.user.id, "retirerAffectation");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 

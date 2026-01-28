@@ -411,14 +411,11 @@ export async function getAllDocuments(options?: {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (user?.role !== "ADMIN") {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    // Permission dynamique (lecture admin)
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllDocuments");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
     }
 
     const where: any = {};
@@ -502,14 +499,11 @@ export async function adminUpdateDocument(
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (user?.role !== "ADMIN") {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    // Permission dynamique (écriture admin)
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "adminUpdateDocument");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
     }
 
     // Vérifier que le document existe et que l'admin en est le propriétaire
@@ -565,14 +559,11 @@ export async function adminDeleteDocument(documentId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (user?.role !== "ADMIN") {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    // Permission dynamique (suppression admin)
+    const { canDelete } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canDelete(session.user.id, "adminDeleteDocument");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
     }
 
     // Récupérer le document

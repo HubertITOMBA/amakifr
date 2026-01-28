@@ -288,12 +288,11 @@ export async function validerIdee(formData: FormData) {
       return { success: false, error: "Non autorisé" };
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
-    });
-
-    if (!user || user.role !== UserRole.ADMIN) {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    // Permission dynamique (écriture / modération)
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "validerIdee");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
     }
 
     const rawData = {
@@ -377,12 +376,11 @@ export async function rejeterIdee(formData: FormData) {
       return { success: false, error: "Non autorisé" };
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
-    });
-
-    if (!user || user.role !== UserRole.ADMIN) {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    // Permission dynamique (écriture / modération)
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "rejeterIdee");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
     }
 
     const rawData = {
@@ -469,12 +467,11 @@ export async function bloquerIdee(formData: FormData) {
       return { success: false, error: "Non autorisé" };
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
-    });
-
-    if (!user || user.role !== UserRole.ADMIN) {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    // Permission dynamique (écriture / modération)
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "bloquerIdee");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
     }
 
     const rawData = {
@@ -647,12 +644,11 @@ export async function supprimerCommentaire(formData: FormData) {
       return { success: false, error: "Non autorisé" };
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
-    });
-
-    if (!user || user.role !== UserRole.ADMIN) {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    // Permission dynamique (suppression / modération)
+    const { canDelete } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canDelete(session.user.id, "supprimerCommentaire");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
     }
 
     const rawData = {
@@ -1039,12 +1035,11 @@ export async function getAllIdeesForAdmin() {
       return { success: false, error: "Non autorisé" };
     }
 
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id }
-    });
-
-    if (!user || user.role !== UserRole.ADMIN) {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    // Permission dynamique (lecture admin)
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllIdeesForAdmin");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
     }
 
     const idees = await prisma.idee.findMany({
