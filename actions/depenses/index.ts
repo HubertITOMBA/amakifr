@@ -7,6 +7,7 @@ import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { logCreation, logModification } from "@/lib/activity-logger";
+import { isAdminRole } from "@/lib/utils";
 
 // Fonction helper pour transformer null/empty en undefined
 const nullishToString = z.preprocess(
@@ -123,8 +124,13 @@ export async function createDepense(data: z.infer<typeof CreateDepenseSchema>) {
 export async function getAllDepenses() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+
+    const normalizedRole = session.user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !isAdminRole(normalizedRole)) {
+      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
     }
 
     const depenses = await prisma.depense.findMany({
@@ -472,8 +478,13 @@ export async function suspendDepense(id: string) {
 export async function getDepenseStats() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+
+    const normalizedRole = session.user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !isAdminRole(normalizedRole)) {
+      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
     }
 
     const currentMonth = new Date();
@@ -544,8 +555,13 @@ export async function getDepenseStats() {
 export async function getDepenseById(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+
+    const normalizedRole = session.user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !isAdminRole(normalizedRole)) {
+      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
     }
 
     const depense = await prisma.depense.findUnique({
@@ -619,8 +635,13 @@ export async function filterDepenses(filters: {
 }) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+
+    const normalizedRole = session.user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !isAdminRole(normalizedRole)) {
+      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
     }
 
     const whereClause: any = {};
@@ -873,8 +894,13 @@ export async function deleteJustificatif(id: string) {
 export async function getJustificatifsByDepense(depenseId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+
+    const normalizedRole = session.user.role?.toString().trim().toUpperCase();
+    if (!normalizedRole || !isAdminRole(normalizedRole)) {
+      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
     }
 
     const justificatifs = await prisma.justificatifDepense.findMany({

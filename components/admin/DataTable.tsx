@@ -99,7 +99,7 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
   const maxHeight = compact ? "max-h-full" : "max-h-[70vh]";
 
   return (
-    <div className="overflow-x-auto -mx-4 sm:mx-0 h-full">
+    <div className={`${compact ? 'overflow-hidden' : 'overflow-x-auto'} -mx-4 sm:mx-0 h-full`}>
       <div className={`${maxHeight} overflow-auto h-full`}>
         <table className={`w-full ${compact ? 'table-fixed' : ''} md:table-auto min-w-0 md:min-w-[640px]`} style={compact ? { tableLayout: 'fixed', width: '100%' } : {}}>
           <thead className={`${headerClasses} sticky top-0 z-10 shadow-sm`}>
@@ -164,11 +164,13 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
                   return (
                   <td 
                     key={cell.id} 
-                    className={`${cellPadding} text-gray-900 dark:text-gray-100 ${cellTextSize} ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
+                    className={`${cellPadding} text-gray-900 dark:text-gray-100 ${cellTextSize} ${isMobileHidden ? 'hidden md:table-cell' : ''} ${compact && columnId === 'titre' ? 'overflow-hidden' : ''}`}
                     style={compact && !isMobileHidden ? {
                       width: columnId === 'titre' ? 'calc(100% - 70px)' : columnId === 'actions' ? '70px' : undefined,
                       maxWidth: columnId === 'titre' ? 'calc(100% - 70px)' : undefined,
-                      minWidth: columnId === 'titre' ? '0' : columnId === 'actions' ? '70px' : undefined
+                      minWidth: columnId === 'titre' ? '0' : columnId === 'actions' ? '70px' : undefined,
+                      overflow: columnId === 'titre' ? 'hidden' : undefined,
+                      textOverflow: columnId === 'titre' ? 'ellipsis' : undefined
                     } : undefined}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}

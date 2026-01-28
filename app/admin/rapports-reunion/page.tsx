@@ -351,7 +351,7 @@ export default function AdminRapportsReunionPage() {
     columnHelper.accessor("titre", {
       header: "Titre",
       cell: ({ row }) => (
-        <span className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 font-medium break-words line-clamp-2 md:line-clamp-none block max-w-full">
+        <span className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 font-medium block max-w-full md:break-words md:line-clamp-none truncate">
           {row.getValue("titre")}
         </span>
       ),
