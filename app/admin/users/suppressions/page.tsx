@@ -402,7 +402,7 @@ export default function AdminSuppressionsPage() {
                   placeholder="Rechercher par nom, email, raison..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-28"
                 />
               </div>
               <ColumnVisibilityToggle

@@ -482,7 +482,7 @@ export default function AdminMenusPage() {
                 placeholder="Rechercher un menu..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-11"
+                className="pl-28"
               />
             </div>
             <Select value={niveauFilter} onValueChange={setNiveauFilter}>

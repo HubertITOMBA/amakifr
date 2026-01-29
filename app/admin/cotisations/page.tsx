@@ -376,7 +376,7 @@ function CotisationsListTable({ cotisations, typesCotisation, loading, onEdit }:
             placeholder="Rechercher par type, adhérent, email, statut..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10"
+            className="pl-28"
           />
         </div>
         <ColumnVisibilityToggle 
@@ -1092,7 +1092,7 @@ export default function AdminCotisationCreation() {
                     min="0"
                     value={editFormData.montantAttendu}
                     onChange={(e) => setEditFormData({ ...editFormData, montantAttendu: parseFloat(e.target.value) || 0 })}
-                    className="pl-10"
+                    className="pl-28"
                     required
                   />
                 </div>

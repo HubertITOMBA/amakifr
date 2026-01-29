@@ -671,7 +671,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
                           placeholder="Rechercher par type, montant, statut..."
                           value={searchCotisations}
                           onChange={(event) => setSearchCotisations(event.target.value)}
-                          className="pl-10"
+                          className="pl-28"
                         />
                       </div>
                       <Button 
@@ -821,7 +821,7 @@ export function FinancialTables({ cotisations, obligations, loading = false }: F
                           placeholder="Rechercher par type, statut, période..."
                           value={searchObligations}
                           onChange={(event) => setSearchObligations(event.target.value)}
-                          className="pl-10"
+                          className="pl-28"
                         />
                       </div>
                       <Button 

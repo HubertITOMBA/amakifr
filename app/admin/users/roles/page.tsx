@@ -418,7 +418,7 @@ export default function AdminRolesPage() {
                 placeholder="Rechercher par nom, email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-11"
+                className="pl-28"
               />
             </div>
             <ColumnVisibilityToggle 

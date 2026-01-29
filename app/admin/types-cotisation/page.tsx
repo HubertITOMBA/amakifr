@@ -638,7 +638,7 @@ export default function AdminTypesCotisationMensuelle() {
                   placeholder="Rechercher par nom, description, montant..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-11"
+                  className="pl-28"
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>

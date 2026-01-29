@@ -98,7 +98,7 @@ export function AdherentSearchDialog({
               placeholder="Rechercher par nom, prénom ou email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-28"
               autoFocus
             />
             {searchTerm && (

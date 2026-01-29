@@ -306,7 +306,7 @@ export default function IdeesPage() {
                   placeholder="Rechercher une idée par titre, description ou auteur..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 h-11 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-blue-500 dark:focus:border-blue-400"
+                  className="pl-28 h-11 bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-600 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500 focus:border-blue-500 dark:focus:border-blue-400"
                 />
               </div>
 

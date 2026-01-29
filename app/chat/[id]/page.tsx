@@ -335,7 +335,7 @@ export default function ConversationPage() {
                     handleSearch();
                   }
                 }}
-                className="pl-10 border-blue-200 focus:border-blue-400 focus:ring-blue-400"
+                className="pl-28 border-blue-200 focus:border-blue-400 focus:ring-blue-400"
               />
             </div>
             {searchQuery && (

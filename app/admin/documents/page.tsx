@@ -541,7 +541,7 @@ export default function AdminDocumentsPage() {
                   placeholder="Rechercher par nom, description, utilisateur..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-11 text-sm h-9 sm:h-10"
+                  className="pl-28 text-sm h-9 sm:h-10"
                 />
               </div>
               <Select value={filterType} onValueChange={setFilterType}>

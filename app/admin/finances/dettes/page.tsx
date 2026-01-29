@@ -193,6 +193,13 @@ export default function AdminDettesPage() {
     });
   }, [data, globalFilter, anneeFilter]);
 
+  // Totaux selon les filtres
+  const { totalMontant, totalRestant } = useMemo(() => {
+    const montant = filteredData.reduce((acc, item) => acc + (Number(item.montant) || 0), 0);
+    const restant = filteredData.reduce((acc, item) => acc + (Number(item.montantRestant) ?? 0), 0);
+    return { totalMontant: montant, totalRestant: restant };
+  }, [filteredData]);
+
   const handleCreate = async () => {
     if (!formData.adherentId || !formData.montant) {
       toast.error("Veuillez remplir tous les champs obligatoires");
@@ -453,9 +460,9 @@ export default function AdminDettesPage() {
   }, [data]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50">
-      <div className="p-4 sm:p-6">
-        <div className="mb-4">
+    <div className="min-h-[90vh] flex flex-col bg-gradient-to-br from-blue-50 via-white to-blue-50">
+      <div className="p-3 sm:p-4 flex-1 w-full max-w-[96rem] mx-auto">
+        <div className="mb-2">
           <Link href="/admin/finances">
             <Button variant="ghost" size="sm" className="text-gray-600 dark:text-gray-300">
               <ArrowLeft className="h-4 w-4 mr-2" />
@@ -463,11 +470,11 @@ export default function AdminDettesPage() {
             </Button>
           </Link>
         </div>
-        <Card className="mx-auto max-w-7xl shadow-lg border-2 border-blue-200 dark:border-blue-800/50 bg-white dark:bg-gray-900 !py-0">
-          <CardHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 dark:from-blue-700/50 dark:via-blue-600/40 dark:to-blue-700/50 text-white pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0 shadow-md">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold text-white">
-                <FileText className="h-5 w-5 text-white" />
+        <Card className="mx-auto w-full max-w-[96rem] shadow-lg border-2 border-blue-200 dark:border-blue-800/50 bg-white dark:bg-gray-900 !py-0">
+          <CardHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 dark:from-blue-700/50 dark:via-blue-600/40 dark:to-blue-700/50 text-white py-2 sm:py-3 px-3 sm:px-4 gap-0 shadow-md">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 sm:gap-0">
+              <CardTitle className="flex items-center gap-2 text-base sm:text-lg font-bold text-white">
+                <FileText className="h-4 w-4 sm:h-5 sm:w-5 text-white" />
                 Dettes Initiales ({filteredData.length})
               </CardTitle>
               <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -605,16 +612,16 @@ export default function AdminDettesPage() {
             </div>
           </div>
         </CardHeader>
-        <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
+        <CardContent className="pt-2 sm:pt-3 pb-2 sm:pb-3 px-3 sm:px-4">
           {/* Filtres et recherche */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="flex flex-col sm:flex-row gap-2 sm:gap-3 mb-2 sm:mb-3">
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
               <Input
                 placeholder="Rechercher..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-11"
+                className="pl-28"
               />
             </div>
             <Select value={anneeFilter} onValueChange={setAnneeFilter}>
@@ -632,26 +639,45 @@ export default function AdminDettesPage() {
             </Select>
           </div>
 
+          {/* Card total des dettes (selon filtres) */}
+          <Card className="mb-2 sm:mb-3 border-blue-200 dark:border-blue-800/50 bg-blue-50/50 dark:bg-blue-950/30">
+            <CardContent className="py-2 px-3 sm:px-4">
+              <div className="flex flex-wrap items-center gap-3 sm:gap-6">
+                <div className="flex items-center gap-1.5">
+                  <Euro className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Total des dettes (filtré) :</span>
+                  <span className="text-base sm:text-lg font-bold text-gray-900 dark:text-white">{totalMontant.toFixed(2)} €</span>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Restant dû :</span>
+                  <span className={`text-base sm:text-lg font-bold ${totalRestant > 0 ? "text-red-600 dark:text-red-400" : "text-green-600 dark:text-green-400"}`}>
+                    {totalRestant.toFixed(2)} €
+                  </span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
           {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+            <div className="flex items-center justify-center py-4">
+              <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
             </div>
           ) : (
             <>
-              <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+              <div className="mb-2 text-xs sm:text-sm text-gray-600 dark:text-gray-300">
                 {filteredData.length} dette(s) trouvée(s)
               </div>
-              <DataTable table={table} emptyMessage="Aucune dette initiale trouvée" headerColor="blue" />
+              <DataTable table={table} emptyMessage="Aucune dette initiale trouvée" headerColor="blue" compact />
               
               {/* Pagination - Masquée sur mobile */}
-              <div className="hidden md:flex bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
+              <div className="hidden md:flex bg-white dark:bg-gray-800 mt-2 sm:mt-3 flex-col sm:flex-row items-center justify-between gap-2 sm:gap-0 py-2 sm:py-3 font-semibold rounded-lg border border-gray-200 dark:border-gray-700 px-3 sm:px-4 text-sm">
                 <div className="flex-1 text-xs sm:text-sm text-muted-foreground dark:text-gray-400 text-center sm:text-left">
                   {table.getFilteredRowModel().rows.length} ligne(s) au total
                 </div>
 
-                <div className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8 w-full sm:w-auto justify-center sm:justify-end">
-                  <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+                <div className="flex items-center space-x-2 sm:space-x-4 w-full sm:w-auto justify-center sm:justify-end">
+                  <div className="flex items-center space-x-1.5">
+                    <p className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
                     <Select
                       value={`${table.getState().pagination.pageSize}`}
                       onValueChange={(value) => {

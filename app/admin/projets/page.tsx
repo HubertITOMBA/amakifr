@@ -412,7 +412,7 @@ export default function AdminProjetsPage() {
                   placeholder="Rechercher par titre, description, créateur..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-28"
                 />
               </div>
               <Select value={statutFilter} onValueChange={setStatutFilter}>

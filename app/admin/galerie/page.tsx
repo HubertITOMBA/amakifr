@@ -743,7 +743,7 @@ export default function AdminGaleriePage() {
                   placeholder="Rechercher un média..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-28"
                 />
               </div>
               <Select value={typeFilter} onValueChange={setTypeFilter}>

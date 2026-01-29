@@ -509,7 +509,7 @@ export default function AdminPermissionsPage() {
                     placeholder="Rechercher par action, ressource, route..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-8"
+                    className="pl-28"
                   />
                 </div>
               </div>

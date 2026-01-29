@@ -625,7 +625,7 @@ export default function AdminIdeesPage() {
                 placeholder="Rechercher une idée..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-11"
+                className="pl-28"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>

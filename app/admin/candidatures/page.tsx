@@ -472,7 +472,7 @@ export default function AdminCandidaturesPage() {
                 placeholder="Rechercher par nom, poste ou élection..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-28"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>

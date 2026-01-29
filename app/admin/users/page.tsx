@@ -1559,7 +1559,7 @@ export default function AdminUsersPage() {
                 placeholder="Rechercher par nom ou email..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-11"
+                className="pl-28"
               />
             </div>
             <Select value={roleFilter} onValueChange={setRoleFilter}>

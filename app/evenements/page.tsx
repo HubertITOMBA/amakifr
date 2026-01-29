@@ -351,7 +351,7 @@ export default function PublicEvenementsPage() {
                 placeholder="Rechercher un événement..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-9 sm:pl-10 pr-4"
+                className="w-full pl-28 pr-4"
               />
             </div>
 

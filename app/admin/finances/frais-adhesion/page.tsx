@@ -763,7 +763,7 @@ export default function FraisAdhesionPage() {
                     placeholder="Rechercher..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-11"
+                    className="pl-28"
                   />
                 </div>
                 <Select value={statutFilter} onValueChange={setStatutFilter}>

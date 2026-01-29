@@ -450,7 +450,7 @@ export default function AdminActivitiesPage() {
                   placeholder="Rechercher par action, utilisateur, email..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-28"
                 />
               </div>
               <Select value={typeFilter} onValueChange={setTypeFilter}>

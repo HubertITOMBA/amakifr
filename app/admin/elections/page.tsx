@@ -425,7 +425,7 @@ export default function AdminElectionsPage() {
                   placeholder="Rechercher par titre ou description..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-11"
+                  className="pl-28"
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>

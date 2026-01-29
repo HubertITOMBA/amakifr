@@ -682,7 +682,7 @@ export default function AdminBadgesPage() {
                   placeholder="Rechercher un badge..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-11"
+                  className="pl-28"
                 />
               </div>
               <Select value={typeFilter} onValueChange={setTypeFilter}>
@@ -1053,7 +1053,7 @@ export default function AdminBadgesPage() {
                   placeholder="Rechercher par nom, email..."
                   value={userSearch}
                   onChange={(e) => setUserSearch(e.target.value)}
-                  className="pl-11 pr-10"
+                  className="pl-28 pr-10"
                 />
                 {userSearch && (
                   <button

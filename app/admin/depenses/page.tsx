@@ -852,7 +852,7 @@ export default function AdminDepensesPage() {
                   placeholder="Rechercher (libellé, description, type, statut)..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-11"
+                  className="pl-28"
                 />
               </div>
               <Select value={typeFilter} onValueChange={setTypeFilter}>

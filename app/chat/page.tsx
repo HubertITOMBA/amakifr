@@ -308,7 +308,7 @@ export default function ChatPage() {
                     placeholder="    Rechercher..."
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    className="mt-0 pl-11 bg-white/20 border-white/30 text-white placeholder:text-white/70 focus:bg-white/30"
+                    className="mt-0 pl-28 bg-white/20 border-white/30 text-white placeholder:text-white/70 focus:bg-white/30"
                   />
                 </div>
               </div>
@@ -491,7 +491,7 @@ export default function ChatPage() {
                       placeholder="Rechercher un participant..."
                       value={participantSearch}
                       onChange={(e) => setParticipantSearch(e.target.value)}
-                      className="pl-11 pr-10 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
+                      className="pl-28 pr-10 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600"
                     />
                     {participantSearch && (
                       <button

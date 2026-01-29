@@ -631,7 +631,7 @@ export default function AdminRGPDDemandesPage() {
                   placeholder="Rechercher par email, nom..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10"
+                  className="pl-28"
                 />
               </div>
               <Select value={statusFilter} onValueChange={setStatusFilter}>

@@ -164,7 +164,7 @@ export default function RapportsReunionPage() {
                     placeholder="Rechercher un rapport..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-11"
+                    className="pl-28"
                   />
                 </div>
               </div>

@@ -180,7 +180,7 @@ export function AffecterSousProjetDialog({ sousProjet, open, onOpenChange, onSuc
               placeholder="Rechercher un adhérent..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10"
+              className="pl-28"
             />
           </div>
 

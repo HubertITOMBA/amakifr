@@ -304,7 +304,7 @@ export default function AdminEmailsPage() {
                     placeholder="Rechercher par objet, contenu, destinataire..."
                     value={searchTerm}
                     onChange={(e) => setSearchTerm(e.target.value)}
-                    className="pl-11 text-sm h-9 sm:h-10"
+                    className="pl-28 text-sm h-9 sm:h-10"
                   />
                 </div>
                 <Select value={filterSent} onValueChange={setFilterSent}>
