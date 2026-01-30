@@ -22,14 +22,10 @@ export async function sendEventInvitations(
       return { success: false, error: "Non authentifié" };
     }
 
-    // Vérifier que l'utilisateur est admin
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id! },
-      select: { role: true },
-    });
-
-    if (!user || user.role !== "ADMIN") {
-      return { success: false, error: "Accès non autorisé. Administrateur requis." };
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id!, "sendEventInvitations");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'envoi d'invitations événement requis." };
     }
 
     // Validation

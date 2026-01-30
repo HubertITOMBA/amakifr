@@ -104,9 +104,10 @@ export async function createEvenement(data: z.infer<typeof EvenementSchema>) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que l'utilisateur est admin
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent créer des événements" };
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "createEvenement");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de création d'événement requis." };
     }
 
     // Validation des données
@@ -220,8 +221,10 @@ export async function updateEvenement(id: string, data: z.infer<typeof Evenement
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent modifier des événements" };
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateEvenement");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de modification d'événement requis." };
     }
 
     const validatedData = EvenementSchema.parse(data);
@@ -331,8 +334,10 @@ export async function deleteEvenement(id: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent supprimer des événements" };
+    const { canDelete } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canDelete(session.user.id, "deleteEvenement");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de suppression d'événement requis." };
     }
 
     // Récupérer l'événement avant suppression pour le logging
@@ -377,8 +382,10 @@ export async function getAllEvenements() {
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent voir tous les événements" };
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllEvenements");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de consultation des événements requis." };
     }
 
     const evenements = await prisma.evenement.findMany({
@@ -995,8 +1002,10 @@ export async function getAdherentsForEvent() {
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent accéder à cette fonctionnalité" };
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAdherentsForEvent");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de consultation des adhérents pour événement requis." };
     }
 
     const adherents = await prisma.adherent.findMany({
@@ -1039,8 +1048,10 @@ export async function addParticipantToEvent(
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent ajouter des participants" };
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "addParticipantToEvent");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'ajout de participant requis." };
     }
 
     // Vérifier que l'événement existe
@@ -1234,8 +1245,10 @@ export async function removeParticipantFromEvent(inscriptionId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent supprimer des participants" };
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "removeParticipantFromEvent");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de retrait de participant requis." };
     }
 
     // Récupérer l'inscription
@@ -1284,8 +1297,10 @@ export async function uploadEvenementImage(formData: FormData): Promise<{ succes
       return { success: false, message: "Non autorisé" };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, message: "Seuls les administrateurs peuvent uploader des images" };
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "uploadEvenementImage");
+    if (!hasAccess) {
+      return { success: false, message: "Droit d'upload d'image événement requis." };
     }
 
     const file: File | null = formData.get("file") as unknown as File;
@@ -1353,8 +1368,10 @@ export async function getEvenementsStats() {
       return { success: false, error: "Non autorisé" };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent voir les statistiques" };
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getEvenementsStats");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de consultation des statistiques événements requis." };
     }
 
     const [

@@ -44,8 +44,13 @@ const CreateReservationSchema = z.object({
 export async function createRessource(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
-      return { success: false, error: "Non autorisé. Admin requis." };
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé." };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "createRessource");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de création de ressource requis." };
     }
 
     const rawData = {
@@ -123,8 +128,13 @@ export async function createReservation(formData: FormData) {
     if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
     }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "createReservation");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de création de réservation requis." };
+    }
 
-    // Récupérer l'adhérent si connecté
+    // Récupérer l'adhérent si connecté (admin peut choisir un adhérent, sinon on utilise l'adhérent connecté)
     let adherentId: string | undefined;
     if (session.user.role !== UserRole.ADMIN) {
       const adherent = await prisma.adherent.findUnique({
@@ -237,6 +247,11 @@ export async function getAllReservations() {
     if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
     }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllReservations");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de consultation des réservations requis." };
+    }
 
     const reservations = await safeFindMany(prisma.reservation.findMany({
       include: {
@@ -274,8 +289,13 @@ export async function getAllReservations() {
 export async function confirmerReservation(reservationId: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
-      return { success: false, error: "Non autorisé. Admin requis." };
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé." };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "confirmerReservation");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de confirmation des réservations requis." };
     }
 
     const reservation = await prisma.reservation.update({
@@ -326,11 +346,11 @@ export async function annulerReservation(reservationId: string) {
       return { success: false, error: "Réservation non trouvée" };
     }
 
-    // Seul l'admin ou le propriétaire peut annuler
-    if (
-      session.user.role !== UserRole.ADMIN &&
-      reservation.adherentId !== reservation.Adherent?.id
-    ) {
+    // Seul un utilisateur avec droit d'annulation ou le propriétaire peut annuler
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasCancelRight = await canWrite(session.user.id, "annulerReservation");
+    const isOwner = reservation.Adherent?.userId === session.user.id;
+    if (!hasCancelRight && !isOwner) {
       return { success: false, error: "Vous n'êtes pas autorisé à annuler cette réservation" };
     }
 
@@ -424,8 +444,13 @@ export async function getReservationsByRessource(ressourceId: string, dateDebut?
 export async function getReservationsStats() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getReservationsStats");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de consultation des statistiques réservations requis." };
     }
 
     // Helper pour gérer l'absence de table

@@ -41,8 +41,10 @@ export async function uploadMediaGalerie(formData: FormData) {
       return { success: false, error: "Non autorisé. Vous devez être connecté." };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent ajouter des médias à la galerie." };
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "uploadMediaGalerie");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'ajout de média à la galerie requis." };
     }
 
     const file: File | null = formData.get("file") as unknown as File;
@@ -217,6 +219,17 @@ export async function uploadMediaGalerie(formData: FormData) {
  */
 export async function getAllMediaGalerie(actifOnly: boolean = false) {
   try {
+    if (!actifOnly) {
+      const session = await auth();
+      if (!session?.user?.id) {
+        return { success: false, error: "Non autorisé.", data: [] };
+      }
+      const { canRead } = await import("@/lib/dynamic-permissions");
+      const hasAccess = await canRead(session.user.id, "getAllMediaGalerie");
+      if (!hasAccess) {
+        return { success: false, error: "Droit de consultation de la galerie (admin) requis.", data: [] };
+      }
+    }
     const where = actifOnly ? { actif: true } : {};
     
     const medias = await db.mediaGalerie.findMany({
@@ -305,8 +318,10 @@ export async function updateMediaGalerie(formData: FormData) {
       return { success: false, error: "Non autorisé. Vous devez être connecté." };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent modifier les médias." };
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateMediaGalerie");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de modification des médias requis." };
     }
 
     const id = formData.get("id") as string;
@@ -388,8 +403,10 @@ export async function deleteMediaGalerie(id: string) {
       return { success: false, error: "Non autorisé. Vous devez être connecté." };
     }
 
-    if (session.user.role !== "ADMIN") {
-      return { success: false, error: "Seuls les administrateurs peuvent supprimer les médias." };
+    const { canDelete } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canDelete(session.user.id, "deleteMediaGalerie");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de suppression des médias requis." };
     }
 
     // Vérifier que le média existe

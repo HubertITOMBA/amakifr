@@ -38,14 +38,10 @@ export async function createRapportReunion(formData: FormData) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (user?.role !== "ADMIN") {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "createRapportReunion");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de création de rapport de réunion requis." };
     }
 
     const rawData = {
@@ -97,14 +93,10 @@ export async function updateRapportReunion(formData: FormData) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (user?.role !== "ADMIN") {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateRapportReunion");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de modification de rapport de réunion requis." };
     }
 
     const rawData = {
@@ -166,14 +158,10 @@ export async function deleteRapportReunion(rapportId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que l'utilisateur est admin
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (user?.role !== "ADMIN") {
-      return { success: false, error: "Accès réservé aux administrateurs" };
+    const { canDelete } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canDelete(session.user.id, "deleteRapportReunion");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de suppression de rapport de réunion requis." };
     }
 
     // Vérifier que le rapport existe
@@ -216,20 +204,10 @@ export async function getAllRapportsReunion() {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Autoriser les rôles admin qui ont accès aux rapports de réunion
-    const user = await db.user.findUnique({
-      where: { id: session.user.id },
-      select: { role: true },
-    });
-
-    if (!user) {
-      return { success: false, error: "Utilisateur non trouvé" };
-    }
-
-    const adminRoles = ['ADMIN', 'PRESID', 'VICEPR', 'SECRET', 'VICESE', 'COMCPT', 'TRESOR', 'VTRESO'];
-    const normalizedRole = user.role?.toString().trim().toUpperCase();
-    if (!normalizedRole || !adminRoles.includes(normalizedRole)) {
-      return { success: false, error: "Accès refusé. Vous devez avoir un rôle d'administration." };
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllRapportsReunion");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de consultation des rapports de réunion requis." };
     }
 
     const rapports = await db.rapportReunion.findMany({

@@ -2,7 +2,6 @@
 
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { UserRole } from "@prisma/client";
 import { format } from "date-fns";
 import { logExport } from "@/lib/activity-logger";
 
@@ -12,8 +11,13 @@ import { logExport } from "@/lib/activity-logger";
 export async function getAdherentsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAdherentsForExport");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'export des adhérents requis." };
     }
 
     const adherents = await prisma.adherent.findMany({
@@ -96,8 +100,13 @@ export async function getAdherentsForExport() {
 export async function getCotisationsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getCotisationsForExport");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'export des cotisations requis." };
     }
 
     const cotisations = await prisma.cotisation.findMany({
@@ -139,8 +148,13 @@ export async function getCotisationsForExport() {
 export async function getPaiementsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getPaiementsForExport");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'export des paiements requis." };
     }
 
     const paiements = await prisma.paiementCotisation.findMany({
@@ -181,8 +195,13 @@ export async function getPaiementsForExport() {
 export async function getEvenementsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getEvenementsForExport");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'export des événements requis." };
     }
 
     const evenements = await prisma.evenement.findMany({
@@ -233,8 +252,13 @@ export async function getEvenementsForExport() {
 export async function getInscriptionsEvenementsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getInscriptionsEvenementsForExport");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'export des inscriptions événements requis." };
     }
 
     const inscriptions = await prisma.inscriptionEvenement.findMany({
@@ -285,8 +309,13 @@ export async function getInscriptionsEvenementsForExport() {
 export async function getElectionsResultsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getElectionsResultsForExport");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'export des résultats d'élections requis." };
     }
 
     const elections = await prisma.election.findMany({
@@ -352,8 +381,13 @@ export async function getElectionsResultsForExport() {
 export async function getDocumentsForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getDocumentsForExport");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'export des documents requis." };
     }
 
     const documents = await prisma.document.findMany({
@@ -398,8 +432,13 @@ export async function getDocumentsForExport() {
 export async function getRelancesForExport() {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getRelancesForExport");
+    if (!hasAccess) {
+      return { success: false, error: "Droit d'export des relances requis." };
     }
 
     const relances = await prisma.relance.findMany({
