@@ -336,8 +336,13 @@ export async function deleteDepense(id: string) {
 export async function validateDepense(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "validateDepense");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé. Droit de validation des dépenses requis." };
     }
 
     // Récupérer les informations de la dépense avant la mise à jour
@@ -725,8 +730,13 @@ export async function filterDepenses(filters: {
 export async function uploadJustificatif(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "uploadJustificatif");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé. Droit d'ajout de justificatif requis." };
     }
 
     const file = formData.get("file") as File;
@@ -842,8 +852,13 @@ export async function uploadJustificatif(formData: FormData) {
 export async function deleteJustificatif(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canDelete } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canDelete(session.user.id, "deleteJustificatif");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé. Droit de suppression de justificatif requis." };
     }
 
     // Récupérer le justificatif pour obtenir le chemin du fichier
@@ -881,6 +896,60 @@ export async function deleteJustificatif(id: string) {
 
   } catch (error) {
     console.error("Erreur lors de la suppression du justificatif:", error);
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+/**
+ * Modifie les métadonnées d'un justificatif (ex. nom du fichier)
+ *
+ * @param id - L'identifiant du justificatif
+ * @param data - { nomFichier?: string }
+ * @returns Un objet avec success (boolean), message (string) en cas de succès, ou error (string) en cas d'échec
+ */
+export async function updateJustificatif(
+  id: string,
+  data: { nomFichier?: string }
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateJustificatif");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé. Droit de modification de justificatif requis." };
+    }
+
+    const justificatif = await prisma.justificatifDepense.findUnique({
+      where: { id },
+    });
+
+    if (!justificatif) {
+      return { success: false, error: "Justificatif non trouvé" };
+    }
+
+    const updateData: { nomFichier?: string } = {};
+    if (data.nomFichier != null && data.nomFichier.trim()) {
+      updateData.nomFichier = data.nomFichier.trim().slice(0, 255);
+    }
+
+    if (Object.keys(updateData).length === 0) {
+      return { success: true, message: "Aucune modification" };
+    }
+
+    await prisma.justificatifDepense.update({
+      where: { id },
+      data: updateData,
+    });
+
+    revalidatePath("/admin/depenses");
+    revalidatePath(`/admin/depenses/${justificatif.depenseId}/edition`);
+
+    return { success: true, message: "Justificatif modifié avec succès" };
+  } catch (error) {
+    console.error("Erreur lors de la modification du justificatif:", error);
     return { success: false, error: "Erreur interne du serveur" };
   }
 }

@@ -22,8 +22,13 @@ const CreateEmailsSchema = z.object({
 export async function sendEmails(data: z.infer<typeof CreateEmailsSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== "ADMIN") {
-      return { success: false, error: "Non autorisé. Admin requis." };
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé." };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "sendEmails");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé. Droit d'envoi de mails requis." };
     }
 
     // Validation des données

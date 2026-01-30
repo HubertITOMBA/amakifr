@@ -210,6 +210,44 @@ export const SERVER_ACTIONS_CONFIG: ServerActionConfig[] = [
     route: "/admin/depenses",
     category: "Dépenses",
   },
+  {
+    action: "uploadJustificatif",
+    label: "Ajouter un justificatif",
+    description: "Uploader un justificatif (fichier) pour une dépense",
+    resource: "depenses",
+    defaultType: "WRITE",
+    route: "/admin/depenses",
+    category: "Dépenses",
+  },
+  {
+    action: "deleteJustificatif",
+    label: "Supprimer un justificatif",
+    description: "Supprimer un justificatif d'une dépense",
+    resource: "depenses",
+    defaultType: "DELETE",
+    route: "/admin/depenses",
+    category: "Dépenses",
+  },
+  {
+    action: "updateJustificatif",
+    label: "Modifier un justificatif",
+    description: "Modifier les métadonnées d'un justificatif (ex. nom du fichier)",
+    resource: "depenses",
+    defaultType: "WRITE",
+    route: "/admin/depenses",
+    category: "Dépenses",
+  },
+
+  // ========== EMAILS ==========
+  {
+    action: "sendEmails",
+    label: "Envoi de mails",
+    description: "Envoyer des emails aux adhérents (admin)",
+    resource: "emails",
+    defaultType: "WRITE",
+    route: "/admin/emails",
+    category: "Emails",
+  },
 
   // ========== UTILISATEURS ==========
   {
