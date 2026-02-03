@@ -8,7 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Activity, Search, Filter, Download, RefreshCw, Calendar, User, FileText, Trash2, Edit, Eye, CheckCircle2, XCircle, AlertCircle, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight } from "lucide-react";
 import { toast } from "react-toastify";
-import { getUserActivities, getActivityStats } from "@/actions/admin/activities";
+import { getUserActivities, getActivityStats, deleteActivitiesOlderThanDays, deleteAllActivities } from "@/actions/admin/activities";
 import { ensureActivitiesMenu } from "@/actions/menus/ensure-activities-menu";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -26,6 +26,12 @@ import {
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 
 // Types pour les activités
 type ActivityType = "Connexion" | "Deconnexion" | "Creation" | "Modification" | "Suppression" | "Consultation" | "Export" | "Import" | "Authentification" | "ChangementMotDePasse" | "Autre";
@@ -134,6 +140,7 @@ export default function AdminActivitiesPage() {
     }
     return {};
   });
+  const [deleting, setDeleting] = useState(false);
 
   // Debounce pour la recherche
   useEffect(() => {
@@ -231,9 +238,9 @@ export default function AdminActivitiesPage() {
           {format(new Date(row.getValue("createdAt")), "dd/MM/yyyy HH:mm", { locale: fr })}
         </span>
       ),
-      size: 150,
-      minSize: 120,
-      maxSize: 180,
+      size: 115,
+      minSize: 95,
+      maxSize: 140,
       enableResizing: true,
     }),
     columnHelper.accessor("type", {
@@ -249,9 +256,9 @@ export default function AdminActivitiesPage() {
           </Badge>
         );
       },
-      size: 140,
-      minSize: 100,
-      maxSize: 180,
+      size: 110,
+      minSize: 85,
+      maxSize: 140,
       enableResizing: true,
     }),
     columnHelper.accessor("action", {
@@ -333,9 +340,9 @@ export default function AdminActivitiesPage() {
           </Badge>
         );
       },
-      size: 100,
-      minSize: 80,
-      maxSize: 120,
+      size: 85,
+      minSize: 70,
+      maxSize: 100,
       enableResizing: true,
     }),
     columnHelper.accessor("ipAddress", {
@@ -345,9 +352,9 @@ export default function AdminActivitiesPage() {
           {row.getValue("ipAddress") || "N/A"}
         </span>
       ),
-      size: 120,
-      minSize: 100,
-      maxSize: 150,
+      size: 95,
+      minSize: 80,
+      maxSize: 120,
       enableResizing: true,
     }),
   ], []);
@@ -377,37 +384,104 @@ export default function AdminActivitiesPage() {
       },
     },
     state: { sorting, columnFilters, globalFilter, columnVisibility },
+    getRowId: (row) => row.id,
+    manualPagination: true,
+    pageCount: pagination.totalPages,
+    enableColumnResizing: true,
+    columnResizeMode: "onChange",
     defaultColumn: {
       minSize: 50,
       maxSize: 800,
     },
-    manualPagination: true,
-    pageCount: pagination.totalPages,
   });
+
+  const handleDeleteOlderThan = async (days: number) => {
+    if (!confirm(`Supprimer toutes les activités de plus de ${days} jours ?`)) return;
+    setDeleting(true);
+    try {
+      const result = await deleteActivitiesOlderThanDays(days);
+      if (result.success) {
+        toast.success(result.message);
+        loadData();
+      } else {
+        toast.error(result.error || "Erreur lors de la suppression");
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (!confirm("Supprimer TOUTES les activités ? Cette action est irréversible.")) return;
+    setDeleting(true);
+    try {
+      const result = await deleteAllActivities();
+      if (result.success) {
+        toast.success(result.message);
+        loadData();
+      } else {
+        toast.error(result.error || "Erreur lors de la suppression");
+      }
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const headerButtonClass = "bg-white dark:bg-gray-800 border-white/40 dark:border-gray-600 text-gray-800 dark:text-gray-200 hover:bg-blue-50 dark:hover:bg-gray-700";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card className="mx-auto max-w-7xl shadow-lg border-blue-200 dark:border-gray-700 !pt-0">
-          <CardHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 dark:from-blue-700/50 dark:via-blue-600/40 dark:to-blue-700/50 text-white !pt-0 rounded-t-lg">
-            <div className="flex items-center justify-between pt-4 sm:pt-6 pb-4 sm:pb-6">
-              <CardTitle className="flex items-center gap-2">
-                <Activity className="h-5 w-5" />
-                Activités des utilisateurs ({stats.total})
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={loadData}
-                disabled={loading}
-                className="bg-white/10 hover:bg-white/20 border-white/30 text-white hover:text-white"
-              >
-                <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
-                Actualiser
-              </Button>
+      <div className="max-w-[100rem] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Card className="mx-auto max-w-[100rem] !py-0 shadow-xl border-blue-200 dark:border-blue-800">
+          <CardHeader className="bg-gradient-to-r from-blue-500/90 to-blue-600/90 dark:from-blue-600/90 dark:to-blue-700/90 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+              <div>
+                <CardTitle className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2">
+                  <Activity className="h-5 w-5" />
+                  Activités des utilisateurs ({stats.total})
+                </CardTitle>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={deleting || loading}
+                      className={headerButtonClass}
+                    >
+                      Vider les activités
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-56">
+                    <DropdownMenuItem onClick={() => handleDeleteOlderThan(90)}>
+                      Supprimer les activités de plus de 90 jours
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onClick={() => handleDeleteOlderThan(30)}>
+                      Supprimer les activités de plus de 30 jours
+                    </DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={handleDeleteAll}
+                      className="text-red-600 dark:text-red-400 focus:text-red-600 dark:focus:text-red-400"
+                    >
+                      Tout vider (toutes les activités)
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={loadData}
+                  disabled={loading}
+                  className={headerButtonClass}
+                >
+                  <RefreshCw className={`h-4 w-4 mr-2 ${loading ? "animate-spin" : ""}`} />
+                  Actualiser
+                </Button>
+              </div>
             </div>
           </CardHeader>
-          <CardContent className="p-4 sm:p-6">
+          <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
             {/* Statistiques */}
             <div className="grid grid-cols-2 sm:grid-cols-5 gap-4 mb-6">
               <Card className="border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-900/20">
@@ -492,10 +566,10 @@ export default function AdminActivitiesPage() {
                 <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
                   {filteredData.length} activité(s) trouvée(s)
                 </div>
-                <DataTable table={table} emptyMessage="Aucune activité trouvée" />
+                <DataTable table={table} emptyMessage="Aucune activité trouvée" compact={true} headerColor="blue" showCellBorders resizable />
                 
                 {/* Pagination - Masquée sur mobile */}
-                <div className="hidden md:flex bg-white dark:bg-gray-800 mt-5 flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4">
+                <div className="hidden md:flex bg-white dark:bg-gray-800 mt-4 flex-col sm:flex-row items-center justify-between py-4 font-semibold rounded-lg border border-gray-200 dark:border-gray-700 gap-4">
                   <div className="ml-5 flex-1 text-sm text-muted-foreground dark:text-gray-400">
                     {pagination.total} activité(s) au total
                   </div>

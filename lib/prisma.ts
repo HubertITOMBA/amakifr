@@ -12,9 +12,10 @@ declare const globalThis: {
 function getPrismaClient(): PrismaClient {
   // En développement, vérifier que le client existant a le modèle appSettings
   if (globalThis.prismaGlobal) {
-    if (!('appSettings' in globalThis.prismaGlobal)) {
+    // Invalider le cache si le client n'a pas les modèles attendus (après migration / prisma generate)
+    const hasExpectedModels = 'appSettings' in globalThis.prismaGlobal && 'passAssistance' in globalThis.prismaGlobal;
+    if (!hasExpectedModels) {
       console.warn('⚠️ Client Prisma obsolète détecté dans lib/prisma.ts, recréation...');
-      // Déconnecter l'ancien client
       globalThis.prismaGlobal.$disconnect().catch(() => {});
       globalThis.prismaGlobal = undefined as any;
     } else {

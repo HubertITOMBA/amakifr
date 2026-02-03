@@ -9,9 +9,6 @@ import { DEFAULT_LOGIN_REDIRECT } from "@/routes"
 import { AuthError } from "next-auth"
 import { signIn } from "@/auth"
 import { normalizeEmail } from "@/lib/utils"
-import { logUserActivity } from "@/lib/activity-logger"
-import { TypeActivite } from "@prisma/client"
-
 export const login = async (
     values: z.infer<typeof LoginSchema>,
     callbackUrl: string | null
@@ -85,23 +82,7 @@ export const login = async (
             return { error: "Identifiants non valides!" };
         }
         
-        // Logger la connexion
-        try {
-            await logUserActivity(
-                TypeActivite.Connexion,
-                `Connexion de l'utilisateur ${normalizedEmail}`,
-                "User",
-                existingUser.id,
-                {
-                    email: normalizedEmail,
-                    role: existingUser.role,
-                }
-            );
-        } catch (logError) {
-            console.error("Erreur lors du logging de la connexion:", logError);
-            // Ne pas bloquer la connexion si le logging échoue
-        }
-        
+        // La connexion est enregistrée dans auth.ts (events.signIn) pour tous les utilisateurs
         return { success: "Connexion réussie !" }
     } catch (error: any) {
         // NextAuth peut lancer une NEXT_REDIRECT qui est une erreur spéciale

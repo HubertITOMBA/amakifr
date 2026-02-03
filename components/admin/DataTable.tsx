@@ -14,9 +14,13 @@ interface DataTableProps<TData> {
   disableVirtualization?: boolean; // non utilisé, conservé pour compatibilité
   headerColor?: "blue" | "purple" | "green" | "orange" | "red" | "indigo" | "pink" | "teal"; // Couleur du thème pour les en-têtes
   compact?: boolean; // Mode compact pour réduire les espacements
+  resizable?: boolean; // Permet d'agrandir ou rétrécir la largeur des colonnes par glisser-déposer
+  headerUppercase?: boolean; // Si false, les en-têtes ne sont pas en majuscules (défaut: true)
+  headerBold?: boolean; // Si true, les en-têtes sont en gras (défaut: false)
+  showCellBorders?: boolean; // Affiche les bordures entre cellules (lignes et colonnes) comme sur cotisations/gestion
 }
 
-export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvée", headerColor = "blue", compact = false }: DataTableProps<TData>) {
+export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvée", headerColor = "blue", compact = false, resizable = false, headerUppercase = true, headerBold = false, showCellBorders = false }: DataTableProps<TData>) {
   const rows = table.getRowModel().rows;
   const headers = table.getHeaderGroups();
 
@@ -92,8 +96,8 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
     );
   }
 
-  const headerPadding = compact ? "px-2 py-1.5" : "px-2 py-3 sm:px-4 sm:py-4";
-  const cellPadding = compact ? "px-2 py-1" : "px-2 py-1.5 sm:px-4 sm:py-2";
+  const headerPadding = compact ? "px-2 py-1" : "px-2 py-3 sm:px-4 sm:py-4";
+  const cellPadding = compact ? "px-2 py-0.5" : "px-2 py-1.5 sm:px-4 sm:py-2";
   const headerTextSize = compact ? "text-xs" : "text-xs sm:text-sm";
   const cellTextSize = compact ? "text-xs" : "text-xs sm:text-sm";
   const maxHeight = compact ? "max-h-full" : "max-h-[70vh]";
@@ -101,26 +105,38 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
   return (
     <div className={`${compact ? 'overflow-hidden' : 'overflow-x-auto'} -mx-4 sm:mx-0 h-full`}>
       <div className={`${maxHeight} overflow-auto h-full`}>
-        <table className={`w-full ${compact ? 'table-fixed' : ''} md:table-auto min-w-0 md:min-w-[640px]`} style={compact ? { tableLayout: 'fixed', width: '100%' } : {}}>
+        <table className={`w-full ${compact || resizable ? 'table-fixed' : ''} md:table-auto min-w-0 md:min-w-[640px]`} style={compact || resizable ? { tableLayout: 'fixed', width: '100%' } : {}}>
           <thead className={`${headerClasses} sticky top-0 z-10 shadow-sm`}>
             {headers.map((headerGroup) => (
-              <tr key={headerGroup.id} className="border-b-2">
-                {headerGroup.headers.map((header) => {
+              <tr key={headerGroup.id} className={`border-b-2 ${showCellBorders ? "border-gray-300 dark:border-gray-600" : ""}`}>
+                {headerGroup.headers.map((header, headerIndex) => {
                   const columnId = header.column.id;
+                  const isLastHeader = headerIndex === headerGroup.headers.length - 1;
                   // Masquer certaines colonnes sur mobile pour éviter le scroll horizontal
                   // Cette logique est spécifique aux pages avec compact=true
                   // En mode mobile, seules "titre" et "actions" doivent être visibles
-                  const isMobileHidden = compact && ['dateReunion', 'CreatedBy', 'createdAt'].includes(columnId);
-                  
+                  const isMobileHidden = compact && !resizable && ['dateReunion', 'CreatedBy', 'createdAt'].includes(columnId);
+                  const canResize = resizable && header.column.getCanResize();
+                  const col = header.column;
+                  const getNum = (fn: (() => number) | undefined): number | undefined =>
+                    typeof fn === "function" ? fn() : undefined;
+                  const colSize = resizable ? (getNum(header.getSize?.()) ?? getNum(col.getSize?.())) : undefined;
+                  const colMin = resizable ? getNum(col.getMinSize?.()) : undefined;
+                  const colMax = resizable ? getNum(col.getMaxSize?.()) : undefined;
+                  const thStyle = resizable
+                    ? {
+                        ...(typeof colSize === "number" && Number.isFinite(colSize) && { width: colSize }),
+                        ...(typeof colMin === "number" && Number.isFinite(colMin) && { minWidth: colMin }),
+                        ...(typeof colMax === "number" && Number.isFinite(colMax) && colMax < 10000 && { maxWidth: colMax }),
+                      }
+                    : compact && !isMobileHidden
+                      ? (columnId === 'titre' ? { width: 'calc(100% - 70px)', maxWidth: 'calc(100% - 70px)', minWidth: 0 } : columnId === 'actions' ? { width: 70, minWidth: 70 } : undefined)
+                      : undefined;
                   return (
                   <th
                     key={header.id}
-                    className={`text-left ${headerPadding} font-semibold ${headerTextSize} uppercase tracking-wider ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
-                    style={compact && !isMobileHidden ? {
-                      width: columnId === 'titre' ? 'calc(100% - 70px)' : columnId === 'actions' ? '70px' : undefined,
-                      maxWidth: columnId === 'titre' ? 'calc(100% - 70px)' : undefined,
-                      minWidth: columnId === 'titre' ? '0' : columnId === 'actions' ? '70px' : undefined
-                    } : undefined}
+                    className={`text-left ${headerPadding} ${headerBold ? "font-bold" : "font-semibold"} ${headerTextSize} ${headerUppercase ? "uppercase" : ""} tracking-wider ${isMobileHidden ? 'hidden md:table-cell' : ''} ${canResize ? 'relative' : ''} ${showCellBorders ? `border-r border-gray-200 dark:border-gray-700 ${isLastHeader ? "border-r-0" : ""}` : ""}`}
+                    style={thStyle}
                   >
                     {header.isPlaceholder ? null : (
                       <SortButton
@@ -134,18 +150,27 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
                         )}
                       </SortButton>
                     )}
+                    {canResize && (
+                      <div
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className="absolute right-0 top-0 h-full w-1 cursor-col-resize touch-none select-none hover:bg-current hover:opacity-30 active:bg-current active:opacity-50"
+                        style={{ marginRight: -2 }}
+                        title="Redimensionner la colonne"
+                      />
+                    )}
                   </th>
                   );
                 })}
               </tr>
             ))}
           </thead>
-          <tbody>
+          <tbody className={showCellBorders ? "divide-y divide-gray-200 dark:divide-gray-700" : ""}>
             {rows.map((row, index) => (
               <tr 
                 key={row.id} 
                 className={`
-                  border-b border-gray-200 dark:border-gray-700 
+                  border-b border-gray-200 dark:border-gray-700
                   ${index % 2 === 0 
                     ? alternateColors.even
                     : alternateColors.odd
@@ -154,24 +179,32 @@ export function DataTable<TData>({ table, emptyMessage = "Aucune donnée trouvé
                   transition-colors
                 `}
               >
-                {row.getVisibleCells().map((cell) => {
+                {row.getVisibleCells().map((cell, cellIndex) => {
                   const columnId = cell.column.id;
+                  const visibleCells = row.getVisibleCells();
+                  const isLastCell = showCellBorders && cellIndex === visibleCells.length - 1;
                   // Masquer certaines colonnes sur mobile pour éviter le scroll horizontal
-                  // Cette logique est spécifique aux pages avec compact=true
-                  // En mode mobile, seules "titre" et "actions" doivent être visibles
-                  const isMobileHidden = compact && ['dateReunion', 'CreatedBy', 'createdAt'].includes(columnId);
-                  
+                  const isMobileHidden = compact && !resizable && ['dateReunion', 'CreatedBy', 'createdAt'].includes(columnId);
+                  const cellCol = cell.column;
+                  const getCellNum = (fn: (() => number) | undefined): number | undefined =>
+                    typeof fn === "function" ? fn() : undefined;
+                  const cellSize = resizable ? getCellNum(cellCol.getSize?.()) : undefined;
+                  const cellMin = resizable ? getCellNum(cellCol.getMinSize?.()) : undefined;
+                  const cellMaxSize = resizable ? getCellNum(cellCol.getMaxSize?.()) : undefined;
+                  const tdStyle = resizable
+                    ? {
+                        ...(typeof cellSize === "number" && Number.isFinite(cellSize) && { width: cellSize }),
+                        ...(typeof cellMin === "number" && Number.isFinite(cellMin) && { minWidth: cellMin }),
+                        ...(typeof cellMaxSize === "number" && Number.isFinite(cellMaxSize) && cellMaxSize < 10000 && { maxWidth: cellMaxSize }),
+                      }
+                    : compact && !isMobileHidden
+                      ? (columnId === 'titre' ? { width: 'calc(100% - 70px)', maxWidth: 'calc(100% - 70px)', minWidth: 0, overflow: 'hidden', textOverflow: 'ellipsis' } : columnId === 'actions' ? { width: 70, minWidth: 70 } : undefined)
+                      : undefined;
                   return (
                   <td 
                     key={cell.id} 
-                    className={`${cellPadding} text-gray-900 dark:text-gray-100 ${cellTextSize} ${isMobileHidden ? 'hidden md:table-cell' : ''} ${compact && columnId === 'titre' ? 'overflow-hidden' : ''}`}
-                    style={compact && !isMobileHidden ? {
-                      width: columnId === 'titre' ? 'calc(100% - 70px)' : columnId === 'actions' ? '70px' : undefined,
-                      maxWidth: columnId === 'titre' ? 'calc(100% - 70px)' : undefined,
-                      minWidth: columnId === 'titre' ? '0' : columnId === 'actions' ? '70px' : undefined,
-                      overflow: columnId === 'titre' ? 'hidden' : undefined,
-                      textOverflow: columnId === 'titre' ? 'ellipsis' : undefined
-                    } : undefined}
+                    className={`${cellPadding} text-gray-900 dark:text-gray-100 ${cellTextSize} ${isMobileHidden ? 'hidden md:table-cell' : ''} ${compact && columnId === 'titre' ? 'overflow-hidden' : ''} ${showCellBorders ? `border-r border-gray-200 dark:border-gray-700 ${isLastCell ? "border-r-0" : ""}` : ""}`}
+                    style={tdStyle}
                   >
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
                   </td>

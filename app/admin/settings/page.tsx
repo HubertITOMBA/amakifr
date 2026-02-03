@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -26,11 +27,27 @@ import {
   EyeOff,
   Users,
   LogOut,
-  RefreshCw
+  RefreshCw,
+  HandHeart,
+  Plus,
+  Pencil,
+  MoreHorizontal,
+  Search,
+  ChevronLeft,
+  ChevronRight,
+  ChevronsLeft,
+  ChevronsRight,
 } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { toast } from "sonner";
 import { Separator } from "@/components/ui/separator";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useSession } from "next-auth/react";
 import { getEmailProviderFromDB, updateEmailProvider } from "@/actions/admin/settings";
 import type { EmailProvider } from "@/lib/email/providers/types";
@@ -38,6 +55,70 @@ import { getAllSessions, revokeSessionAction, revokeAllUserSessionsAction } from
 import type { UserSession } from "@/lib/session-tracker";
 import { getElectoralMenuStatus, updateElectoralMenuStatus } from "@/actions/settings/electoral-menu";
 import { PermissionsManager } from "@/components/admin/PermissionsManager";
+import { upsertPassAssistance, updatePassAssistance } from "@/actions/admin/assistance-settings";
+import {
+  createColumnHelper,
+  getCoreRowModel,
+  getFilteredRowModel,
+  getPaginationRowModel,
+  getSortedRowModel,
+  useReactTable,
+  type ColumnFiltersState,
+  type SortingState,
+  type VisibilityState,
+} from "@tanstack/react-table";
+import { DataTable } from "@/components/admin/DataTable";
+import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+
+type PassAssistanceRow = {
+  id: string;
+  description: string;
+  montant: number;
+  typeCotisationId: string;
+  TypeCotisationMensuelle: { id: string; nom: string } | null;
+  createdAt?: string;
+  updatedAt?: string;
+};
+
+/** Normalise une valeur date (string ISO, Date, timestamp, ou objet sérialisé) en Date ou null. */
+function parseDateAssistance(value: unknown): Date | null {
+  if (value == null) return null;
+  if (value instanceof Date) return Number.isNaN(value.getTime()) ? null : value;
+  if (typeof value === "number") {
+    const ms = value < 1e12 ? value * 1000 : value;
+    const d = new Date(ms);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === "string") {
+    if (value.trim() === "") return null;
+    const d = new Date(value);
+    return Number.isNaN(d.getTime()) ? null : d;
+  }
+  if (typeof value === "object" && value !== null) {
+    const v = value as Record<string, unknown>;
+    if (typeof v.getTime === "function") return parseDateAssistance((v as Date));
+    if (v.value != null) return parseDateAssistance(v.value);
+    if (v.date != null) return parseDateAssistance(v.date);
+  }
+  return null;
+}
+
+function formatDateAssistance(value: unknown): string {
+  const d = parseDateAssistance(value);
+  if (!d) return "—";
+  try {
+    const s = d.toLocaleDateString("fr-FR", { dateStyle: "short", timeStyle: "short" });
+    return typeof s === "string" ? s : "—";
+  } catch {
+    try {
+      return `${String(d.getDate()).padStart(2, "0")}/${String(d.getMonth() + 1).padStart(2, "0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2, "0")}:${String(d.getMinutes()).padStart(2, "0")}`;
+    } catch {
+      return "—";
+    }
+  }
+}
+
+const assistanceColumnHelper = createColumnHelper<PassAssistanceRow>();
 
 export default function AdminSettingsPage() {
   const { data: session } = useSession();
@@ -84,6 +165,71 @@ export default function AdminSettingsPage() {
   const [sessions, setSessions] = useState<UserSession[]>([]);
   const [loadingSessions, setLoadingSessions] = useState(false);
 
+  // Paramètres Assistance (PassAssistance)
+  const [assistanceRows, setAssistanceRows] = useState<PassAssistanceRow[]>([]);
+  const [assistanceTypeCotisations, setAssistanceTypeCotisations] = useState<Array<{ id: string; nom: string }>>([]);
+  const [loadingAssistance, setLoadingAssistance] = useState(false);
+  const [addAssistanceDialogOpen, setAddAssistanceDialogOpen] = useState(false);
+  const [addAssistanceForm, setAddAssistanceForm] = useState({
+    description: "",
+    montant: 50,
+    typeCotisationId: "",
+  });
+  const [submittingAddAssistance, setSubmittingAddAssistance] = useState(false);
+  const [viewPassAssistance, setViewPassAssistance] = useState<PassAssistanceRow | null>(null);
+  const [editPassAssistance, setEditPassAssistance] = useState<PassAssistanceRow | null>(null);
+  const [editPassFormData, setEditPassFormData] = useState({
+    description: "",
+    montant: 50,
+    typeCotisationId: "",
+  });
+  const [loadingEditPass, setLoadingEditPass] = useState(false);
+  const [assistanceSorting, setAssistanceSorting] = useState<SortingState>([]);
+  const [assistanceColumnFilters, setAssistanceColumnFilters] = useState<ColumnFiltersState>([]);
+  const [assistanceGlobalFilter, setAssistanceGlobalFilter] = useState("");
+  const [assistanceSearchTerm, setAssistanceSearchTerm] = useState("");
+  const [assistanceColumnVisibility, setAssistanceColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-settings-assistance-column-visibility");
+        if (saved) {
+          const parsed = JSON.parse(saved) as Record<string, boolean>;
+          if (Object.keys(parsed).length > 0) {
+            return { ...parsed, createdAt: parsed.createdAt ?? true, updatedAt: parsed.updatedAt ?? true };
+          }
+        }
+        const isMobile = window.innerWidth < 768;
+        if (isMobile) return { montant: false, createdAt: false, updatedAt: false, description: false };
+      } catch {
+        // ignorer
+      }
+    }
+    return { description: false };
+  });
+
+  useEffect(() => {
+    const timer = setTimeout(() => setAssistanceGlobalFilter(assistanceSearchTerm), 300);
+    return () => clearTimeout(timer);
+  }, [assistanceSearchTerm]);
+
+  useEffect(() => {
+    const onResize = () => {
+      const isMobile = typeof window !== "undefined" && window.innerWidth < 768;
+      const saved = localStorage.getItem("admin-settings-assistance-column-visibility");
+      if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+        setAssistanceColumnVisibility((prev) => ({
+          ...prev,
+          montant: false,
+          createdAt: false,
+          updatedAt: false,
+          description: false,
+        }));
+      }
+    };
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+
   useEffect(() => {
     loadSettings();
     loadSystemStats();
@@ -92,7 +238,217 @@ export default function AdminSettingsPage() {
     if (activeTab === "sessions") {
       loadSessions();
     }
+    if (activeTab === "assistance") {
+      loadAssistanceSettings();
+    }
   }, [activeTab]);
+
+  const loadAssistanceSettings = async () => {
+    try {
+      setLoadingAssistance(true);
+      const resp = await fetch("/api/admin/assistance-settings");
+      const res = await resp.json();
+      if (!resp.ok || !res.success || !res.data) {
+        toast.error(res?.error || "Erreur lors du chargement des paramètres d'assistance");
+        return;
+      }
+      const raw = res.data.passAssistances as Array<{
+        id: string;
+        description: string;
+        montant: number;
+        typeCotisationId: string;
+        createdAt?: string | null;
+        updatedAt?: string | null;
+        TypeCotisationMensuelle: { id: string; nom: string } | null;
+      }>;
+      const rows: PassAssistanceRow[] = raw.map((p) => ({
+        id: p.id,
+        description: p.description,
+        montant: p.montant,
+        typeCotisationId: p.typeCotisationId,
+        TypeCotisationMensuelle: p.TypeCotisationMensuelle ?? null,
+        createdAt: p.createdAt != null && String(p.createdAt).trim() !== "" ? String(p.createdAt) : undefined,
+        updatedAt: p.updatedAt != null && String(p.updatedAt).trim() !== "" ? String(p.updatedAt) : undefined,
+      }));
+      setAssistanceRows(rows);
+      setAssistanceTypeCotisations(res.data.typesCotisationAssistance || []);
+    } catch (e) {
+      console.error(e);
+      toast.error("Erreur lors du chargement des paramètres d'assistance");
+    } finally {
+      setLoadingAssistance(false);
+    }
+  };
+
+  const availableTypesForNew = assistanceTypeCotisations.filter(
+    (t) => !assistanceRows.some((r) => r.typeCotisationId === t.id)
+  );
+
+  const handleAddAssistance = async () => {
+    if (!addAssistanceForm.typeCotisationId?.trim()) {
+      toast.error("Veuillez sélectionner un type de cotisation (Assistance).");
+      return;
+    }
+    setSubmittingAddAssistance(true);
+    try {
+      const result = await upsertPassAssistance({
+        description: addAssistanceForm.description.trim() || "Assistance",
+        montant: Number(addAssistanceForm.montant) || 0,
+        typeCotisationId: addAssistanceForm.typeCotisationId,
+      });
+      if (result.success) {
+        toast.success(result.message || "Assistance créée");
+        setAddAssistanceDialogOpen(false);
+        setAddAssistanceForm({ description: "", montant: 50, typeCotisationId: "" });
+        await loadAssistanceSettings();
+      } else {
+        toast.error(result.error || "Erreur lors de la création");
+      }
+    } finally {
+      setSubmittingAddAssistance(false);
+    }
+  };
+
+  const handleEditPassAssistance = async () => {
+    if (!editPassAssistance?.id) return;
+    if (!editPassFormData.typeCotisationId?.trim()) {
+      toast.error("Veuillez sélectionner un type de cotisation (Assistance).");
+      return;
+    }
+    setLoadingEditPass(true);
+    try {
+      const result = await updatePassAssistance({
+        id: editPassAssistance.id,
+        description: editPassFormData.description.trim() || "Assistance",
+        montant: Number(editPassFormData.montant) || 0,
+        typeCotisationId: editPassFormData.typeCotisationId,
+      });
+      if (result.success) {
+        toast.success(result.message || "Sauvegardé");
+        setEditPassAssistance(null);
+        await loadAssistanceSettings();
+      } else {
+        toast.error(result.error || "Erreur");
+      }
+    } finally {
+      setLoadingEditPass(false);
+    }
+  };
+
+  const assistanceColumns = useMemo(
+    () => [
+      assistanceColumnHelper.accessor((r) => r.TypeCotisationMensuelle?.nom ?? "", {
+        id: "assistance",
+        header: "Assistance",
+        cell: ({ row }) => (
+          <span className="font-medium text-gray-900 dark:text-gray-100">
+            {row.original.TypeCotisationMensuelle?.nom ?? "—"}
+          </span>
+        ),
+      }),
+      assistanceColumnHelper.accessor("montant", {
+        header: "Montant",
+        cell: ({ row }) => (
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {Number(row.original.montant ?? 0).toFixed(2)} €
+          </span>
+        ),
+      }),
+      assistanceColumnHelper.accessor((row) => row.createdAt ?? "", {
+        id: "createdAt",
+        header: "Création",
+        cell: ({ getValue }) => (
+          <span className="text-muted-foreground text-sm whitespace-nowrap">
+            {formatDateAssistance(getValue())}
+          </span>
+        ),
+      }),
+      assistanceColumnHelper.accessor((row) => row.updatedAt ?? "", {
+        id: "updatedAt",
+        header: "Mis à jour",
+        cell: ({ getValue }) => (
+          <span className="text-muted-foreground text-sm whitespace-nowrap">
+            {formatDateAssistance(getValue())}
+          </span>
+        ),
+      }),
+      assistanceColumnHelper.accessor("description", {
+        header: "Description",
+        cell: ({ row }) => (
+          <span className="text-sm text-gray-600 dark:text-gray-400 truncate max-w-[200px] block">
+            {row.original.description || "—"}
+          </span>
+        ),
+      }),
+      assistanceColumnHelper.display({
+        id: "actions",
+        header: "Actions",
+        cell: ({ row }) => {
+          const item = row.original;
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                  <MoreHorizontal className="h-4 w-4" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem onClick={() => setViewPassAssistance(item)}>
+                  <Eye className="h-4 w-4 mr-2" />
+                  Voir
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  onClick={() => {
+                    setEditPassAssistance(item);
+                    setEditPassFormData({
+                      description: item.description ?? "",
+                      montant: Number(item.montant ?? 0),
+                      typeCotisationId: item.typeCotisationId ?? "",
+                    });
+                  }}
+                >
+                  <Pencil className="h-4 w-4 mr-2" />
+                  Éditer
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      }),
+    ],
+    []
+  );
+
+  const assistanceTable = useReactTable({
+    data: assistanceRows,
+    columns: assistanceColumns,
+    getCoreRowModel: getCoreRowModel(),
+    getPaginationRowModel: getPaginationRowModel(),
+    getSortedRowModel: getSortedRowModel(),
+    getFilteredRowModel: getFilteredRowModel(),
+    onSortingChange: setAssistanceSorting,
+    onColumnFiltersChange: setAssistanceColumnFilters,
+    onGlobalFilterChange: setAssistanceGlobalFilter,
+    onColumnVisibilityChange: (updater) => {
+      const next = typeof updater === "function" ? updater(assistanceColumnVisibility) : updater;
+      setAssistanceColumnVisibility(next);
+      try {
+        localStorage.setItem("admin-settings-assistance-column-visibility", JSON.stringify(next));
+      } catch {
+        // ignorer
+      }
+    },
+    initialState: {
+      pagination: { pageSize: 10 },
+    },
+    state: {
+      sorting: assistanceSorting,
+      columnFilters: assistanceColumnFilters,
+      globalFilter: assistanceGlobalFilter,
+      columnVisibility: assistanceColumnVisibility,
+    },
+    defaultColumn: { minSize: 50, maxSize: 800 },
+  });
 
   // Tracker la session actuelle au chargement
   useEffect(() => {
@@ -319,7 +675,7 @@ export default function AdminSettingsPage() {
 
       {/* Onglets */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-7">
+        <TabsList className="grid w-full grid-cols-8">
           <TabsTrigger value="general">
             <Globe className="h-4 w-4 mr-2" />
             Général
@@ -331,6 +687,10 @@ export default function AdminSettingsPage() {
           <TabsTrigger value="cotisations">
             <Euro className="h-4 w-4 mr-2" />
             Cotisations
+          </TabsTrigger>
+          <TabsTrigger value="assistance">
+            <HandHeart className="h-4 w-4 mr-2" />
+            Assistance
           </TabsTrigger>
           <TabsTrigger value="display">
             <Palette className="h-4 w-4 mr-2" />
@@ -636,6 +996,355 @@ export default function AdminSettingsPage() {
                   <Badge variant="outline">Carte Bancaire</Badge>
                 </div>
               </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Onglet Assistance */}
+        <TabsContent value="assistance" className="space-y-6">
+          <Card>
+            <CardHeader>
+              <CardTitle>Assistance (PassAssistance)</CardTitle>
+              <CardDescription>
+                Configurez le montant fixe par type d'assistance et liez-le à un type de cotisation mensuelle (catégorie Assistance).
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              {loadingAssistance ? (
+                <div className="flex items-center justify-center py-10">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  <Alert>
+                    <Info className="h-4 w-4" />
+                    <AlertDescription>
+                      Le montant fixe utilisé pour le versement est récupéré depuis la table <code className="text-xs">pass_assistance</code>.
+                      Chaque type d'assistance doit être lié à un type de cotisation mensuelle de catégorie <strong>Assistance</strong>.
+                    </AlertDescription>
+                  </Alert>
+
+                  <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
+                    <div className="relative flex-1">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                      <Input
+                        placeholder="Rechercher..."
+                        value={assistanceSearchTerm}
+                        onChange={(e) => setAssistanceSearchTerm(e.target.value)}
+                        className="pl-9"
+                      />
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <ColumnVisibilityToggle
+                        table={assistanceTable}
+                        storageKey="admin-settings-assistance-column-visibility"
+                      />
+                      <Button
+                        onClick={() => {
+                          const first = availableTypesForNew[0];
+                          if (first) {
+                            setAddAssistanceForm((prev) => ({ ...prev, typeCotisationId: first.id }));
+                            setAddAssistanceDialogOpen(true);
+                          }
+                        }}
+                        disabled={availableTypesForNew.length === 0}
+                      >
+                        <Plus className="h-4 w-4 mr-2" />
+                        Ajouter une assistance
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="mb-4 text-sm text-muted-foreground">
+                    {assistanceTable.getFilteredRowModel().rows.length} assistance(s) configurée(s)
+                  </div>
+
+                  <DataTable
+                    key={`assistance-${assistanceRows.length}-${assistanceRows[0]?.createdAt ?? ""}`}
+                    table={assistanceTable}
+                    emptyMessage="Aucune assistance configurée. Cliquez sur « Ajouter une assistance » pour en créer une."
+                    headerColor="green"
+                    headerBold
+                    headerUppercase={false}
+                    compact={true}
+                  />
+
+                  {assistanceTable.getFilteredRowModel().rows.length > 0 && (
+                    <div className="hidden md:flex mt-4 flex-col sm:flex-row items-center justify-between gap-3 py-4 border-t">
+                      <div className="flex-1 text-sm text-muted-foreground">
+                        {assistanceTable.getFilteredRowModel().rows.length} ligne(s) au total
+                      </div>
+                      <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-medium">Lignes par page</span>
+                          <Select
+                            value={`${assistanceTable.getState().pagination.pageSize}`}
+                            onValueChange={(v) => assistanceTable.setPageSize(Number(v))}
+                          >
+                            <SelectTrigger className="h-8 w-[70px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent side="top">
+                              {[10, 20, 30, 40, 50].map((n) => (
+                                <SelectItem key={n} value={`${n}`}>
+                                  {n}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <span className="text-sm font-medium">
+                          Page {assistanceTable.getState().pagination.pageIndex + 1} sur {assistanceTable.getPageCount()}
+                        </span>
+                        <div className="flex items-center gap-1">
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => assistanceTable.setPageIndex(0)}
+                            disabled={!assistanceTable.getCanPreviousPage()}
+                          >
+                            <ChevronsLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => assistanceTable.previousPage()}
+                            disabled={!assistanceTable.getCanPreviousPage()}
+                          >
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => assistanceTable.nextPage()}
+                            disabled={!assistanceTable.getCanNextPage()}
+                          >
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="icon"
+                            className="h-8 w-8"
+                            onClick={() => assistanceTable.setPageIndex(assistanceTable.getPageCount() - 1)}
+                            disabled={!assistanceTable.getCanNextPage()}
+                          >
+                            <ChevronsRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Dialog Voir PassAssistance */}
+                  <Dialog open={!!viewPassAssistance} onOpenChange={(open) => !open && setViewPassAssistance(null)}>
+                    <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
+                      <DialogHeader className="bg-gradient-to-r from-green-500/90 via-emerald-400/80 to-green-500/90 dark:from-green-700/50 dark:via-emerald-600/40 dark:to-green-700/50 text-white px-6 py-4 shadow-md">
+                        <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                          <HandHeart className="h-5 w-5" />
+                          Détail PassAssistance
+                        </DialogTitle>
+                      </DialogHeader>
+                      {viewPassAssistance && (
+                        <div className="space-y-4 px-6 py-5">
+                          <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20 p-3">
+                            <Label className="text-xs font-medium uppercase tracking-wider text-green-700 dark:text-green-400">Assistance</Label>
+                            <p className="font-semibold text-gray-900 dark:text-gray-100 mt-1">
+                              {viewPassAssistance.TypeCotisationMensuelle?.nom ?? "—"}
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 p-3">
+                            <Label className="text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">Description</Label>
+                            <div className="mt-1 min-h-[100px] max-h-[200px] overflow-y-auto rounded-md bg-white dark:bg-gray-900/50 p-3 border border-gray-100 dark:border-gray-800">
+                              <p className="text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">
+                                {viewPassAssistance.description || "—"}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-900/20 p-3">
+                            <Label className="text-xs font-medium uppercase tracking-wider text-green-700 dark:text-green-400">Montant</Label>
+                            <p className="font-bold text-lg text-green-800 dark:text-green-200 mt-1">
+                              {Number(viewPassAssistance.montant ?? 0).toFixed(2)} €
+                            </p>
+                          </div>
+                          <div className="flex flex-wrap gap-4 sm:gap-6">
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 p-3 flex-1 min-w-[140px]">
+                              <Label className="text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">Création</Label>
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1">
+                                {formatDateAssistance(viewPassAssistance.createdAt)}
+                              </p>
+                            </div>
+                            <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 p-3 flex-1 min-w-[140px]">
+                              <Label className="text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">Mis à jour</Label>
+                              <p className="text-sm font-medium text-gray-900 dark:text-gray-100 mt-1">
+                                {formatDateAssistance(viewPassAssistance.updatedAt)}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+
+                  {/* Dialog Éditer PassAssistance */}
+                  <Dialog
+                    open={!!editPassAssistance}
+                    onOpenChange={(open) => {
+                      if (!open) {
+                        setEditPassAssistance(null);
+                      }
+                    }}
+                  >
+                    <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
+                      <DialogHeader className="bg-gradient-to-r from-amber-500/90 via-orange-400/80 to-amber-500/90 dark:from-amber-700/50 dark:via-orange-600/40 dark:to-amber-700/50 text-white px-6 py-4 shadow-md">
+                        <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                          <Pencil className="h-5 w-5" />
+                          Éditer PassAssistance
+                        </DialogTitle>
+                        <DialogDescription className="text-amber-100 dark:text-amber-200">
+                          Modifiez les champs puis enregistrez.
+                        </DialogDescription>
+                      </DialogHeader>
+                      {editPassAssistance && (
+                        <div className="space-y-4 px-6 py-5">
+                          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/20 p-3">
+                            <Label className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">Type de cotisation (Assistance) *</Label>
+                            <Select
+                              value={editPassFormData.typeCotisationId}
+                              onValueChange={(v) => setEditPassFormData((prev) => ({ ...prev, typeCotisationId: v }))}
+                            >
+                              <SelectTrigger className="mt-1.5 bg-white dark:bg-gray-900">
+                                <SelectValue placeholder="Sélectionner" />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {assistanceTypeCotisations.map((t) => (
+                                  <SelectItem key={t.id} value={t.id}>
+                                    {t.nom}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 p-3">
+                            <Label className="text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">Description</Label>
+                            <Textarea
+                              value={editPassFormData.description}
+                              onChange={(e) =>
+                                setEditPassFormData((prev) => ({ ...prev, description: e.target.value }))
+                              }
+                              placeholder="Description (jusqu'à 500 caractères)"
+                              maxLength={500}
+                              rows={6}
+                              className="mt-1.5 min-h-[140px] resize-y bg-white dark:bg-gray-900"
+                            />
+                            <p className="text-xs text-muted-foreground mt-1">
+                              {editPassFormData.description.length} / 500 caractères
+                            </p>
+                          </div>
+                          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/20 p-3">
+                            <Label className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">Montant (€)</Label>
+                            <Input
+                              type="number"
+                              inputMode="decimal"
+                              value={editPassFormData.montant}
+                              onChange={(e) =>
+                                setEditPassFormData((prev) => ({ ...prev, montant: Number(e.target.value) || 0 }))
+                              }
+                              min={0}
+                              step="0.01"
+                              className="mt-1.5 max-w-[140px] bg-white dark:bg-gray-900"
+                            />
+                          </div>
+                          <div className="flex justify-end gap-2 pt-2">
+                            <Button variant="outline" onClick={() => setEditPassAssistance(null)}>
+                              Annuler
+                            </Button>
+                            <Button onClick={handleEditPassAssistance} disabled={loadingEditPass}>
+                              {loadingEditPass ? "Enregistrement..." : "Enregistrer"}
+                            </Button>
+                          </div>
+                        </div>
+                      )}
+                    </DialogContent>
+                  </Dialog>
+
+                  <Dialog open={addAssistanceDialogOpen} onOpenChange={setAddAssistanceDialogOpen}>
+                    <DialogContent className="sm:max-w-lg p-0 gap-0 overflow-hidden">
+                      <DialogHeader className="bg-gradient-to-r from-amber-500/90 via-orange-400/80 to-amber-500/90 dark:from-amber-700/50 dark:via-orange-600/40 dark:to-amber-700/50 text-white px-6 py-4 shadow-md">
+                        <DialogTitle className="text-lg font-bold text-white flex items-center gap-2">
+                          <Plus className="h-5 w-5" />
+                          Ajouter une assistance
+                        </DialogTitle>
+                        <DialogDescription className="text-amber-100 dark:text-amber-200">
+                          Associez un type de cotisation (catégorie Assistance) à un montant fixe et une description.
+                        </DialogDescription>
+                      </DialogHeader>
+                      <div className="space-y-4 px-6 py-5">
+                        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/20 p-3">
+                          <Label className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">Type de cotisation (Assistance) *</Label>
+                          <Select
+                            value={addAssistanceForm.typeCotisationId}
+                            onValueChange={(v) =>
+                              setAddAssistanceForm((prev) => ({ ...prev, typeCotisationId: v }))
+                            }
+                          >
+                            <SelectTrigger className="mt-1.5 bg-white dark:bg-gray-900">
+                              <SelectValue placeholder="Sélectionner un type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {availableTypesForNew.map((t) => (
+                                <SelectItem key={t.id} value={t.id}>
+                                  {t.nom}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50/50 dark:bg-gray-900/30 p-3">
+                          <Label className="text-xs font-medium uppercase tracking-wider text-gray-600 dark:text-gray-400">Description</Label>
+                          <Textarea
+                            value={addAssistanceForm.description}
+                            onChange={(e) =>
+                              setAddAssistanceForm((prev) => ({ ...prev, description: e.target.value }))
+                            }
+                            placeholder="Ex. Naissance d'un enfant (jusqu'à 500 caractères)"
+                            maxLength={500}
+                            rows={6}
+                            className="mt-1.5 min-h-[140px] resize-y bg-white dark:bg-gray-900"
+                          />
+                          <p className="text-xs text-muted-foreground mt-1">
+                            {addAssistanceForm.description.length} / 500 caractères
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-900/20 p-3">
+                          <Label className="text-xs font-medium uppercase tracking-wider text-amber-700 dark:text-amber-400">Montant (€)</Label>
+                          <Input
+                            type="number"
+                            inputMode="decimal"
+                            value={addAssistanceForm.montant}
+                            onChange={(e) =>
+                              setAddAssistanceForm((prev) => ({ ...prev, montant: Number(e.target.value) || 0 }))
+                            }
+                            min={0}
+                            step="0.01"
+                            className="mt-1.5 max-w-[140px] bg-white dark:bg-gray-900"
+                          />
+                        </div>
+                        <div className="flex justify-end gap-2 pt-2">
+                          <Button variant="outline" onClick={() => setAddAssistanceDialogOpen(false)}>
+                            Annuler
+                          </Button>
+                          <Button onClick={handleAddAssistance} disabled={submittingAddAssistance}>
+                            {submittingAddAssistance ? "Création..." : "Créer"}
+                          </Button>
+                        </div>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

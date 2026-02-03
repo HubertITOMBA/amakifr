@@ -1,4 +1,4 @@
-import { PrismaClient, UserRole } from '@prisma/client';
+import { PrismaClient, UserRole, CategorieTypeCotisation } from '@prisma/client';
 
 const prisma = new PrismaClient();
 
@@ -17,7 +17,7 @@ async function createDefaultTypesCotisationMensuelle() {
 
     console.log(`👤 Admin trouvé: ${admin.email}`);
 
-    // Types de cotisation par défaut
+    // Types de cotisation par défaut (categorie: ForfaitMensuel | Assistance | Divers)
     const typesParDefaut = [
       {
         nom: "Forfait Mensuel",
@@ -26,6 +26,7 @@ async function createDefaultTypesCotisationMensuelle() {
         obligatoire: true,
         actif: true,
         ordre: 1,
+        categorie: CategorieTypeCotisation.ForfaitMensuel,
         aBeneficiaire: false
       },
       {
@@ -35,25 +36,38 @@ async function createDefaultTypesCotisationMensuelle() {
         obligatoire: true,
         actif: true,
         ordre: 2,
-        aBeneficiaire: true // Nécessite un adhérent bénéficiaire
+        categorie: CategorieTypeCotisation.Assistance,
+        aBeneficiaire: true
       },
       {
         nom: "Mariage",
-        description: "Assistance mariage de l'adhérent, conjoint ou de son enfant ",
+        description: "Assistance mariage de l'adhérent, conjoint ou de son enfant",
         montant: 50.00,
         obligatoire: true,
         actif: true,
         ordre: 3,
-        aBeneficiaire: true // Nécessite un adhérent bénéficiaire
+        categorie: CategorieTypeCotisation.Assistance,
+        aBeneficiaire: true
       },
       {
         nom: "Décès",
-        description: "Assistance décès d'un adhérent, conjoint , membre sa famille restreint ou parentde l'adhérent",
+        description: "Assistance décès d'un adhérent, conjoint, membre sa famille restreint ou parent de l'adhérent",
         montant: 50.00,
         obligatoire: true,
         actif: true,
         ordre: 4,
-        aBeneficiaire: true // Nécessite un adhérent bénéficiaire
+        categorie: CategorieTypeCotisation.Assistance,
+        aBeneficiaire: true
+      },
+      {
+        nom: "Naissance",
+        description: "Assistance naissance",
+        montant: 50.00,
+        obligatoire: true,
+        actif: true,
+        ordre: 5,
+        categorie: CategorieTypeCotisation.Assistance,
+        aBeneficiaire: true
       },
       {
         nom: "Formation",
@@ -61,7 +75,8 @@ async function createDefaultTypesCotisationMensuelle() {
         montant: 25.00,
         obligatoire: false,
         actif: true,
-        ordre: 5,
+        ordre: 6,
+        categorie: CategorieTypeCotisation.Divers,
         aBeneficiaire: false
       },
       {
@@ -70,7 +85,8 @@ async function createDefaultTypesCotisationMensuelle() {
         montant: 10.00,
         obligatoire: false,
         actif: true,
-        ordre: 6,
+        ordre: 7,
+        categorie: CategorieTypeCotisation.Divers,
         aBeneficiaire: false
       }
     ];

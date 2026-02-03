@@ -3,7 +3,7 @@ import { db } from "./lib/db";
 import authConfig from "./auth.config";
 import { PrismaAdapter } from "@auth/prisma-adapter";
 import { getUserById } from "@/actions/auth";
-import { UserRole } from "@prisma/client";
+import { UserRole, TypeActivite } from "@prisma/client";
 
 export const {
 	handlers: { GET, POST },
@@ -71,14 +71,31 @@ export const {
 			}
 		},
 		async signIn({ user }) {
-			await db.user.update({
-				where: {
-					id: user.id,
-				},
-				data: {
-					lastLogin: new Date(),
-				},
-			});
+			if (user.id) {
+				await db.user.update({
+					where: { id: user.id },
+					data: { lastLogin: new Date() },
+				});
+				// Logger la connexion pour tous les utilisateurs (credentials + OAuth)
+				try {
+					if ("userActivity" in db) {
+						await (db as any).userActivity.create({
+							data: {
+								userId: user.id,
+								userName: user.name ?? null,
+								userEmail: user.email ?? null,
+								type: TypeActivite.Connexion,
+								action: `Connexion de l'utilisateur ${user.email || user.name || user.id}`,
+								entityType: "User",
+								entityId: user.id,
+								success: true,
+							},
+						});
+					}
+				} catch (logErr) {
+					console.warn("[auth] Erreur lors du logging de la connexion:", logErr);
+				}
+			}
 		},
 	},
 	callbacks: {

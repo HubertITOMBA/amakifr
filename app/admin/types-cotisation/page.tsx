@@ -122,12 +122,18 @@ function TypeActionsCell({
   );
 }
 
+export type CategorieTypeCotisation = "ForfaitMensuel" | "Assistance" | "Divers";
+
 interface TypeCotisationMensuelle {
   id: string;
   nom: string;
   description?: string;
   montant: number;
+  obligatoire?: boolean;
   actif: boolean;
+  ordre?: number;
+  categorie?: CategorieTypeCotisation;
+  aBeneficiaire?: boolean;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -156,11 +162,18 @@ export default function AdminTypesCotisationMensuelle() {
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingType, setEditingType] = useState<TypeCotisationMensuelle | null>(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState<{
+    nom: string;
+    description: string;
+    montant: number;
+    actif: boolean;
+    categorie: CategorieTypeCotisation;
+  }>({
     nom: "",
     description: "",
     montant: 0,
     actif: true,
+    categorie: "Divers",
   });
 
   // États pour TanStack Table
@@ -316,6 +329,31 @@ export default function AdminTypesCotisationMensuelle() {
       maxSize: 150,
       enableResizing: true,
     }),
+    columnHelper.accessor("categorie", {
+      header: "Catégorie",
+      cell: ({ row }) => {
+        const cat = (row.getValue("categorie") as CategorieTypeCotisation) || "Divers";
+        const labels: Record<CategorieTypeCotisation, string> = {
+          ForfaitMensuel: "Forfait mensuel",
+          Assistance: "Assistance",
+          Divers: "Divers",
+        };
+        const colors: Record<CategorieTypeCotisation, string> = {
+          ForfaitMensuel: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+          Assistance: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+          Divers: "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200",
+        };
+        return (
+          <Badge className={colors[cat]}>
+            {labels[cat]}
+          </Badge>
+        );
+      },
+      size: 140,
+      minSize: 120,
+      maxSize: 180,
+      enableResizing: true,
+    }),
     columnHelper.accessor("actif", {
       header: "Statut",
       cell: ({ row }) => (
@@ -441,6 +479,7 @@ export default function AdminTypesCotisationMensuelle() {
           description: "",
           montant: 0,
           actif: true,
+          categorie: "Divers",
         });
         loadData();
       } else {
@@ -617,6 +656,7 @@ export default function AdminTypesCotisationMensuelle() {
                       description: "",
                       montant: 0,
                       actif: true,
+                      categorie: "Divers",
                     });
                     setShowForm(true);
                   }}
@@ -834,6 +874,30 @@ export default function AdminTypesCotisationMensuelle() {
                         La modification du montant n'affectera que les futures cotisations. Les cotisations déjà créées conservent leur montant initial.
                       </p>
                     )}
+                  </div>
+
+                  {/* Catégorie */}
+                  <div className="space-y-1">
+                    <label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 px-2 py-1 rounded-t-md">
+                      <Settings className="h-3 w-3" />
+                      Catégorie
+                    </label>
+                    <Select
+                      value={formData.categorie}
+                      onValueChange={(v: CategorieTypeCotisation) => setFormData({ ...formData, categorie: v })}
+                    >
+                      <SelectTrigger className="rounded-md rounded-tl-none border-blue-200 dark:border-blue-800 border-t-0">
+                        <SelectValue placeholder="Choisir une catégorie" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ForfaitMensuel">Forfait mensuel</SelectItem>
+                        <SelectItem value="Assistance">Assistance</SelectItem>
+                        <SelectItem value="Divers">Divers / Extra</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                      Forfait mensuel = obligatoire par mois. Assistance = bénéficiaire (naissance, décès…). Divers = formation, matériel, etc.
+                    </p>
                   </div>
 
                   {/* Statut */}

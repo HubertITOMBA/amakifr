@@ -12,7 +12,6 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Calendar, 
-  Euro, 
   Plus, 
   Edit, 
   Trash2, 
@@ -27,15 +26,19 @@ import {
   X,
   Info,
   FileText,
-  User
+  User,
+  HandHeart,
+  MoreHorizontal
 } from "lucide-react";
 import { AdherentSearchDialog } from "@/components/admin/AdherentSearchDialog";
 import { toast } from "react-toastify";
+import Link from "next/link";
 import { 
   getAllCotisationsDuMois,
   createCotisationDuMois,
   updateCotisationDuMois,
   deleteCotisationDuMois,
+  getAdherentsMembres,
 } from "@/actions/cotisations-du-mois";
 import { getAllTypesCotisationMensuelle } from "@/actions/cotisations-mensuelles";
 import {
@@ -49,6 +52,14 @@ import {
   ColumnFiltersState,
   VisibilityState,
 } from "@tanstack/react-table";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 
@@ -62,6 +73,7 @@ interface CotisationDuMois {
   dateEcheance: Date | string;
   description?: string | null;
   statut: string;
+  adherentBeneficiaireId?: string | null;
   createdBy: string;
   createdAt: Date | string;
   updatedAt: Date | string;
@@ -73,6 +85,12 @@ interface CotisationDuMois {
     obligatoire: boolean;
     aBeneficiaire: boolean;
   };
+  AdherentBeneficiaire?: {
+    id: string;
+    civility?: string | null;
+    firstname: string;
+    lastname: string;
+  } | null;
   CreatedBy: {
     name?: string | null;
     email: string;
@@ -125,6 +143,8 @@ export default function AdminCotisationsDuMois() {
     adherentBeneficiaireId: "",
   });
   const [adherentSearchOpen, setAdherentSearchOpen] = useState(false);
+  const [loadingAffecter, setLoadingAffecter] = useState(false);
+  const [adherentsMembres, setAdherentsMembres] = useState<Array<{ id: string; firstname: string; lastname: string; email: string }>>([]);
   const [selectedAdherent, setSelectedAdherent] = useState<{
     id: string;
     firstname: string;
@@ -151,19 +171,16 @@ export default function AdminCotisationsDuMois() {
             return parsed;
           }
         }
-        // Par défaut sur mobile, masquer les colonnes non essentielles
+        // Sur mobile : n'afficher que 2 colonnes (Période + Actions)
         const isMobile = window.innerWidth < 768;
         if (isMobile) {
           return {
-            periode: false,
-            TypeCotisation: false,
-            montantAttendu: false,
-            montantPaye: false,
-            montantRestant: false,
-            description: false,
+            "TypeCotisation.nom": false,
+            beneficiaire: false,
+            montantBase: false,
+            dateEcheance: false,
             statut: false,
-            createdAt: false,
-            // Garder visible : (première colonne principale), actions (si présente)
+            "_count.CotisationsMensuelles": false,
           };
         }
       } catch (error) {
@@ -173,26 +190,26 @@ export default function AdminCotisationsDuMois() {
     return {};
   });
 
-  // Détecter les changements de taille d'écran
+  const [isMobile, setIsMobile] = useState(false);
+
+  // Détecter mobile : 2 colonnes (Période, Actions) et pas de pagination
   useEffect(() => {
     const handleResize = () => {
-      const isMobile = window.innerWidth < 768;
+      const mobile = typeof window !== "undefined" && window.innerWidth < 768;
+      setIsMobile(mobile);
       const saved = localStorage.getItem("admin-cotisations-du-mois-column-visibility");
-      
-      if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+      if (mobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
         setColumnVisibility({
-          periode: false,
-          TypeCotisation: false,
-          montantAttendu: false,
-          montantPaye: false,
-          montantRestant: false,
-          description: false,
+          "TypeCotisation.nom": false,
+          beneficiaire: false,
+          montantBase: false,
+          dateEcheance: false,
           statut: false,
-          createdAt: false,
+          "_count.CotisationsMensuelles": false,
         });
       }
     };
-
+    handleResize();
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
@@ -208,6 +225,27 @@ export default function AdminCotisationsDuMois() {
   useEffect(() => {
     loadData();
   }, []);
+
+  // Charger la liste des adhérents MEMBRE pour le bénéficiaire (assistance) à l'ouverture du dialog
+  const loadAdherentsMembres = useCallback(async () => {
+    try {
+      const res = await getAdherentsMembres();
+      if (res.success && res.adherents) {
+        setAdherentsMembres(res.adherents);
+      } else {
+        setAdherentsMembres([]);
+      }
+    } catch (err) {
+      console.error("Chargement adhérents MEMBRE:", err);
+      setAdherentsMembres([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (showForm) {
+      loadAdherentsMembres();
+    }
+  }, [showForm, loadAdherentsMembres]);
 
   const loadData = useCallback(async () => {
     try {
@@ -304,33 +342,42 @@ export default function AdminCotisationsDuMois() {
       enableResizing: true,
     }),
     columnHelper.accessor("TypeCotisation.nom", {
-      header: "Type de cotisation",
+      header: "Type",
       cell: ({ row }) => (
-        <div className="flex flex-col">
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-            {row.original.TypeCotisation?.nom || "Type inconnu"}
-          </span>
-          {row.original.TypeCotisation?.obligatoire && (
-            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs w-fit mt-1">
-              Obligatoire
-            </Badge>
-          )}
-        </div>
+        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {row.original.TypeCotisation?.nom || "Type inconnu"}
+        </span>
       ),
-      size: 200,
-      minSize: 150,
-      maxSize: 300,
+      size: 160,
+      minSize: 120,
+      maxSize: 240,
+      enableResizing: true,
+    }),
+    columnHelper.display({
+      id: "beneficiaire",
+      header: "Bénéficiaire",
+      cell: ({ row }) => {
+        const benef = row.original.AdherentBeneficiaire;
+        if (!benef) return <span className="text-xs text-gray-400">—</span>;
+        const civilite = benef.civility ? String(benef.civility) : "";
+        const nom = [civilite, benef.firstname, benef.lastname].filter(Boolean).join(" ");
+        return (
+          <span className="text-xs text-gray-900 dark:text-gray-100" title={nom}>
+            {nom || "—"}
+          </span>
+        );
+      },
+      size: 180,
+      minSize: 120,
+      maxSize: 260,
       enableResizing: true,
     }),
     columnHelper.accessor("montantBase", {
-      header: "Montant de base",
+      header: "Montant",
       cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Euro className="h-4 w-4 text-gray-500" />
-          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {row.original.montantBase.toFixed(2).replace(".", ",")} €
-          </span>
-        </div>
+        <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+          {row.original.montantBase.toFixed(2).replace(".", ",")} €
+        </span>
       ),
       size: 150,
       minSize: 120,
@@ -338,7 +385,7 @@ export default function AdminCotisationsDuMois() {
       enableResizing: true,
     }),
     columnHelper.accessor("dateEcheance", {
-      header: "Date d'échéance",
+      header: "Échéance",
       cell: ({ row }) => (
         <span className="text-sm text-gray-900 dark:text-gray-100">
           {new Date(row.original.dateEcheance).toLocaleDateString('fr-FR')}
@@ -366,7 +413,7 @@ export default function AdminCotisationsDuMois() {
       enableResizing: true,
     }),
     columnHelper.accessor("_count.CotisationsMensuelles", {
-      header: "Cotisations créées",
+      header: "Nombre",
       cell: ({ row }) => (
         <span className="text-sm text-gray-900 dark:text-gray-100">
           {row.original._count.CotisationsMensuelles}
@@ -385,44 +432,56 @@ export default function AdminCotisationsDuMois() {
       cell: ({ row }) => {
         const item = row.original;
         return (
-          <div className="flex items-center space-x-2">
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0 border-blue-300 hover:bg-blue-50"
-              onClick={() => {
-                setEditingCotisation(item);
-                setFormData({
-                  annee: item.annee,
-                  mois: item.mois,
-                  typeCotisationId: item.typeCotisationId,
-                  montantBase: item.montantBase,
-                  dateEcheance: new Date(item.dateEcheance).toISOString().split('T')[0],
-                  description: item.description || "",
-                  adherentBeneficiaireId: (item as any).adherentBeneficiaireId || "",
-                });
-                // TODO: Charger l'adhérent bénéficiaire si présent
-                setShowForm(true);
-              }}
-              title="Modifier"
-            >
-              <Edit className="h-4 w-4" />
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-8 w-8 p-0 border-red-300 hover:bg-red-50"
-              onClick={() => handleDelete(item.id)}
-              disabled={item._count.CotisationsMensuelles > 0}
-              title={
-                item._count.CotisationsMensuelles > 0
-                  ? "Impossible de supprimer : des cotisations mensuelles ont été créées"
-                  : "Supprimer"
-              }
-            >
-              <Trash2 className="h-4 w-4" />
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 data-[state=open]:bg-muted"
+                aria-haspopup="true"
+                aria-label="Menu actions"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">Menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => {
+                  setEditingCotisation(item);
+                  setFormData({
+                    annee: item.annee,
+                    mois: item.mois,
+                    typeCotisationId: item.typeCotisationId,
+                    montantBase: item.montantBase,
+                    dateEcheance: new Date(item.dateEcheance).toISOString().split('T')[0],
+                    description: item.description || "",
+                    adherentBeneficiaireId: (item as any).adherentBeneficiaireId || "",
+                  });
+                  setShowForm(true);
+                }}
+              >
+                <Edit className="h-4 w-4" />
+                Modifier
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600"
+                onClick={() => handleDelete(item.id)}
+                disabled={item._count.CotisationsMensuelles > 0}
+                title={
+                  item._count.CotisationsMensuelles > 0
+                    ? "Impossible de supprimer : des cotisations mensuelles ont été créées"
+                    : undefined
+                }
+              >
+                <Trash2 className="h-4 w-4" />
+                Supprimer
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         );
       },
       size: 120,
@@ -461,6 +520,11 @@ export default function AdminCotisationsDuMois() {
       maxSize: 800,
     },
   });
+
+  // Sur mobile : afficher toutes les lignes (pas de pagination)
+  useEffect(() => {
+    table.setPageSize(isMobile ? 999 : 10);
+  }, [isMobile, table]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -522,6 +586,50 @@ export default function AdminCotisationsDuMois() {
     }
   };
 
+  const handleAffecterCotisations = async () => {
+    const now = new Date();
+    const mois = now.getMonth() + 1;
+    const annee = now.getFullYear();
+
+    // Même logique que /admin/cotisations : on envoie les types obligatoires + actifs (au moins le forfait)
+    const typeCotisationIds = typesCotisation.filter((t) => t.obligatoire && t.actif).map((t) => t.id);
+    if (typeCotisationIds.length === 0) {
+      toast.error("Aucun type de cotisation obligatoire actif. Configurez les types sur /admin/cotisations.");
+      return;
+    }
+    const forfaitSelected = typesCotisation.some(
+      (t) => typeCotisationIds.includes(t.id) && t.nom.toLowerCase().includes("forfait")
+    );
+    if (!forfaitSelected) {
+      toast.error("Veuillez avoir au moins le type 'Forfait Mensuel' actif et obligatoire.");
+      return;
+    }
+    setLoadingAffecter(true);
+    try {
+      const result = await createCotisationsMensuelles({
+        periode: `${annee}-${String(mois).padStart(2, "0")}`,
+        annee,
+        mois,
+        typeCotisationIds,
+      });
+      if (result.success) {
+        toast.success(result.message);
+        loadData();
+      } else {
+        const msg = result.error ?? "";
+        if (msg.includes("Aucune cotisation du mois trouvée") || msg.includes("Veuillez d'abord créer les cotisations du mois")) {
+          toast.info("Pas de cotisation à affecter");
+        } else {
+          toast.error(msg || "Erreur lors de l'affectation");
+        }
+      }
+    } catch {
+      toast.error("Erreur lors de l'affectation des cotisations");
+    } finally {
+      setLoadingAffecter(false);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!confirm("Êtes-vous sûr de vouloir supprimer cette cotisation du mois ?")) {
       return;
@@ -550,39 +658,72 @@ export default function AdminCotisationsDuMois() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4">
-      <Card className="mx-auto max-w-7xl shadow-lg border-blue-200 !pt-0">
+      <Card className="mx-auto max-w-[96rem] w-full shadow-lg border-blue-200 !pt-0 min-h-[85vh]">
         <CardHeader className="!py-0 !pt-0 bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
-          <div className="flex items-center justify-between py-3">
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Calendar className="h-4 w-4" />
               Gestion des Cotisations du Mois ({cotisations.length})
             </CardTitle>
-            <Button
-              onClick={() => {
-                setEditingCotisation(null);
-                setFormData({
-                  annee: new Date().getFullYear(),
-                  mois: new Date().getMonth() + 1,
-                  typeCotisationId: "",
-                  montantBase: 0,
-                  dateEcheance: "",
-                  description: "",
-                  adherentBeneficiaireId: "",
-                });
-                setSelectedAdherent(null);
-                setShowForm(true);
-              }}
-              className="bg-white/10 hover:bg-white/20 border-white/30 text-white"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nouvelle cotisation
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                asChild
+                variant="outline"
+                className="bg-white text-blue-600 hover:bg-blue-50 border-white shadow-sm font-medium"
+              >
+                <Link href="/admin/finances/assistances?open=create">
+                  <HandHeart className="h-4 w-4 mr-2" />
+                  Nouvelle assistance
+                </Link>
+              </Button>
+              <Button
+                onClick={handleAffecterCotisations}
+                disabled={loadingAffecter}
+                className="bg-white text-blue-600 hover:bg-blue-50 border-white shadow-sm font-medium"
+                title="Crée les cotisations mensuelles pour tous les adhérents actifs (mois en cours)"
+              >
+                {loadingAffecter ? (
+                  <Clock className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                )}
+                Affecter les Cotisations
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditingCotisation(null);
+                  const now = new Date();
+                  const annee = now.getFullYear();
+                  const mois = now.getMonth() + 1;
+                  // Forfait mensuel ajouté par défaut : premier type forfait (obligatoire, sans bénéficiaire)
+                  const typeForfait = typesCotisation.find(
+                    (t) => !t.aBeneficiaire && (t.obligatoire || t.nom.toLowerCase().includes("forfait"))
+                  ) ?? typesCotisation[0];
+                  const dateEcheance = `${annee}-${String(mois).padStart(2, "0")}-15`;
+                  setFormData({
+                    annee,
+                    mois,
+                    typeCotisationId: typeForfait?.id ?? "",
+                    montantBase: typeForfait ? Number(typeForfait.montant) : 0,
+                    dateEcheance,
+                    description: "",
+                    adherentBeneficiaireId: "",
+                  });
+                  setSelectedAdherent(null);
+                  setShowForm(true);
+                }}
+                className="bg-white text-blue-600 hover:bg-blue-50 border-white shadow-sm font-medium"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nouvelle cotisation
+              </Button>
+            </div>
           </div>
           <CardDescription className="text-blue-100 text-xs pb-3">
             Créez et gérez les cotisations par mois et année. Recherchez et triez par année ou mois.
           </CardDescription>
         </CardHeader>
-        <CardContent className="!py-0 p-4">
+        <CardContent className="!py-0 p-3 sm:p-4">
           {/* Filtres et recherche */}
           <div className="flex flex-col sm:flex-row gap-2 mb-3">
             <div className="relative flex-1">
@@ -650,11 +791,11 @@ export default function AdminCotisationsDuMois() {
             </Select>
           </div>
 
-          <div className="mb-2 text-xs text-gray-600 dark:text-gray-300">
+          <div className="mb-1.5 text-xs text-gray-600 dark:text-gray-300">
             {filteredData.length} cotisation(s) trouvée(s) sur {cotisations.length}
           </div>
 
-          <DataTable table={table} emptyMessage="Aucune cotisation du mois trouvée" />
+          <DataTable table={table} emptyMessage="Aucune cotisation du mois trouvée" compact={true} />
           
           {/* Pagination - Masquée sur mobile */}
           <div className="hidden md:flex bg-white dark:bg-gray-800 mt-3 items-center justify-between !py-0 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
@@ -815,7 +956,7 @@ export default function AdminCotisationsDuMois() {
                 />
               </div>
               <div className="space-y-1">
-                <Label htmlFor="dateEcheance" className="text-xs">Date d'échéance *</Label>
+                <Label htmlFor="dateEcheance" className="text-xs">Échéance *</Label>
                 <Input
                   id="dateEcheance"
                   type="date"
@@ -837,33 +978,52 @@ export default function AdminCotisationsDuMois() {
               />
             </div>
 
-            {/* Champ pour l'adhérent bénéficiaire (pour les types avec bénéficiaire) */}
+            {/* Champ pour l'adhérent bénéficiaire (pour les types assistance : choix depuis la liste des adhérents MEMBRE) */}
             {formData.typeCotisationId && (() => {
               const selectedType = typesCotisation.find(t => t.id === formData.typeCotisationId);
-              // Utiliser le champ aBeneficiaire du type de cotisation
               const aBeneficiaire = selectedType?.aBeneficiaire || false;
               
               if (aBeneficiaire) {
                 return (
                   <div className="space-y-1">
                     <Label className="text-xs">Adhérent bénéficiaire *</Label>
-                    <div className="flex gap-2">
-                      <Input
-                        readOnly
-                        value={selectedAdherent ? `${selectedAdherent.firstname} ${selectedAdherent.lastname}` : ""}
-                        placeholder="Sélectionnez l'adhérent bénéficiaire..."
-                        className="flex-1"
-                      />
+                    <div className="flex gap-2 flex-wrap">
+                      <Select
+                        value={formData.adherentBeneficiaireId}
+                        onValueChange={(value) => {
+                          const adherent = adherentsMembres.find((a) => a.id === value);
+                          setFormData({ ...formData, adherentBeneficiaireId: value });
+                          setSelectedAdherent(adherent ?? null);
+                        }}
+                        required={aBeneficiaire}
+                      >
+                        <SelectTrigger className="flex-1 min-w-[200px]">
+                          <SelectValue placeholder="Choisir un adhérent dans la liste..." />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {adherentsMembres.map((a) => (
+                            <SelectItem key={a.id} value={a.id}>
+                              {a.firstname} {a.lastname} {a.email ? `(${a.email})` : ""}
+                            </SelectItem>
+                          ))}
+                          {adherentsMembres.length === 0 && (
+                            <SelectItem value="_none" disabled>
+                              Aucun adhérent MEMBRE actif
+                            </SelectItem>
+                          )}
+                        </SelectContent>
+                      </Select>
                       <Button
                         type="button"
                         variant="outline"
                         size="sm"
                         onClick={() => setAdherentSearchOpen(true)}
+                        title="Rechercher un adhérent"
                       >
                         <User className="h-4 w-4 mr-2" />
                         Rechercher
                       </Button>
-                      {selectedAdherent && (
+                      {formData.adherentBeneficiaireId && (
                         <Button
                           type="button"
                           variant="outline"
@@ -878,7 +1038,7 @@ export default function AdminCotisationsDuMois() {
                       )}
                     </div>
                     <p className="text-xs text-gray-500 dark:text-gray-400">
-                      L'adhérent bénéficiaire ne paiera pas cette cotisation d'assistance
+                      Les cotisations ne concernent que les adhérents MEMBRE. L&apos;adhérent bénéficiaire ne paiera pas cette cotisation d&apos;assistance.
                     </p>
                   </div>
                 );

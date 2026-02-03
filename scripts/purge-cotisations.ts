@@ -3,93 +3,153 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 /**
- * Script pour purger toutes les données de cotisations_mensuelles et paiements_cotisation
+ * Script pour purger TOUTES les données de cotisations (anciennes et mensuelles).
  * ATTENTION: Cette opération est irréversible !
- * 
+ *
+ * Tables vidées :
+ * - utilisations_avoir (liées aux cotisations/obligations/assistances)
+ * - paiements_cotisation (liés aux cotisations/obligations/assistances)
+ * - relances_cotisation_mensuelle
+ * - relances (obligations cotisation)
+ * - cotisations_mensuelles
+ * - cotisations_du_mois
+ * - assistances
+ * - obligations_cotisation
+ * - cotisations (ancien système enum)
+ *
+ * Les TYPES de cotisation mensuelle (types_cotisation_mensuelle) sont conservés.
+ *
  * Exécuter avec: npm run db:purge-cotisations
  */
 async function purgeCotisations() {
   try {
-    console.log("🗑️  Début de la purge des cotisations mensuelles et paiements...\n");
+    console.log("🗑️  Purge complète de toutes les cotisations\n");
     console.log("⚠️  ATTENTION: Cette opération est irréversible !\n");
 
     // 1. Compter les données avant suppression
-    const countPaiements = await prisma.paiementCotisation.count({
+    const countUtilisationsCotisation = await prisma.utilisationAvoir.count({
       where: {
-        cotisationMensuelleId: { not: null }
-      }
+        OR: [
+          { cotisationMensuelleId: { not: null } },
+          { obligationCotisationId: { not: null } },
+          { assistanceId: { not: null } },
+        ],
+      },
     });
-    const countCotisations = await prisma.cotisationMensuelle.count();
-    const countRelances = await prisma.relanceCotisationMensuelle.count();
-    const countUtilisations = await prisma.utilisationAvoir.count({
+    const countPaiementsCotisation = await prisma.paiementCotisation.count({
       where: {
-        cotisationMensuelleId: { not: null }
-      }
+        OR: [
+          { cotisationMensuelleId: { not: null } },
+          { obligationCotisationId: { not: null } },
+          { assistanceId: { not: null } },
+        ],
+      },
     });
+    const countRelancesMensuelle = await prisma.relanceCotisationMensuelle.count();
+    const countRelances = await prisma.relance.count();
+    const countCotisationsMensuelles = await prisma.cotisationMensuelle.count();
+    const countCotisationsDuMois = await prisma.cotisationDuMois.count();
+    const countAssistances = await prisma.assistance.count();
+    const countObligations = await prisma.obligationCotisation.count();
+    const countCotisations = await prisma.cotisation.count();
 
     console.log("📊 Données à supprimer :");
-    console.log(`   - Paiements de cotisations : ${countPaiements}`);
-    console.log(`   - Cotisations mensuelles : ${countCotisations}`);
-    console.log(`   - Relances : ${countRelances}`);
-    console.log(`   - Utilisations d'avoirs : ${countUtilisations}\n`);
+    console.log(`   - Utilisations d'avoirs (cotisations/obligations/assistances) : ${countUtilisationsCotisation}`);
+    console.log(`   - Paiements (cotisations/obligations/assistances) : ${countPaiementsCotisation}`);
+    console.log(`   - Relances cotisations mensuelles : ${countRelancesMensuelle}`);
+    console.log(`   - Relances (obligations) : ${countRelances}`);
+    console.log(`   - Cotisations mensuelles : ${countCotisationsMensuelles}`);
+    console.log(`   - Cotisations du mois (planification) : ${countCotisationsDuMois}`);
+    console.log(`   - Assistances : ${countAssistances}`);
+    console.log(`   - Obligations cotisation : ${countObligations}`);
+    console.log(`   - Cotisations (ancien système) : ${countCotisations}\n`);
 
-    if (countPaiements === 0 && countCotisations === 0 && countRelances === 0 && countUtilisations === 0) {
-      console.log("✅ Aucune donnée à supprimer");
+    const total =
+      countUtilisationsCotisation +
+      countPaiementsCotisation +
+      countRelancesMensuelle +
+      countRelances +
+      countCotisationsMensuelles +
+      countCotisationsDuMois +
+      countAssistances +
+      countObligations +
+      countCotisations;
+
+    if (total === 0) {
+      console.log("✅ Aucune donnée de cotisation à supprimer.");
       return;
     }
 
-    // 2. Supprimer dans l'ordre pour respecter les contraintes de clés étrangères
-    
-    // Supprimer les utilisations d'avoirs liées aux cotisations mensuelles
-    const utilisationsAvoir = await prisma.utilisationAvoir.deleteMany({
+    // 2. Supprimer dans l'ordre (enfants avant parents, contraintes FK)
+
+    const u1 = await prisma.utilisationAvoir.deleteMany({
       where: {
-        cotisationMensuelleId: { not: null }
-      }
+        OR: [
+          { cotisationMensuelleId: { not: null } },
+          { obligationCotisationId: { not: null } },
+          { assistanceId: { not: null } },
+        ],
+      },
     });
-    console.log(`   ✓ ${utilisationsAvoir.count} utilisation(s) d'avoir(s) supprimée(s)`);
+    console.log(`   ✓ ${u1.count} utilisation(s) d'avoir(s) supprimée(s)`);
 
-    // Supprimer les relances de cotisations mensuelles
-    const relances = await prisma.relanceCotisationMensuelle.deleteMany({});
-    console.log(`   ✓ ${relances.count} relance(s) supprimée(s)`);
-
-    // Supprimer les paiements de cotisations
-    const paiements = await prisma.paiementCotisation.deleteMany({
+    const p1 = await prisma.paiementCotisation.deleteMany({
       where: {
-        cotisationMensuelleId: { not: null }
-      }
+        OR: [
+          { cotisationMensuelleId: { not: null } },
+          { obligationCotisationId: { not: null } },
+          { assistanceId: { not: null } },
+        ],
+      },
     });
-    console.log(`   ✓ ${paiements.count} paiement(s) supprimé(s)`);
+    console.log(`   ✓ ${p1.count} paiement(s) cotisation/obligation/assistance supprimé(s)`);
 
-    // Supprimer toutes les cotisations mensuelles
-    const cotisations = await prisma.cotisationMensuelle.deleteMany({});
-    console.log(`   ✓ ${cotisations.count} cotisation(s) mensuelle(s) supprimée(s)\n`);
+    const rcm = await prisma.relanceCotisationMensuelle.deleteMany({});
+    console.log(`   ✓ ${rcm.count} relance(s) cotisation mensuelle supprimée(s)`);
+
+    const rl = await prisma.relance.deleteMany({});
+    console.log(`   ✓ ${rl.count} relance(s) obligation supprimée(s)`);
+
+    const cm = await prisma.cotisationMensuelle.deleteMany({});
+    console.log(`   ✓ ${cm.count} cotisation(s) mensuelle(s) supprimée(s)`);
+
+    const cdm = await prisma.cotisationDuMois.deleteMany({});
+    console.log(`   ✓ ${cdm.count} cotisation(s) du mois supprimée(s)`);
+
+    const as = await prisma.assistance.deleteMany({});
+    console.log(`   ✓ ${as.count} assistance(s) supprimée(s)`);
+
+    const ob = await prisma.obligationCotisation.deleteMany({});
+    console.log(`   ✓ ${ob.count} obligation(s) cotisation supprimée(s)`);
+
+    const co = await prisma.cotisation.deleteMany({});
+    console.log(`   ✓ ${co.count} cotisation(s) (ancien) supprimée(s)\n`);
 
     // 3. Vérification finale
-    const remainingPaiements = await prisma.paiementCotisation.count({
-      where: {
-        cotisationMensuelleId: { not: null }
-      }
-    });
-    const remainingCotisations = await prisma.cotisationMensuelle.count();
-    const remainingRelances = await prisma.relanceCotisationMensuelle.count();
-    const remainingUtilisations = await prisma.utilisationAvoir.count({
-      where: {
-        cotisationMensuelleId: { not: null }
-      }
-    });
+    const remainingCotisationsMensuelles = await prisma.cotisationMensuelle.count();
+    const remainingCotisationsDuMois = await prisma.cotisationDuMois.count();
+    const remainingAssistances = await prisma.assistance.count();
+    const remainingObligations = await prisma.obligationCotisation.count();
+    const remainingCotisations = await prisma.cotisation.count();
 
     console.log("📊 Vérification finale :");
-    console.log(`   - Paiements restants : ${remainingPaiements}`);
-    console.log(`   - Cotisations restantes : ${remainingCotisations}`);
-    console.log(`   - Relances restantes : ${remainingRelances}`);
-    console.log(`   - Utilisations d'avoirs restantes : ${remainingUtilisations}\n`);
+    console.log(`   - Cotisations mensuelles restantes : ${remainingCotisationsMensuelles}`);
+    console.log(`   - Cotisations du mois restantes : ${remainingCotisationsDuMois}`);
+    console.log(`   - Assistances restantes : ${remainingAssistances}`);
+    console.log(`   - Obligations restantes : ${remainingObligations}`);
+    console.log(`   - Cotisations (ancien) restantes : ${remainingCotisations}\n`);
 
-    if (remainingPaiements === 0 && remainingCotisations === 0 && remainingRelances === 0 && remainingUtilisations === 0) {
-      console.log("✅ Purge terminée avec succès !");
+    if (
+      remainingCotisationsMensuelles === 0 &&
+      remainingCotisationsDuMois === 0 &&
+      remainingAssistances === 0 &&
+      remainingObligations === 0 &&
+      remainingCotisations === 0
+    ) {
+      console.log("✅ Purge terminée avec succès. Vous pouvez repartir de zéro pour les cotisations.");
     } else {
-      console.log("⚠️  Certaines données n'ont pas été supprimées");
+      console.log("⚠️  Certaines données n'ont pas été supprimées.");
     }
-
   } catch (error) {
     console.error("❌ Erreur lors de la purge:", error);
     throw error;
@@ -98,7 +158,6 @@ async function purgeCotisations() {
   }
 }
 
-// Exécuter le script
 purgeCotisations()
   .then(() => {
     console.log("\n✅ Script terminé");
@@ -108,4 +167,3 @@ purgeCotisations()
     console.error("\n❌ Erreur fatale:", error);
     process.exit(1);
   });
-

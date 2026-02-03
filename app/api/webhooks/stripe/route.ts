@@ -67,8 +67,10 @@ export async function POST(request: NextRequest) {
             },
           });
 
-          // Appliquer le paiement aux cotisations/dettes
+          // Appliquer le paiement aux cotisations/dettes : montant saisi dans cotisations_mensuelles (montantPaye),
+          // décrémenter montantRestant ; si paiement > restant, excédent → avoir (comme createPaiement)
           const montantPaiement = new Decimal(paiement.montant);
+          let excédent = new Decimal(0);
 
           if (paiement.cotisationMensuelleId) {
             const cotisation = await db.cotisationMensuelle.findUnique({
@@ -76,13 +78,12 @@ export async function POST(request: NextRequest) {
             });
 
             if (cotisation) {
-              const nouveauMontantPaye = new Decimal(cotisation.montantPaye).plus(montantPaiement);
-              const nouveauMontantRestant = new Decimal(cotisation.montantAttendu).minus(nouveauMontantPaye);
-              const nouveauStatut = nouveauMontantRestant.lte(0) 
-                ? "Paye" 
-                : nouveauMontantPaye.gt(0) 
-                  ? "PartiellementPaye" 
-                  : "EnAttente";
+              const montantEffectivementPaye = Decimal.min(montantPaiement, new Decimal(cotisation.montantRestant));
+              excédent = montantPaiement.minus(montantEffectivementPaye);
+              const nouveauMontantPaye = new Decimal(cotisation.montantPaye).plus(montantEffectivementPaye);
+              const nouveauMontantRestant = new Decimal(cotisation.montantRestant).minus(montantEffectivementPaye);
+              const nouveauStatut =
+                nouveauMontantRestant.lte(0) ? "Paye" : nouveauMontantPaye.gt(0) ? "PartiellementPaye" : "EnAttente";
 
               await db.cotisationMensuelle.update({
                 where: { id: cotisation.id },
@@ -99,8 +100,11 @@ export async function POST(request: NextRequest) {
             });
 
             if (assistance) {
-              const nouveauMontantPaye = new Decimal(assistance.montantPaye).plus(montantPaiement);
-              const nouveauMontantRestant = new Decimal(assistance.montant).minus(nouveauMontantPaye);
+              const restant = new Decimal(assistance.montantRestant);
+              const montantEffectivementPaye = Decimal.min(montantPaiement, restant);
+              excédent = montantPaiement.minus(montantEffectivementPaye);
+              const nouveauMontantPaye = new Decimal(assistance.montantPaye).plus(montantEffectivementPaye);
+              const nouveauMontantRestant = restant.minus(montantEffectivementPaye);
               const nouveauStatut = nouveauMontantRestant.lte(0) ? "Paye" : "EnAttente";
 
               await db.assistance.update({
@@ -118,8 +122,11 @@ export async function POST(request: NextRequest) {
             });
 
             if (dette) {
-              const nouveauMontantPaye = new Decimal(dette.montantPaye).plus(montantPaiement);
-              const nouveauMontantRestant = new Decimal(dette.montant).minus(nouveauMontantPaye);
+              const restant = new Decimal(dette.montantRestant);
+              const montantEffectivementPaye = Decimal.min(montantPaiement, restant);
+              excédent = montantPaiement.minus(montantEffectivementPaye);
+              const nouveauMontantPaye = new Decimal(dette.montantPaye).plus(montantEffectivementPaye);
+              const nouveauMontantRestant = restant.minus(montantEffectivementPaye);
 
               await db.detteInitiale.update({
                 where: { id: dette.id },
@@ -129,6 +136,21 @@ export async function POST(request: NextRequest) {
                 },
               });
             }
+          }
+
+          // Excédent de paiement → créer un avoir (comme en manuel)
+          if (excédent.gt(0)) {
+            await db.avoir.create({
+              data: {
+                adherentId: paiement.adherentId,
+                montant: excédent,
+                montantUtilise: new Decimal(0),
+                montantRestant: excédent,
+                paiementId: paiement.id,
+                description: `Avoir créé suite à un excédent de paiement en ligne (${excédent.toFixed(2)}€)`,
+                statut: "Disponible",
+              },
+            });
           }
 
           // Revalider les pages concernées

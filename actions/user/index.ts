@@ -187,6 +187,17 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
               ],
               include: {
                 TypeCotisation: true,
+                CotisationDuMois: {
+                  include: {
+                    AdherentBeneficiaire: {
+                      select: {
+                        id: true,
+                        firstname: true,
+                        lastname: true
+                      }
+                    }
+                  }
+                },
                 Paiements: {
                   orderBy: {
                     datePaiement: 'desc'
@@ -243,19 +254,17 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
     // L'admin n'est pas adhérent et ne cotise ni ne bénéficie d'assistances
     const isAdmin = user.role === UserRole.ADMIN;
 
-    // Récupérer TOUTES les assistances du mois en cours (pas seulement celles de l'utilisateur)
-    // Car l'utilisateur doit payer les assistances des autres adhérents
-    // SAUF si c'est un admin (il ne paie rien)
-    const moisCourant = new Date().getMonth() + 1;
+    // Récupérer les assistances de l'année où cet adhérent est bénéficiaire (adherentId = lui)
     const anneeCourante = new Date().getFullYear();
-    const startOfMonth = new Date(anneeCourante, moisCourant - 1, 1);
-    const endOfMonth = new Date(anneeCourante, moisCourant, 0, 23, 59, 59);
-    
-    const toutesAssistancesMois = isAdmin ? [] : await prisma.assistance.findMany({
+    const startOfYear = new Date(anneeCourante, 0, 1);
+    const endOfYear = new Date(anneeCourante, 11, 31, 23, 59, 59);
+
+    const toutesAssistancesAnnee = isAdmin || !user.adherent ? [] : await prisma.assistance.findMany({
       where: {
+        adherentId: user.adherent.id,
         dateEvenement: {
-          gte: startOfMonth,
-          lte: endOfMonth
+          gte: startOfYear,
+          lte: endOfYear
         },
         statut: { not: "Annule" } // Exclure les assistances annulées
       },
@@ -269,6 +278,43 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
         }
       }
     });
+
+    // Fallback : pour les cotisations assistance sans AdherentBeneficiaire (ex. cotisationDuMoisId non renseigné),
+    // récupérer le bénéficiaire depuis CotisationDuMois (periode + typeCotisationId)
+    let cdmBeneficiairesByPeriodeType: Map<string, { id: string; firstname: string; lastname: string }> = new Map();
+    if (user.adherent && !isAdmin && user.adherent.CotisationsMensuelles?.length) {
+      const periodesTypes = new Set<string>();
+      user.adherent.CotisationsMensuelles.forEach((cot: any) => {
+        if (cot.TypeCotisation?.aBeneficiaire && cot.periode && cot.typeCotisationId) {
+          periodesTypes.add(`${cot.periode}|${cot.typeCotisationId}`);
+        }
+      });
+      if (periodesTypes.size > 0) {
+        const cdmWithBenef = await prisma.cotisationDuMois.findMany({
+          where: {
+            adherentBeneficiaireId: { not: null },
+            OR: Array.from(periodesTypes).map((key) => {
+              const [periode, typeCotisationId] = key.split("|");
+              return { periode, typeCotisationId };
+            }),
+          },
+          include: {
+            AdherentBeneficiaire: {
+              select: { id: true, firstname: true, lastname: true },
+            },
+          },
+        });
+        cdmWithBenef.forEach((cdm: any) => {
+          if (cdm.AdherentBeneficiaire) {
+            cdmBeneficiairesByPeriodeType.set(`${cdm.periode}|${cdm.typeCotisationId}`, {
+              id: cdm.AdherentBeneficiaire.id,
+              firstname: cdm.AdherentBeneficiaire.firstname ?? "",
+              lastname: cdm.AdherentBeneficiaire.lastname ?? "",
+            });
+          }
+        });
+      }
+    }
 
     // Convertir les valeurs Decimal en nombres pour éviter l'erreur de sérialisation
     // Si l'utilisateur est admin, exclure toutes les données financières (cotisations, assistances, dettes, avoirs)
@@ -293,7 +339,18 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
           montantPaye: Number(dette.montantPaye),
           montantRestant: Number(dette.montantRestant)
         })) || []),
-        CotisationsMensuelles: isAdmin ? [] : (user.adherent.CotisationsMensuelles?.map((cot: any) => ({
+        CotisationsMensuelles: isAdmin ? [] : (user.adherent.CotisationsMensuelles?.map((cot: any) => {
+          const cotisationDuMois = cot.CotisationDuMois;
+          const benefFromCdm = cotisationDuMois?.AdherentBeneficiaire;
+          const benefFallback = cot.TypeCotisation?.aBeneficiaire && cot.periode && cot.typeCotisationId
+            ? cdmBeneficiairesByPeriodeType.get(`${cot.periode}|${cot.typeCotisationId}`)
+            : undefined;
+          const adherentBeneficiaire = benefFromCdm
+            ? { id: benefFromCdm.id, firstname: benefFromCdm.firstname, lastname: benefFromCdm.lastname }
+            : benefFallback
+              ? { id: benefFallback.id, firstname: benefFallback.firstname, lastname: benefFallback.lastname }
+              : null;
+          return {
           ...cot,
           montantAttendu: Number(cot.montantAttendu),
           montantPaye: Number(cot.montantPaye),
@@ -302,6 +359,11 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
             ...cot.TypeCotisation,
             montant: Number(cot.TypeCotisation.montant)
           } : null,
+          CotisationDuMois: cotisationDuMois ? {
+            ...cotisationDuMois,
+            montantBase: Number(cotisationDuMois.montantBase),
+            AdherentBeneficiaire: adherentBeneficiaire
+          } : (adherentBeneficiaire ? { periode: cot.periode, typeCotisationId: cot.typeCotisationId, montantBase: 0, AdherentBeneficiaire: adherentBeneficiaire } : null),
           Paiements: cot.Paiements?.map((paiement: any) => ({
             ...paiement,
             montant: Number(paiement.montant),
@@ -311,11 +373,11 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
               email: paiement.CreatedBy.email
             } : null
           })) || []
-        })) || []),
-        // Remplacer les assistances de l'adhérent par TOUTES les assistances du mois
-        // (l'utilisateur doit payer les assistances des autres, pas seulement les siennes)
+        };
+        }) || []),
+        // Remplacer les assistances par TOUTES les assistances de l'année (pour vues mois / année / toutes)
         // SAUF si c'est un admin (il ne paie rien)
-        Assistances: isAdmin ? [] : (toutesAssistancesMois.map((ass: any) => ({
+        Assistances: isAdmin ? [] : (toutesAssistancesAnnee.map((ass: any) => ({
           ...ass,
           montant: Number(ass.montant),
           montantPaye: Number(ass.montantPaye),
@@ -335,13 +397,15 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
       } : null
     };
 
-    // Récupérer le type Forfait Mensuel (pour calculer les cotisations du mois en cours et prochain)
+    // Récupérer le type Forfait Mensuel (categorie ForfaitMensuel)
     // SAUF si c'est un admin (il n'a pas de cotisations)
     const typeForfait = isAdmin ? null : await prisma.typeCotisationMensuelle.findFirst({
       where: {
-        nom: { contains: "Forfait", mode: "insensitive" },
-        obligatoire: true,
-        actif: true
+        actif: true,
+        OR: [
+          { categorie: "ForfaitMensuel" },
+          { nom: { contains: "Forfait", mode: "insensitive" } }
+        ]
       },
       orderBy: {
         ordre: "asc"

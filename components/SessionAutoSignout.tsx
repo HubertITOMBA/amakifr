@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { signOut } from "next-auth/react";
 import { toast } from "sonner";
+import { logDeconnexionActivity } from "@/actions/auth/logout";
 
 /**
  * Composant de déconnexion automatique pour inactivité
@@ -48,6 +49,7 @@ export default function SessionAutoSignout() {
         // Si c'est une déconnexion pour inactivité, utiliser signOut avec redirection vers le modal de connexion
         if (isInactivity) {
           try {
+            await logDeconnexionActivity();
             await signOut({
               redirect: true,
               callbackUrl: "/?openLogin=true&inactivity=true"

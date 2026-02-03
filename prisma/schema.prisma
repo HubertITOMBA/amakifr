@@ -91,6 +91,13 @@ enum TypeCotisation {
   Adhesion
 }
 
+/// Catégorie du type de cotisation mensuelle : forfait mensuel (obligatoire), assistance (bénéficiaire), ou divers/extra
+enum CategorieTypeCotisation {
+  ForfaitMensuel // Cotisation forfait mensuelle obligatoire (une par mois)
+  Assistance     // Cotisation type assistance : naissance, décès, mariage, anniversaire (bénéficiaire)
+  Divers         // Cotisation diverse / extra : formation, matériel, etc.
+}
+
 enum MoyenPaiement {
   Especes
   Cheque
@@ -345,7 +352,8 @@ model Adherent {
   Relances                      Relance[]
   Candidacies                   Candidacy[]
   Votes                         Vote[]
-  CotisationsMensuelles         CotisationMensuelle[] // Cotisations mensuelles
+  CotisationsMensuelles         CotisationMensuelle[] // Cotisations mensuelles (payeur)
+  CotisationsMensuellesBeneficiaire CotisationMensuelle[]    @relation("CotisationMensuelleBeneficiaire") // Cotisations mensuelles dont l'adhérent est bénéficiaire (assistances)
   RelancesCotisationMensuelle   RelanceCotisationMensuelle[] // Relances cotisations mensuelles
   CotisationsDuMoisBeneficiaire CotisationDuMois[]           @relation("CotisationDuMoisBeneficiaire") // Cotisations du mois dont l'adhérent est bénéficiaire (assistances)
   InscriptionsEvenements        InscriptionEvenement[] // Inscriptions aux événements
@@ -725,19 +733,23 @@ model JustificatifDepense {
 
 model TypeCotisationMensuelle {
   id            String  @id @default(cuid())
-  nom           String  @db.VarChar(100) // ex: "Forfait", "Occasionnel", "Formation", etc.
+  nom           String  @db.VarChar(100) // ex: "Forfait Mensuel", "Décès", "Formation", etc.
   description   String? @db.Text
   montant       Decimal @db.Decimal(10, 2)
   obligatoire   Boolean @default(true) // Si la cotisation est obligatoire
   actif         Boolean @default(true) // Si le type est actuellement utilisé
   ordre         Int     @default(0) // Ordre d'affichage
+  /// Catégorie : ForfaitMensuel (obligatoire), Assistance (bénéficiaire), Divers (extra)
+  categorie     CategorieTypeCotisation @default(Divers)
   aBeneficiaire Boolean @default(false) // Si ce type nécessite un adhérent bénéficiaire (pour les assistances)
   createdBy     String // ID de l'admin qui a créé le type
 
   // Relations
-  CreatedBy             User                  @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-  CotisationsMensuelles CotisationMensuelle[] // Les cotisations créées avec ce type
-  CotisationsDuMois     CotisationDuMois[] // Les cotisations du mois avec ce type
+  CreatedBy             User                   @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  CotisationsMensuelles CotisationMensuelle[]   // Les cotisations créées avec ce type
+  CotisationsDuMois     CotisationDuMois[]     // Les cotisations du mois avec ce type
+  PassAssistance        PassAssistance?        // Config montant fixe (une par type de cotisation Assistance)
+  Assistances           Assistance[]           // Assistances liées à ce type (pour montant)
 
   // Métadonnées
   createdAt DateTime @default(now())
@@ -786,26 +798,28 @@ model CotisationDuMois {
 }
 
 model CotisationMensuelle {
-  id                 String   @id @default(cuid())
-  periode            String   @db.VarChar(50) // ex: "2024-01", "2024-02"
-  annee              Int
-  mois               Int
-  typeCotisationId   String // Référence au type de cotisation
-  adherentId         String // Adhérent concerné
-  montantAttendu     Decimal  @db.Decimal(10, 2)
-  montantPaye        Decimal  @default(0) @db.Decimal(10, 2)
-  montantRestant     Decimal  @db.Decimal(10, 2)
-  dateEcheance       DateTime
-  statut             String   @default("EnAttente") // EnAttente, PartiellementPaye, Paye, EnRetard
-  description        String?  @db.Text
-  cotisationDuMoisId String? // Référence à la cotisation du mois (planification)
-  createdBy          String // ID de l'admin qui a créé la cotisation
+  id                     String   @id @default(cuid())
+  periode                String   @db.VarChar(50) // ex: "2024-01", "2024-02"
+  annee                  Int
+  mois                   Int
+  typeCotisationId       String // Référence au type de cotisation
+  adherentId             String // Adhérent concerné (payeur)
+  adherentBeneficiaireId String? // Pour les assistances : id de l'adhérent bénéficiaire
+  montantAttendu         Decimal  @db.Decimal(10, 2)
+  montantPaye            Decimal  @default(0) @db.Decimal(10, 2)
+  montantRestant         Decimal  @db.Decimal(10, 2)
+  dateEcheance           DateTime
+  statut                 String   @default("EnAttente") // EnAttente, PartiellementPaye, Paye, EnRetard
+  description            String?  @db.Text
+  cotisationDuMoisId     String? // Référence à la cotisation du mois (planification)
+  createdBy              String // ID de l'admin qui a créé la cotisation
 
   // Relations
-  TypeCotisation    TypeCotisationMensuelle      @relation(fields: [typeCotisationId], references: [id], onDelete: Cascade)
-  Adherent          Adherent                     @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  CreatedBy         User                         @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-  CotisationDuMois  CotisationDuMois?            @relation(fields: [cotisationDuMoisId], references: [id], onDelete: SetNull)
+  TypeCotisation        TypeCotisationMensuelle      @relation(fields: [typeCotisationId], references: [id], onDelete: Cascade)
+  Adherent              Adherent                     @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  AdherentBeneficiaire  Adherent?                    @relation("CotisationMensuelleBeneficiaire", fields: [adherentBeneficiaireId], references: [id], onDelete: SetNull)
+  CreatedBy             User                         @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  CotisationDuMois      CotisationDuMois?            @relation(fields: [cotisationDuMoisId], references: [id], onDelete: SetNull)
   Relances          RelanceCotisationMensuelle[]
   Paiements         PaiementCotisation[] // Paiements liés à cette cotisation mensuelle
   UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette cotisation
@@ -814,7 +828,8 @@ model CotisationMensuelle {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@unique([periode, typeCotisationId, adherentId])
+  // Un adhérent peut avoir plusieurs lignes par période (une par cotisation_du_mois : forfait + chaque assistance)
+  @@unique([periode, adherentId, cotisationDuMoisId], name: "unique_periode_adherent_cotisation_du_mois")
   @@map("cotisations_mensuelles")
 }
 
@@ -970,26 +985,43 @@ model UtilisationAvoir {
 
 // Modèle pour les assistances (50€ pour naissance, décès, anniversaire, mariage)
 model Assistance {
-  id             String                @id @default(cuid())
-  adherentId     String
-  type           TypeEvenementFamilial // Naissance, MariageEnfant, DecesFamille, AnniversaireSalle, Autre
-  montant        Decimal               @default(50.00) @db.Decimal(10, 2) // Montant fixe de 50€
-  dateEvenement  DateTime // Date de l'événement
-  montantPaye    Decimal               @default(0) @db.Decimal(10, 2)
-  montantRestant Decimal               @db.Decimal(10, 2)
-  statut         String                @default("EnAttente") // EnAttente, Paye, Annule
-  description    String?               @db.Text
-  createdAt      DateTime              @default(now())
-  updatedAt      DateTime              @updatedAt
-  createdBy      String // ID de l'admin qui a créé l'assistance
+  id               String                 @id @default(cuid())
+  adherentId       String
+  type             TypeEvenementFamilial  // Naissance, MariageEnfant, DecesFamille, AnniversaireSalle, Autre
+  typeCotisationId String?                // Type de cotisation (Assistance) pour récupérer le montant depuis PassAssistance
+  montant          Decimal                @default(50.00) @db.Decimal(10, 2) // Montant fixe de 50€
+  dateEvenement    DateTime               // Date de l'événement
+  montantPaye      Decimal                @default(0) @db.Decimal(10, 2)
+  montantRestant   Decimal                @db.Decimal(10, 2)
+  statut           String                 @default("EnAttente") // EnAttente, Affecte, Paye, Annule
+  description      String?                @db.Text
+  createdAt        DateTime               @default(now())
+  updatedAt        DateTime               @updatedAt
+  createdBy        String                 // ID de l'admin qui a créé l'assistance
 
   // Relations
-  Adherent          Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  CreatedBy         User                 @relation("AssistanceCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
-  Paiements         PaiementCotisation[] // Paiements liés à cette assistance
-  UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette assistance
+  Adherent            Adherent              @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  TypeCotisation      TypeCotisationMensuelle? @relation(fields: [typeCotisationId], references: [id], onDelete: SetNull)
+  CreatedBy           User                  @relation("AssistanceCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  Paiements           PaiementCotisation[]  // Paiements liés à cette assistance
+  UtilisationsAvoir   UtilisationAvoir[]   // Utilisations d'avoirs pour cette assistance
 
   @@map("assistances")
+}
+
+/// Table de configuration du montant fixe par type d'assistance (créée à la demande, liée à un type de cotisation catégorie Assistance)
+model PassAssistance {
+  id                  String   @id @default(cuid())
+  description         String   @db.VarChar(500)
+  montant             Decimal  @db.Decimal(10, 2)
+  typeCotisationId    String   // Relation obligatoire avec TypeCotisationMensuelle (catégorie Assistance)
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  TypeCotisationMensuelle TypeCotisationMensuelle @relation(fields: [typeCotisationId], references: [id], onDelete: Restrict)
+
+  @@unique([typeCotisationId], name: "pass_assistance_type_unique")
+  @@map("pass_assistance")
 }
 
 // Modèle pour la gestion des événements

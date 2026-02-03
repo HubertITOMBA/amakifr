@@ -294,12 +294,14 @@ export async function getAdherentsWithCotisations() {
       }
     });
 
-    // Trouver le type Forfait Mensuel
+    // Trouver le type Forfait Mensuel (categorie ForfaitMensuel)
     const typeForfait = await prisma.typeCotisationMensuelle.findFirst({
       where: {
-        nom: { contains: "Forfait", mode: "insensitive" },
-        obligatoire: true,
-        actif: true
+        actif: true,
+        OR: [
+          { categorie: "ForfaitMensuel" },
+          { nom: { contains: "Forfait", mode: "insensitive" } }
+        ]
       }
     });
 
@@ -381,20 +383,27 @@ export async function getAdherentsWithCotisations() {
       }
     });
 
-    // Calculer les dettes pour chaque adhérent
+    // Calculer les dettes pour chaque adhérent (relations optionnelles après purge ou tables vides)
     const adherentsWithDebt = adherents.map(adherent => {
+      const obligations = adherent.ObligationsCotisation ?? [];
+      const dettesInitiales = adherent.DettesInitiales ?? [];
+      const avoirs = adherent.Avoirs ?? [];
+      const cotisations = adherent.Cotisations ?? [];
+      const cotisationsMensuelles = adherent.CotisationsMensuelles ?? [];
+      const assistances = adherent.Assistances ?? [];
+
       // Dette des obligations de cotisation
-      const detteObligations = adherent.ObligationsCotisation.reduce((sum, obligation) => {
+      const detteObligations = obligations.reduce((sum, obligation) => {
         return sum + Number(obligation.montantRestant);
       }, 0);
 
       // Dette initiale (somme des montants restants de toutes les dettes initiales)
-      const detteInitiale = adherent.DettesInitiales.reduce((sum, dette) => {
+      const detteInitiale = dettesInitiales.reduce((sum, dette) => {
         return sum + Number(dette.montantRestant);
       }, 0);
 
       // Total des avoirs disponibles
-      const totalAvoirs = adherent.Avoirs.reduce((sum, avoir) => {
+      const totalAvoirs = avoirs.reduce((sum, avoir) => {
         return sum + Number(avoir.montantRestant);
       }, 0);
 
@@ -407,8 +416,8 @@ export async function getAdherentsWithCotisations() {
       // Calculer le forfait du mois en cours
       // IMPORTANT: Ne calculer le forfait que si une cotisation mensuelle existe
       // Si aucune cotisation n'a été créée, le forfait ne doit pas être inclus dans le calcul
-      const cotisationMensuelleCourante = adherent.CotisationsMensuelles.find(
-        cm => cm.periode === periodeCourante
+      const cotisationMensuelleCourante = cotisationsMensuelles.find(
+        (cm: { periode: string }) => cm.periode === periodeCourante
       );
       let forfaitMoisCourant = 0;
       let assistanceMoisCourant = 0;
@@ -443,28 +452,28 @@ export async function getAdherentsWithCotisations() {
       const montantBrutAPayer = detteInitiale + forfaitMoisCourant + assistanceMoisCourant;
       const montantAPayerPourAnnulerDette = Math.max(0, montantBrutAPayer - totalAvoirs);
 
-      const cotisationMensuelle = montantForfait + 50; // Forfait + assistance moyenne
-      const moisDeRetard = Math.floor(totalDette / cotisationMensuelle);
+      const cotisationMensuelle = montantForfait + 50 || 1; // Forfait + assistance moyenne (éviter division par 0)
+      const moisDeRetard = cotisationMensuelle > 0 ? Math.floor(totalDette / cotisationMensuelle) : 0;
 
       return {
         ...adherent,
-        ObligationsCotisation: adherent.ObligationsCotisation.map((obligation: any) => ({
+        ObligationsCotisation: obligations.map((obligation: any) => ({
           ...obligation,
           montantAttendu: Number(obligation.montantAttendu),
           montantPaye: Number(obligation.montantPaye),
           montantRestant: Number(obligation.montantRestant)
         })),
-        DettesInitiales: adherent.DettesInitiales.map((dette: any) => ({
+        DettesInitiales: dettesInitiales.map((dette: any) => ({
           ...dette,
           montant: Number(dette.montant),
           montantPaye: Number(dette.montantPaye),
           montantRestant: Number(dette.montantRestant)
         })),
-        Cotisations: adherent.Cotisations.map((cotisation: any) => ({
+        Cotisations: cotisations.map((cotisation: any) => ({
           ...cotisation,
           montant: Number(cotisation.montant)
         })),
-        CotisationsMensuelles: adherent.CotisationsMensuelles.map((cotisation: any) => ({
+        CotisationsMensuelles: cotisationsMensuelles.map((cotisation: any) => ({
           ...cotisation,
           montantAttendu: Number(cotisation.montantAttendu),
           montantPaye: Number(cotisation.montantPaye),
@@ -474,13 +483,13 @@ export async function getAdherentsWithCotisations() {
             montant: Number(cotisation.TypeCotisation.montant)
           } : null
         })),
-        Assistances: adherent.Assistances.map((assistance: any) => ({
+        Assistances: assistances.map((assistance: any) => ({
           ...assistance,
           montant: Number(assistance.montant),
           montantPaye: Number(assistance.montantPaye),
           montantRestant: Number(assistance.montantRestant)
         })),
-        Avoirs: adherent.Avoirs.map((avoir: any) => ({
+        Avoirs: avoirs.map((avoir: any) => ({
           ...avoir,
           montant: Number(avoir.montant),
           montantUtilise: Number(avoir.montantUtilise),
@@ -489,8 +498,8 @@ export async function getAdherentsWithCotisations() {
         totalDette: Number(totalDette.toFixed(2)),
         moisDeRetard,
         enRetard: moisDeRetard >= 3,
-        montantForfait: Number(adherent.ObligationsCotisation.find(o => o.type === "Forfait")?.montantRestant || 0),
-        montantOccasionnel: Number(adherent.ObligationsCotisation.find(o => o.type === "Assistance")?.montantRestant || 0),
+        montantForfait: Number(obligations.find((o: any) => o.type === "Forfait")?.montantRestant || 0),
+        montantOccasionnel: Number(obligations.find((o: any) => o.type === "Assistance")?.montantRestant || 0),
         forfaitMoisCourant: Number(forfaitMoisCourant.toFixed(2)),
         assistanceMoisCourant: Number(assistanceMoisCourant.toFixed(2)),
         montantAPayerPourAnnulerDette: Number(montantAPayerPourAnnulerDette.toFixed(2)),

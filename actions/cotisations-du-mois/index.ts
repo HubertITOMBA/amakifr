@@ -7,7 +7,7 @@ import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { Decimal } from "@prisma/client/runtime/library";
 import { logCreation, logModification } from "@/lib/activity-logger";
-import { calculerCotisationMensuelle } from "@/lib/utils/cotisations";
+import { calculerCotisationMensuelle, buildDescriptionLigne } from "@/lib/utils/cotisations";
 
 // Schémas de validation
 const CreateCotisationDuMoisSchema = z.object({
@@ -17,6 +17,7 @@ const CreateCotisationDuMoisSchema = z.object({
   montantBase: z.number().min(0, "Le montant doit être positif"),
   dateEcheance: z.string().min(1, "La date d'échéance est requise"),
   description: z.string().optional(),
+  adherentBeneficiaireId: z.string().optional(),
 });
 
 const UpdateCotisationDuMoisSchema = z.object({
@@ -38,7 +39,12 @@ const UpdateCotisationDuMoisSchema = z.object({
 export async function createCotisationDuMois(formData: FormData) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "createCotisationDuMois");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -137,7 +143,7 @@ export async function createCotisationDuMois(formData: FormData) {
         newCotisation.id,
         {
           periode,
-          typeCotisation: newCotisation.TypeCotisation.libelle,
+          typeCotisation: newCotisation.TypeCotisation.nom,
           montantBase: Number(newCotisation.montantBase),
         }
       );
@@ -280,11 +286,22 @@ export async function updateCotisationDuMois(formData: FormData) {
         });
 
         // Trouver la cotisation forfait pour cette période
-        const cotisationForfait = allCotisationsDuMois.find(cdm => 
-          !cdm.TypeCotisation.aBeneficiaire
+        const cotisationForfait = allCotisationsDuMois.find(cdm =>
+          cdm.TypeCotisation.categorie === "ForfaitMensuel" || !cdm.TypeCotisation.aBeneficiaire
         );
 
         if (cotisationForfait) {
+          // Description de la ligne : type + (Civilite Prénom Nom bénéficiaire) ou (montant€)
+          const cdmForDescription = allCotisationsDuMois.find(cdm => cdm.id === updated.id);
+          const descriptionLigne = cdmForDescription
+            ? buildDescriptionLigne(
+                cdmForDescription.TypeCotisation?.nom ?? "Cotisation",
+                cdmForDescription.TypeCotisation?.aBeneficiaire ?? false,
+                Number(cdmForDescription.montantBase),
+                cdmForDescription.AdherentBeneficiaire ?? null
+              )
+            : undefined;
+
           // Pour chaque cotisation mensuelle existante, recalculer le montant
           for (const cotisationMensuelle of updated.CotisationsMensuelles) {
             // Récupérer l'adhérent
@@ -332,8 +349,12 @@ export async function updateCotisationDuMois(formData: FormData) {
               data: {
                 montantAttendu: new Decimal(result.montantTotal),
                 montantRestant: new Decimal(nouveauMontantRestant),
-                description: result.description,
+                description: descriptionLigne ?? result.description,
                 statut: nouveauStatut,
+                // Pour les assistances : garder l'id du bénéficiaire aligné avec la CotisationDuMois
+                ...(updated.adherentBeneficiaireId != null
+                  ? { adherentBeneficiaireId: updated.adherentBeneficiaireId }
+                  : { adherentBeneficiaireId: null }),
                 // Mettre à jour la date d'échéance si elle a changé
                 ...(validatedData.dateEcheance ? {
                   dateEcheance: new Date(validatedData.dateEcheance),
@@ -404,7 +425,12 @@ export async function updateCotisationDuMois(formData: FormData) {
 export async function deleteCotisationDuMois(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canDelete } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canDelete(session.user.id, "deleteCotisationDuMois");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -450,6 +476,56 @@ export async function deleteCotisationDuMois(id: string) {
 }
 
 /**
+ * Récupère la liste des adhérents dont le rôle est MEMBRE (pour sélection bénéficiaire assistance).
+ * Les cotisations ne concernent que les adhérents MEMBRE.
+ */
+export async function getAdherentsMembres(): Promise<{
+  success: boolean;
+  adherents?: Array<{ id: string; firstname: string; lastname: string; email: string }>;
+  error?: string;
+}> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, adherents: [], error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllCotisationsDuMois");
+    if (!hasAccess) {
+      return { success: false, adherents: [], error: "Non autorisé" };
+    }
+
+    const adherents = await db.adherent.findMany({
+      where: {
+        User: {
+          role: UserRole.MEMBRE,
+          status: "Actif",
+        },
+      },
+      select: {
+        id: true,
+        firstname: true,
+        lastname: true,
+        User: { select: { email: true } },
+      },
+      orderBy: [{ lastname: "asc" }, { firstname: "asc" }],
+    });
+
+    const mapped = adherents.map((a) => ({
+      id: a.id,
+      firstname: a.firstname ?? "",
+      lastname: a.lastname ?? "",
+      email: a.User?.email ?? "",
+    }));
+
+    return { success: true, adherents: mapped };
+  } catch (error) {
+    console.error("Erreur getAdherentsMembres:", error);
+    return { success: false, adherents: [], error: "Erreur lors du chargement des adhérents" };
+  }
+}
+
+/**
  * Récupère toutes les cotisations du mois pour l'admin
  * 
  * @returns Un objet avec success (boolean), data (array de cotisations) en cas de succès, 
@@ -473,6 +549,14 @@ export async function getAllCotisationsDuMois() {
             obligatoire: true,
             ordre: true,
             aBeneficiaire: true,
+          },
+        },
+        AdherentBeneficiaire: {
+          select: {
+            id: true,
+            civility: true,
+            firstname: true,
+            lastname: true,
           },
         },
         CreatedBy: {
@@ -519,6 +603,14 @@ export async function getAllCotisationsDuMois() {
         createdBy: cotisation.createdBy,
         createdAt: cotisation.createdAt,
         updatedAt: cotisation.updatedAt,
+        AdherentBeneficiaire: cotisation.AdherentBeneficiaire
+          ? {
+              id: cotisation.AdherentBeneficiaire.id,
+              civility: cotisation.AdherentBeneficiaire.civility,
+              firstname: cotisation.AdherentBeneficiaire.firstname,
+              lastname: cotisation.AdherentBeneficiaire.lastname,
+            }
+          : null,
         TypeCotisation: {
           id: cotisation.TypeCotisation.id,
           nom: cotisation.TypeCotisation.nom,
@@ -560,7 +652,12 @@ export async function getAllCotisationsDuMois() {
 export async function getCotisationDuMoisById(id: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getCotisationDuMoisById");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 

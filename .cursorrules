@@ -905,6 +905,11 @@ export default function AdminEntityPage() {
 - **Tri** : Activé par défaut, désactiver avec `enableSorting: false` si nécessaire
 - **Colonnes d'actions** : Toujours définir `meta: { forceVisible: true }` et `enableResizing: false`
 
+### Labels des colonnes (en-têtes de tableau)
+- **Première lettre en majuscule** : Les libellés de colonnes doivent avoir le premier caractère en majuscule (exemples : « Période » et non « période », « Adhérent » et non « adhérent », « Description », « Type », « Attendu », « Payé », « Restant », « Statut », « Actions »).
+- **En gras** : Les libellés de colonnes doivent être affichés en gras (font-weight bold). Utiliser la prop `headerBold` sur le composant DataTable pour activer l’affichage en gras des en-têtes.
+- Utiliser `headerUppercase={false}` sur le composant DataTable si les en-têtes ne doivent pas être affichés en majuscules (uppercase) via CSS.
+
 ### Persistance des préférences
 - Utiliser `localStorage` avec une clé unique par page (ex: `admin-entity-column-visibility`)
 - Gérer les erreurs de parsing JSON avec try/catch

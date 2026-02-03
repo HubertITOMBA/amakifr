@@ -228,6 +228,48 @@ const ROLE_PERMISSIONS: Record<AdminRole, Permission[]> = {
     "settings.view",
     "profile.edit",
   ],
+  TRESOR: [
+    // Trésorier : accès finances et cotisations
+    "users.view",
+    "adherents.view",
+    "depenses.view",
+    "depenses.create",
+    "depenses.validate",
+    "cotisations.view",
+    "cotisations.create",
+    "cotisations.edit",
+    "finances.view",
+    "finances.edit",
+    "documents.view",
+    "documents.create",
+    "documents.edit",
+    "evenements.view",
+    "projets.view",
+    "menus.view",
+    "settings.view",
+    "profile.edit",
+  ],
+  VTRESO: [
+    // Vice-Trésorier : idem Trésorier
+    "users.view",
+    "adherents.view",
+    "depenses.view",
+    "depenses.create",
+    "depenses.validate",
+    "cotisations.view",
+    "cotisations.create",
+    "cotisations.edit",
+    "finances.view",
+    "finances.edit",
+    "documents.view",
+    "documents.create",
+    "documents.edit",
+    "evenements.view",
+    "projets.view",
+    "menus.view",
+    "settings.view",
+    "profile.edit",
+  ],
 };
 
 /**
@@ -344,6 +386,8 @@ export const ROLE_LABELS: Record<AdminRole, string> = {
   VICEPR: "Vice-Président",
   SECRET: "Secrétaire",
   VICESE: "Vice-Secrétaire",
+  TRESOR: "Trésorier",
+  VTRESO: "Vice-Trésorier",
   COMCPT: "Comptable/Trésorier",
 };
 
@@ -356,5 +400,7 @@ export const ROLE_DESCRIPTIONS: Record<AdminRole, string> = {
   VICEPR: "Peut tout voir mais ne peut pas tout modifier",
   SECRET: "Peut tout voir mais ne peut pas tout modifier",
   VICESE: "Peut tout voir mais ne peut pas tout modifier",
+  TRESOR: "Accès finances et cotisations.",
+  VTRESO: "Accès finances et cotisations.",
   COMCPT: "Peut tout voir mais ne peut pas tout modifier. Accès privilégié aux finances.",
 };

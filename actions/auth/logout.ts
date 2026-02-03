@@ -5,34 +5,27 @@ import { auth } from "@/auth"
 import { logUserActivity } from "@/lib/activity-logger"
 import { TypeActivite } from "@prisma/client"
 
+/**
+ * Enregistre l'activité de déconnexion (pour /admin/activities).
+ * À appeler côté client avant signOut() pour que la session soit encore disponible.
+ */
+export async function logDeconnexionActivity() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return;
+    await logUserActivity(
+      TypeActivite.Deconnexion,
+      `Déconnexion de l'utilisateur ${session.user.email || session.user.name || session.user.id}`,
+      "User",
+      session.user.id,
+      { email: session.user.email, role: session.user.role }
+    );
+  } catch (e) {
+    console.warn("Erreur lors du logging de la déconnexion:", e);
+  }
+}
+
 export const logOut = async () => {
-    try {
-        // Récupérer la session avant la déconnexion pour le logging
-        const session = await auth();
-        
-        // Logger la déconnexion si une session existe
-        if (session?.user?.id) {
-            try {
-                await logUserActivity(
-                    TypeActivite.Deconnexion,
-                    `Déconnexion de l'utilisateur ${session.user.email || session.user.name || session.user.id}`,
-                    "User",
-                    session.user.id,
-                    {
-                        email: session.user.email,
-                        role: session.user.role,
-                    }
-                );
-            } catch (logError) {
-                console.error("Erreur lors du logging de la déconnexion:", logError);
-                // Ne pas bloquer la déconnexion si le logging échoue
-            }
-        }
-    } catch (error) {
-        console.error("Erreur lors de la récupération de la session pour le logging:", error);
-        // Continuer la déconnexion même si le logging échoue
-    }
-    
-    // Effectuer la déconnexion
-    await signOut()
+    await logDeconnexionActivity();
+    await signOut();
 }

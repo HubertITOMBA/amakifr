@@ -22,12 +22,15 @@ import {
   Info
 } from "lucide-react";
 
+type CategorieTypeCotisation = "ForfaitMensuel" | "Assistance" | "Divers";
+
 interface TypeCotisationMensuelle {
   id: string;
   nom: string;
   description?: string;
   montant: number;
   actif: boolean;
+  categorie?: CategorieTypeCotisation;
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -172,6 +175,22 @@ export function ViewDialog({ type, open: controlledOpen, onOpenChange, triggerBu
               </h3>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Catégorie */}
+                <div className="space-y-1">
+                  <label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 px-2 py-1 rounded-t-md">
+                    Catégorie
+                  </label>
+                  <div className="p-2 rounded-md rounded-tl-none border border-slate-200 dark:border-slate-700">
+                    <Badge className={
+                      type.categorie === "ForfaitMensuel" ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200" :
+                      type.categorie === "Assistance" ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200" :
+                      "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200"
+                    }>
+                      {type.categorie === "ForfaitMensuel" ? "Forfait mensuel" : type.categorie === "Assistance" ? "Assistance" : "Divers / Extra"}
+                    </Badge>
+                  </div>
+                </div>
+
                 {/* Description */}
                 <div className="space-y-1 md:col-span-2">
                   <label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 px-2 py-1 rounded-t-md">

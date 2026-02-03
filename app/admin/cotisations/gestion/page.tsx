@@ -185,14 +185,18 @@ export default function AdminCotisationManagement() {
       setLoading(true);
       const result = await getAdherentsWithCotisations();
       if (result.success && result.data) {
-        setAdherents(result.data as unknown as AdherentWithCotisations[]);
+        const data = Array.isArray(result.data) ? result.data : [];
+        setAdherents(data as unknown as AdherentWithCotisations[]);
       } else {
+        setAdherents([]);
         // Ne pas afficher de toast pour les erreurs d'autorisation
         if (result.error && !isAuthorizationError(result.error)) {
           toast.error(result.error || "Erreur lors du chargement");
         }
       }
     } catch (error) {
+      setAdherents([]);
+      console.error("Erreur loadAdherents:", error);
       toast.error("Erreur lors du chargement des adhérents");
     } finally {
       setLoading(false);
@@ -573,8 +577,8 @@ export default function AdminCotisationManagement() {
     }
   };
 
-  const totalDettes = adherents.reduce((sum, adherent) => sum + adherent.totalDette, 0);
-  const adherentsEnRetard = adherents.filter(adherent => adherent.enRetard).length;
+  const totalDettes = (adherents ?? []).reduce((sum, adherent) => sum + (adherent?.totalDette ?? 0), 0);
+  const adherentsEnRetard = (adherents ?? []).filter(adherent => adherent?.enRetard).length;
 
   if (loading) {
     return (

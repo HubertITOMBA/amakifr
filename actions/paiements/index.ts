@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { UserRole, MoyenPaiement, TypeEvenementFamilial } from "@prisma/client";
+import { UserRole, MoyenPaiement, TypeEvenementFamilial, CategorieTypeCotisation } from "@prisma/client";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { Decimal } from "@prisma/client/runtime/library";
@@ -574,6 +574,7 @@ export async function getCumulDette(adherentId: string) {
 const CreateAssistanceSchema = z.object({
   adherentId: z.string().min(1, "L'ID de l'adhérent est requis"),
   type: z.enum(["Naissance", "MariageEnfant", "DecesFamille", "AnniversaireSalle", "Autre"]),
+  typeCotisationId: z.string().optional(), // ID du type de cotisation (catégorie Assistance) pour le montant
   dateEvenement: z.string(), // ISO string
   montant: z.number().optional().default(50),
   description: z.string().optional(),
@@ -734,7 +735,12 @@ async function syncAssistanceWithCotisationDuMois(
 export async function createAssistance(data: z.infer<typeof CreateAssistanceSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "createAssistance");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -750,6 +756,7 @@ export async function createAssistance(data: z.infer<typeof CreateAssistanceSche
       data: {
         adherentId: validatedData.adherentId,
         type: validatedData.type as TypeEvenementFamilial,
+        typeCotisationId: validatedData.typeCotisationId ?? null,
         montant: new Decimal(validatedData.montant),
         dateEvenement: dateEvenement,
         montantPaye: new Decimal(0),
@@ -1160,7 +1167,9 @@ export async function getAllPaiements() {
           },
         },
         ObligationCotisation: true,
-        CotisationMensuelle: true,
+        CotisationMensuelle: {
+          include: { TypeCotisation: true },
+        },
         DetteInitiale: true,
         Assistance: true,
       },
@@ -1685,7 +1694,8 @@ export async function updateAssistance(data: z.infer<typeof UpdateAssistanceSche
       dateEvenement = new Date(validatedData.dateEvenement);
       updateData.dateEvenement = dateEvenement;
     }
-    if (validatedData.montant !== undefined) {
+    const statutBloqueMontant = existingAssistance.statut === "Affecte" || existingAssistance.statut === "Paye";
+    if (validatedData.montant !== undefined && !statutBloqueMontant) {
       updateData.montant = new Decimal(validatedData.montant);
       montant = validatedData.montant;
       // Recalculer montantRestant si le montant change
@@ -1773,6 +1783,35 @@ export async function updateAssistance(data: z.infer<typeof UpdateAssistanceSche
   }
 }
 
+/**
+ * Retourne les types de cotisation de catégorie Assistance (pour la liste déroulante de création d'assistance).
+ */
+export async function getTypesCotisationAssistance() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé", data: [] };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllAssistances");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé", data: [] };
+    }
+    const types = await prisma.typeCotisationMensuelle.findMany({
+      where: { categorie: CategorieTypeCotisation.Assistance, actif: true },
+      select: { id: true, nom: true, montant: true },
+      orderBy: { nom: "asc" },
+    });
+    return {
+      success: true,
+      data: types.map((t) => ({ id: t.id, nom: t.nom, montant: Number(t.montant) })),
+    };
+  } catch (error) {
+    console.error("getTypesCotisationAssistance:", error);
+    return { success: false, error: "Erreur serveur", data: [] };
+  }
+}
+
 export async function getAllAssistances() {
   try {
     const session = await auth();
@@ -1818,6 +1857,413 @@ export async function getAllAssistances() {
   } catch (error) {
     console.error("Erreur lors de la récupération des assistances:", error);
     return { success: false, error: "Erreur lors de la récupération des assistances" };
+  }
+}
+
+/**
+ * Supprime une assistance (impossible si statut Affecte ou Paye)
+ */
+export async function deleteAssistance(id: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canDelete } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canDelete(session.user.id, "deleteAssistance");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const assistance = await prisma.assistance.findUnique({ where: { id } });
+    if (!assistance) {
+      return { success: false, error: "Assistance introuvable" };
+    }
+    if (assistance.statut === "Affecte" || assistance.statut === "Paye") {
+      return { success: false, error: "La suppression n'est pas possible lorsque l'assistance est au statut Affecté ou Payé" };
+    }
+    await prisma.assistance.delete({ where: { id } });
+    revalidatePath("/admin/finances/assistances");
+    revalidatePath("/admin/cotisations-du-mois");
+    return { success: true, message: "Assistance supprimée" };
+  } catch (error) {
+    console.error("Erreur lors de la suppression de l'assistance:", error);
+    return { success: false, error: "Erreur lors de la suppression" };
+  }
+}
+
+/** Noms possibles pour retrouver le type de cotisation selon le type d'assistance (ordre de préférence) */
+const typeCotisationNamesByAssistance: Record<string, string[]> = {
+  AnniversaireSalle: ["Anniversaire en salle", "Anniversaire"],
+  MariageEnfant: ["Mariage", "Assistance mariage"],
+  DecesFamille: ["Décès", "Assistance décès", "Décès dans la famille"],
+  Naissance: ["Naissance", "Décès", "Assistance décès"],
+  Autre: ["Décès", "Assistance décès", "Autre"],
+};
+
+/**
+ * Affecte une assistance à la cotisation du mois pour la période choisie (mois >= mois en cours).
+ * Crée la CotisationDuMois correspondante et met à jour le statut de l'assistance en "Affecte" si besoin.
+ */
+export async function affecterAssistanceToCotisationDuMois(data: {
+  assistanceId: string;
+  annee: number;
+  mois: number;
+}) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "affecterAssistanceToCotisationDuMois");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const now = new Date();
+    const anneeCourante = now.getFullYear();
+    const moisCourant = now.getMonth() + 1;
+    if (data.annee < anneeCourante || (data.annee === anneeCourante && data.mois < moisCourant)) {
+      return { success: false, error: "Le mois doit être égal ou supérieur au mois en cours" };
+    }
+
+    const assistance = await prisma.assistance.findUnique({
+      where: { id: data.assistanceId },
+      include: { Adherent: true },
+    });
+    if (!assistance) {
+      return { success: false, error: "Assistance introuvable" };
+    }
+
+    const periode = `${data.annee}-${String(data.mois).padStart(2, "0")}`;
+    const nomsPossibles = typeCotisationNamesByAssistance[assistance.type] ?? ["Décès", "Assistance décès"];
+
+    const allTypes = await prisma.typeCotisationMensuelle.findMany({
+      where: { actif: true },
+      select: { id: true, nom: true, montant: true, aBeneficiaire: true },
+    });
+    const typesBeneficiaire = allTypes.filter((t) => t.aBeneficiaire);
+    // Utiliser les types bénéficiaires en priorité, sinon tous les types actifs (au cas où aBeneficiaire n'est pas encore coché)
+    const typesToSearch = typesBeneficiaire.length > 0 ? typesBeneficiaire : allTypes;
+    let typeCotisation: (typeof allTypes)[0] | null = null;
+
+    for (const nom of nomsPossibles) {
+      const n = nom.toLowerCase().trim();
+      typeCotisation = typesToSearch.find((t) => t.nom.toLowerCase().trim() === n) ?? null;
+      if (typeCotisation) break;
+      typeCotisation = typesToSearch.find(
+        (t) =>
+          t.nom.toLowerCase().includes(n) || n.includes(t.nom.toLowerCase().trim())
+      ) ?? null;
+      if (typeCotisation) break;
+    }
+    if (!typeCotisation) {
+      const keywords = ["décès", "naissance", "anniversaire", "mariage", "assistance"];
+      for (const kw of keywords) {
+        typeCotisation = typesToSearch.find((t) => t.nom.toLowerCase().includes(kw)) ?? null;
+        if (typeCotisation) break;
+      }
+    }
+    // Exclure le forfait mensuel (obligatoire, pas une assistance)
+    if (typeCotisation && typeCotisation.nom.toLowerCase().includes("forfait")) {
+      typeCotisation = typesToSearch.find(
+        (t) =>
+          !t.nom.toLowerCase().includes("forfait") &&
+          (t.aBeneficiaire || t.nom.toLowerCase().includes("décès") || t.nom.toLowerCase().includes("mariage") || t.nom.toLowerCase().includes("anniversaire") || t.nom.toLowerCase().includes("naissance"))
+      ) ?? null;
+    }
+    if (!typeCotisation) {
+      return {
+        success: false,
+        error: `Type de cotisation pour l'assistance "${assistance.type}" introuvable. Vérifiez qu'il existe un type actif (ex. Décès, Mariage, Anniversaire en salle) dans Admin > Types de cotisation et cochez "Bénéficiaire" si besoin.`,
+      };
+    }
+
+    const existing = await prisma.cotisationDuMois.findFirst({
+      where: {
+        periode,
+        adherentBeneficiaireId: assistance.adherentId,
+      },
+    });
+    if (existing) {
+      return {
+        success: false,
+        error: `Une cotisation du mois existe déjà pour ${assistance.Adherent?.firstname} ${assistance.Adherent?.lastname} sur la période ${periode}`,
+      };
+    }
+
+    const dateEcheance = new Date(data.annee, data.mois - 1, 15);
+    await prisma.cotisationDuMois.create({
+      data: {
+        periode,
+        annee: data.annee,
+        mois: data.mois,
+        typeCotisationId: typeCotisation.id,
+        montantBase: assistance.montant,
+        dateEcheance,
+        description: `Assistance ${assistance.type} - ${periode}`,
+        adherentBeneficiaireId: assistance.adherentId,
+        statut: "Planifie",
+        createdBy: session.user.id,
+      },
+    });
+
+    await prisma.assistance.update({
+      where: { id: data.assistanceId },
+      data: { statut: "Affecte" },
+    });
+
+    revalidatePath("/admin/finances/assistances");
+    revalidatePath("/admin/cotisations-du-mois");
+    return {
+      success: true,
+      message: `Assistance affectée à la cotisation du mois ${data.mois}/${data.annee}`,
+    };
+  } catch (error) {
+    console.error("Erreur lors de l'affectation:", error);
+    return { success: false, error: "Erreur lors de l'affectation à la cotisation du mois" };
+  }
+}
+
+/** Libellé du type d'assistance pour affichage */
+const typeAssistanceLabel: Record<string, string> = {
+  Naissance: "Naissance",
+  MariageEnfant: "Mariage d'un enfant",
+  DecesFamille: "Décès dans la famille",
+  AnniversaireSalle: "Anniversaire en salle",
+  Autre: "Autre",
+};
+
+/**
+ * Calcule le détail du versement assistance à l'adhérent bénéficiaire.
+ *
+ * Règle métier :
+ * - Montant fixe : récupéré dans PassAssistance en filtrant par
+ *   assistances.typeCotisationId = pass_assistance.typeCotisationId.
+ *   Si pas de typeCotisationId ou aucun PassAssistance trouvé, on utilise assistance.montant.
+ * - On déduit du montant fixe :
+ *   1) le total des dettes initiales de l'adhérent (montantRestant > 0),
+ *   2) le total de ses cotisations non payées (cotisations mensuelles avec montantRestant > 0).
+ * - Montant à verser = max(0, montant fixe − (dettes initiales + cotisations non payées)).
+ * Ce versement constitue une dépense comptabilisée dans les comptes.
+ */
+export async function getVersementAssistanceBreakdown(assistanceId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllAssistances");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const assistance = await prisma.assistance.findUnique({
+      where: { id: assistanceId },
+      include: {
+        Adherent: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+          },
+        },
+      },
+    });
+    if (!assistance) {
+      return { success: false, error: "Assistance introuvable" };
+    }
+
+    const adherentId = assistance.adherentId;
+
+    // Montant fixe : PassAssistance où pass_assistance.typeCotisationId = assistance.typeCotisationId
+    const passAssistance = assistance.typeCotisationId
+      ? await prisma.passAssistance.findFirst({
+          where: { typeCotisationId: assistance.typeCotisationId },
+        })
+      : null;
+    const montantFixe = passAssistance ? Number(passAssistance.montant) : Number(assistance.montant);
+
+    // Dettes initiales de l'adhérent (montant restant à payer)
+    const dettes = await prisma.detteInitiale.findMany({
+      where: { adherentId, montantRestant: { gt: 0 } },
+    });
+    const totalDettes = dettes.reduce((s, d) => s + Number(d.montantRestant), 0);
+
+    // Cotisations non payées de l'adhérent (cotisations mensuelles avec solde restant)
+    const cotisationsNonPayees = await prisma.cotisationMensuelle.findMany({
+      where: { adherentId, montantRestant: { gt: 0 } },
+    });
+    const totalCotisationsNonPayees = cotisationsNonPayees.reduce((s, c) => s + Number(c.montantRestant), 0);
+
+    const aDeduire = totalDettes + totalCotisationsNonPayees;
+    const montantAVerser = Math.max(0, montantFixe - aDeduire);
+
+    const adherentName = assistance.Adherent
+      ? `${assistance.Adherent.firstname} ${assistance.Adherent.lastname}`.trim()
+      : "Adhérent";
+    const typeLabel = typeAssistanceLabel[assistance.type] ?? assistance.type;
+
+    return {
+      success: true,
+      data: {
+        montantFixe,
+        totalDettes,
+        totalCotisationsNonPayees,
+        aDeduire,
+        montantAVerser,
+        adherentName,
+        typeAssistance: typeLabel,
+        assistanceId,
+      },
+    };
+  } catch (error) {
+    console.error("Erreur getVersementAssistanceBreakdown:", error);
+    return { success: false, error: "Erreur lors du calcul du versement" };
+  }
+}
+
+/**
+ * Enregistre le versement à l'adhérent bénéficiaire : crée une dépense du montant à verser (comptabilisée dans les comptes).
+ * Montant versé = montant fixe (PassAssistance via typeCotisationId) − (dettes initiales + cotisations non payées).
+ */
+export async function verserAssistanceToAdherent(assistanceId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateAssistance");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const breakdown = await getVersementAssistanceBreakdown(assistanceId);
+    if (!breakdown.success || !breakdown.data) {
+      return { success: false, error: breakdown.error ?? "Impossible de calculer le versement" };
+    }
+
+    const { montantAVerser, adherentName, typeAssistance, montantFixe, totalDettes, totalCotisationsNonPayees } = breakdown.data;
+    if (montantAVerser <= 0) {
+      return {
+        success: false,
+        error: "Rien à verser : le montant fixe est entièrement absorbé par les dettes et cotisations non payées.",
+      };
+    }
+
+    let typeDepense = await prisma.typeDepense.findFirst({
+      where: { titre: "Versement assistance", actif: true },
+    });
+    if (!typeDepense) {
+      typeDepense = await prisma.typeDepense.create({
+        data: {
+          titre: "Versement assistance",
+          description: "Versement du solde d'assistance à l'adhérent bénéficiaire (après déduction dettes et cotisations)",
+          actif: true,
+          createdBy: session.user.id,
+        },
+      });
+    }
+
+    await prisma.depense.create({
+      data: {
+        libelle: `Versement assistance - ${adherentName} - ${typeAssistance}`,
+        montant: new Decimal(montantAVerser),
+        dateDepense: new Date(),
+        typeDepenseId: typeDepense.id,
+        description: `Assistance ${typeAssistance}. Montant fixe ${montantFixe.toFixed(2)} € - Dettes ${totalDettes.toFixed(2)} € - Cotisations non payées ${totalCotisationsNonPayees.toFixed(2)} € = ${montantAVerser.toFixed(2)} € versés à l'adhérent.`,
+        statut: "EnAttente",
+        createdBy: session.user.id,
+      },
+    });
+
+    revalidatePath("/admin/finances/assistances");
+    revalidatePath("/admin/depenses");
+    revalidatePath("/admin/depenses/gestion");
+
+    return {
+      success: true,
+      message: `Versement de ${montantAVerser.toFixed(2)} € enregistré comme dépense. Il sera comptabilisé dans les comptes.`,
+    };
+  } catch (error) {
+    console.error("Erreur verserAssistanceToAdherent:", error);
+    return { success: false, error: "Erreur lors de l'enregistrement du versement" };
+  }
+}
+
+/**
+ * Envoie à la demande un email à l'adhérent bénéficiaire avec le détail du versement assistance (montant fixe, déductions, montant à verser).
+ * L'email n'est pas envoyé automatiquement ; l'admin déclenche l'envoi depuis l'interface.
+ */
+export async function envoyerEmailVersementAssistance(assistanceId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllAssistances");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const breakdown = await getVersementAssistanceBreakdown(assistanceId);
+    if (!breakdown.success || !breakdown.data) {
+      return { success: false, error: breakdown.error ?? "Impossible de calculer le versement" };
+    }
+
+    const assistanceWithUser = await prisma.assistance.findUnique({
+      where: { id: assistanceId },
+      include: {
+        Adherent: {
+          include: {
+            User: { select: { email: true } },
+          },
+        },
+      },
+    });
+    const beneficiaryEmail = assistanceWithUser?.Adherent?.User?.email;
+    if (!beneficiaryEmail) {
+      return { success: false, error: "Aucune adresse email pour l'adhérent bénéficiaire." };
+    }
+
+    const { montantFixe, totalDettes, totalCotisationsNonPayees, montantAVerser, adherentName, typeAssistance } = breakdown.data;
+    const { sendEmail } = await import("@/lib/mail");
+    const fromEmail = process.env.EMAIL_FROM || process.env.SMTP_EMAIL || "webmaster@amaki.fr";
+
+    await sendEmail(
+      {
+        from: fromEmail,
+        to: beneficiaryEmail,
+        subject: `Versement assistance - ${typeAssistance} - AMAKI`,
+        html: `
+          <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+            <h2 style="color: #15803d;">Versement de votre assistance</h2>
+            <p>Bonjour ${adherentName},</p>
+            <p>Voici le détail du versement au titre de votre assistance (<strong>${typeAssistance}</strong>) :</p>
+            <ul style="list-style: none; padding: 0;">
+              <li style="margin: 8px 0;">Montant fixe de l'assistance : <strong>${montantFixe.toFixed(2)} €</strong></li>
+              <li style="margin: 8px 0;">Dettes initiales déduites : <strong>− ${totalDettes.toFixed(2)} €</strong></li>
+              <li style="margin: 8px 0;">Cotisations non payées déduites : <strong>− ${totalCotisationsNonPayees.toFixed(2)} €</strong></li>
+              <li style="margin: 12px 0; padding-top: 8px; border-top: 1px solid #e5e7eb;">Montant qui vous sera versé : <strong style="color: #15803d;">${montantAVerser.toFixed(2)} €</strong></li>
+            </ul>
+            <p>Ce montant sera comptabilisé et versé selon les modalités habituelles.</p>
+            <p style="color: #6b7280; font-size: 12px;">Cet email vous a été envoyé à votre demande par le portail AMAKI.</p>
+          </div>
+        `,
+      },
+      false
+    );
+
+    return {
+      success: true,
+      message: `Email envoyé à l'adhérent bénéficiaire (${beneficiaryEmail}).`,
+    };
+  } catch (error) {
+    console.error("Erreur envoyerEmailVersementAssistance:", error);
+    return { success: false, error: "Erreur lors de l'envoi de l'email" };
   }
 }
 

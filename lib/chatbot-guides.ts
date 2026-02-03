@@ -910,9 +910,12 @@ export const chatbotGuides: Guide[] = [
       '• Comment utiliser la messagerie interne',
       '• Comment commenter ou documenter l\'avancement de vos tâches',
       '• Comment proposer une idée dans la boîte à idées',
-      '• [ADMIN] Comment encaisser une cotisation manuelle',
+      '• [ADMIN] Comment encaisser une cotisation manuelle / enregistrer un paiement',
+      '• [ADMIN] Comment consulter l\'historique des paiements',
       '• [ADMIN] Comment créer une cotisation mensuelle',
       '• [ADMIN] Comment ajouter une assistance',
+      '• [ADMIN] Comment affecter une assistance à la cotisation du mois',
+      '• [ADMIN] Comment gérer les cotisations du mois (affectations)',
       '• [ADMIN] Comment créer un événement',
       '• [ADMIN] Comment créer un projet',
       '• [ADMIN] Comment ajouter une tâche à un projet',
@@ -1016,7 +1019,64 @@ export const chatbotGuides: Guide[] = [
       '💡 Conseil : Les assistances mensuelles sont idéales pour les soutiens réguliers'
     ],
     actions: [
-      { label: 'Gérer les assistances', action: 'open_admin_assistances', href: '/admin/cotisations/assistances' }
+      { label: 'Gérer les assistances', action: 'open_admin_assistances', href: '/admin/finances/assistances' }
+    ]
+  },
+  {
+    keywords: ['affecter assistance', 'affectation assistance', 'lier assistance cotisation', 'assistance cotisation du mois', 'affecter une assistance', 'assistance à la cotisation'],
+    title: '[ADMIN] Comment affecter une assistance à la cotisation du mois',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Allez dans "ADMIN" > "Finances" > "Assistances"',
+      'Dans la liste des assistances, repérez celle à affecter (statut "En attente")',
+      'Cliquez sur le bouton "Actions" (ou menu) de la ligne',
+      'Sélectionnez "Affecter à la cotisation du mois"',
+      'Dans le dialog : choisissez l\'année et le mois (mois en cours ou futur uniquement)',
+      'Validez : une ligne de cotisation du mois sera créée et le statut de l\'assistance passera à "Affecté"',
+      'Vous pouvez consulter les affectations dans "ADMIN" > "Cotisations du mois"',
+      '💡 Une assistance affectée ou payée ne peut plus être supprimée ni avoir son montant modifié'
+    ],
+    actions: [
+      { label: 'Assistances', action: 'open_admin_assistances', href: '/admin/finances/assistances' },
+      { label: 'Cotisations du mois', action: 'open_admin_cotisations_du_mois', href: '/admin/cotisations-du-mois' }
+    ]
+  },
+  {
+    keywords: ['cotisations du mois', 'cotisation du mois', 'affectations cotisations', 'lignes cotisation mensuelle', 'admin cotisations du mois', 'gérer cotisations du mois'],
+    title: '[ADMIN] Comment gérer les cotisations du mois (affectations)',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs',
+      'Allez dans "ADMIN" > "Cotisations du mois" (ou "Finances" > "Cotisations du mois")',
+      'Vous voyez la liste des lignes de cotisation mensuelle (forfait, assistances, etc.)',
+      'Pour ajouter une ligne : cliquez sur "Créer une cotisation du mois"',
+      '  • Choisissez année, mois, type de cotisation, montant, date d\'échéance',
+      '  • Pour une assistance avec bénéficiaire : sélectionnez l\'adhérent bénéficiaire',
+      'Pour modifier une ligne : utilisez le menu d\'actions sur la ligne (mois en cours ou prochain uniquement)',
+      'Pour supprimer une ligne : possible seulement si aucune cotisation mensuelle adhérent n\'a encore été générée à partir de celle-ci',
+      'Les cotisations du mois servent de planification : la "Création de la cotisation mensuelle" génère ensuite les cotisations par adhérent'
+    ],
+    actions: [
+      { label: 'Cotisations du mois', action: 'open_admin_cotisations_du_mois', href: '/admin/cotisations-du-mois' }
+    ]
+  },
+  {
+    keywords: ['historique paiements', 'historique des paiements', 'liste paiements', 'tous les paiements', 'admin paiements', 'voir paiements', 'consulter paiements admin', 'historique de paiement', 'paiement manuel', 'paiements manuels', 'enregistrer paiement'],
+    title: '[ADMIN] Comment consulter l\'historique des paiements et enregistrer un paiement manuel',
+    steps: [
+      '📋 Cette fonction est réservée aux administrateurs (avec permission Finances)',
+      '🔹 Historique des paiements :',
+      '  • "ADMIN" > "Finances" > "Paiements" : liste des paiements du mois courant',
+      '  • "ADMIN" > "Finances" > "Historique des paiements" : historique complet avec filtres',
+      '  • Filtres : période, adhérent, moyen de paiement, type (cotisation, assistance, dette, etc.)',
+      '  • Chaque ligne : date, adhérent, montant, moyen de paiement, type',
+      '🔹 Paiement manuel (encaissement) :',
+      '  • "ADMIN" > "Finances" > "Paiements" > "Enregistrer un paiement"',
+      '  • Choisissez l\'adhérent, le montant, le moyen (Espèces, Chèque, Virement, Carte), le type (cotisation, assistance, dette, etc.)',
+      '  • Les paiements en ligne (Stripe) apparaissent aussi dans l\'historique'
+    ],
+    actions: [
+      { label: 'Paiements', action: 'open_admin_paiements', href: '/admin/finances/paiements' },
+      { label: 'Historique des paiements', action: 'open_admin_historique_paiements', href: '/admin/finances/historique-paiements' }
     ]
   },
   {

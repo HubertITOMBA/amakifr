@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Calendar, Euro, Users, AlertTriangle, CheckCircle2, Clock, Eye, Edit, Settings, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, List } from "lucide-react";
+import { Calendar, Euro, Users, AlertTriangle, CheckCircle2, Clock, Eye, Edit, Settings, Search, Filter, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, List, Plus, MoreHorizontal } from "lucide-react";
 import { toast } from "react-toastify";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
@@ -16,6 +16,8 @@ import { createCotisationsMensuelles, getCotisationsMensuellesStats, getCotisati
 import { getAllTypesCotisationMensuelle } from "@/actions/cotisations-mensuelles";
 import { useRouter } from "next/navigation";
 import { ViewDialog } from "@/app/admin/types-cotisation/ViewDialog";
+import { CreateTypeCotisationDialog } from "./CreateTypeCotisationDialog";
+import { EditTypeCotisationDialog } from "./EditTypeCotisationDialog";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -29,6 +31,14 @@ import {
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuSeparator,
+  DropdownMenuLabel,
+} from "@/components/ui/dropdown-menu";
 
 interface CotisationStats {
   totalTypesCotisation: number;
@@ -46,9 +56,10 @@ interface TypeCotisationMensuelle {
   obligatoire: boolean;
   actif: boolean;
   ordre: number;
+  categorie?: "ForfaitMensuel" | "Assistance" | "Divers";
   _count?: {
     CotisationsMensuelles: number;
-  };
+  } | null;
   CreatedBy?: {
     email: string;
   };
@@ -67,12 +78,14 @@ interface CotisationMensuelle {
   statut: string;
   dateEcheance: Date | string;
   description?: string | null;
+  adherentBeneficiaireId?: string | null;
   TypeCotisation: {
     id: string;
     nom: string;
     description?: string | null;
     montant: number;
     obligatoire: boolean;
+    aBeneficiaire?: boolean;
   };
   Adherent: {
     id: string;
@@ -82,6 +95,11 @@ interface CotisationMensuelle {
       email: string;
     };
   };
+  AdherentBeneficiaire?: {
+    id: string;
+    firstname: string;
+    lastname: string;
+  } | null;
   CreatedBy: {
     name?: string | null;
     email: string;
@@ -231,6 +249,35 @@ function CotisationsListTable({ cotisations, typesCotisation, loading, onEdit }:
       size: 200,
       minSize: 150,
       maxSize: 300,
+      enableResizing: true,
+    }),
+    cotisationColumnHelper.display({
+      id: "beneficiaire",
+      header: "Bénéficiaire",
+      cell: ({ row }) => {
+        const cot = row.original;
+        const isAssistance = cot.TypeCotisation?.aBeneficiaire === true;
+        if (!isAssistance) return <span className="text-sm text-gray-400">—</span>;
+        const benef = cot.AdherentBeneficiaire;
+        const id = cot.adherentBeneficiaireId ?? benef?.id;
+        const nom = benef ? `${benef.firstname} ${benef.lastname}`.trim() : null;
+        return (
+          <div className="flex flex-col">
+            {id && (
+              <span className="text-xs font-mono text-gray-600 dark:text-gray-400" title={id}>
+                {id.slice(0, 8)}…
+              </span>
+            )}
+            {nom && (
+              <span className="text-sm text-gray-900 dark:text-gray-100">{nom}</span>
+            )}
+            {!id && !nom && <span className="text-sm text-gray-400">—</span>}
+          </div>
+        );
+      },
+      size: 180,
+      minSize: 120,
+      maxSize: 250,
       enableResizing: true,
     }),
     cotisationColumnHelper.accessor("Adherent", {
@@ -562,6 +609,9 @@ export default function AdminCotisationCreation() {
     annee: new Date().getFullYear(),
     typeCotisationIds: [] as string[],
   });
+  const [showExistingCotisationsDialog, setShowExistingCotisationsDialog] = useState(false);
+  const [createTypeDialogOpen, setCreateTypeDialogOpen] = useState(false);
+  const cotisationsListRef = useRef<HTMLDivElement>(null);
 
   const moisOptions = [
     { value: 1, label: "Janvier" },
@@ -608,11 +658,12 @@ export default function AdminCotisationCreation() {
       }
 
       if (typesResult.success && typesResult.data) {
-        setTypesCotisation(typesResult.data);
+        const data = typesResult.data as TypeCotisationMensuelle[];
+        setTypesCotisation(data);
         // Sélectionner automatiquement les types obligatoires
-        const typesObligatoires = typesResult.data
-          .filter((type: TypeCotisationMensuelle) => type.obligatoire && type.actif)
-          .map((type: TypeCotisationMensuelle) => type.id);
+        const typesObligatoires = data
+          .filter((type) => type.obligatoire && type.actif)
+          .map((type) => type.id);
         setFormData(prev => ({ ...prev, typeCotisationIds: typesObligatoires }));
       }
     } catch (error) {
@@ -655,6 +706,12 @@ export default function AdminCotisationCreation() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
+    // Si des cotisations existent déjà pour ce mois et ne sont pas toutes validées, proposer la modification
+    if (hasExistingNonValidated) {
+      setShowExistingCotisationsDialog(true);
+      return;
+    }
+    
     // Vérifier qu'au moins le forfait est sélectionné
     const forfaitSelected = formData.typeCotisationIds.some(id => {
       const type = typesCotisation.find(t => t.id === id);
@@ -689,7 +746,12 @@ export default function AdminCotisationCreation() {
         loadData(); // Recharger les données
         loadCotisationsMois(); // Recharger les cotisations du mois
       } else {
-        toast.error(result.error);
+        // Si le backend signale que des cotisations existent déjà, proposer la modification
+        if (result.error?.includes("existent déjà") || result.error?.includes("exist déjà")) {
+          setShowExistingCotisationsDialog(true);
+        } else {
+          toast.error(result.error);
+        }
       }
     } catch (error) {
       toast.error("Erreur lors de la création des cotisations");
@@ -697,6 +759,17 @@ export default function AdminCotisationCreation() {
       setLoading(false);
     }
   };
+
+  const scrollToCotisationsList = () => {
+    setShowExistingCotisationsDialog(false);
+    cotisationsListRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  // Cotisations existantes pour le mois sélectionné et non encore toutes validées
+  const hasExistingNonValidated = useMemo(() => {
+    if (cotisationsMois.length === 0) return false;
+    return cotisationsMois.some((c: CotisationMensuelle) => c.statut !== "Paye");
+  }, [cotisationsMois]);
 
   // Trouver le forfait pour afficher le montant de base
   const typeForfait = typesCotisation.find(t => 
@@ -851,26 +924,37 @@ export default function AdminCotisationCreation() {
 
               {/* Types de Cotisation */}
               <div className="space-y-2 md:col-span-2">
-                <div className="flex items-center justify-between">
+                <div className="flex flex-wrap items-center justify-between gap-2">
                   <Label>Types de Cotisation à Inclure</Label>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const actifsIds = typesCotisation.filter(t => t.actif).map(t => t.id);
-                      if (formData.typeCotisationIds.length === actifsIds.length) {
-                        setFormData(prev => ({ ...prev, typeCotisationIds: [] }));
-                      } else {
-                        setFormData(prev => ({ ...prev, typeCotisationIds: actifsIds }));
-                      }
-                    }}
-                    className="text-xs"
-                  >
-                    {formData.typeCotisationIds.length === typesCotisation.filter(t => t.actif).length 
-                      ? "Tout désélectionner" 
-                      : "Tout sélectionner"}
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => setCreateTypeDialogOpen(true)}
+                      className="text-xs bg-blue-600 hover:bg-blue-700 text-white border-0"
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Créer un type
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const actifsIds = typesCotisation.filter(t => t.actif).map(t => t.id);
+                        if (formData.typeCotisationIds.length === actifsIds.length) {
+                          setFormData(prev => ({ ...prev, typeCotisationIds: [] }));
+                        } else {
+                          setFormData(prev => ({ ...prev, typeCotisationIds: actifsIds }));
+                        }
+                      }}
+                      className="text-xs"
+                    >
+                      {formData.typeCotisationIds.length === typesCotisation.filter(t => t.actif).length 
+                        ? "Tout désélectionner" 
+                        : "Tout sélectionner"}
+                    </Button>
+                  </div>
                 </div>
                 <TypesCotisationTable 
                   types={typesCotisation}
@@ -878,6 +962,7 @@ export default function AdminCotisationCreation() {
                   onSelectionChange={(ids) => setFormData(prev => ({ ...prev, typeCotisationIds: ids }))}
                   sorting={sorting}
                   onSortingChange={setSorting}
+                  onEditSuccess={loadData}
                 />
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
                   {formData.typeCotisationIds.length} type(s) sélectionné(s) sur {typesCotisation.filter(t => t.actif).length} actif(s)
@@ -921,8 +1006,19 @@ export default function AdminCotisationCreation() {
               </AlertDescription>
             </Alert>
 
+            {/* Alerte si cotisations existantes non validées pour ce mois */}
+            {hasExistingNonValidated && (
+              <Alert className="border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+                <AlertTriangle className="h-4 w-4 text-amber-600 dark:text-amber-400" />
+                <AlertDescription>
+                  Des cotisations existent déjà pour {moisOptions.find(m => m.value === formData.mois)?.label} {formData.annee} et ne sont pas toutes validées.
+                  Vous pouvez les modifier dans la liste ci-dessous.
+                </AlertDescription>
+              </Alert>
+            )}
+
             {/* Bouton de soumission */}
-            <div className="flex justify-end space-x-4">
+            <div className="flex justify-end flex-wrap gap-2 space-x-4">
               <Button
                 type="button"
                 variant="outline"
@@ -936,6 +1032,17 @@ export default function AdminCotisationCreation() {
               >
                 Réinitialiser
               </Button>
+              {hasExistingNonValidated && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={scrollToCotisationsList}
+                  className="border-amber-600 text-amber-700 hover:bg-amber-50 dark:text-amber-400 dark:hover:bg-amber-900/20"
+                >
+                  <Edit className="h-4 w-4 mr-2" />
+                  Modifier les cotisations existantes
+                </Button>
+              )}
               <Button
                 type="submit"
                 disabled={loading}
@@ -949,7 +1056,7 @@ export default function AdminCotisationCreation() {
                 ) : (
                   <>
                     <CheckCircle2 className="h-4 w-4 mr-2" />
-                    Créer les Cotisations
+                    Affecter les cotisations
                   </>
                 )}
               </Button>
@@ -981,7 +1088,39 @@ export default function AdminCotisationCreation() {
         </Card>
       )}
 
+      {/* Dialog : cotisations déjà existantes pour ce mois */}
+      <Dialog open={showExistingCotisationsDialog} onOpenChange={setShowExistingCotisationsDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-600" />
+              Cotisations déjà existantes
+            </DialogTitle>
+            <DialogDescription>
+              Des cotisations existent déjà pour {moisOptions.find(m => m.value === formData.mois)?.label} {formData.annee} et ne sont pas toutes validées.
+              Vous pouvez les modifier dans la liste ci-dessous.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button type="button" variant="outline" onClick={() => setShowExistingCotisationsDialog(false)}>
+              Fermer
+            </Button>
+            <Button type="button" onClick={scrollToCotisationsList} className="bg-amber-600 hover:bg-amber-700 text-white">
+              <Edit className="h-4 w-4 mr-2" />
+              Voir les cotisations
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <CreateTypeCotisationDialog
+        open={createTypeDialogOpen}
+        onOpenChange={setCreateTypeDialogOpen}
+        onSuccess={loadData}
+      />
+
       {/* Cotisations créées pour le mois */}
+      <div ref={cotisationsListRef}>
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center space-x-2">
@@ -1033,6 +1172,7 @@ export default function AdminCotisationCreation() {
           )}
         </CardContent>
       </Card>
+      </div>
 
       {/* Dialog d'édition */}
       <Dialog open={!!editingCotisation} onOpenChange={(open) => !open && setEditingCotisation(null)}>
@@ -1252,77 +1392,183 @@ export default function AdminCotisationCreation() {
   );
 }
 
-// Composant Table pour les types de cotisation
+// Visibilité par défaut : nom, categorie, montant, actif, actions (pas de colonne sélection ici)
+const DEFAULT_TYPES_TABLE_VISIBILITY: VisibilityState = {
+  nom: true,
+  categorie: true,
+  montant: true,
+  actif: true,
+  actions: true,
+  description: false,
+  obligatoire: false,
+  ordre: false,
+};
+
+// Ids de colonnes valides pour TypesCotisationTable (accessor = id pour chaque colonne)
+const TYPES_TABLE_COLUMN_IDS = new Set(["nom", "categorie", "montant", "actif", "description", "obligatoire", "ordre", "actions"]);
+
+// Composant Table pour les types de cotisation (même style que /admin/types-cotisation, actions en menu)
 function TypesCotisationTable({
   types,
   selectedIds,
   onSelectionChange,
   sorting,
   onSortingChange,
+  onEditSuccess,
 }: {
   types: TypeCotisationMensuelle[];
   selectedIds: string[];
   onSelectionChange: (ids: string[]) => void;
   sorting: SortingState;
   onSortingChange: (sorting: SortingState) => void;
+  onEditSuccess?: () => void;
 }) {
   const router = useRouter();
-  const data = useMemo(() => types.map(type => ({
-    ...type,
-    selected: selectedIds.includes(type.id),
-  })), [types, selectedIds]);
+  const [viewOpenTypeId, setViewOpenTypeId] = useState<string | null>(null);
+  const [editOpenTypeId, setEditOpenTypeId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
+    if (typeof window !== "undefined") {
+      try {
+        const saved = localStorage.getItem("admin-cotisations-types-table-column-visibility");
+        if (saved) {
+          const parsed = JSON.parse(saved) as Record<string, boolean>;
+          const filtered: VisibilityState = {};
+          for (const id of TYPES_TABLE_COLUMN_IDS) {
+            if (id in parsed) filtered[id] = parsed[id];
+          }
+          return { ...DEFAULT_TYPES_TABLE_VISIBILITY, ...filtered };
+        }
+      } catch (e) {
+        console.error("Erreur chargement visibilité colonnes:", e);
+      }
+    }
+    return DEFAULT_TYPES_TABLE_VISIBILITY;
+  });
+
+  const data = useMemo(() => [...types], [types]);
+
+  const filteredData = useMemo(() => {
+    return data.filter((item) => {
+      if (searchTerm.trim()) {
+        const q = searchTerm.trim().toLowerCase();
+        const searchText = [
+          item.nom || "",
+          item.description || "",
+          (item.categorie || "").toLowerCase(),
+          item.montant.toString(),
+        ].join(" ").toLowerCase();
+        if (!searchText.includes(q)) return false;
+      }
+      if (statusFilter !== "all") {
+        if (statusFilter === "actif" && !item.actif) return false;
+        if (statusFilter === "inactif" && item.actif) return false;
+      }
+      return true;
+    });
+  }, [data, searchTerm, statusFilter]);
+
+  const typeForView = useMemo(() => {
+    if (!viewOpenTypeId) return null;
+    const type = types.find(t => t.id === viewOpenTypeId);
+    if (!type) return null;
+    return {
+      ...type,
+      createdBy: type.CreatedBy?.email || "",
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+      CreatedBy: type.CreatedBy || { id: "", email: "" },
+      _count: type._count || { CotisationsMensuelles: 0 },
+    };
+  }, [viewOpenTypeId, types]);
+
+  const typeForEdit = useMemo(() => {
+    if (!editOpenTypeId) return null;
+    const type = types.find(t => t.id === editOpenTypeId);
+    if (!type) return null;
+    return {
+      id: type.id,
+      nom: type.nom,
+      description: type.description ?? "",
+      montant: type.montant,
+      obligatoire: type.obligatoire,
+      actif: type.actif,
+      ordre: type.ordre,
+      categorie: type.categorie ?? "Divers",
+      aBeneficiaire: false,
+    };
+  }, [editOpenTypeId, types]);
 
   const columns = useMemo(() => [
-    columnHelper.display({
-      id: "select",
-      header: () => (
-        <input
-          type="checkbox"
-          checked={types.length > 0 && selectedIds.length === types.filter(t => t.actif).length}
-          onChange={(e) => {
-            if (e.target.checked) {
-              const actifsIds = types.filter(t => t.actif).map(t => t.id);
-              onSelectionChange(actifsIds);
-            } else {
-              onSelectionChange([]);
-            }
-          }}
-          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
-        />
-      ),
-      cell: ({ row }) => (
-        <input
-          type="checkbox"
-          checked={row.original.selected}
-          onChange={(e) => {
-            if (e.target.checked) {
-              onSelectionChange([...selectedIds, row.original.id]);
-            } else {
-              onSelectionChange(selectedIds.filter(id => id !== row.original.id));
-            }
-          }}
-          disabled={!row.original.actif}
-          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-        />
-      ),
-      size: 50,
-      enableResizing: false,
-    }),
     columnHelper.accessor("nom", {
       header: "Nom",
       cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
-            {row.getValue("nom")}
-          </span>
-          {!row.original.actif && (
-            <Badge className="bg-gray-100 text-gray-600 text-xs">Inactif</Badge>
-          )}
-        </div>
+        <span className="text-sm font-medium text-gray-900 dark:text-gray-100">
+          {row.getValue("nom")}
+        </span>
       ),
       size: 150,
       minSize: 120,
       maxSize: 200,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("categorie", {
+      header: "Catégorie",
+      cell: ({ row }) => {
+        const cat = (row.getValue("categorie") as "ForfaitMensuel" | "Assistance" | "Divers") || "Divers";
+        const labels: Record<string, string> = {
+          ForfaitMensuel: "Forfait mensuel",
+          Assistance: "Assistance",
+          Divers: "Divers",
+        };
+        const colors: Record<string, string> = {
+          ForfaitMensuel: "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200",
+          Assistance: "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200",
+          Divers: "bg-slate-100 text-slate-800 dark:bg-slate-700 dark:text-slate-200",
+        };
+        return (
+          <Badge className={colors[cat] || colors.Divers}>
+            {labels[cat] || cat}
+          </Badge>
+        );
+      },
+      size: 130,
+      minSize: 100,
+      maxSize: 180,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("montant", {
+      header: "Montant",
+      cell: ({ row }) => (
+        <div className="flex items-center gap-1">
+          <Euro className="h-4 w-4 text-gray-500" />
+          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            {(row.getValue("montant") as number).toFixed(2).replace(".", ",")} €
+          </span>
+        </div>
+      ),
+      size: 120,
+      minSize: 100,
+      maxSize: 150,
+      enableResizing: true,
+    }),
+    columnHelper.accessor("actif", {
+      header: "Statut",
+      cell: ({ row }) => (
+        <Badge
+          className={
+            row.getValue("actif")
+              ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs"
+              : "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 text-xs"
+          }
+        >
+          {row.getValue("actif") ? "Actif" : "Inactif"}
+        </Badge>
+      ),
+      size: 90,
+      minSize: 80,
+      maxSize: 120,
       enableResizing: true,
     }),
     columnHelper.accessor("description", {
@@ -1337,37 +1583,22 @@ function TypesCotisationTable({
       maxSize: 300,
       enableResizing: true,
     }),
-    columnHelper.accessor("montant", {
-      header: "Montant",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-1">
-          <Euro className="h-4 w-4 text-gray-500" />
-          <span className="text-sm font-semibold text-gray-900 dark:text-gray-100">
-            {row.getValue("montant").toFixed(2).replace(".", ",")} €
-          </span>
-        </div>
-      ),
-      size: 120,
-      minSize: 100,
-      maxSize: 150,
-      enableResizing: true,
-    }),
     columnHelper.accessor("obligatoire", {
-      header: "Type",
+      header: "Obligatoire",
       cell: ({ row }) => (
-        <Badge 
+        <Badge
           className={
             row.getValue("obligatoire")
               ? "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 text-xs"
               : "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 text-xs"
           }
         >
-          {row.getValue("obligatoire") ? "Obligatoire" : "Optionnel"}
+          {row.getValue("obligatoire") ? "Oui" : "Non"}
         </Badge>
       ),
-      size: 120,
-      minSize: 100,
-      maxSize: 150,
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
       enableResizing: true,
     }),
     columnHelper.accessor("ordre", {
@@ -1389,8 +1620,7 @@ function TypesCotisationTable({
       enableResizing: false,
       cell: ({ row }) => {
         const type = row.original;
-        // Convertir le type pour correspondre à l'interface ViewDialog
-        const typeForView = {
+        const typeForViewRow = {
           ...type,
           createdBy: type.CreatedBy?.email || "",
           createdAt: new Date().toISOString(),
@@ -1399,40 +1629,72 @@ function TypesCotisationTable({
           _count: type._count || { CotisationsMensuelles: 0 },
         };
         return (
-          <div className="flex items-center gap-1 sm:gap-2">
-            <ViewDialog type={typeForView as any} />
-            <Button
-              variant="outline"
-              size="sm"
-              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
-              onClick={() => {
-                // Rediriger vers la page de gestion des types pour éditer
-                router.push(`/admin/types-cotisation`);
-                // Afficher un message pour indiquer qu'il faut sélectionner le type à éditer
-                setTimeout(() => {
-                  toast.info(`Redirection vers la page de gestion des types de cotisation. Veuillez utiliser le bouton "Éditer" pour modifier "${type.nom}".`);
-                }, 500);
-              }}
-              title="Éditer le type de cotisation"
-            >
-              <Edit className="h-3 w-3 sm:h-4 sm:w-4" />
-            </Button>
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0 hover:bg-slate-100 dark:hover:bg-slate-800"
+                title="Actions"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+                <span className="sr-only">Menu</span>
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-48">
+              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => setViewOpenTypeId(type.id)}
+              >
+                <Eye className="h-4 w-4" />
+                Voir
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="flex items-center gap-2 cursor-pointer"
+                onClick={() => setEditOpenTypeId(type.id)}
+              >
+                <Edit className="h-4 w-4" />
+                Éditer
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
         );
       },
-      size: 120,
-      minSize: 100,
-      maxSize: 150,
+      size: 80,
+      minSize: 70,
+      maxSize: 100,
     }),
-  ], [selectedIds, types, onSelectionChange, router]);
+  ], [types, router]);
 
   const table = useReactTable({
-    data,
+    data: filteredData,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
-    onSortingChange: onSortingChange,
-    state: { sorting },
+    getPaginationRowModel: getPaginationRowModel(),
+    onSortingChange: (updaterOrValue) => {
+      const next = typeof updaterOrValue === "function" ? updaterOrValue(sorting) : updaterOrValue;
+      onSortingChange(next);
+    },
+    onColumnVisibilityChange: (updater) => {
+      const next = typeof updater === "function" ? updater(columnVisibility) : updater;
+      const sanitized: VisibilityState = {};
+      for (const id of TYPES_TABLE_COLUMN_IDS) {
+        if (id in next) sanitized[id] = next[id];
+      }
+      setColumnVisibility(sanitized);
+      try {
+        localStorage.setItem("admin-cotisations-types-table-column-visibility", JSON.stringify(sanitized));
+      } catch (e) {
+        console.error("Erreur sauvegarde visibilité colonnes:", e);
+      }
+    },
+    initialState: {
+      pagination: { pageSize: 10 },
+    },
+    state: { sorting, columnVisibility },
     defaultColumn: {
       minSize: 50,
       maxSize: 800,
@@ -1440,11 +1702,147 @@ function TypesCotisationTable({
   });
 
   return (
-    <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-900">
-      <div className="max-h-96 overflow-y-auto">
-        <DataTable table={table} emptyMessage="Aucun type de cotisation disponible" compact={true} />
-      </div>
-    </div>
+    <>
+    <Card className="shadow-lg border-blue-200 dark:border-blue-800">
+      <CardHeader className="bg-gradient-to-r from-blue-500/90 to-blue-600/90 dark:from-blue-600/90 dark:to-blue-700/90 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+          <div>
+            <CardTitle className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 sm:gap-3">
+              <Settings className="h-5 w-5 sm:h-6 sm:w-6" />
+              Types de cotisation
+            </CardTitle>
+            <CardDescription className="text-blue-100 dark:text-blue-200 mt-1 sm:mt-2 text-sm sm:text-base">
+              Sélectionnez les types à inclure pour la période
+            </CardDescription>
+          </div>
+          <div className="flex items-center w-full sm:w-auto">
+            <ColumnVisibilityToggle
+              table={table}
+              storageKey="admin-cotisations-types-table-column-visibility"
+            />
+          </div>
+        </div>
+      </CardHeader>
+      <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
+        {/* Filtres et recherche (même style que types-cotisation) */}
+        <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <Input
+              placeholder="Rechercher par nom, description, catégorie, montant..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <Select value={statusFilter} onValueChange={setStatusFilter}>
+            <SelectTrigger className="w-full sm:w-48">
+              <SelectValue placeholder="Filtrer par statut" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Tous les statuts</SelectItem>
+              <SelectItem value="actif">Actifs</SelectItem>
+              <SelectItem value="inactif">Inactifs</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
+          {filteredData.length} type(s) trouvé(s)
+        </div>
+        <div className="border rounded-lg overflow-hidden bg-white dark:bg-gray-900 border-slate-200 dark:border-slate-700">
+          <DataTable table={table} emptyMessage="Aucun type de cotisation disponible" compact={true} />
+        </div>
+
+        {/* Pagination (même style que types-cotisation) */}
+        <div className="hidden md:flex bg-white dark:bg-gray-800 mt-5 items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
+          <div className="ml-5 mt-2 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+            {table.getFilteredRowModel().rows.length} ligne(s) au total
+          </div>
+          <div className="flex items-center space-x-6 lg:space-x-8">
+            <div className="flex items-center space-x-2">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+              <Select
+                value={`${table.getState().pagination.pageSize}`}
+                onValueChange={(value) => table.setPageSize(Number(value))}
+              >
+                <SelectTrigger className="h-8 w-[70px]">
+                  <SelectValue placeholder={table.getState().pagination.pageSize} />
+                </SelectTrigger>
+                <SelectContent side="top">
+                  {[10, 20, 30, 40, 50].map((pageSize) => (
+                    <SelectItem key={pageSize} value={`${pageSize}`}>
+                      {pageSize}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+              Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount() || 1}
+            </div>
+            <div className="flex items-center space-x-2">
+              <Button
+                variant="outline"
+                className="hidden h-8 w-8 p-0 lg:flex"
+                onClick={() => table.setPageIndex(0)}
+                disabled={!table.getCanPreviousPage()}
+              >
+                <span className="sr-only">Aller à la première page</span>
+                <ChevronsLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => table.previousPage()}
+                disabled={!table.getCanPreviousPage()}
+              >
+                <span className="sr-only">Page précédente</span>
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="h-8 w-8 p-0"
+                onClick={() => table.nextPage()}
+                disabled={!table.getCanNextPage()}
+              >
+                <span className="sr-only">Page suivante</span>
+                <ChevronRight className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                className="hidden h-8 w-8 p-0 lg:flex"
+                onClick={() => table.setPageIndex(table.getPageCount() - 1)}
+                disabled={!table.getCanNextPage()}
+              >
+                <span className="sr-only">Aller à la dernière page</span>
+                <ChevronsRight className="h-4 w-4" />
+              </Button>
+            </div>
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+      {typeForView && (
+        <ViewDialog
+          type={typeForView as any}
+          open={!!viewOpenTypeId}
+          onOpenChange={(open) => !open && setViewOpenTypeId(null)}
+          triggerButton={<span className="hidden" />}
+        />
+      )}
+      {typeForEdit && (
+        <EditTypeCotisationDialog
+          type={typeForEdit}
+          open={!!editOpenTypeId}
+          onOpenChange={(open) => !open && setEditOpenTypeId(null)}
+          onSuccess={() => {
+            setEditOpenTypeId(null);
+            onEditSuccess?.();
+          }}
+        />
+      )}
+    </>
   );
 }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useMemo, Suspense } from "react";
+import { useState, useEffect, useMemo, useRef, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { DynamicNavbar } from "@/components/home/DynamicNavbar";
@@ -78,7 +78,6 @@ import { updateUserData, getUserCandidatures, getUserVotes, getAllCandidatesForP
 import { downloadPasseportPDF } from "@/actions/passeport";
 import { differenceInYears, differenceInMonths } from "date-fns";
 import { toast } from "sonner";
-import { FinancialTables } from "@/components/financial/financial-tables";
 import { NotificationPreferences } from "@/components/user/NotificationPreferences";
 import { ChangePasswordDialog } from "@/components/user/ChangePasswordDialog";
 import { getIdeesByUser, getAllIdees, createIdee, updateIdee, deleteIdee, createCommentaire, toggleApprobation } from "@/actions/idees";
@@ -93,6 +92,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
   Table,
   TableBody,
@@ -429,6 +429,7 @@ interface HistoriqueCotisation {
   montantRestant: number;
   statut: string;
   description?: string;
+  TypeCotisation?: { nom: string };
   Paiements: Array<{
     id: string;
     montant: number;
@@ -460,6 +461,20 @@ function HistoriqueCotisationsTable({ cotisations }: { cotisations: HistoriqueCo
           return (
             <span className="text-xs font-semibold text-gray-900 dark:text-gray-100">
               {nomMois.charAt(0).toUpperCase() + nomMois.slice(1)}
+            </span>
+          );
+        },
+      }),
+      columnHelper.display({
+        id: 'description',
+        header: 'Description',
+        cell: ({ row }) => {
+          const desc = (row.original as any).description;
+          const typeNom = (row.original as any).TypeCotisation?.nom;
+          const label = desc || typeNom || '—';
+          return (
+            <span className="text-xs text-gray-700 dark:text-gray-300" title={label}>
+              {label}
             </span>
           );
         },
@@ -569,18 +584,43 @@ function HistoriqueCotisationsTable({ cotisations }: { cotisations: HistoriqueCo
           </TableHeader>
           <TableBody>
             {table.getRowModel().rows?.length ? (
-              table.getRowModel().rows.map((row) => (
-                <TableRow
-                  key={row.id}
-                  className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
-                >
-                  {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id} className="text-center text-xs px-2 py-1.5">
-                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                    </TableCell>
-                  ))}
-                </TableRow>
-              ))
+              <>
+                {table.getRowModel().rows.map((row) => (
+                  <TableRow
+                    key={row.id}
+                    className="hover:bg-indigo-50 dark:hover:bg-indigo-900/20 transition-colors"
+                  >
+                    {row.getVisibleCells().map((cell) => (
+                      <TableCell key={cell.id} className="text-center text-xs px-2 py-1.5">
+                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                      </TableCell>
+                    ))}
+                  </TableRow>
+                ))}
+                {/* Ligne des totaux */}
+                {(() => {
+                  const totalAttendu = cotisations.reduce((s, c) => s + Number(c.montantAttendu), 0);
+                  const totalRestant = cotisations.reduce((s, c) => s + Number(c.montantRestant), 0);
+                  const totalPaye = cotisations.reduce((s, c) => s + ((c.Paiements || []).reduce((sp: number, p: any) => sp + Number(p.montant), 0)), 0);
+                  return (
+                    <TableRow className="bg-indigo-100/50 dark:bg-indigo-900/30 border-t-2 border-indigo-200 dark:border-indigo-800 font-semibold">
+                      <TableCell colSpan={2} className="text-center text-xs px-2 py-2 text-gray-900 dark:text-gray-100">
+                        Total
+                      </TableCell>
+                      <TableCell className="text-center text-xs px-2 py-2 text-gray-900 dark:text-gray-100">
+                        {totalAttendu.toFixed(2).replace('.', ',')} €
+                      </TableCell>
+                      <TableCell className="text-center text-xs px-2 py-2 text-red-600 dark:text-red-400">
+                        {totalRestant.toFixed(2).replace('.', ',')} €
+                      </TableCell>
+                      <TableCell className="text-center text-xs px-2 py-2 text-green-600 dark:text-green-400">
+                        {totalPaye.toFixed(2).replace('.', ',')} €
+                      </TableCell>
+                      <TableCell className="text-center text-xs px-2 py-2" />
+                    </TableRow>
+                  );
+                })()}
+              </>
             ) : (
               <TableRow>
                 <TableCell colSpan={columns.length} className="h-24 text-center">
@@ -613,20 +653,34 @@ interface CotisationMois {
   reference: string;
   isCotisationMensuelle?: boolean;
   isAssistance?: boolean;
+  isBeneficiaire?: boolean;
   cotisationMensuelleId?: string;
   assistanceId?: string;
 }
 
-function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }) {
+function CotisationsMoisTable({
+  cotisations,
+  vueCotisations = 'mois',
+}: {
+  cotisations: CotisationMois[];
+  vueCotisations?: 'mois' | 'annee' | 'toutes';
+}) {
   const router = useRouter();
   const [sorting, setSorting] = useState<SortingState>([{ id: 'type', desc: false }]);
   const { userProfile, loading: profileLoading } = useUserProfile();
 
+  const labelTotal =
+    vueCotisations === 'annee'
+      ? "Total de l'année :"
+      : vueCotisations === 'toutes'
+        ? 'Total :'
+        : 'Total du mois :';
+
   const columnHelper = createColumnHelper<CotisationMois>();
 
-  // Calculer le total du mois et le montant restant total
+  // Total à payer = forfait + assistances (hors lignes dont l'adhérent est bénéficiaire)
   const totalMois = useMemo(() => {
-    return cotisations.reduce((sum, cot) => sum + cot.montant, 0);
+    return cotisations.reduce((sum, cot) => sum + (cot.isBeneficiaire ? 0 : cot.montant), 0);
   }, [cotisations]);
 
   const totalRestantMois = useMemo(() => {
@@ -673,8 +727,17 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
         cell: ({ row }) => {
           const montantRestant = parseFloat(row.original.montantRestant.toString());
           const statut = row.original.statut;
+          const isBeneficiaire = row.original.isBeneficiaire === true;
           const isPaye = montantRestant === 0 || statut === 'Paye' || statut === 'Valide';
           
+          if (isBeneficiaire) {
+            return (
+              <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs">
+                <Heart className="h-3 w-3 mr-1" />
+                Bénéficiaire
+              </Badge>
+            );
+          }
           if (isPaye) {
             return (
               <Badge className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 text-xs">
@@ -802,7 +865,7 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
       {cotisations.length > 0 && totalMois > 0 && (
         <div className="flex justify-between items-center gap-3 px-4 sm:px-0 pt-2 border-t border-gray-200 dark:border-gray-700">
           <div className="flex items-center gap-3">
-            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">Total du mois :</span>
+            <span className="text-sm sm:text-base font-semibold text-gray-700 dark:text-gray-300">{labelTotal}</span>
             <span className="text-base sm:text-lg font-bold text-blue-600 dark:text-blue-400">
               {totalMois.toFixed(2).replace('.', ',')} €
             </span>
@@ -841,8 +904,8 @@ function CotisationsMoisTable({ cotisations }: { cotisations: CotisationMois[] }
 function UserProfilePageContent() {
   const searchParams = useSearchParams();
   const user = useCurrentUser();
-  const { userProfile, loading: profileLoading, error: profileError } = useUserProfile();
-  
+  const { userProfile, loading: profileLoading, error: profileError, refetch: refetchProfile } = useUserProfile();
+
   // Initialiser activeSection depuis les paramètres d'URL ou par défaut 'profile'
   const sectionFromUrl = searchParams.get('section') as MenuSection | null;
   const [activeSection, setActiveSection] = useState<MenuSection>(
@@ -857,6 +920,16 @@ function UserProfilePageContent() {
       setActiveSection(sectionFromUrl);
     }
   }, [sectionFromUrl]);
+
+  const prevActiveSectionRef = useRef<MenuSection | null>(null);
+  // Rafraîchir les données cotisations à l'ouverture de la section pour voir les créations récentes (ex. février)
+  useEffect(() => {
+    if (prevActiveSectionRef.current !== null && activeSection === 'cotisations') {
+      refetchProfile();
+    }
+    prevActiveSectionRef.current = activeSection;
+  }, [activeSection, refetchProfile]);
+
   const [candidatures, setCandidatures] = useState<any[]>([]);
   const [votes, setVotes] = useState<any[]>([]);
   const [candidates, setCandidates] = useState<any[]>([]);
@@ -864,11 +937,15 @@ function UserProfilePageContent() {
   const [obligationsCotisation, setObligationsCotisation] = useState<any[]>([]);
   const [dettesInitiales, setDettesInitiales] = useState<any[]>([]);
   const [cotisationsMois, setCotisationsMois] = useState<any[]>([]);
-  const [cotisationMoisProchain, setCotisationMoisProchain] = useState<any>(null);
-  const [showCotisationMoisProchain, setShowCotisationMoisProchain] = useState(false);
   const [avoirs, setAvoirs] = useState<any[]>([]);
   const [historiqueCotisations, setHistoriqueCotisations] = useState<any[]>([]);
-  const [showHistoriqueCotisations, setShowHistoriqueCotisations] = useState(false);
+  const [historiqueFilterMois, setHistoriqueFilterMois] = useState<string>('all');
+  const [historiqueFilterAnnee, setHistoriqueFilterAnnee] = useState<string>('all');
+  // Mois/année et mode d'affichage pour "Cotisations" (un mois / une année / toutes)
+  const now = new Date();
+  const [selectedCotisationsMois, setSelectedCotisationsMois] = useState<number>(() => now.getMonth() + 1);
+  const [selectedCotisationsAnnee, setSelectedCotisationsAnnee] = useState<number>(() => now.getFullYear());
+  const [cotisationsVue, setCotisationsVue] = useState<'mois' | 'annee' | 'toutes'>('mois');
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedElection, setSelectedElection] = useState<string>('all');
@@ -907,6 +984,134 @@ function UserProfilePageContent() {
   const [editingEnfant, setEditingEnfant] = useState<any>(null);
   const [enfantFormData, setEnfantFormData] = useState({ prenom: '', dateNaissance: '', age: undefined as number | undefined });
 
+  // Cotisations affichées selon le mode : un mois / une année / toutes
+  const cotisationsMoisAffichage = useMemo(() => {
+    if (activeSection !== 'cotisations' || !userProfile?.adherent || user?.role === 'ADMIN') {
+      return [];
+    }
+    const adherent = userProfile.adherent as any;
+    const cotisationsMensuelles = adherent.CotisationsMensuelles || [];
+    const assistances = adherent.Assistances || [];
+    const adherentId = adherent.id;
+    const typeForfait = (userProfile as any)?.typeForfait;
+    const montantForfaitDefaut = typeForfait?.montant ?? 15.00;
+
+    function buildItemsForMonth(annee: number, mois: number): any[] {
+      // Une ligne par cotisation_mensuelle (forfait + assistances à payer) — aligné sur l'admin cotisations_du_mois
+      const cotisationsDuMois = cotisationsMensuelles.filter((cm: any) =>
+        Number(cm.mois) === mois && Number(cm.annee) === annee
+      );
+      const items: any[] = [];
+
+      cotisationsDuMois.forEach((cm: any) => {
+        const montant = Number(cm.montantAttendu);
+        const montantPaye = Number(cm.montantPaye);
+        const montantRestant = Number(cm.montantRestant);
+        const typeNom = cm.TypeCotisation?.nom ?? 'Cotisation';
+        const isForfait = !cm.TypeCotisation?.aBeneficiaire;
+        const benef = cm.CotisationDuMois?.AdherentBeneficiaire;
+        const nomBeneficiaire = benef
+          ? [benef.firstname, benef.lastname].filter(Boolean).join(' ').trim()
+          : '';
+        // Pour les assistances : afficher le bénéficiaire (depuis CotisationDuMois ou depuis la description stockée)
+        const descriptionAssistance = nomBeneficiaire
+          ? `${typeNom} — bénéficiaire : ${nomBeneficiaire}`
+          : (cm.description && typeof cm.description === 'string' && cm.description.includes(' pour ')
+              ? cm.description
+              : typeNom);
+        const description = cm.description || (isForfait ? 'Cotisation mensuelle forfaitaire' : descriptionAssistance);
+        items.push({
+          id: `cotisation-${cm.id}`,
+          type: typeNom,
+          montant,
+          montantPaye,
+          montantRestant: Math.max(0, montantRestant),
+          dateCotisation: cm.dateEcheance,
+          periode: cm.periode,
+          statut: montantRestant <= 0 ? 'Paye' : cm.statut,
+          description,
+          moyenPaiement: 'Non payé',
+          reference: cm.id,
+          isCotisationMensuelle: true,
+          cotisationMensuelleId: cm.id
+        });
+      });
+
+      if (cotisationsDuMois.length === 0) {
+        const periode = `${annee}-${String(mois).padStart(2, '0')}`;
+        items.push({
+          id: `forfait-dynamique-${mois}-${annee}`,
+          type: 'Forfait mensuel',
+          montant: montantForfaitDefaut,
+          montantPaye: 0,
+          montantRestant: montantForfaitDefaut,
+          dateCotisation: new Date(annee, mois - 1, 15),
+          periode,
+          statut: 'EnAttente',
+          description: 'Cotisation mensuelle forfaitaire (non créée par l\'admin)',
+          moyenPaiement: 'Non payé',
+          reference: 'dynamique',
+          isCotisationMensuelle: false,
+          cotisationMensuelleId: null
+        });
+      }
+
+      return items;
+    }
+
+    if (cotisationsVue === 'mois') {
+      return buildItemsForMonth(selectedCotisationsAnnee, selectedCotisationsMois);
+    }
+
+    if (cotisationsVue === 'annee') {
+      const periodesAnnee = new Set<number>();
+      cotisationsMensuelles
+        .filter((cm: any) => Number(cm.annee) === selectedCotisationsAnnee)
+        .forEach((cm: any) => periodesAnnee.add(Number(cm.mois)));
+      assistances.forEach((ass: any) => {
+        const d = new Date(ass.dateEvenement);
+        if (d.getFullYear() === selectedCotisationsAnnee) periodesAnnee.add(d.getMonth() + 1);
+      });
+      const moisToShow = periodesAnnee.size > 0 ? Array.from(periodesAnnee).sort((a, b) => a - b) : [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12];
+      const all: any[] = [];
+      moisToShow.forEach((m) => all.push(...buildItemsForMonth(selectedCotisationsAnnee, m)));
+      return all;
+    }
+
+    // cotisationsVue === 'toutes' : toutes les périodes ayant des données
+    const periodesSet = new Set<string>();
+    cotisationsMensuelles.forEach((cm: any) => periodesSet.add(`${cm.annee}-${String(cm.mois).padStart(2, '0')}`));
+    assistances.forEach((ass: any) => {
+      const d = new Date(ass.dateEvenement);
+      periodesSet.add(`${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`);
+    });
+    const periodes = Array.from(periodesSet)
+      .map((p) => {
+        const [y, m] = p.split('-');
+        return { annee: parseInt(y, 10), mois: parseInt(m, 10) };
+      })
+      .sort((a, b) => b.annee !== a.annee ? b.annee - a.annee : b.mois - a.mois);
+
+    const all: any[] = [];
+    periodes.forEach(({ annee, mois }) => {
+      all.push(...buildItemsForMonth(annee, mois));
+    });
+    return all;
+  }, [activeSection, userProfile, user?.role, selectedCotisationsMois, selectedCotisationsAnnee, cotisationsVue]);
+
+  // Filtre et totaux pour l'historique des cotisations par mois
+  const filteredHistoriqueCotisations = useMemo(() => {
+    return historiqueCotisations.filter((c: any) => {
+      const matchMois = historiqueFilterMois === 'all' || Number(c.mois) === Number(historiqueFilterMois);
+      const matchAnnee = historiqueFilterAnnee === 'all' || Number(c.annee) === Number(historiqueFilterAnnee);
+      return matchMois && matchAnnee;
+    });
+  }, [historiqueCotisations, historiqueFilterMois, historiqueFilterAnnee]);
+
+  const historiqueAnneesOptions = useMemo(() => {
+    const years = new Set(historiqueCotisations.map((c: any) => Number(c.annee)));
+    return Array.from(years).sort((a, b) => b - a);
+  }, [historiqueCotisations]);
 
   // Charger les données selon la section active
   useEffect(() => {
@@ -935,7 +1140,7 @@ function UserProfilePageContent() {
               const moisCourant = new Date().getMonth() + 1;
               const anneeCourante = new Date().getFullYear();
               const cotisationMensuelleCourante = cotisationsMensuelles.find((cm: any) => 
-                cm.mois === moisCourant && cm.annee === anneeCourante
+                Number(cm.mois) === moisCourant && Number(cm.annee) === anneeCourante
               );
               
               const items: any[] = [];
@@ -1033,11 +1238,6 @@ function UserProfilePageContent() {
               // Construire l'historique des cotisations mensuelles avec leurs paiements
               const toutesCotisationsMensuelles = ((userProfile.adherent as any).CotisationsMensuelles || []);
               setHistoriqueCotisations(toutesCotisationsMensuelles);
-              
-              // Récupérer la cotisation du mois prochain
-              if ((userProfile as any).cotisationMoisProchain) {
-                setCotisationMoisProchain((userProfile as any).cotisationMoisProchain);
-              }
             } else if (isAdmin) {
               // Si l'utilisateur est admin, ne pas afficher de cotisations
               setCotisations([]);
@@ -1046,7 +1246,6 @@ function UserProfilePageContent() {
               setAvoirs([]);
               setCotisationsMois([]);
               setHistoriqueCotisations([]);
-              setCotisationMoisProchain(null);
             }
             break;
           case 'candidatures':
@@ -2042,184 +2241,149 @@ function UserProfilePageContent() {
               </Card>
             )}
 
-            {/* Afficher les cotisations du mois en cours */}
-            {cotisationsMois.length > 0 && (() => {
-              // Extraire le nom du mois depuis la première cotisation
-              const premiereCotisation = cotisationsMois[0];
-              let nomMois = "en cours";
-              
-              if (premiereCotisation?.periode) {
-                // Format période: "2024-11"
-                const [annee, mois] = premiereCotisation.periode.split('-');
-                if (mois) {
-                  const date = new Date(parseInt(annee), parseInt(mois) - 1, 1);
-                  nomMois = date.toLocaleDateString('fr-FR', { month: 'long' });
-                  // Capitaliser la première lettre
-                  nomMois = nomMois.charAt(0).toUpperCase() + nomMois.slice(1);
-                }
-              } else if (premiereCotisation?.dateCotisation) {
-                const date = new Date(premiereCotisation.dateCotisation);
-                nomMois = date.toLocaleDateString('fr-FR', { month: 'long' });
-                nomMois = nomMois.charAt(0).toUpperCase() + nomMois.slice(1);
+            {/* Sélecteur : Un mois / Une année / Toutes */}
+            <div className="flex flex-wrap items-center gap-2 mb-2">
+              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Afficher :</span>
+              <Select
+                value={cotisationsVue}
+                onValueChange={(v: 'mois' | 'annee' | 'toutes') => setCotisationsVue(v)}
+              >
+                <SelectTrigger className="w-[160px] h-8 text-sm">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="mois">Un mois</SelectItem>
+                  <SelectItem value="annee">Une année</SelectItem>
+                  <SelectItem value="toutes">Toutes les cotisations</SelectItem>
+                </SelectContent>
+              </Select>
+              {cotisationsVue === 'mois' && (
+                <>
+                  <Select
+                    value={String(selectedCotisationsMois)}
+                    onValueChange={(v) => setSelectedCotisationsMois(Number(v))}
+                  >
+                    <SelectTrigger className="w-[140px] h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => {
+                        const date = new Date(2000, m - 1, 1);
+                        const label = date.toLocaleDateString('fr-FR', { month: 'long' });
+                        const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
+                        return (
+                          <SelectItem key={m} value={String(m)}>
+                            {labelCap}
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                  <Select
+                    value={String(selectedCotisationsAnnee)}
+                    onValueChange={(v) => setSelectedCotisationsAnnee(Number(v))}
+                  >
+                    <SelectTrigger className="w-[90px] h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(() => {
+                        const currentYear = new Date().getFullYear();
+                        const years = [];
+                        for (let y = currentYear - 2; y <= currentYear + 1; y++) years.push(y);
+                        return years.map((y) => (
+                          <SelectItem key={y} value={String(y)}>
+                            {y}
+                          </SelectItem>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-blue-600 dark:text-blue-400"
+                    onClick={() => {
+                      const n = new Date();
+                      setSelectedCotisationsMois(n.getMonth() + 1);
+                      setSelectedCotisationsAnnee(n.getFullYear());
+                    }}
+                  >
+                    Mois en cours
+                  </Button>
+                </>
+              )}
+              {cotisationsVue === 'annee' && (
+                <>
+                  <Select
+                    value={String(selectedCotisationsAnnee)}
+                    onValueChange={(v) => setSelectedCotisationsAnnee(Number(v))}
+                  >
+                    <SelectTrigger className="w-[90px] h-8 text-sm">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {(() => {
+                        const currentYear = new Date().getFullYear();
+                        const years = [];
+                        for (let y = currentYear - 2; y <= currentYear + 1; y++) years.push(y);
+                        return years.map((y) => (
+                          <SelectItem key={y} value={String(y)}>
+                            {y}
+                          </SelectItem>
+                        ));
+                      })()}
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 text-xs text-blue-600 dark:text-blue-400"
+                    onClick={() => setSelectedCotisationsAnnee(new Date().getFullYear())}
+                  >
+                    Année en cours
+                  </Button>
+                </>
+              )}
+            </div>
+
+            {/* Carte cotisations selon le mode */}
+            {(() => {
+              let title = '';
+              let description = '';
+              if (cotisationsVue === 'mois') {
+                const nomMois = new Date(selectedCotisationsAnnee, selectedCotisationsMois - 1, 1)
+                  .toLocaleDateString('fr-FR', { month: 'long' });
+                const nomMoisCap = nomMois.charAt(0).toUpperCase() + nomMois.slice(1);
+                title = `Cotisations du mois de ${nomMoisCap} ${selectedCotisationsAnnee}`;
+                description = 'Cotisations mensuelles + assistances du mois';
+              } else if (cotisationsVue === 'annee') {
+                title = `Cotisations de l'année ${selectedCotisationsAnnee}`;
+                description = 'Toutes les cotisations mensuelles et assistances de l\'année';
+              } else {
+                title = 'Toutes mes cotisations';
+                description = 'Toutes vos cotisations mensuelles et assistances';
               }
-              
               return (
                 <Card className="border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 !py-0">
                   <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white pb-3 pt-3 px-6 gap-0">
                     <CardTitle className="flex items-center gap-2 text-base">
                       <Receipt className="h-4 w-4" />
-                      Cotisations du Mois de {nomMois}
+                      {title}
                     </CardTitle>
                     <CardDescription className="text-blue-100 dark:text-blue-200 mt-1 text-xs">
-                      Cotisations mensuelles + assistances du mois
+                      {description}
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="pt-3 pb-4 px-6">
-                    <CotisationsMoisTable cotisations={cotisationsMois} />
+                    <CotisationsMoisTable cotisations={cotisationsMoisAffichage} vueCotisations={cotisationsVue} />
                   </CardContent>
                 </Card>
               );
             })()}
 
-            {/* Afficher la cotisation prévisionnelle du mois prochain */}
-            {cotisationMoisProchain && showCotisationMoisProchain && (
-              <Card className="border-purple-200 dark:border-purple-800 bg-white dark:bg-gray-900 !py-0">
-                <CardHeader className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 text-white pb-3 pt-3 px-6 gap-0">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Clock className="h-4 w-4" />
-                    Cotisation Prévisionnelle du Mois de {cotisationMoisProchain.nomMois}
-                  </CardTitle>
-                  <CardDescription className="text-purple-100 dark:text-purple-200 mt-1 text-xs">
-                    Estimation basée sur le forfait mensuel + assistances prévues
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-3 pb-4 px-6">
-                  <div className="space-y-3">
-                    <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between">
-                          <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                            Forfait mensuel:
-                          </span>
-                          <span className="text-sm font-bold text-gray-900 dark:text-white">
-                            {cotisationMoisProchain.montantForfait.toFixed(2).replace('.', ',')} €
-                          </span>
-                        </div>
-                        
-                        {cotisationMoisProchain.assistances && cotisationMoisProchain.assistances.length > 0 && (
-                          <>
-                            {cotisationMoisProchain.isBeneficiaire ? (
-                              <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
-                                <div className="flex items-center gap-1 mb-1">
-                                  <CheckCircle2 className="h-3 w-3 text-green-600 dark:text-green-400" />
-                                  <span className="text-xs font-semibold text-green-700 dark:text-green-300">
-                                    Vous êtes bénéficiaire
-                                  </span>
-                                </div>
-                                <div className="text-xs text-gray-600 dark:text-gray-400 pl-4">
-                                  {cotisationMoisProchain.assistances.map((ass: any) => (
-                                    <div key={ass.id} className="mb-1">
-                                      • {ass.type} - Vous ne payez pas cette assistance
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="mt-2 pt-2 border-t border-purple-200 dark:border-purple-800">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                      Total prévisionnel:
-                                    </span>
-                                    <span className="text-base font-bold text-green-600 dark:text-green-400">
-                                      {cotisationMoisProchain.montantForfait.toFixed(2).replace('.', ',')} €
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            ) : (
-                              <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
-                                <div className="text-xs font-semibold text-gray-700 dark:text-gray-300 mb-2">
-                                  Assistances prévues:
-                                </div>
-                                <div className="space-y-1 pl-2">
-                                  {cotisationMoisProchain.assistances.map((ass: any) => (
-                                    <div key={ass.id} className="text-xs text-gray-600 dark:text-gray-400">
-                                      • {ass.type} pour {ass.adherent?.firstname} {ass.adherent?.lastname} ({ass.montant.toFixed(2).replace('.', ',')} €)
-                                    </div>
-                                  ))}
-                                </div>
-                                <div className="mt-2 pt-2 border-t border-purple-200 dark:border-purple-800">
-                                  <div className="flex items-center justify-between">
-                                    <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                      Total prévisionnel:
-                                    </span>
-                                    <span className="text-base font-bold text-purple-600 dark:text-purple-400">
-                                      {cotisationMoisProchain.montantTotal.toFixed(2).replace('.', ',')} €
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            )}
-                          </>
-                        )}
-                        
-                        {(!cotisationMoisProchain.assistances || cotisationMoisProchain.assistances.length === 0) && (
-                          <div className="pt-2 border-t border-purple-200 dark:border-purple-800">
-                            <div className="flex items-center justify-between">
-                              <span className="text-sm font-semibold text-gray-700 dark:text-gray-300">
-                                Total prévisionnel:
-                              </span>
-                              <span className="text-base font-bold text-purple-600 dark:text-purple-400">
-                                {cotisationMoisProchain.montantForfait.toFixed(2).replace('.', ',')} €
-                              </span>
-                            </div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400 mt-1 italic">
-                              Aucune assistance prévue pour ce mois
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="p-2 bg-blue-50 dark:bg-blue-900/20 rounded border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-start gap-2">
-                        <Info className="h-3 w-3 text-blue-600 dark:text-blue-400 shrink-0 mt-0.5" />
-                        <p className="text-[10px] text-blue-800 dark:text-blue-200 leading-relaxed">
-                          Cette cotisation est une estimation. Le montant final sera calculé lors de la génération des cotisations mensuelles par l'administrateur.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Bouton pour afficher/masquer la cotisation prévisionnelle */}
-            {cotisationMoisProchain && (
-              <div className="flex justify-center pt-2 pb-2 border-t border-gray-200 dark:border-gray-700 mt-4">
-                {!showCotisationMoisProchain ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowCotisationMoisProchain(true)}
-                    className="text-xs text-purple-600 dark:text-purple-400 hover:text-purple-700 dark:hover:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20 h-8"
-                  >
-                    <Clock className="h-3 w-3 mr-1.5" />
-                    Voir la cotisation prévisionnelle du mois prochain
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowCotisationMoisProchain(false)}
-                    className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 h-8"
-                  >
-                    <X className="h-3 w-3 mr-1.5" />
-                    Masquer
-                  </Button>
-                )}
-              </div>
-            )}
-
-            {/* Afficher l'historique des cotisations par mois */}
-            {historiqueCotisations.length > 0 && showHistoriqueCotisations && (
+            {/* Historique des cotisations par mois (toujours affiché) */}
+            {historiqueCotisations.length > 0 && (
               <Card className="border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-900 !py-0">
                 <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white pb-3 pt-3 px-6 gap-0">
                   <CardTitle className="flex items-center gap-2 text-base">
@@ -2231,43 +2395,49 @@ function UserProfilePageContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-3 pb-4 px-6">
-                  <HistoriqueCotisationsTable cotisations={historiqueCotisations} />
+                  <div className="flex flex-col sm:flex-row gap-3 mb-4">
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="historique-mois" className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Mois</Label>
+                      <Select value={historiqueFilterMois} onValueChange={setHistoriqueFilterMois}>
+                        <SelectTrigger id="historique-mois" className="w-[140px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">
+                          <SelectValue placeholder="Tous" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Tous les mois</SelectItem>
+                          <SelectItem value="1">Janvier</SelectItem>
+                          <SelectItem value="2">Février</SelectItem>
+                          <SelectItem value="3">Mars</SelectItem>
+                          <SelectItem value="4">Avril</SelectItem>
+                          <SelectItem value="5">Mai</SelectItem>
+                          <SelectItem value="6">Juin</SelectItem>
+                          <SelectItem value="7">Juillet</SelectItem>
+                          <SelectItem value="8">Août</SelectItem>
+                          <SelectItem value="9">Septembre</SelectItem>
+                          <SelectItem value="10">Octobre</SelectItem>
+                          <SelectItem value="11">Novembre</SelectItem>
+                          <SelectItem value="12">Décembre</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Label htmlFor="historique-annee" className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Année</Label>
+                      <Select value={historiqueFilterAnnee} onValueChange={setHistoriqueFilterAnnee}>
+                        <SelectTrigger id="historique-annee" className="w-[120px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">
+                          <SelectValue placeholder="Toutes" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="all">Toutes les années</SelectItem>
+                          {historiqueAnneesOptions.map((y) => (
+                            <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <HistoriqueCotisationsTable cotisations={filteredHistoriqueCotisations} />
                 </CardContent>
               </Card>
             )}
-
-            {/* Bouton pour afficher/masquer l'historique des cotisations */}
-            {historiqueCotisations.length > 0 && (
-              <div className="flex justify-center pt-2 pb-2 border-t border-gray-200 dark:border-gray-700 mt-4">
-                {!showHistoriqueCotisations ? (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowHistoriqueCotisations(true)}
-                    className="text-xs text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 h-8"
-                  >
-                    <History className="h-3 w-3 mr-1.5" />
-                    Voir l'historique des cotisations par mois
-                  </Button>
-                ) : (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowHistoriqueCotisations(false)}
-                    className="text-xs text-gray-600 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 h-8"
-                  >
-                    <X className="h-3 w-3 mr-1.5" />
-                    Masquer
-                  </Button>
-                )}
-              </div>
-            )}
-
-            <FinancialTables 
-              cotisations={cotisations}
-              obligations={obligationsCotisation}
-              loading={loading}
-            />
           </div>
         );
 

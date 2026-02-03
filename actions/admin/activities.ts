@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { revalidatePath } from "next/cache";
 import { TypeActivite } from "@prisma/client";
 
 /**
@@ -287,5 +288,95 @@ export async function getRecentActivitiesForDashboard(limit: number = 10) {
       success: false,
       error: "Erreur lors de la récupération des activités récentes",
     };
+  }
+}
+
+/**
+ * Supprime les activités dont les IDs sont fournis (sélection manuelle).
+ */
+export async function deleteActivitiesByIds(ids: string[]) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
+      return { success: false, error: "Non autorisé" };
+    }
+    if (!ids.length) {
+      return { success: false, error: "Aucune activité sélectionnée" };
+    }
+    if (!("userActivity" in db)) {
+      return { success: false, error: "Modèle userActivity non disponible" };
+    }
+    const result = await (db as any).userActivity.deleteMany({
+      where: { id: { in: ids } },
+    });
+    revalidatePath("/admin/activities");
+    revalidatePath("/admin");
+    return {
+      success: true,
+      message: `${result.count} activité(s) supprimée(s)`,
+      deletedCount: result.count,
+    };
+  } catch (error: any) {
+    console.error("Erreur lors de la suppression des activités:", error);
+    return { success: false, error: "Erreur lors de la suppression" };
+  }
+}
+
+/**
+ * Supprime les activités plus anciennes que X jours (vider partiellement la base).
+ */
+export async function deleteActivitiesOlderThanDays(days: number) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
+      return { success: false, error: "Non autorisé" };
+    }
+    if (days < 1) {
+      return { success: false, error: "Le nombre de jours doit être au moins 1" };
+    }
+    if (!("userActivity" in db)) {
+      return { success: false, error: "Modèle userActivity non disponible" };
+    }
+    const before = new Date();
+    before.setDate(before.getDate() - days);
+    const result = await (db as any).userActivity.deleteMany({
+      where: { createdAt: { lt: before } },
+    });
+    revalidatePath("/admin/activities");
+    revalidatePath("/admin");
+    return {
+      success: true,
+      message: `${result.count} activité(s) de plus de ${days} jours supprimée(s)`,
+      deletedCount: result.count,
+    };
+  } catch (error: any) {
+    console.error("Erreur lors de la suppression des activités:", error);
+    return { success: false, error: "Erreur lors de la suppression" };
+  }
+}
+
+/**
+ * Supprime toutes les activités (vider complètement). À utiliser avec précaution.
+ */
+export async function deleteAllActivities() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== "ADMIN") {
+      return { success: false, error: "Non autorisé" };
+    }
+    if (!("userActivity" in db)) {
+      return { success: false, error: "Modèle userActivity non disponible" };
+    }
+    const result = await (db as any).userActivity.deleteMany({});
+    revalidatePath("/admin/activities");
+    revalidatePath("/admin");
+    return {
+      success: true,
+      message: `${result.count} activité(s) supprimée(s)`,
+      deletedCount: result.count,
+    };
+  } catch (error: any) {
+    console.error("Erreur lors de la suppression des activités:", error);
+    return { success: false, error: "Erreur lors de la suppression" };
   }
 }

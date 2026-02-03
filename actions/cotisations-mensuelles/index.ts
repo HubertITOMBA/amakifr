@@ -4,9 +4,9 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { z } from "zod";
-import { UserRole } from "@prisma/client";
+import { UserRole, CategorieTypeCotisation } from "@prisma/client";
 import { revalidatePath } from "next/cache";
-import { calculerCotisationMensuelle } from "@/lib/utils/cotisations";
+import { calculerCotisationMensuelle, buildDescriptionLigne } from "@/lib/utils/cotisations";
 import { logCreation } from "@/lib/activity-logger";
 
 // Schémas de validation
@@ -17,6 +17,7 @@ const CreateTypeCotisationSchema = z.object({
   obligatoire: z.boolean().default(true),
   actif: z.boolean().default(true),
   ordre: z.number().int().min(0).default(0),
+  categorie: z.nativeEnum(CategorieTypeCotisation).default(CategorieTypeCotisation.Divers),
   aBeneficiaire: z.boolean().default(false), // Si ce type nécessite un adhérent bénéficiaire
 });
 
@@ -28,6 +29,7 @@ const UpdateTypeCotisationSchema = z.object({
   obligatoire: z.boolean().optional(),
   actif: z.boolean().optional(),
   ordre: z.number().int().min(0).optional(),
+  categorie: z.nativeEnum(CategorieTypeCotisation).optional(),
   aBeneficiaire: z.boolean().optional(), // Si ce type nécessite un adhérent bénéficiaire
 });
 
@@ -65,6 +67,7 @@ export async function createTypeCotisationMensuelle(data: z.infer<typeof CreateT
         obligatoire: validatedData.obligatoire,
         actif: validatedData.actif,
         ordre: validatedData.ordre,
+        categorie: validatedData.categorie,
         aBeneficiaire: validatedData.aBeneficiaire,
         createdBy: session.user.id,
       },
@@ -142,6 +145,7 @@ export async function getAllTypesCotisationMensuelle() {
       obligatoire: type.obligatoire,
       actif: type.actif,
       ordre: type.ordre,
+      categorie: type.categorie ?? "Divers",
       aBeneficiaire: type.aBeneficiaire || false,
       createdBy: type.createdBy,
       createdAt: type.createdAt,
@@ -180,6 +184,7 @@ export async function updateTypeCotisationMensuelle(data: z.infer<typeof UpdateT
     if (validatedData.obligatoire !== undefined) updateData.obligatoire = validatedData.obligatoire;
     if (validatedData.actif !== undefined) updateData.actif = validatedData.actif;
     if (validatedData.ordre !== undefined) updateData.ordre = validatedData.ordre;
+    if (validatedData.categorie !== undefined) updateData.categorie = validatedData.categorie;
     if (validatedData.aBeneficiaire !== undefined) updateData.aBeneficiaire = validatedData.aBeneficiaire;
 
     const typeCotisation = await prisma.typeCotisationMensuelle.update({
@@ -204,6 +209,7 @@ export async function updateTypeCotisationMensuelle(data: z.infer<typeof UpdateT
       obligatoire: typeCotisation.obligatoire,
       actif: typeCotisation.actif,
       ordre: typeCotisation.ordre,
+      categorie: typeCotisation.categorie,
       aBeneficiaire: typeCotisation.aBeneficiaire || false,
       createdBy: typeCotisation.createdBy,
       createdAt: typeCotisation.createdAt,
@@ -280,29 +286,28 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
       };
     }
 
-    // Récupérer tous les adhérents actifs SAUF l'administrateur
-    // L'administrateur ne cotise ni le frais d'adhésion, ni la cotisation forfaitaire, ni les assistances
+    // Les cotisations ne concernent que les adhérents dont le rôle est MEMBRE (actifs)
     const adherents = await prisma.adherent.findMany({
       where: {
         User: {
           status: "Actif",
-          role: { not: UserRole.ADMIN } // Exclure l'administrateur
-        }
+          role: UserRole.MEMBRE,
+        },
       },
       include: {
-        User: true
-      }
+        User: true,
+      },
     });
 
     if (adherents.length === 0) {
-      return { success: false, error: "Aucun adhérent actif trouvé (hors administrateur)" };
+      return { success: false, error: "Aucun adhérent MEMBRE actif trouvé" };
     }
 
-    // Récupérer toutes les cotisations du mois pour cette période
+    // Récupérer toutes les cotisations du mois pour cette période (Planifie ou Cree, pas Annule)
     const cotisationsDuMois = await prisma.cotisationDuMois.findMany({
       where: {
         periode,
-        statut: { not: "Annule" } // Exclure les cotisations annulées
+        statut: { in: ["Planifie", "Cree"] }
       },
       include: {
         TypeCotisation: {
@@ -311,11 +316,15 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
             nom: true,
             montant: true,
             obligatoire: true,
+            categorie: true,
+            aBeneficiaire: true,
+            ordre: true,
           }
         },
         AdherentBeneficiaire: {
           select: {
             id: true,
+            civility: true,
             firstname: true,
             lastname: true,
           }
@@ -334,8 +343,8 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
     }
 
     // Vérifier qu'il y a un forfait
-    const cotisationForfait = cotisationsDuMois.find(cdm => 
-      !cdm.TypeCotisation?.aBeneficiaire
+    const cotisationForfait = cotisationsDuMois.find(cdm =>
+      cdm.TypeCotisation?.categorie === "ForfaitMensuel" || !cdm.TypeCotisation?.aBeneficiaire
     );
 
     if (!cotisationForfait) {
@@ -345,48 +354,79 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
       };
     }
 
-    const cotisationsCreated = [] as any[];
-    const bulkData = [] as any[];
+    // Une ligne dans cotisations_mensuelles par (adhérent, cotisation_du_mois) : forfait + chaque assistance à payer
+    const bulkData: Array<{
+      periode: string;
+      annee: number;
+      mois: number;
+      typeCotisationId: string;
+      adherentId: string;
+      adherentBeneficiaireId?: string;
+      montantAttendu: number;
+      montantPaye: number;
+      montantRestant: number;
+      dateEcheance: Date;
+      statut: string;
+      description: string;
+      cotisationDuMoisId: string;
+      createdBy: string;
+    }> = [];
 
-    // Pour chaque adhérent, calculer et créer une cotisation mensuelle
-    for (const adherent of adherents) {
-      // Utiliser la fonction utilitaire pour calculer le montant et générer la description
-      const result = calculerCotisationMensuelle(
-        adherent.id,
-        periode,
-        cotisationsDuMois.map(cdm => ({
-          id: cdm.id,
-          periode: cdm.periode,
-          montantBase: Number(cdm.montantBase),
-          adherentBeneficiaireId: cdm.adherentBeneficiaireId,
-          TypeCotisation: {
-            id: cdm.TypeCotisation.id,
-            nom: cdm.TypeCotisation.nom || "Assistance",
-            aBeneficiaire: cdm.TypeCotisation.aBeneficiaire || false,
-          },
-          AdherentBeneficiaire: cdm.AdherentBeneficiaire || null,
-        }))
+    for (const cdm of cotisationsDuMois) {
+      const typeCotisation = cdm.TypeCotisation;
+      const montantBase = Number(cdm.montantBase);
+      const estAssistance = typeCotisation.aBeneficiaire === true;
+      const beneficiaireId = cdm.adherentBeneficiaireId ?? undefined;
+      const descriptionLigne = buildDescriptionLigne(
+        typeCotisation.nom,
+        estAssistance,
+        montantBase,
+        cdm.AdherentBeneficiaire ?? null
       );
 
-      // Créer une seule cotisation mensuelle par adhérent
-      bulkData.push({
-        periode,
-        annee: validatedData.annee,
-        mois: validatedData.mois,
-        typeCotisationId: cotisationForfait.TypeCotisation?.id || cotisationForfait.typeCotisationId, // Utiliser le type Forfait
-        adherentId: adherent.id,
-        montantAttendu: result.montantTotal,
-        montantPaye: 0,
-        montantRestant: result.montantTotal,
-        dateEcheance: cotisationForfait.dateEcheance,
-        statut: "EnAttente",
-        description: result.description,
-        cotisationDuMoisId: cotisationForfait.id, // Lier à la cotisation du mois
-        createdBy: session.user.id,
-      });
+      if (estAssistance && beneficiaireId) {
+        // Assistance : une ligne par adhérent qui doit la payer (tous sauf le bénéficiaire)
+        for (const adherent of adherents) {
+          if (adherent.id === beneficiaireId) continue;
+          bulkData.push({
+            periode,
+            annee: validatedData.annee,
+            mois: validatedData.mois,
+            typeCotisationId: cdm.typeCotisationId,
+            adherentId: adherent.id,
+            adherentBeneficiaireId: beneficiaireId,
+            montantAttendu: montantBase,
+            montantPaye: 0,
+            montantRestant: montantBase,
+            dateEcheance: cdm.dateEcheance,
+            statut: "EnAttente",
+            description: descriptionLigne,
+            cotisationDuMoisId: cdm.id,
+            createdBy: session.user.id,
+          });
+        }
+      } else {
+        // Forfait (ou type sans bénéficiaire) : une ligne par adhérent
+        for (const adherent of adherents) {
+          bulkData.push({
+            periode,
+            annee: validatedData.annee,
+            mois: validatedData.mois,
+            typeCotisationId: cdm.typeCotisationId,
+            adherentId: adherent.id,
+            montantAttendu: montantBase,
+            montantPaye: 0,
+            montantRestant: montantBase,
+            dateEcheance: cdm.dateEcheance,
+            statut: "EnAttente",
+            description: descriptionLigne,
+            cotisationDuMoisId: cdm.id,
+            createdBy: session.user.id,
+          });
+        }
+      }
     }
 
-    // Insérer en lot en ignorant les doublons (index unique composite)
     const createManyResult = await prisma.cotisationMensuelle.createMany({
       data: bulkData,
       skipDuplicates: true,
@@ -394,17 +434,24 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
 
     const createdCount = createManyResult.count;
 
-    // Appliquer automatiquement les avoirs disponibles sur les nouvelles cotisations
+    // Mettre à jour le statut des cotisations_du_mois de "Planifie" à "Cree" pour cette période
+    const updatedCotisationsDuMois = await prisma.cotisationDuMois.updateMany({
+      where: {
+        periode,
+        statut: "Planifie",
+      },
+      data: {
+        statut: "Cree",
+      },
+    });
+
+    // Appliquer automatiquement les avoirs disponibles sur les nouvelles cotisations (toutes les lignes de la période)
     const { appliquerAvoirs } = await import("@/actions/paiements/index");
     const Decimal = (await import("@prisma/client/runtime/library")).Decimal;
     let avoirsAppliques = 0;
 
-    // Récupérer les cotisations créées pour appliquer les avoirs
     const cotisationsCreees = await prisma.cotisationMensuelle.findMany({
-      where: {
-        periode,
-        typeCotisationId: cotisationForfait.TypeCotisation?.id || cotisationForfait.typeCotisationId,
-      },
+      where: { periode },
     });
 
     for (const cotisation of cotisationsCreees) {
@@ -438,7 +485,10 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
       }
     }
 
-    let message = `${createdCount} cotisation(s) mensuelle(s) créées pour ${adherents.length} adhérent(s). Chaque cotisation inclut le forfait mensuel + les assistances du mois.`;
+    let message = `${createdCount} ligne(s) créée(s) dans cotisations_mensuelles (une par cotisation du mois × adhérent concerné : forfait pour tous + chaque assistance pour les adhérents qui la paient). Les ${cotisationsDuMois.length} cotisation(s) du mois ont été prises en compte et leur statut a été mis à jour en « Créé ».`;
+    if (updatedCotisationsDuMois.count > 0) {
+      message += ` ${updatedCotisationsDuMois.count} ligne(s) de la table cotisations_du_mois passée(s) de « Planifié » à « Créé ».`;
+    }
     if (avoirsAppliques > 0) {
       message += ` ${avoirsAppliques} cotisation(s) ont été partiellement ou totalement payées avec des avoirs disponibles.`;
     }
@@ -464,10 +514,10 @@ export async function createCotisationsMensuelles(data: z.infer<typeof CreateCot
     }
 
     // Revalider les pages des adhérents et de gestion
-    // Note: L'administrateur n'a pas de cotisations, donc son profil ne sera pas mis à jour
     revalidatePath("/user/profile");
     revalidatePath("/admin/cotisations");
     revalidatePath("/admin/cotisations/gestion");
+    revalidatePath("/admin/cotisations-du-mois");
 
     return { 
       success: true, 
@@ -774,6 +824,7 @@ export async function getCotisationsMensuellesByPeriode(periode: string) {
             description: true,
             montant: true,
             obligatoire: true,
+            aBeneficiaire: true,
           }
         },
         Adherent: {
@@ -784,6 +835,25 @@ export async function getCotisationsMensuellesByPeriode(periode: string) {
             User: {
               select: {
                 email: true
+              }
+            }
+          }
+        },
+        AdherentBeneficiaire: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+          }
+        },
+        CotisationDuMois: {
+          select: {
+            adherentBeneficiaireId: true,
+            AdherentBeneficiaire: {
+              select: {
+                id: true,
+                firstname: true,
+                lastname: true,
               }
             }
           }
@@ -806,17 +876,23 @@ export async function getCotisationsMensuellesByPeriode(periode: string) {
       ]
     });
 
-    // Conversion des Decimal en nombres
-    const cotisationsConverted = cotisationsMensuelles.map((cotisation: any) => ({
-      ...cotisation,
-      montantAttendu: Number(cotisation.montantAttendu),
-      montantPaye: Number(cotisation.montantPaye),
-      montantRestant: Number(cotisation.montantRestant),
-      TypeCotisation: {
-        ...cotisation.TypeCotisation,
-        montant: Number(cotisation.TypeCotisation.montant)
-      }
-    }));
+    // Conversion des Decimal en nombres + fallback bénéficiaire depuis CotisationDuMois pour anciennes lignes
+    const cotisationsConverted = cotisationsMensuelles.map((cotisation: any) => {
+      const benef = cotisation.AdherentBeneficiaire ?? cotisation.CotisationDuMois?.AdherentBeneficiaire;
+      const adherentBeneficiaireId = cotisation.adherentBeneficiaireId ?? cotisation.CotisationDuMois?.adherentBeneficiaireId;
+      return {
+        ...cotisation,
+        montantAttendu: Number(cotisation.montantAttendu),
+        montantPaye: Number(cotisation.montantPaye),
+        montantRestant: Number(cotisation.montantRestant),
+        adherentBeneficiaireId: adherentBeneficiaireId ?? undefined,
+        AdherentBeneficiaire: benef,
+        TypeCotisation: {
+          ...cotisation.TypeCotisation,
+          montant: Number(cotisation.TypeCotisation.montant)
+        }
+      };
+    });
 
     return { success: true, data: cotisationsConverted };
 
@@ -848,6 +924,7 @@ export async function getAllCotisationsMensuelles() {
             description: true,
             montant: true,
             obligatoire: true,
+            aBeneficiaire: true,
           }
         },
         Adherent: {
@@ -858,6 +935,25 @@ export async function getAllCotisationsMensuelles() {
             User: {
               select: {
                 email: true
+              }
+            }
+          }
+        },
+        AdherentBeneficiaire: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+          }
+        },
+        CotisationDuMois: {
+          select: {
+            adherentBeneficiaireId: true,
+            AdherentBeneficiaire: {
+              select: {
+                id: true,
+                firstname: true,
+                lastname: true,
               }
             }
           }
@@ -881,17 +977,23 @@ export async function getAllCotisationsMensuelles() {
       ]
     });
 
-    // Conversion des Decimal en nombres
-    const cotisationsConverted = cotisationsMensuelles.map((cotisation: any) => ({
-      ...cotisation,
-      montantAttendu: Number(cotisation.montantAttendu),
-      montantPaye: Number(cotisation.montantPaye),
-      montantRestant: Number(cotisation.montantRestant),
-      TypeCotisation: {
-        ...cotisation.TypeCotisation,
-        montant: Number(cotisation.TypeCotisation.montant)
-      }
-    }));
+    // Conversion des Decimal en nombres + fallback bénéficiaire depuis CotisationDuMois pour anciennes lignes
+    const cotisationsConverted = cotisationsMensuelles.map((cotisation: any) => {
+      const benef = cotisation.AdherentBeneficiaire ?? cotisation.CotisationDuMois?.AdherentBeneficiaire;
+      const adherentBeneficiaireId = cotisation.adherentBeneficiaireId ?? cotisation.CotisationDuMois?.adherentBeneficiaireId;
+      return {
+        ...cotisation,
+        montantAttendu: Number(cotisation.montantAttendu),
+        montantPaye: Number(cotisation.montantPaye),
+        montantRestant: Number(cotisation.montantRestant),
+        adherentBeneficiaireId: adherentBeneficiaireId ?? undefined,
+        AdherentBeneficiaire: benef,
+        TypeCotisation: {
+          ...cotisation.TypeCotisation,
+          montant: Number(cotisation.TypeCotisation.montant)
+        }
+      };
+    });
 
     return { success: true, data: cotisationsConverted };
 

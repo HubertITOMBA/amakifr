@@ -20,10 +20,43 @@ export type CotisationDuMoisWithRelations = {
   };
   AdherentBeneficiaire?: {
     id: string;
+    civility?: string | null;
     firstname: string;
     lastname: string;
   } | null;
 };
+
+/** Libellé civilité pour la description (ex. Monsieur, Madame) */
+export function libelleCivilite(civility: string | null | undefined): string {
+  if (!civility) return "";
+  const c = String(civility);
+  if (["Monsieur", "Madame", "Mademoiselle", "Partenaire"].includes(c)) return c;
+  return c;
+}
+
+/**
+ * Construit la description d'une ligne de cotisation mensuelle (colonne description).
+ * Pour une assistance avec bénéficiaire : "Type (Civilite Prénom Nom)".
+ * Sinon : "Type (montant€)".
+ */
+export function buildDescriptionLigne(
+  typeNom: string,
+  aBeneficiaire: boolean,
+  montantBase: number,
+  adherentBeneficiaire?: { civility?: string | null; firstname: string; lastname: string } | null
+): string {
+  if (aBeneficiaire && adherentBeneficiaire) {
+    const parts = [
+      libelleCivilite(adherentBeneficiaire.civility),
+      adherentBeneficiaire.firstname,
+      adherentBeneficiaire.lastname,
+    ].filter(Boolean);
+    if (parts.length > 0) {
+      return `${typeNom} (${parts.join(" ")})`;
+    }
+  }
+  return `${typeNom} (${montantBase.toFixed(2)}€)`;
+}
 
 /**
  * Résultat du calcul d'une cotisation mensuelle
@@ -41,6 +74,7 @@ export interface CalculCotisationResult {
       montant: number;
       beneficiaire?: {
         id: string;
+        civility?: string | null;
         firstname: string;
         lastname: string;
       };
@@ -131,11 +165,12 @@ export function calculerCotisationMensuelle(
     descriptionParts.push(`Bénéficiaire de: ${beneficiaireDetails}`);
   }
 
-  // Assistances à payer
+  // Assistances à payer (avec bénéficiaire : "Type (Civilite Prénom Nom)", sinon "Type (montant€)")
   if (details.assistances.length > 0) {
     const assistancesDetails = details.assistances.map(a => {
       if (a.beneficiaire) {
-        return `${a.nom} pour ${a.beneficiaire.firstname} ${a.beneficiaire.lastname} (${a.montant.toFixed(2)}€)`;
+        const parts = [libelleCivilite(a.beneficiaire.civility), a.beneficiaire.firstname, a.beneficiaire.lastname].filter(Boolean);
+        return parts.length > 0 ? `${a.nom} (${parts.join(" ")})` : `${a.nom} (${a.montant.toFixed(2)}€)`;
       }
       return `${a.nom} (${a.montant.toFixed(2)}€)`;
     });

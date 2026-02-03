@@ -11,7 +11,7 @@
 
 import { PrismaClient } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
-import { calculerCotisationMensuelle } from '../lib/utils/cotisations';
+import { calculerCotisationMensuelle, buildDescriptionLigne } from '../lib/utils/cotisations';
 
 const prisma = new PrismaClient();
 
@@ -112,6 +112,7 @@ async function recalculerCotisationsPourPeriode(periode: string, dryRun: boolean
       AdherentBeneficiaire: {
         select: {
           id: true,
+          civility: true,
           firstname: true,
           lastname: true,
         },
@@ -187,9 +188,20 @@ async function recalculerCotisationsPourPeriode(periode: string, dryRun: boolean
               cotisationsDuMois
             );
 
+          // Description de la ligne : type + (Civilite Prénom Nom bénéficiaire) ou (montant€)
+          const cdm = cotisationsDuMois.find((cdm: any) => cdm.id === cotisationMensuelle.cotisationDuMoisId);
+          const descriptionLigne = cdm
+            ? buildDescriptionLigne(
+                cdm.TypeCotisation?.nom ?? "Cotisation",
+                cdm.TypeCotisation?.aBeneficiaire ?? false,
+                Number(cdm.montantBase),
+                cdm.AdherentBeneficiaire ?? null
+              )
+            : description;
+
       const difference = montantAttendu - ancienMontant;
 
-      if (difference !== 0 || cotisationMensuelle.description !== description) {
+      if (difference !== 0 || cotisationMensuelle.description !== descriptionLigne) {
         logInfo(
           `  ${cotisationMensuelle.Adherent.firstname} ${cotisationMensuelle.Adherent.lastname}: ` +
           `${ancienMontant.toFixed(2)}€ → ${montantAttendu.toFixed(2)}€ ` +
@@ -214,7 +226,7 @@ async function recalculerCotisationsPourPeriode(periode: string, dryRun: boolean
             data: {
               montantAttendu: new Decimal(montantAttendu),
               montantRestant: new Decimal(montantRestant),
-              description,
+              description: descriptionLigne,
               statut: nouveauStatut,
             },
           });

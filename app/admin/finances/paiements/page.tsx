@@ -5,432 +5,299 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AdherentSearchDialog } from "@/components/admin/AdherentSearchDialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { Badge } from "@/components/ui/badge";
-import { 
-  Receipt, 
-  Search, 
-  Plus, 
-  Euro,
-  Calendar,
-  User,
-  X,
-  CreditCard,
-  ChevronLeft,
-  ChevronRight,
-  ChevronsLeft,
-  ChevronsRight,
-  ArrowLeft
-} from "lucide-react";
+import { Search, Euro, ArrowLeft, MoreHorizontal, Loader2, CalendarDays, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { 
-  getAllPaiements, 
-  createPaiement,
-  getAdherentFinancialItems
-} from "@/actions/paiements";
+import { createPaiement } from "@/actions/paiements";
+import { getCotisationsMensuellesByPeriode } from "@/actions/cotisations-mensuelles";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
 import {
   createColumnHelper,
   getCoreRowModel,
-  useReactTable,
-  getSortedRowModel,
-  SortingState,
-  getFilteredRowModel,
   getPaginationRowModel,
-  ColumnFiltersState,
-  VisibilityState,
+  useReactTable,
+  type VisibilityState,
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
-import { format } from "date-fns";
-import { fr } from "date-fns/locale";
+
+const MOIS_LABELS: Record<number, string> = { 1: "Janvier", 2: "Février", 3: "Mars", 4: "Avril", 5: "Mai", 6: "Juin", 7: "Juillet", 8: "Août", 9: "Septembre", 10: "Octobre", 11: "Novembre", 12: "Décembre" };
 
 const columnHelper = createColumnHelper<any>();
 
-const getMoyenPaiementLabel = (moyen: string) => {
-  switch (moyen) {
-    case "Especes":
-      return "Espèces";
-    case "Cheque":
-      return "Chèque";
-    case "Virement":
-      return "Virement";
-    case "CarteBancaire":
-      return "Carte bancaire";
-    default:
-      return moyen;
-  }
-};
-
-const getMoyenPaiementColor = (moyen: string) => {
-  switch (moyen) {
-    case "Especes":
-      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-    case "Cheque":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-    case "Virement":
-      return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
-    case "CarteBancaire":
-      return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
-    default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
-  }
-};
-
 export default function AdminPaiementsPage() {
-  const [data, setData] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [sorting, setSorting] = useState<SortingState>([]);
-  const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
-  const [globalFilter, setGlobalFilter] = useState("");
-  const [searchTerm, setSearchTerm] = useState("");
-  const [moyenFilter, setMoyenFilter] = useState<string>("all");
+  // Cotisations mensuelles (vue principale)
+  const now = new Date();
+  const [periode, setPeriode] = useState(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`);
+  const [adherentFilterCotisations, setAdherentFilterCotisations] = useState("");
+  const [cotisations, setCotisations] = useState<any[]>([]);
+  const [loadingCotisations, setLoadingCotisations] = useState(true);
+  const [payDialogOpen, setPayDialogOpen] = useState(false);
+  const [selectedCotisationForPay, setSelectedCotisationForPay] = useState<any | null>(null);
+  const [payForm, setPayForm] = useState({
+    montant: "",
+    datePaiement: new Date().toISOString().split("T")[0],
+    moyenPaiement: "Especes" as "Especes" | "Cheque" | "Virement" | "CarteBancaire",
+    reference: "",
+  });
+  const [payingId, setPayingId] = useState<string | null>(null);
+  const [calendarOpen, setCalendarOpen] = useState(false);
+  const [detailDialogOpen, setDetailDialogOpen] = useState(false);
+  const [selectedCotisationForDetail, setSelectedCotisationForDetail] = useState<any | null>(null);
+  const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     if (typeof window !== "undefined") {
       try {
-        const saved = localStorage.getItem("admin-paiements-column-visibility");
+        const saved = localStorage.getItem("admin-paiements-cotisations-column-visibility");
         if (saved) {
           const parsed = JSON.parse(saved);
-          if (Object.keys(parsed).length > 0) {
-            return parsed;
-          }
+          if (Object.keys(parsed).length > 0) return parsed;
         }
-        // Par défaut sur mobile, masquer les colonnes non essentielles
-        const isMobile = window.innerWidth < 768;
-        if (isMobile) {
-          return {
-            moyenPaiement: false,
-            datePaiement: false,
-            reference: false,
-            description: false,
-            // Garder visible : Adherent, montant, actions (si présente)
-          };
-        }
-      } catch (error) {
-        console.error("Erreur lors du chargement des préférences:", error);
+      } catch (e) {
+        console.error(e);
       }
     }
-    return {};
+    return { type: false };
   });
 
-  // Détecter les changements de taille d'écran
-  useEffect(() => {
-    const handleResize = () => {
-      const isMobile = window.innerWidth < 768;
-      const saved = localStorage.getItem("admin-paiements-column-visibility");
-      
-      if (isMobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
-        setColumnVisibility({
-          moyenPaiement: false,
-          datePaiement: false,
-          reference: false,
-          description: false,
-        });
-      }
-    };
-
-    window.addEventListener("resize", handleResize);
-    return () => window.removeEventListener("resize", handleResize);
-  }, []);
-  const [createDialogOpen, setCreateDialogOpen] = useState(false);
-  const [adherentSearchOpen, setAdherentSearchOpen] = useState(false);
-  const [selectedAdherent, setSelectedAdherent] = useState<{
-    id: string;
-    firstname: string;
-    lastname: string;
-    email: string;
-  } | null>(null);
-  const [financialItems, setFinancialItems] = useState<{
-    dettes: any[];
-    cotisations: any[];
-    assistances: any[];
-  }>({ dettes: [], cotisations: [], assistances: [] });
-  const [loadingItems, setLoadingItems] = useState(false);
-  const [formData, setFormData] = useState({
-    adherentId: "",
-    montant: "",
-    datePaiement: new Date().toISOString().split('T')[0],
-    moyenPaiement: "Especes" as "Especes" | "Cheque" | "Virement" | "CarteBancaire",
-    reference: "",
-    description: "",
-    cotisationMensuelleId: "",
-    detteInitialeId: "",
-    assistanceId: "",
-  });
-
-  // Debounce pour la recherche
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      setGlobalFilter(searchTerm);
-    }, 300);
-    return () => clearTimeout(timer);
-  }, [searchTerm]);
-
-  const loadData = useCallback(async () => {
+  const loadCotisations = useCallback(async () => {
     try {
-      setLoading(true);
-      const res = await getAllPaiements();
+      setLoadingCotisations(true);
+      const res = await getCotisationsMensuellesByPeriode(periode);
       if (res.success && res.data) {
-        setData(res.data);
+        setCotisations(res.data);
       } else {
-        toast.error(res.error || "Erreur lors du chargement des paiements");
+        setCotisations([]);
       }
     } catch (e) {
-      console.error(e);
-      toast.error("Erreur lors du chargement des données");
+      setCotisations([]);
     } finally {
-      setLoading(false);
+      setLoadingCotisations(false);
     }
-  }, []);
+  }, [periode]);
 
   useEffect(() => {
-    loadData();
-  }, [loadData]);
+    loadCotisations();
+  }, [loadCotisations]);
 
-  // Charger les éléments financiers quand un adhérent est sélectionné
-  useEffect(() => {
-    if (selectedAdherent?.id) {
-      loadFinancialItems(selectedAdherent.id);
-    } else {
-      setFinancialItems({ dettes: [], cotisations: [], assistances: [] });
-      setFormData(prev => ({
-        ...prev,
-        detteInitialeId: "",
-        cotisationMensuelleId: "",
-        assistanceId: "",
-      }));
-    }
-  }, [selectedAdherent?.id]);
-
-  const loadFinancialItems = async (adherentId: string) => {
-    try {
-      setLoadingItems(true);
-      const res = await getAdherentFinancialItems(adherentId);
-      if (res.success && res.data) {
-        setFinancialItems(res.data);
-      }
-    } catch (e) {
-      console.error(e);
-    } finally {
-      setLoadingItems(false);
-    }
-  };
-
-  // Filtrer les données
-  const filteredData = useMemo(() => {
-    return data.filter((item) => {
-      // Filtre global (recherche)
-      if (globalFilter.trim()) {
-        const q = globalFilter.trim().toLowerCase();
-        const searchText = [
-          item.Adherent?.firstname || "",
-          item.Adherent?.lastname || "",
-          item.Adherent?.User?.email || "",
-          item.reference || "",
-          item.description || "",
-          getMoyenPaiementLabel(item.moyenPaiement) || "",
-        ].join(" ").toLowerCase();
-        if (!searchText.includes(q)) return false;
-      }
-      
-      // Filtre par moyen de paiement
-      if (moyenFilter !== "all" && item.moyenPaiement !== moyenFilter) {
-        return false;
-      }
-      
-      return true;
+  // Filtrer les cotisations par adhérent
+  const filteredCotisations = useMemo(() => {
+    if (!adherentFilterCotisations.trim()) return cotisations;
+    const q = adherentFilterCotisations.trim().toLowerCase();
+    return cotisations.filter((c) => {
+      const name = [c.Adherent?.firstname, c.Adherent?.lastname].filter(Boolean).join(" ");
+      const email = c.Adherent?.User?.email || "";
+      return name.toLowerCase().includes(q) || email.toLowerCase().includes(q);
     });
-  }, [data, globalFilter, moyenFilter]);
+  }, [cotisations, adherentFilterCotisations]);
 
-  const handleCreate = async () => {
-    if (!formData.adherentId || !formData.montant) {
-      toast.error("Veuillez remplir tous les champs obligatoires");
-      return;
-    }
+  const totals = useMemo(() => {
+    let attendu = 0, paye = 0, restant = 0;
+    filteredCotisations.forEach((c) => {
+      attendu += Number(c.montantAttendu ?? 0);
+      paye += Number(c.montantPaye ?? 0);
+      restant += Number(c.montantRestant ?? 0);
+    });
+    return { attendu, paye, restant };
+  }, [filteredCotisations]);
 
-    try {
-      const result = await createPaiement({
-        adherentId: formData.adherentId,
-        montant: parseFloat(formData.montant),
-        datePaiement: formData.datePaiement,
-        moyenPaiement: formData.moyenPaiement,
-        reference: formData.reference || undefined,
-        description: formData.description || undefined,
-        cotisationMensuelleId: formData.cotisationMensuelleId || undefined,
-        detteInitialeId: formData.detteInitialeId || undefined,
-        assistanceId: formData.assistanceId || undefined,
-      });
-
-      if (result.success) {
-        toast.success(result.message);
-        setCreateDialogOpen(false);
-        setFormData({
-          adherentId: "",
-          montant: "",
-          datePaiement: new Date().toISOString().split('T')[0],
-          moyenPaiement: "Especes",
-          reference: "",
-          description: "",
-          cotisationMensuelleId: "",
-          detteInitialeId: "",
-          assistanceId: "",
-        });
-        setSelectedAdherent(null);
-        setFinancialItems({ dettes: [], cotisations: [], assistances: [] });
-        loadData();
-      } else {
-        toast.error(result.error || "Erreur lors de l'enregistrement");
-      }
-    } catch (error) {
-      console.error("Erreur:", error);
-      toast.error("Erreur lors de l'enregistrement");
-    }
-  };
-
-  const columns = useMemo(() => [
-    columnHelper.accessor("Adherent", {
-      header: "Adhérent",
-      cell: ({ row }) => {
-        const adherent = row.original.Adherent;
-        const datePaiement = row.original.datePaiement;
-        return (
-          <div className="flex flex-col gap-0.5">
-            <div className="flex items-center gap-2">
-              <User className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" />
-              <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                {adherent?.firstname} {adherent?.lastname}
-              </span>
-            </div>
-            {/* Afficher la date en petit sur mobile */}
-            {datePaiement && (
-              <span className="text-xs text-gray-500 dark:text-gray-400 md:hidden ml-6 font-normal">
-                {format(new Date(datePaiement), "d MMM yyyy", { locale: fr })}
-              </span>
-            )}
-          </div>
-        );
-      },
-      size: 200,
-      minSize: 120,
-      maxSize: 300,
-      enableResizing: true,
-    }),
-    columnHelper.accessor("montant", {
-      header: "Montant",
-      cell: ({ row }) => {
-        const montant = row.getValue("montant") as number;
-        const moyenPaiement = row.original.moyenPaiement;
-        return (
-          <div className="flex flex-col gap-0.5">
-            <span className="text-sm font-semibold text-green-600 dark:text-green-400">
-              {montant.toFixed(2)} €
-            </span>
-            {/* Afficher le moyen de paiement en petit sur mobile */}
-            {moyenPaiement && (
-              <span className="text-xs text-gray-500 dark:text-gray-400 md:hidden font-normal">
-                {getMoyenPaiementLabel(moyenPaiement)}
-              </span>
-            )}
-          </div>
-        );
-      },
-      size: 120,
-      minSize: 90,
-      maxSize: 150,
-      enableResizing: true,
-    }),
-    columnHelper.accessor("moyenPaiement", {
-      header: "Moyen de paiement",
-      cell: ({ row }) => {
-        const moyen = row.getValue("moyenPaiement");
-        return (
-          <Badge className={getMoyenPaiementColor(moyen)}>
-            {getMoyenPaiementLabel(moyen)}
-          </Badge>
-        );
-      },
-      size: 150,
-      minSize: 120,
-      maxSize: 200,
-      enableResizing: true,
-    }),
-    columnHelper.accessor("datePaiement", {
-      header: "Date",
-      cell: ({ row }) => (
-        <div className="flex items-center gap-2">
-          <Calendar className="h-4 w-4 text-gray-400" />
-          <span className="text-sm text-gray-600 dark:text-gray-400">
-            {format(new Date(row.getValue("datePaiement")), "d MMM yyyy", { locale: fr })}
+  const columns = useMemo(
+    () => [
+      columnHelper.accessor((r) => `${r.mois}-${r.annee}`, {
+        id: "periode",
+        header: "Période",
+        cell: ({ row }) => (
+          <span className="text-gray-900 dark:text-gray-100">
+            {MOIS_LABELS[row.original.mois] ?? row.original.mois} {row.original.annee}
           </span>
-        </div>
-      ),
-      size: 150,
-      minSize: 120,
-      maxSize: 200,
-      enableResizing: true,
-    }),
-    columnHelper.accessor("reference", {
-      header: "Référence",
-      cell: ({ row }) => (
-        <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-          {row.getValue("reference") || "—"}
-        </span>
-      ),
-      size: 150,
-      minSize: 120,
-      maxSize: 200,
-      enableResizing: true,
-    }),
-    columnHelper.accessor("description", {
-      header: "Description",
-      cell: ({ row }) => (
-        <span className="text-sm text-gray-600 dark:text-gray-400">
-          {row.getValue("description") || "—"}
-        </span>
-      ),
-      size: 200,
-      minSize: 150,
-      maxSize: 400,
-      enableResizing: true,
-    }),
-  ], []);
+        ),
+      }),
+      columnHelper.accessor("Adherent", {
+        id: "adherent",
+        header: "Adhérent",
+        cell: ({ row }) => (
+          <span className="font-medium text-gray-900 dark:text-gray-100">
+            {row.original.Adherent?.firstname} {row.original.Adherent?.lastname}
+          </span>
+        ),
+      }),
+      columnHelper.accessor("description", {
+        id: "description",
+        header: "Description",
+        cell: ({ row }) => {
+          const c = row.original;
+          const label = c.description ?? c.TypeCotisation?.nom ?? (c.mois != null && c.annee != null ? `Cotisation ${MOIS_LABELS[c.mois] ?? c.mois} ${c.annee}` : "—");
+          return <span className="text-gray-700 dark:text-gray-300" title={label}>{label}</span>;
+        },
+      }),
+      columnHelper.accessor("TypeCotisation", {
+        id: "type",
+        header: "Type",
+        cell: ({ row }) => (
+          <span className="text-gray-700 dark:text-gray-300">{row.original.TypeCotisation?.nom ?? "—"}</span>
+        ),
+      }),
+      columnHelper.accessor("montantAttendu", {
+        id: "attendu",
+        header: "Attendu",
+        cell: ({ row }) => (
+          <span className="text-gray-700 dark:text-gray-300">{Number(row.original.montantAttendu).toFixed(2)} €</span>
+        ),
+      }),
+      columnHelper.accessor("montantPaye", {
+        id: "paye",
+        header: "Payé",
+        cell: ({ row }) => (
+          <span className="text-green-600 dark:text-green-400 font-medium">{Number(row.original.montantPaye).toFixed(2)} €</span>
+        ),
+      }),
+      columnHelper.accessor("montantRestant", {
+        id: "restant",
+        header: "Restant",
+        cell: ({ row }) => (
+          <span className="text-gray-900 dark:text-gray-100 font-semibold">{Number(row.original.montantRestant).toFixed(2)} €</span>
+        ),
+      }),
+      columnHelper.accessor("statut", {
+        id: "statut",
+        header: "Statut",
+        cell: ({ row }) => (
+          <Badge
+            className={
+              row.original.statut === "Paye"
+                ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                : row.original.statut === "PartiellementPaye"
+                  ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                  : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+            }
+          >
+            {row.original.statut}
+          </Badge>
+        ),
+      }),
+      columnHelper.display({
+        id: "actions",
+        header: "Actions",
+        meta: { forceVisible: true },
+        cell: ({ row }) => {
+          const c = row.original;
+          return (
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 data-[state=open]:bg-emerald-100 dark:data-[state=open]:bg-emerald-900/40" aria-label="Menu actions">
+                  <MoreHorizontal className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  className="cursor-pointer text-gray-900 dark:text-gray-100"
+                  onClick={() => {
+                    setSelectedCotisationForDetail(c);
+                    setDetailDialogOpen(true);
+                  }}
+                >
+                  <Eye className="h-4 w-4 mr-2" />
+                  Voir les détails
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="cursor-pointer text-gray-900 dark:text-gray-100"
+                  onClick={() => openPaiementManuel(c)}
+                  disabled={Number(c.montantRestant) <= 0}
+                >
+                  <Euro className="h-4 w-4 mr-2" />
+                  Paiement manuel
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          );
+        },
+      }),
+    ],
+    []
+  );
 
   const table = useReactTable({
-    data: filteredData,
+    data: filteredCotisations,
     columns,
     getCoreRowModel: getCoreRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
-    getSortedRowModel: getSortedRowModel(),
-    getFilteredRowModel: getFilteredRowModel(),
-    onSortingChange: setSorting,
-    onColumnFiltersChange: setColumnFilters,
-    onGlobalFilterChange: setGlobalFilter,
     onColumnVisibilityChange: (updater) => {
-      const newVisibility = typeof updater === "function" ? updater(columnVisibility) : updater;
-      setColumnVisibility(newVisibility);
+      const next = typeof updater === "function" ? updater(columnVisibility) : updater;
+      setColumnVisibility(next);
       try {
-        localStorage.setItem("admin-paiements-column-visibility", JSON.stringify(newVisibility));
-      } catch (error) {
-        console.error("Erreur lors de la sauvegarde des préférences:", error);
+        localStorage.setItem("admin-paiements-cotisations-column-visibility", JSON.stringify(next));
+      } catch (e) {
+        console.error(e);
       }
     },
-    initialState: {
-      pagination: {
-        pageSize: 10,
-      },
-    },
-    state: { sorting, columnFilters, globalFilter, columnVisibility },
-    defaultColumn: {
-      minSize: 50,
-      maxSize: 800,
-    },
+    state: { columnVisibility, pagination },
+    onPaginationChange: setPagination,
+    initialState: { pagination: { pageSize: 10 } },
   });
 
+  const openPaiementManuel = (row: any) => {
+    setSelectedCotisationForPay(row);
+    const restant = Number(row.montantRestant ?? 0);
+    setPayForm({
+      montant: restant > 0 ? restant.toFixed(2) : "",
+      datePaiement: new Date().toISOString().split("T")[0],
+      moyenPaiement: "Especes",
+      reference: "",
+    });
+    setPayDialogOpen(true);
+  };
+
+  const handleSubmitPaiementManuel = async () => {
+    if (!selectedCotisationForPay || !payForm.montant) {
+      toast.error("Montant requis");
+      return;
+    }
+    const montant = parseFloat(payForm.montant.replace(",", "."));
+    if (isNaN(montant) || montant <= 0) {
+      toast.error("Montant invalide");
+      return;
+    }
+    setPayingId(selectedCotisationForPay.id);
+    try {
+      const result = await createPaiement({
+        adherentId: selectedCotisationForPay.adherentId,
+        montant,
+        datePaiement: payForm.datePaiement,
+        moyenPaiement: payForm.moyenPaiement,
+        reference: payForm.reference || undefined,
+        cotisationMensuelleId: selectedCotisationForPay.id,
+      });
+      if (result.success) {
+        toast.success(result.message);
+        setPayDialogOpen(false);
+        setSelectedCotisationForPay(null);
+        loadCotisations();
+      } else {
+        toast.error(result.error || "Erreur");
+      }
+    } catch (e) {
+      toast.error("Erreur lors de l'enregistrement");
+    } finally {
+      setPayingId(null);
+    }
+  };
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50">
+    <div className="min-h-screen bg-gradient-to-br from-green-50 via-white to-green-50 dark:from-gray-900 dark:via-gray-800 dark:to-gray-900">
       <div className="p-4 sm:p-6">
         <div className="mb-4">
           <Link href="/admin/finances">
@@ -440,329 +307,279 @@ export default function AdminPaiementsPage() {
             </Button>
           </Link>
         </div>
-        <Card className="mx-auto max-w-7xl shadow-lg border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900 !py-0">
-          <CardHeader className="bg-gradient-to-r from-green-500/90 via-emerald-400/80 to-green-500/90 dark:from-green-700/50 dark:via-emerald-600/40 dark:to-green-700/50 text-white pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0 shadow-md">
+
+        {/* Section Cotisations mensuelles (vue principale) */}
+        <Card className="mx-auto max-w-screen-2xl w-full shadow-lg border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900 mb-6 !py-0">
+          <CardHeader className="bg-gradient-to-r from-green-500/90 via-emerald-400/80 to-green-500/90 dark:from-green-700/50 dark:via-emerald-600/40 dark:to-green-700/50 text-white pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
-              <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold text-white">
-                <Receipt className="h-5 w-5 text-white" />
-                Paiements ({filteredData.length})
-              </CardTitle>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
-              <ColumnVisibilityToggle 
-                table={table} 
-                storageKey="admin-paiements-column-visibility"
-              />
-              <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button className="bg-white text-green-600 hover:bg-green-50">
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nouveau paiement
-                  </Button>
-                </DialogTrigger>
-                <DialogContent className="max-w-2xl">
-                  <DialogHeader>
-                    <DialogTitle>Enregistrer un paiement</DialogTitle>
-                    <DialogDescription>
-                      Enregistrez un paiement partiel ou complet pour un adhérent
-                    </DialogDescription>
-                  </DialogHeader>
-                  <div className="space-y-4">
-                    <div>
-                      <Label htmlFor="adherent">Adhérent *</Label>
-                      <div className="flex items-center gap-2">
-                        <Button
-                          type="button"
-                          variant="outline"
-                          onClick={() => setAdherentSearchOpen(true)}
-                          className="flex-1 justify-start"
-                        >
-                          <User className="h-4 w-4 mr-2" />
-                          {selectedAdherent
-                            ? `${selectedAdherent.firstname} ${selectedAdherent.lastname}`
-                            : "Rechercher un adhérent"}
-                        </Button>
-                        {selectedAdherent && (
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => {
-                              setSelectedAdherent(null);
-                              setFormData({ ...formData, adherentId: "", detteInitialeId: "", cotisationMensuelleId: "", assistanceId: "" });
-                              setFinancialItems({ dettes: [], cotisations: [], assistances: [] });
-                            }}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
-                        )}
-                      </div>
-                      {selectedAdherent && (
-                        <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {selectedAdherent.email}
-                        </p>
-                      )}
-                      <AdherentSearchDialog
-                        open={adherentSearchOpen}
-                        onOpenChange={setAdherentSearchOpen}
-                        onSelect={(adherent) => {
-                          setSelectedAdherent(adherent);
-                          setFormData({ ...formData, adherentId: adherent.id, detteInitialeId: "", cotisationMensuelleId: "", assistanceId: "" });
-                        }}
-                      />
-                    </div>
-                    
-                    {/* Afficher les éléments financiers disponibles */}
-                    {selectedAdherent && (
-                      <div className="space-y-2 p-3 bg-gray-50 dark:bg-gray-800 rounded-md border">
-                        <Label className="text-sm font-semibold">Lier le paiement à (optionnel)</Label>
-                        {loadingItems ? (
-                          <div className="text-sm text-gray-500">Chargement...</div>
-                        ) : (
-                          <div className="space-y-3">
-                            {financialItems.dettes.length > 0 && (
-                              <div>
-                                <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Dettes initiales</Label>
-                                <Select value={formData.detteInitialeId || "none"} onValueChange={(value) => setFormData({ ...formData, detteInitialeId: value === "none" ? "" : value, cotisationMensuelleId: "", assistanceId: "" })}>
-                                  <SelectTrigger className="h-9 text-sm">
-                                    <SelectValue placeholder="Sélectionner une dette" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem key="dette-none" value="none">Aucune</SelectItem>
-                                    {financialItems.dettes.map((d) => (
-                                      <SelectItem key={d.id} value={d.id}>
-                                        {d.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                            {financialItems.cotisations.length > 0 && (
-                              <div>
-                                <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Cotisations mensuelles</Label>
-                                <Select value={formData.cotisationMensuelleId || "none"} onValueChange={(value) => setFormData({ ...formData, cotisationMensuelleId: value === "none" ? "" : value, detteInitialeId: "", assistanceId: "" })}>
-                                  <SelectTrigger className="h-9 text-sm">
-                                    <SelectValue placeholder="Sélectionner une cotisation" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem key="cotisation-none" value="none">Aucune</SelectItem>
-                                    {financialItems.cotisations.map((c) => (
-                                      <SelectItem key={c.id} value={c.id}>
-                                        {c.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                            {financialItems.assistances.length > 0 && (
-                              <div>
-                                <Label className="text-xs font-semibold text-gray-700 dark:text-gray-300">Assistances</Label>
-                                <Select value={formData.assistanceId || "none"} onValueChange={(value) => setFormData({ ...formData, assistanceId: value === "none" ? "" : value, detteInitialeId: "", cotisationMensuelleId: "" })}>
-                                  <SelectTrigger className="h-9 text-sm">
-                                    <SelectValue placeholder="Sélectionner une assistance" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem key="assistance-none" value="none">Aucune</SelectItem>
-                                    {financialItems.assistances.map((a) => (
-                                      <SelectItem key={a.id} value={a.id}>
-                                        {a.label}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            )}
-                            {financialItems.dettes.length === 0 && financialItems.cotisations.length === 0 && financialItems.assistances.length === 0 && (
-                              <p className="text-xs text-gray-500 dark:text-gray-400">Aucune dette, cotisation ou assistance en attente pour cet adhérent</p>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                    
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <Label htmlFor="montant">Montant (€) *</Label>
-                        <Input
-                          id="montant"
-                          type="number"
-                          step="0.01"
-                          min="0"
-                          value={formData.montant}
-                          onChange={(e) => setFormData({ ...formData, montant: e.target.value })}
-                          placeholder="0.00"
-                        />
-                      </div>
-                      <div>
-                        <Label htmlFor="datePaiement">Date de paiement *</Label>
-                        <Input
-                          id="datePaiement"
-                          type="date"
-                          value={formData.datePaiement}
-                          onChange={(e) => setFormData({ ...formData, datePaiement: e.target.value })}
-                        />
-                      </div>
-                    </div>
-                    <div>
-                      <Label htmlFor="moyenPaiement">Moyen de paiement *</Label>
-                      <Select value={formData.moyenPaiement} onValueChange={(value: any) => setFormData({ ...formData, moyenPaiement: value })}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem key="moyen-especes" value="Especes">Espèces</SelectItem>
-                          <SelectItem key="moyen-cheque" value="Cheque">Chèque</SelectItem>
-                          <SelectItem key="moyen-virement" value="Virement">Virement</SelectItem>
-                          <SelectItem key="moyen-cartebancaire" value="CarteBancaire">Carte bancaire</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div>
-                      <Label htmlFor="reference">Référence</Label>
-                      <Input
-                        id="reference"
-                        value={formData.reference}
-                        onChange={(e) => setFormData({ ...formData, reference: e.target.value })}
-                        placeholder="N° de chèque, virement, etc."
-                      />
-                    </div>
-                    <div>
-                      <Label htmlFor="description">Description</Label>
-                      <Textarea
-                        id="description"
-                        value={formData.description}
-                        onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                        placeholder="Description optionnelle"
-                        rows={3}
-                      />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" onClick={() => setCreateDialogOpen(false)}>
-                        Annuler
-                      </Button>
-                      <Button onClick={handleCreate}>
-                        Enregistrer
-                      </Button>
-                    </div>
-                  </div>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4 sm:pt-6 pb-4 px-4 sm:px-6">
-          {/* Filtres et recherche */}
-          <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              <Input
-                placeholder="Rechercher..."
-                value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-28"
-              />
-            </div>
-            <Select value={moyenFilter} onValueChange={setMoyenFilter}>
-              <SelectTrigger className="w-full sm:w-48">
-                <SelectValue placeholder="Filtrer par moyen" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem key="filter-all" value="all">Tous les moyens</SelectItem>
-                <SelectItem key="filter-especes" value="Especes">Espèces</SelectItem>
-                <SelectItem key="filter-cheque" value="Cheque">Chèque</SelectItem>
-                <SelectItem key="filter-virement" value="Virement">Virement</SelectItem>
-                <SelectItem key="filter-cartebancaire" value="CarteBancaire">Carte bancaire</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          {loading ? (
-            <div className="flex items-center justify-center py-8">
-              <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-green-600"></div>
-            </div>
-          ) : (
-            <>
-              <div className="mb-4 text-sm text-gray-600 dark:text-gray-300">
-                {filteredData.length} paiement(s) trouvé(s)
+              <div>
+                <CardTitle className="text-lg sm:text-xl font-bold text-white">
+                  Cotisations mensuelles ({filteredCotisations.length})
+                </CardTitle>
+                <p className="text-sm text-emerald-100 dark:text-emerald-200/90 mt-1">
+                  Liste des cotisations · Menu (…) : voir les détails ou paiement manuel.
+                </p>
               </div>
-              <DataTable table={table} emptyMessage="Aucun paiement trouvé" compact={true} headerColor="green" />
-              
-              {/* Pagination - Masquée sur mobile */}
-              <div className="hidden md:flex bg-white dark:bg-gray-800 mt-4 sm:mt-5 flex-col sm:flex-row items-center justify-between gap-3 sm:gap-0 py-4 sm:py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
-                <div className="flex-1 text-xs sm:text-sm text-muted-foreground dark:text-gray-400 text-center sm:text-left">
-                  {table.getFilteredRowModel().rows.length} ligne(s) au total
-                </div>
-
-                <div className="flex items-center space-x-4 sm:space-x-6 lg:space-x-8 w-full sm:w-auto justify-center sm:justify-end">
-                  <div className="flex items-center space-x-2">
-                    <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
-                    <Select
-                      value={`${table.getState().pagination.pageSize}`}
-                      onValueChange={(value) => {
-                        table.setPageSize(Number(value));
+              <ColumnVisibilityToggle table={table} storageKey="admin-paiements-cotisations-column-visibility" />
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 px-4 sm:px-6 pb-4">
+            <div className="flex flex-col sm:flex-row gap-3 mb-4">
+              <div className="flex items-center gap-2">
+                <label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Mois</label>
+                <Popover open={calendarOpen} onOpenChange={setCalendarOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      variant="outline"
+                      className="w-[180px] justify-start text-left font-normal bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+                    >
+                      <CalendarDays className="mr-2 h-4 w-4" />
+                      {(() => {
+                        const [y, m] = periode.split("-").map(Number);
+                        return `${MOIS_LABELS[m] ?? m} ${y}`;
+                      })()}
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent className="w-auto p-0 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700" align="start">
+                    <Calendar
+                      mode="single"
+                      selected={(() => {
+                        const [y, m] = periode.split("-").map(Number);
+                        return new Date(y, (m ?? 1) - 1, 1);
+                      })()}
+                      onSelect={(date) => {
+                        if (date) {
+                          const y = date.getFullYear();
+                          const m = date.getMonth() + 1;
+                          setPeriode(`${y}-${String(m).padStart(2, "0")}`);
+                          setCalendarOpen(false);
+                        }
                       }}
-                    >
-                      <SelectTrigger className="h-8 w-[70px]">
-                        <SelectValue placeholder={table.getState().pagination.pageSize} />
-                      </SelectTrigger>
-                      <SelectContent side="top">
-                        {[10, 20, 30, 40, 50].map((pageSize) => (
-                          <SelectItem key={pageSize} value={`${pageSize}`}>
-                            {pageSize}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                      defaultMonth={(() => {
+                        const [y, m] = periode.split("-").map(Number);
+                        return new Date(y ?? now.getFullYear(), (m ?? now.getMonth() + 1) - 1, 1);
+                      })()}
+                    />
+                  </PopoverContent>
+                </Popover>
+              </div>
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Filtrer par adhérent (nom, email)..."
+                  value={adherentFilterCotisations}
+                  onChange={(e) => setAdherentFilterCotisations(e.target.value)}
+                  className="pl-9 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+            </div>
+            {loadingCotisations ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400" />
+              </div>
+            ) : (
+              <>
+                <DataTable table={table} emptyMessage="Aucune cotisation pour ce mois ou ce filtre." headerColor="green" compact headerUppercase={false} headerBold />
+                {filteredCotisations.length > 0 && (
+                  <>
+                    <div className="mt-4 flex flex-wrap items-center gap-4 sm:gap-6 py-3 px-2 text-sm font-semibold text-gray-700 dark:text-gray-300 border-t border-gray-200 dark:border-gray-700">
+                      <span>Total attendu : <span className="text-gray-900 dark:text-gray-100">{totals.attendu.toFixed(2)} €</span></span>
+                      <span>Total payé : <span className="text-green-600 dark:text-green-400">{totals.paye.toFixed(2)} €</span></span>
+                      <span>Total restant : <span className="text-gray-900 dark:text-gray-100">{totals.restant.toFixed(2)} €</span></span>
+                    </div>
+                    <div className="hidden md:flex flex-col sm:flex-row items-center justify-between gap-3 py-4 font-semibold rounded-xl border border-gray-200 dark:border-gray-700 px-4 sm:px-6">
+                      <div className="text-xs sm:text-sm text-muted-foreground dark:text-gray-400">
+                        {table.getFilteredRowModel().rows.length} ligne(s) au total
+                      </div>
+                      <div className="flex items-center space-x-4 sm:space-x-6">
+                        <div className="flex items-center space-x-2">
+                          <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
+                          <Select
+                            value={`${table.getState().pagination.pageSize}`}
+                            onValueChange={(v) => table.setPageSize(Number(v))}
+                          >
+                            <SelectTrigger className="h-8 w-[70px]">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent side="top">
+                              {[10, 20, 30, 40, 50].map((size) => (
+                                <SelectItem key={size} value={`${size}`}>{size}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
+                          Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Button variant="outline" size="icon" className="h-8 w-8 hidden lg:flex" onClick={() => table.setPageIndex(0)} disabled={!table.getCanPreviousPage()} aria-label="Première page">
+                            <ChevronsLeft className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.previousPage()} disabled={!table.getCanPreviousPage()} aria-label="Page précédente">
+                            <ChevronLeft className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="icon" className="h-8 w-8" onClick={() => table.nextPage()} disabled={!table.getCanNextPage()} aria-label="Page suivante">
+                            <ChevronRight className="h-4 w-4" />
+                          </Button>
+                          <Button variant="outline" size="icon" className="h-8 w-8 hidden lg:flex" onClick={() => table.setPageIndex(table.getPageCount() - 1)} disabled={!table.getCanNextPage()} aria-label="Dernière page">
+                            <ChevronsRight className="h-4 w-4" />
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
+          </CardContent>
+        </Card>
 
-                  <div className="flex items-center justify-center text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">
-                    Page {table.getState().pagination.pageIndex + 1} sur {table.getPageCount()}
+      {/* Dialog Paiement manuel (depuis la liste cotisations, adhérent déjà connu) */}
+      <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
+        <DialogContent className="max-w-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+          <DialogHeader>
+            <DialogTitle className="text-base text-gray-900 dark:text-gray-100">
+              Paiement manuel
+            </DialogTitle>
+            <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
+              {selectedCotisationForPay && (
+                <> {selectedCotisationForPay.Adherent?.firstname} {selectedCotisationForPay.Adherent?.lastname} · {selectedCotisationForPay.TypeCotisation?.nom} · Reste {Number(selectedCotisationForPay.montantRestant).toFixed(2)} €</>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3 pt-2">
+            <div>
+              <Label className="text-sm text-gray-700 dark:text-gray-300">Montant (€) *</Label>
+              <Input
+                type="text"
+                inputMode="decimal"
+                value={payForm.montant}
+                onChange={(e) => setPayForm((p) => ({ ...p, montant: e.target.value }))}
+                placeholder="0,00"
+                className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+              />
+            </div>
+            <div>
+              <Label className="text-sm text-gray-700 dark:text-gray-300">Date</Label>
+              <Input
+                type="date"
+                value={payForm.datePaiement}
+                onChange={(e) => setPayForm((p) => ({ ...p, datePaiement: e.target.value }))}
+                className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+              />
+            </div>
+            <div>
+              <Label className="text-sm text-gray-700 dark:text-gray-300">Moyen</Label>
+              <Select
+                value={payForm.moyenPaiement}
+                onValueChange={(v: "Especes" | "Cheque" | "Virement" | "CarteBancaire") =>
+                  setPayForm((p) => ({ ...p, moyenPaiement: v }))
+                }
+              >
+                <SelectTrigger className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Especes">Espèces</SelectItem>
+                  <SelectItem value="Cheque">Chèque</SelectItem>
+                  <SelectItem value="Virement">Virement</SelectItem>
+                  <SelectItem value="CarteBancaire">Carte bancaire</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+            <div>
+              <Label className="text-sm text-gray-700 dark:text-gray-300">Référence</Label>
+              <Input
+                value={payForm.reference}
+                onChange={(e) => setPayForm((p) => ({ ...p, reference: e.target.value }))}
+                placeholder="N° chèque, virement..."
+                className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+              />
+            </div>
+            <div className="flex justify-end gap-2 pt-2">
+              <Button variant="outline" onClick={() => setPayDialogOpen(false)} className="text-gray-700 dark:text-gray-300">
+                Annuler
+              </Button>
+              <Button
+                onClick={handleSubmitPaiementManuel}
+                disabled={payingId !== null}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+              >
+                {payingId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enregistrer"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+        {/* Dialog Voir les détails (cotisation) */}
+        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
+            <DialogHeader>
+              <DialogTitle className="text-base text-gray-900 dark:text-gray-100">Détails de la cotisation</DialogTitle>
+              <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
+                Informations de la cotisation mensuelle
+              </DialogDescription>
+            </DialogHeader>
+            {selectedCotisationForDetail && (
+              <div className="space-y-4 pt-2">
+                <div className="grid gap-2">
+                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Période</Label>
+                  <p className="text-sm text-gray-900 dark:text-gray-100">
+                    {MOIS_LABELS[selectedCotisationForDetail.mois] ?? selectedCotisationForDetail.mois} {selectedCotisationForDetail.annee}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Adhérent</Label>
+                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                    {selectedCotisationForDetail.Adherent?.firstname} {selectedCotisationForDetail.Adherent?.lastname}
+                  </p>
+                  {selectedCotisationForDetail.Adherent?.User?.email && (
+                    <p className="text-xs text-gray-600 dark:text-gray-400">{selectedCotisationForDetail.Adherent.User.email}</p>
+                  )}
+                </div>
+                <div className="grid gap-2">
+                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Description</Label>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                    {selectedCotisationForDetail.description ?? selectedCotisationForDetail.TypeCotisation?.nom ?? (selectedCotisationForDetail.mois != null && selectedCotisationForDetail.annee != null ? `Cotisation ${MOIS_LABELS[selectedCotisationForDetail.mois] ?? selectedCotisationForDetail.mois} ${selectedCotisationForDetail.annee}` : "—")}
+                  </p>
+                </div>
+                <div className="grid gap-2">
+                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Type</Label>
+                  <p className="text-sm text-gray-700 dark:text-gray-300">{selectedCotisationForDetail.TypeCotisation?.nom ?? "—"}</p>
+                </div>
+                <div className="grid grid-cols-3 gap-4">
+                  <div className="grid gap-2">
+                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Attendu</Label>
+                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{Number(selectedCotisationForDetail.montantAttendu).toFixed(2)} €</p>
                   </div>
-                  <div className="flex items-center space-x-2">
-                    <Button
-                      variant="outline"
-                      className="hidden h-8 w-8 p-0 lg:flex"
-                      onClick={() => table.setPageIndex(0)}
-                      disabled={!table.getCanPreviousPage()}
-                    >
-                      <span className="sr-only">Aller à la première page</span>
-                      <ChevronsLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-8 w-8 p-0"
-                      onClick={() => table.previousPage()}
-                      disabled={!table.getCanPreviousPage()}
-                    >
-                      <span className="sr-only">Page précédente</span>
-                      <ChevronLeft className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="h-8 w-8 p-0"
-                      onClick={() => table.nextPage()}
-                      disabled={!table.getCanNextPage()}
-                    >
-                      <span className="sr-only">Page suivante</span>
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      variant="outline"
-                      className="hidden h-8 w-8 p-0 lg:flex"
-                      onClick={() => table.setPageIndex(table.getPageCount() - 1)}
-                      disabled={!table.getCanNextPage()}
-                    >
-                      <span className="sr-only">Aller à la dernière page</span>
-                      <ChevronsRight className="h-4 w-4" />
-                    </Button>
+                  <div className="grid gap-2">
+                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Payé</Label>
+                    <p className="text-sm font-medium text-green-600 dark:text-green-400">{Number(selectedCotisationForDetail.montantPaye).toFixed(2)} €</p>
+                  </div>
+                  <div className="grid gap-2">
+                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Restant</Label>
+                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{Number(selectedCotisationForDetail.montantRestant).toFixed(2)} €</p>
                   </div>
                 </div>
+                <div className="grid gap-2">
+                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Statut</Label>
+                  <Badge
+                    className={
+                      selectedCotisationForDetail.statut === "Paye"
+                        ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200"
+                        : selectedCotisationForDetail.statut === "PartiellementPaye"
+                          ? "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200"
+                          : "bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200"
+                    }
+                  >
+                    {selectedCotisationForDetail.statut}
+                  </Badge>
+                </div>
               </div>
-            </>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );
