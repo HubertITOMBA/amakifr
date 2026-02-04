@@ -67,6 +67,7 @@ import {
   Baby,
   Edit2,
   Calendar as CalendarIcon,
+  CalendarDays,
   BookOpen,
   Scale,
   Bell,
@@ -93,6 +94,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar as CalendarUI } from "@/components/ui/calendar";
 import {
   Table,
   TableBody,
@@ -945,6 +948,7 @@ function UserProfilePageContent() {
   const now = new Date();
   const [selectedCotisationsMois, setSelectedCotisationsMois] = useState<number>(() => now.getMonth() + 1);
   const [selectedCotisationsAnnee, setSelectedCotisationsAnnee] = useState<number>(() => now.getFullYear());
+  const [calendarCotisationsOpen, setCalendarCotisationsOpen] = useState(false);
   const [cotisationsVue, setCotisationsVue] = useState<'mois' | 'annee' | 'toutes'>('mois');
   const [loading, setLoading] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
@@ -2259,46 +2263,33 @@ function UserProfilePageContent() {
               </Select>
               {cotisationsVue === 'mois' && (
                 <>
-                  <Select
-                    value={String(selectedCotisationsMois)}
-                    onValueChange={(v) => setSelectedCotisationsMois(Number(v))}
-                  >
-                    <SelectTrigger className="w-[140px] h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map((m) => {
-                        const date = new Date(2000, m - 1, 1);
-                        const label = date.toLocaleDateString('fr-FR', { month: 'long' });
-                        const labelCap = label.charAt(0).toUpperCase() + label.slice(1);
-                        return (
-                          <SelectItem key={m} value={String(m)}>
-                            {labelCap}
-                          </SelectItem>
-                        );
-                      })}
-                    </SelectContent>
-                  </Select>
-                  <Select
-                    value={String(selectedCotisationsAnnee)}
-                    onValueChange={(v) => setSelectedCotisationsAnnee(Number(v))}
-                  >
-                    <SelectTrigger className="w-[90px] h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(() => {
-                        const currentYear = new Date().getFullYear();
-                        const years = [];
-                        for (let y = currentYear - 2; y <= currentYear + 1; y++) years.push(y);
-                        return years.map((y) => (
-                          <SelectItem key={y} value={String(y)}>
-                            {y}
-                          </SelectItem>
-                        ));
-                      })()}
-                    </SelectContent>
-                  </Select>
+                  <Popover open={calendarCotisationsOpen} onOpenChange={setCalendarCotisationsOpen}>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="h-8 w-[180px] justify-start text-left font-normal bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+                      >
+                        <CalendarDays className="mr-2 h-4 w-4" />
+                        {format(new Date(selectedCotisationsAnnee, selectedCotisationsMois - 1, 1), "MMMM yyyy", { locale: fr }).replace(/^\w/, (c) => c.toUpperCase())}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700" align="start">
+                      <CalendarUI
+                        mode="single"
+                        selected={new Date(selectedCotisationsAnnee, selectedCotisationsMois - 1, 1)}
+                        onSelect={(date) => {
+                          if (date) {
+                            setSelectedCotisationsAnnee(date.getFullYear());
+                            setSelectedCotisationsMois(date.getMonth() + 1);
+                            setCalendarCotisationsOpen(false);
+                          }
+                        }}
+                        defaultMonth={new Date(selectedCotisationsAnnee, selectedCotisationsMois - 1, 1)}
+                        locale={fr}
+                      />
+                    </PopoverContent>
+                  </Popover>
                   <Button
                     variant="ghost"
                     size="sm"
