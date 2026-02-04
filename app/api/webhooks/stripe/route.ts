@@ -138,7 +138,7 @@ export async function POST(request: NextRequest) {
             }
           }
 
-          // Excédent de paiement → créer un avoir (comme en manuel)
+          // Excédent de paiement → créer un avoir puis l'appliquer sur les dettes initiales si possible
           if (excédent.gt(0)) {
             await db.avoir.create({
               data: {
@@ -151,6 +151,8 @@ export async function POST(request: NextRequest) {
                 statut: "Disponible",
               },
             });
+            const { appliquerAvoirSurDettesInitiales } = await import("@/actions/paiements/index");
+            await appliquerAvoirSurDettesInitiales(paiement.adherentId);
           }
 
           // Revalider les pages concernées

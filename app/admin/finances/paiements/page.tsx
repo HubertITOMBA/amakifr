@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import { Search, Euro, ArrowLeft, MoreHorizontal, Loader2, CalendarDays, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
-import { createPaiement } from "@/actions/paiements";
+import { createPaiement, getDettesInitialesByAdherent } from "@/actions/paiements";
 import { getCotisationsMensuellesByPeriode } from "@/actions/cotisations-mensuelles";
 import {
   DropdownMenu,
@@ -57,7 +57,9 @@ export default function AdminPaiementsPage() {
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedCotisationForDetail, setSelectedCotisationForDetail] = useState<any | null>(null);
+  const [dettesInitialesAdherent, setDettesInitialesAdherent] = useState<{ id: string; annee: number; montant: number; montantPaye: number; montantRestant: number; description?: string | null }[]>([]);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
+  const [isMobile, setIsMobile] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -66,12 +68,72 @@ export default function AdminPaiementsPage() {
           const parsed = JSON.parse(saved);
           if (Object.keys(parsed).length > 0) return parsed;
         }
+        const mobile = window.innerWidth < 768;
+        if (mobile) {
+          return {
+            periode: false,
+            description: false,
+            type: false,
+            attendu: false,
+            restant: false,
+            statut: false,
+          };
+        }
       } catch (e) {
         console.error(e);
       }
     }
     return { type: false };
   });
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(typeof window !== "undefined" && window.innerWidth < 768);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, []);
+
+  // Charger les dettes initiales de l'adhérent à l'ouverture du dialog paiement ou détails
+  const adherentIdForDialogs = selectedCotisationForPay?.adherentId ?? selectedCotisationForDetail?.adherentId ?? null;
+  useEffect(() => {
+    if (!adherentIdForDialogs || (!payDialogOpen && !detailDialogOpen)) {
+      if (!adherentIdForDialogs) setDettesInitialesAdherent([]);
+      return;
+    }
+    let cancelled = false;
+    getDettesInitialesByAdherent(adherentIdForDialogs).then((res) => {
+      if (cancelled || !res.success || !res.data) return;
+      setDettesInitialesAdherent(res.data);
+    });
+    return () => { cancelled = true; };
+  }, [adherentIdForDialogs, payDialogOpen, detailDialogOpen]);
+
+  useEffect(() => {
+    setPagination((prev) => ({
+      ...prev,
+      pageSize: isMobile ? 999 : (prev.pageSize === 999 ? 10 : prev.pageSize),
+      pageIndex: 0,
+    }));
+  }, [isMobile]);
+
+  useEffect(() => {
+    const handleResize = () => {
+      const mobile = typeof window !== "undefined" && window.innerWidth < 768;
+      const saved = localStorage.getItem("admin-paiements-cotisations-column-visibility");
+      if (mobile && (!saved || Object.keys(JSON.parse(saved || "{}")).length === 0)) {
+        setColumnVisibility({
+          periode: false,
+          description: false,
+          type: false,
+          attendu: false,
+          restant: false,
+          statut: false,
+        });
+      }
+    };
+    window.addEventListener("resize", handleResize);
+    return () => window.removeEventListener("resize", handleResize);
+  }, []);
 
   const loadCotisations = useCallback(async () => {
     try {
@@ -321,7 +383,9 @@ export default function AdminPaiementsPage() {
                   Enregistrer ici les cotisations en espèces.
                 </p>
               </div>
-              <ColumnVisibilityToggle table={table} storageKey="admin-paiements-cotisations-column-visibility" />
+              <div className="hidden md:block">
+                <ColumnVisibilityToggle table={table} storageKey="admin-paiements-cotisations-column-visibility" />
+              </div>
             </div>
           </CardHeader>
           <CardContent className="pt-0 px-4 sm:px-6 pb-4">
@@ -379,6 +443,70 @@ export default function AdminPaiementsPage() {
               <div className="flex items-center justify-center py-12">
                 <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-emerald-400" />
               </div>
+            ) : isMobile ? (
+              <>
+                {filteredCotisations.length === 0 ? (
+                  <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                    Aucune cotisation pour ce mois ou ce filtre.
+                  </div>
+                ) : (
+                  <div className="space-y-2 min-w-0">
+                    {filteredCotisations.map((c) => (
+                      <div
+                        key={c.id}
+                        className="flex items-center justify-between gap-2 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800/50 p-3"
+                      >
+                        <div className="min-w-0 flex-1 flex flex-col gap-0.5">
+                          <span className="font-medium text-gray-900 dark:text-gray-100 truncate">
+                            {c.Adherent?.firstname} {c.Adherent?.lastname}
+                          </span>
+                          <span className="text-sm text-green-600 dark:text-green-400 font-medium">
+                            Payé : {Number(c.montantPaye).toFixed(2)} €
+                          </span>
+                        </div>
+                        <div className="shrink-0">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 data-[state=open]:bg-emerald-100 dark:data-[state=open]:bg-emerald-900/40" aria-label="Menu actions">
+                                <MoreHorizontal className="h-4 w-4 text-gray-600 dark:text-gray-400" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
+                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="cursor-pointer text-gray-900 dark:text-gray-100"
+                                onClick={() => {
+                                  setSelectedCotisationForDetail(c);
+                                  setDetailDialogOpen(true);
+                                }}
+                              >
+                                <Eye className="h-4 w-4 mr-2" />
+                                Voir les détails
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="cursor-pointer text-gray-900 dark:text-gray-100"
+                                onClick={() => openPaiementManuel(c)}
+                                disabled={Number(c.montantRestant) <= 0}
+                              >
+                                <Euro className="h-4 w-4 mr-2" />
+                                Paiement manuel
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {filteredCotisations.length > 0 && (
+                  <div className="mt-4 flex flex-wrap items-center gap-4 py-3 px-2 text-sm font-semibold text-gray-700 dark:text-gray-300 border-t border-gray-200 dark:border-gray-700">
+                    <span>Total attendu : <span className="text-gray-900 dark:text-gray-100">{totals.attendu.toFixed(2)} €</span></span>
+                    <span>Total payé : <span className="text-green-600 dark:text-green-400">{totals.paye.toFixed(2)} €</span></span>
+                    <span>Total restant : <span className="text-gray-900 dark:text-gray-100">{totals.restant.toFixed(2)} €</span></span>
+                  </div>
+                )}
+              </>
             ) : (
               <>
                 <DataTable table={table} emptyMessage="Aucune cotisation pour ce mois ou ce filtre." headerColor="green" compact headerUppercase={false} headerBold />
@@ -438,17 +566,33 @@ export default function AdminPaiementsPage() {
 
       {/* Dialog Paiement manuel (depuis la liste cotisations, adhérent déjà connu) */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
-        <DialogContent className="max-w-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-          <DialogHeader>
-            <DialogTitle className="text-base text-gray-900 dark:text-gray-100">
+        <DialogContent className="max-w-sm bg-white dark:bg-gray-900 border-2 border-emerald-200 dark:border-emerald-800 shadow-lg">
+          <DialogHeader className="pb-2 border-b border-emerald-100 dark:border-emerald-900/50">
+            <DialogTitle className="text-base text-emerald-800 dark:text-emerald-100">
               Paiement en espèce
             </DialogTitle>
-            <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
+            <DialogDescription className="text-sm text-emerald-700/90 dark:text-emerald-200/80">
               {selectedCotisationForPay && (
                 <> {selectedCotisationForPay.Adherent?.firstname} {selectedCotisationForPay.Adherent?.lastname} · {selectedCotisationForPay.TypeCotisation?.nom} · Reste {Number(selectedCotisationForPay.montantRestant).toFixed(2)} €</>
               )}
             </DialogDescription>
           </DialogHeader>
+          {dettesInitialesAdherent.length > 0 && (
+            <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 p-3 space-y-2">
+              <p className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-200">Dettes initiales (adhérent)</p>
+              <ul className="text-xs space-y-1 text-amber-900 dark:text-amber-100">
+                {dettesInitialesAdherent.map((d) => (
+                  <li key={d.id} className="flex justify-between gap-2">
+                    <span>Année {d.annee}</span>
+                    <span>Restant : <strong>{d.montantRestant.toFixed(2)} €</strong></span>
+                  </li>
+                ))}
+                <li className="pt-1 border-t border-amber-200 dark:border-amber-800 font-medium">
+                  Total restant : {dettesInitialesAdherent.reduce((s, d) => s + d.montantRestant, 0).toFixed(2)} €
+                </li>
+              </ul>
+            </div>
+          )}
           <div className="space-y-3 pt-2">
             <div>
               <Label className="text-sm text-gray-700 dark:text-gray-300">Montant (€) *</Label>
@@ -498,14 +642,14 @@ export default function AdminPaiementsPage() {
                 className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
               />
             </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setPayDialogOpen(false)} className="text-gray-700 dark:text-gray-300">
+            <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+              <Button variant="outline" onClick={() => setPayDialogOpen(false)} className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600">
                 Annuler
               </Button>
               <Button
                 onClick={handleSubmitPaiementManuel}
                 disabled={payingId !== null}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
               >
                 {payingId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enregistrer"}
               </Button>
@@ -516,52 +660,48 @@ export default function AdminPaiementsPage() {
 
         {/* Dialog Voir les détails (cotisation) */}
         <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-            <DialogHeader>
-              <DialogTitle className="text-base text-gray-900 dark:text-gray-100">Détails de la cotisation</DialogTitle>
-              <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border-2 border-indigo-200 dark:border-indigo-800 shadow-lg">
+            <DialogHeader className="pb-2 border-b border-indigo-100 dark:border-indigo-900/50">
+              <DialogTitle className="text-base text-indigo-800 dark:text-indigo-100">Détails de la cotisation</DialogTitle>
+              <DialogDescription className="text-sm text-indigo-700/90 dark:text-indigo-200/80">
                 Informations de la cotisation mensuelle
               </DialogDescription>
             </DialogHeader>
             {selectedCotisationForDetail && (
               <div className="space-y-4 pt-2">
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Période</Label>
-                  <p className="text-sm text-gray-900 dark:text-gray-100">
+                <div className="grid gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 p-3 border border-slate-200 dark:border-slate-700">
+                  <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Période</Label>
+                  <p className="text-sm text-slate-900 dark:text-slate-100">
                     {MOIS_LABELS[selectedCotisationForDetail.mois] ?? selectedCotisationForDetail.mois} {selectedCotisationForDetail.annee}
                   </p>
                 </div>
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Adhérent</Label>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+                <div className="grid gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 p-3 border border-slate-200 dark:border-slate-700">
+                  <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Adhérent</Label>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
                     {selectedCotisationForDetail.Adherent?.firstname} {selectedCotisationForDetail.Adherent?.lastname}
                   </p>
                   {selectedCotisationForDetail.Adherent?.User?.email && (
-                    <p className="text-xs text-gray-600 dark:text-gray-400">{selectedCotisationForDetail.Adherent.User.email}</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">{selectedCotisationForDetail.Adherent.User.email}</p>
                   )}
                 </div>
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Description</Label>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                <div className="grid gap-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 p-3 border border-slate-200 dark:border-slate-700">
+                  <Label className="text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase">Description / Type</Label>
+                  <p className="text-sm text-slate-700 dark:text-slate-300">
                     {selectedCotisationForDetail.description ?? selectedCotisationForDetail.TypeCotisation?.nom ?? (selectedCotisationForDetail.mois != null && selectedCotisationForDetail.annee != null ? `Cotisation ${MOIS_LABELS[selectedCotisationForDetail.mois] ?? selectedCotisationForDetail.mois} ${selectedCotisationForDetail.annee}` : "—")}
                   </p>
                 </div>
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Type</Label>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">{selectedCotisationForDetail.TypeCotisation?.nom ?? "—"}</p>
-                </div>
-                <div className="grid grid-cols-3 gap-4">
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Attendu</Label>
-                    <p className="text-sm font-medium text-gray-900 dark:text-gray-100">{Number(selectedCotisationForDetail.montantAttendu).toFixed(2)} €</p>
+                <div className="grid grid-cols-3 gap-3">
+                  <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 p-3 border border-blue-200 dark:border-blue-800">
+                    <Label className="text-xs font-semibold text-blue-600 dark:text-blue-400 uppercase">Attendu</Label>
+                    <p className="text-sm font-medium text-blue-900 dark:text-blue-100">{Number(selectedCotisationForDetail.montantAttendu).toFixed(2)} €</p>
                   </div>
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Payé</Label>
-                    <p className="text-sm font-medium text-green-600 dark:text-green-400">{Number(selectedCotisationForDetail.montantPaye).toFixed(2)} €</p>
+                  <div className="rounded-lg bg-green-50 dark:bg-green-950/30 p-3 border border-green-200 dark:border-green-800">
+                    <Label className="text-xs font-semibold text-green-600 dark:text-green-400 uppercase">Payé</Label>
+                    <p className="text-sm font-medium text-green-700 dark:text-green-300">{Number(selectedCotisationForDetail.montantPaye).toFixed(2)} €</p>
                   </div>
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Restant</Label>
-                    <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">{Number(selectedCotisationForDetail.montantRestant).toFixed(2)} €</p>
+                  <div className="rounded-lg bg-slate-100 dark:bg-slate-800 p-3 border border-slate-300 dark:border-slate-600">
+                    <Label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase">Restant</Label>
+                    <p className="text-sm font-semibold text-slate-900 dark:text-slate-100">{Number(selectedCotisationForDetail.montantRestant).toFixed(2)} €</p>
                   </div>
                 </div>
                 <div className="grid gap-2">
@@ -578,6 +718,22 @@ export default function AdminPaiementsPage() {
                     {selectedCotisationForDetail.statut}
                   </Badge>
                 </div>
+                {dettesInitialesAdherent.length > 0 && (
+                  <div className="rounded-lg border-2 border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 p-3 space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-200">Dettes initiales (adhérent)</p>
+                    <ul className="text-xs space-y-1.5 text-amber-900 dark:text-amber-100">
+                      {dettesInitialesAdherent.map((d) => (
+                        <li key={d.id} className="flex justify-between gap-2 py-0.5">
+                          <span>Année {d.annee}{d.description ? ` — ${d.description}` : ""}</span>
+                          <span>Restant : <strong>{d.montantRestant.toFixed(2)} €</strong></span>
+                        </li>
+                      ))}
+                      <li className="pt-1.5 mt-1 border-t border-amber-200 dark:border-amber-800 font-medium">
+                        Total restant : {dettesInitialesAdherent.reduce((s, d) => s + d.montantRestant, 0).toFixed(2)} €
+                      </li>
+                    </ul>
+                  </div>
+                )}
               </div>
             )}
           </DialogContent>

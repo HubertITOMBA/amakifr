@@ -944,6 +944,7 @@ function UserProfilePageContent() {
   const [historiqueCotisations, setHistoriqueCotisations] = useState<any[]>([]);
   const [historiqueFilterMois, setHistoriqueFilterMois] = useState<string>('all');
   const [historiqueFilterAnnee, setHistoriqueFilterAnnee] = useState<string>('all');
+  const [historiqueCalendarOpen, setHistoriqueCalendarOpen] = useState(false);
   // Mois/année et mode d'affichage pour "Cotisations" (un mois / une année / toutes)
   const now = new Date();
   const [selectedCotisationsMois, setSelectedCotisationsMois] = useState<number>(() => now.getMonth() + 1);
@@ -2386,44 +2387,52 @@ function UserProfilePageContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="pt-3 pb-4 px-6">
-                  <div className="flex flex-col sm:flex-row gap-3 mb-4">
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="historique-mois" className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Mois</Label>
-                      <Select value={historiqueFilterMois} onValueChange={setHistoriqueFilterMois}>
-                        <SelectTrigger id="historique-mois" className="w-[140px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">
-                          <SelectValue placeholder="Tous" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Tous les mois</SelectItem>
-                          <SelectItem value="1">Janvier</SelectItem>
-                          <SelectItem value="2">Février</SelectItem>
-                          <SelectItem value="3">Mars</SelectItem>
-                          <SelectItem value="4">Avril</SelectItem>
-                          <SelectItem value="5">Mai</SelectItem>
-                          <SelectItem value="6">Juin</SelectItem>
-                          <SelectItem value="7">Juillet</SelectItem>
-                          <SelectItem value="8">Août</SelectItem>
-                          <SelectItem value="9">Septembre</SelectItem>
-                          <SelectItem value="10">Octobre</SelectItem>
-                          <SelectItem value="11">Novembre</SelectItem>
-                          <SelectItem value="12">Décembre</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Label htmlFor="historique-annee" className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Année</Label>
-                      <Select value={historiqueFilterAnnee} onValueChange={setHistoriqueFilterAnnee}>
-                        <SelectTrigger id="historique-annee" className="w-[120px] bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">
-                          <SelectValue placeholder="Toutes" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="all">Toutes les années</SelectItem>
-                          {historiqueAnneesOptions.map((y) => (
-                            <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                    </div>
+                  <div className="flex flex-wrap items-center gap-2 mb-4">
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Période</Label>
+                    <Popover open={historiqueCalendarOpen} onOpenChange={setHistoriqueCalendarOpen}>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="h-8 w-[200px] justify-start text-left font-normal bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
+                        >
+                          <CalendarDays className="mr-2 h-4 w-4" />
+                          {historiqueFilterMois === 'all' || historiqueFilterAnnee === 'all'
+                            ? 'Tous les mois et années'
+                            : format(new Date(Number(historiqueFilterAnnee), Number(historiqueFilterMois) - 1, 1), "MMMM yyyy", { locale: fr }).replace(/^\w/, (c) => c.toUpperCase())}
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-auto p-0 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700" align="start">
+                        <CalendarUI
+                          mode="single"
+                          selected={historiqueFilterMois !== 'all' && historiqueFilterAnnee !== 'all'
+                            ? new Date(Number(historiqueFilterAnnee), Number(historiqueFilterMois) - 1, 1)
+                            : undefined}
+                          onSelect={(date) => {
+                            if (date) {
+                              setHistoriqueFilterMois(String(date.getMonth() + 1));
+                              setHistoriqueFilterAnnee(String(date.getFullYear()));
+                              setHistoriqueCalendarOpen(false);
+                            }
+                          }}
+                          defaultMonth={historiqueFilterMois !== 'all' && historiqueFilterAnnee !== 'all'
+                            ? new Date(Number(historiqueFilterAnnee), Number(historiqueFilterMois) - 1, 1)
+                            : new Date()}
+                          locale={fr}
+                        />
+                      </PopoverContent>
+                    </Popover>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8 text-xs text-indigo-600 dark:text-indigo-400"
+                      onClick={() => {
+                        setHistoriqueFilterMois('all');
+                        setHistoriqueFilterAnnee('all');
+                      }}
+                    >
+                      Voir tout
+                    </Button>
                   </div>
                   <HistoriqueCotisationsTable cotisations={filteredHistoriqueCotisations} />
                 </CardContent>

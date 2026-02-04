@@ -22,6 +22,7 @@
     "db:migrate-elections-dates-validation": "tsx scripts/migrate-elections-dates-validation.ts",
     "db:delete-all-evenements": "tsx scripts/delete-all-evenements.ts",
     "db:purge-cotisations": "tsx scripts/purge-cotisations.ts",
+    "db:purge-cotisations-mois-et-paiements": "tsx scripts/purge-cotisations-mois-et-paiements.ts",
     "db:update-types-beneficiaire": "tsx scripts/update-types-cotisation-beneficiaire.ts",
     "db:create-anniversaire": "tsx scripts/create-anniversaire-evenement.ts",
     "db:create-evenements-elections": "tsx scripts/create-evenements-elections.ts",

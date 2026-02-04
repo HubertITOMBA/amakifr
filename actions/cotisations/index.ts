@@ -182,6 +182,7 @@ export async function createManualCotisation(data: z.infer<typeof CreateCotisati
       // Ne pas bloquer la création si le logging échoue
     }
 
+    let messageAvoirSurDette = "";
     // Mettre à jour l'obligation correspondante si elle existe
     const obligation = await prisma.obligationCotisation.findFirst({
       where: {
@@ -228,7 +229,7 @@ export async function createManualCotisation(data: z.infer<typeof CreateCotisati
         }
       });
 
-      // Si il y a un excédent, créer un avoir
+      // Si il y a un excédent, créer un avoir puis l'appliquer sur les dettes initiales si possible
       if (excédent.gt(0)) {
         await prisma.avoir.create({
           data: {
@@ -240,10 +241,18 @@ export async function createManualCotisation(data: z.infer<typeof CreateCotisati
             statut: "Disponible",
           },
         });
+        const { appliquerAvoirSurDettesInitiales } = await import("@/actions/paiements/index");
+        const { montantApplique } = await appliquerAvoirSurDettesInitiales(validatedData.adherentId);
+        messageAvoirSurDette = montantApplique.gt(0)
+          ? ` L'avoir a été appliqué sur la dette initiale (${montantApplique.toFixed(2)} €).`
+          : "";
       }
     }
 
-    return { success: true, data: cotisationConverted };
+    const message = messageAvoirSurDette
+      ? `Cotisation enregistrée avec succès.${messageAvoirSurDette}`
+      : undefined;
+    return { success: true, data: cotisationConverted, ...(message ? { message } : {}) };
 
   } catch (error) {
     console.error("Erreur lors de la création de la cotisation manuelle:", error);

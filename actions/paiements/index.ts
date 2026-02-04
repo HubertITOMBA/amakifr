@@ -184,6 +184,46 @@ export async function appliquerAvoirs(
 }
 
 /**
+ * Applique les avoirs disponibles de l'adhérent (dont un éventuel avoir venant d'un excédent
+ * de paiement) sur ses dettes initiales, et met à jour les montants des dettes.
+ * Appelé après création d'un avoir pour couvrir automatiquement la dette initiale si possible.
+ * @returns Le montant total appliqué sur les dettes initiales (pour message de succès).
+ */
+export async function appliquerAvoirSurDettesInitiales(adherentId: string): Promise<{ montantApplique: Decimal }> {
+  let montantApplique = new Decimal(0);
+  const dettes = await prisma.detteInitiale.findMany({
+    where: { adherentId, montantRestant: { gt: 0 } },
+    orderBy: { annee: "asc" },
+  });
+  for (const dette of dettes) {
+    const montantDette = new Decimal(dette.montantRestant);
+    if (montantDette.lte(0)) continue;
+    const montantRestantApresAvoirs = await appliquerAvoirs(
+      adherentId,
+      montantDette,
+      "detteInitiale",
+      dette.id
+    );
+    const avoirsUtilises = montantDette.minus(montantRestantApresAvoirs);
+    if (avoirsUtilises.gt(0)) {
+      montantApplique = montantApplique.plus(avoirsUtilises);
+      const nouveauMontantPaye = new Decimal(dette.montantPaye).plus(avoirsUtilises);
+      const nouveauMontantRestant = montantRestantApresAvoirs.gt(0)
+        ? montantRestantApresAvoirs
+        : new Decimal(0);
+      await prisma.detteInitiale.update({
+        where: { id: dette.id },
+        data: {
+          montantPaye: nouveauMontantPaye,
+          montantRestant: nouveauMontantRestant,
+        },
+      });
+    }
+  }
+  return { montantApplique };
+}
+
+/**
  * Enregistre un paiement et met à jour les montants payés/restants
  * Gère automatiquement les excédents en créant des avoirs
  */
@@ -201,6 +241,7 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
     let montantRestantAPayer = montantPaiement;
     let avoirCree: any = null;
     let montantEffectivementPaye = new Decimal(0);
+    let avoirAppliqueSurDetteInitiale = new Decimal(0);
 
     // Mettre à jour les montants selon le type de paiement et appliquer les avoirs
     if (validatedData.cotisationMensuelleId) {
@@ -344,7 +385,7 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
       },
     });
 
-    // Si il y a un excédent, créer un avoir
+    // Si il y a un excédent, créer un avoir puis tenter de l'appliquer sur les dettes initiales
     if (montantRestantAPayer.gt(0)) {
       avoirCree = await prisma.avoir.create({
         data: {
@@ -357,6 +398,12 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
           statut: "Disponible",
         },
       });
+      const { montantApplique } = await appliquerAvoirSurDettesInitiales(validatedData.adherentId);
+      // Recharger l'avoir au cas où il a été partiellement ou totalement utilisé sur une dette
+      if (avoirCree?.id) {
+        avoirCree = await prisma.avoir.findUnique({ where: { id: avoirCree.id } }) ?? avoirCree;
+      }
+      avoirAppliqueSurDetteInitiale = montantApplique;
     }
 
     // Logger l'activité
@@ -382,7 +429,11 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
 
     let message = `Paiement de ${montantPaiement.toFixed(2)}€ enregistré avec succès`;
     if (avoirCree) {
-      message += `. Un avoir de ${montantRestantAPayer.toFixed(2)}€ a été créé pour l'excédent.`;
+      const montantAvoir = Number(avoirCree.montant ?? 0);
+      message += `. Un avoir de ${montantAvoir.toFixed(2)}€ a été créé pour l'excédent.`;
+      if (avoirAppliqueSurDetteInitiale.gt(0)) {
+        message += ` L'avoir a été appliqué sur la dette initiale (${avoirAppliqueSurDetteInitiale.toFixed(2)} €).`;
+      }
     }
 
     // Récupérer le paiement avec toutes ses relations pour convertir les Decimal
@@ -974,6 +1025,41 @@ export async function getAllDettesInitiales() {
 }
 
 /**
+ * Récupère les dettes initiales d'un adhérent (pour affichage dans les dialogs paiement / détails).
+ */
+export async function getDettesInitialesByAdherent(adherentId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllDettesInitiales");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const dettes = await prisma.detteInitiale.findMany({
+      where: { adherentId },
+      orderBy: { annee: "asc" },
+    });
+    return {
+      success: true,
+      data: dettes.map((d) => ({
+        id: d.id,
+        annee: d.annee,
+        montant: Number(d.montant),
+        montantPaye: Number(d.montantPaye),
+        montantRestant: Number(d.montantRestant),
+        description: d.description,
+      })),
+    };
+  } catch (error) {
+    console.error("Erreur getDettesInitialesByAdherent:", error);
+    return { success: false, error: "Erreur lors de la récupération des dettes" };
+  }
+}
+
+/**
  * Schéma de validation pour mettre à jour une dette initiale
  */
 const UpdateDetteInitialeSchema = z.object({
@@ -1466,6 +1552,7 @@ export async function createPaiementGeneral(data: {
     let montantRestant = montantPaiement;
     const paiementsCrees: any[] = [];
     let avoirCree: any = null;
+    let avoirAppliqueSurDetteInitiale = new Decimal(0);
 
     // Distribuer le paiement sur toutes les dettes en commençant par les plus anciennes
     for (const dette of toutesDettes) {
@@ -1605,11 +1692,19 @@ export async function createPaiementGeneral(data: {
           statut: "Disponible",
         },
       });
+      const { montantApplique } = await appliquerAvoirSurDettesInitiales(data.adherentId);
+      if (avoirCree?.id) {
+        avoirCree = await prisma.avoir.findUnique({ where: { id: avoirCree.id } }) ?? avoirCree;
+      }
+      avoirAppliqueSurDetteInitiale = montantApplique;
     }
 
     let message = `Paiement de ${data.montant.toFixed(2)}€ enregistré et distribué sur ${paiementsCrees.length} dette(s).`;
     if (avoirCree) {
       message += ` Un avoir de ${montantRestant.toFixed(2)}€ a été créé pour l'excédent.`;
+      if (avoirAppliqueSurDetteInitiale.gt(0)) {
+        message += ` L'avoir a été appliqué sur la dette initiale (${avoirAppliqueSurDetteInitiale.toFixed(2)} €).`;
+      }
     }
 
     return {
