@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
+import { fr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
 import { Search, Euro, ArrowLeft, MoreHorizontal, Loader2, CalendarDays, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
 import { toast } from "sonner";
@@ -314,10 +315,10 @@ export default function AdminPaiementsPage() {
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
               <div>
                 <CardTitle className="text-lg sm:text-xl font-bold text-white">
-                  Cotisations mensuelles ({filteredCotisations.length})
+                  Paiement en espèce de cotisations ({filteredCotisations.length})
                 </CardTitle>
                 <p className="text-sm text-emerald-100 dark:text-emerald-200/90 mt-1">
-                  Liste des cotisations · Menu (…) : voir les détails ou paiement manuel.
+                  Enregistrer ici les cotisations en espèces.
                 </p>
               </div>
               <ColumnVisibilityToggle table={table} storageKey="admin-paiements-cotisations-column-visibility" />
@@ -359,6 +360,7 @@ export default function AdminPaiementsPage() {
                         const [y, m] = periode.split("-").map(Number);
                         return new Date(y ?? now.getFullYear(), (m ?? now.getMonth() + 1) - 1, 1);
                       })()}
+                      locale={fr}
                     />
                   </PopoverContent>
                 </Popover>
@@ -439,7 +441,7 @@ export default function AdminPaiementsPage() {
         <DialogContent className="max-w-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
           <DialogHeader>
             <DialogTitle className="text-base text-gray-900 dark:text-gray-100">
-              Paiement manuel
+              Paiement en espèce
             </DialogTitle>
             <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
               {selectedCotisationForPay && (

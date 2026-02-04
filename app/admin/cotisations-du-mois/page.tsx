@@ -9,6 +9,8 @@ import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Calendar as CalendarUI } from "@/components/ui/calendar";
+import { fr } from "date-fns/locale";
 import { Textarea } from "@/components/ui/textarea";
 import { 
   Calendar, 
@@ -40,7 +42,7 @@ import {
   deleteCotisationDuMois,
   getAdherentsMembres,
 } from "@/actions/cotisations-du-mois";
-import { getAllTypesCotisationMensuelle } from "@/actions/cotisations-mensuelles";
+import { getAllTypesCotisationMensuelle, createCotisationsMensuelles } from "@/actions/cotisations-mensuelles";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -143,6 +145,8 @@ export default function AdminCotisationsDuMois() {
     adherentBeneficiaireId: "",
   });
   const [adherentSearchOpen, setAdherentSearchOpen] = useState(false);
+  const [showAffecterDialog, setShowAffecterDialog] = useState(false);
+  const [affecterDate, setAffecterDate] = useState<Date>(() => new Date());
   const [loadingAffecter, setLoadingAffecter] = useState(false);
   const [adherentsMembres, setAdherentsMembres] = useState<Array<{ id: string; firstname: string; lastname: string; email: string }>>([]);
   const [selectedAdherent, setSelectedAdherent] = useState<{
@@ -586,12 +590,33 @@ export default function AdminCotisationsDuMois() {
     }
   };
 
-  const handleAffecterCotisations = async () => {
-    const now = new Date();
-    const mois = now.getMonth() + 1;
-    const annee = now.getFullYear();
+  const handleOpenAffecterDialog = () => {
+    setAffecterDate(new Date());
+    setShowAffecterDialog(true);
+  };
 
-    // Même logique que /admin/cotisations : on envoie les types obligatoires + actifs (au moins le forfait)
+  const handleAffecterCotisations = async () => {
+    const affecterAnnee = affecterDate.getFullYear();
+    const affecterMois = affecterDate.getMonth() + 1;
+    const periode = `${affecterAnnee}-${String(affecterMois).padStart(2, "0")}`;
+    const moisLabel = moisOptions.find((m) => m.value === affecterMois)?.label ?? affecterMois;
+    // Vérifier qu'il existe au moins une ligne "cotisation du mois" pour cette période (créée via "Nouvelle cotisation")
+    const cotisationsForPeriod = cotisations.filter((c) => c.periode === periode);
+    const hasCotisationsDuMoisForPeriod = cotisationsForPeriod.length > 0;
+    if (!hasCotisationsDuMoisForPeriod) {
+      toast.warning(
+        `Aucune ligne de cotisation du mois pour ${moisLabel} ${affecterAnnee}. Créez d'abord au moins une cotisation du mois (bouton "Nouvelle cotisation", ex. forfait) pour cette période, puis réessayez.`
+      );
+      return;
+    }
+    // Vérifier si la période est déjà affectée (cotisations mensuelles déjà créées)
+    const alreadyAffected = cotisationsForPeriod.some((c) => (c._count?.CotisationsMensuelles ?? 0) > 0);
+    if (alreadyAffected) {
+      toast.info(
+        `${moisLabel} ${affecterAnnee} est déjà affecté. Les cotisations mensuelles existent déjà pour cette période. Consultez Admin > Cotisations pour les modifier.`
+      );
+      return;
+    }
     const typeCotisationIds = typesCotisation.filter((t) => t.obligatoire && t.actif).map((t) => t.id);
     if (typeCotisationIds.length === 0) {
       toast.error("Aucun type de cotisation obligatoire actif. Configurez les types sur /admin/cotisations.");
@@ -607,18 +632,27 @@ export default function AdminCotisationsDuMois() {
     setLoadingAffecter(true);
     try {
       const result = await createCotisationsMensuelles({
-        periode: `${annee}-${String(mois).padStart(2, "0")}`,
-        annee,
-        mois,
+        periode,
+        annee: affecterAnnee,
+        mois: affecterMois,
         typeCotisationIds,
       });
       if (result.success) {
-        toast.success(result.message);
+        toast.success(
+          result.message + " Consultez la page Admin > Cotisations pour voir les cotisations par adhérent."
+        );
+        setShowAffecterDialog(false);
         loadData();
       } else {
         const msg = result.error ?? "";
         if (msg.includes("Aucune cotisation du mois trouvée") || msg.includes("Veuillez d'abord créer les cotisations du mois")) {
-          toast.info("Pas de cotisation à affecter");
+          toast.warning(
+            `Aucune ligne de cotisation du mois pour cette période. Créez d'abord au moins une "Nouvelle cotisation" (ex. forfait) pour ${moisLabel} ${affecterAnnee}.`
+          );
+        } else if (msg.includes("existent déjà") || msg.includes("exist déjà")) {
+          toast.info(
+            `${moisLabel} ${affecterAnnee} est déjà affecté. Les cotisations mensuelles existent déjà pour cette période.`
+          );
         } else {
           toast.error(msg || "Erreur lors de l'affectation");
         }
@@ -677,10 +711,10 @@ export default function AdminCotisationsDuMois() {
                 </Link>
               </Button>
               <Button
-                onClick={handleAffecterCotisations}
+                onClick={handleOpenAffecterDialog}
                 disabled={loadingAffecter}
                 className="bg-white text-blue-600 hover:bg-blue-50 border-white shadow-sm font-medium"
-                title="Crée les cotisations mensuelles pour tous les adhérents actifs (mois en cours)"
+                title="Choisir la période puis créer les cotisations mensuelles pour tous les adhérents actifs"
               >
                 {loadingAffecter ? (
                   <Clock className="h-4 w-4 mr-2 animate-spin" />
@@ -798,7 +832,7 @@ export default function AdminCotisationsDuMois() {
           <DataTable table={table} emptyMessage="Aucune cotisation du mois trouvée" compact={true} />
           
           {/* Pagination - Masquée sur mobile */}
-          <div className="hidden md:flex bg-white dark:bg-gray-800 mt-3 items-center justify-between !py-0 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
+          <div className="hidden md:flex bg-white dark:bg-gray-800 mt-3 items-center justify-between py-3 px-3 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700">
             <div className="ml-3 flex-1 text-xs text-muted-foreground dark:text-gray-400">
               {table.getFilteredRowModel().rows.length} ligne(s) au total
             </div>
@@ -873,23 +907,22 @@ export default function AdminCotisationsDuMois() {
 
       {/* Dialog de création/édition */}
       <Dialog open={showForm} onOpenChange={setShowForm}>
-        <DialogContent className="!py-0 !pt-0 max-w-2xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader className="!py-0 !pt-0 pb-3">
-            <div className="pt-4">
-              <DialogTitle className="text-lg">
-                {editingCotisation ? "Modifier la cotisation du mois" : "Nouvelle cotisation du mois"}
-              </DialogTitle>
-              <DialogDescription className="text-xs">
-                {editingCotisation 
-                  ? "Modifiez les informations de la cotisation du mois"
-                  : "Créez une nouvelle cotisation pour un mois et une année donnés"}
-              </DialogDescription>
-            </div>
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 border-border bg-card shadow-xl [&_[data-slot=dialog-close]]:text-white [&_[data-slot=dialog-close]]:hover:text-blue-100 [&_[data-slot=dialog-close]]:hover:bg-white/10">
+          <DialogHeader className="shrink-0 bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-blue-700 dark:to-indigo-700 text-white px-6 py-4 rounded-t-lg shadow-sm">
+            <DialogTitle className="text-lg font-semibold text-white">
+              {editingCotisation ? "Modifier la cotisation du mois" : "Nouvelle cotisation du mois"}
+            </DialogTitle>
+            <DialogDescription className="text-sm text-blue-100 dark:text-blue-200">
+              {editingCotisation 
+                ? "Modifiez les informations de la cotisation du mois"
+                : "Créez une nouvelle cotisation pour un mois et une année donnés"}
+            </DialogDescription>
           </DialogHeader>
-          <form onSubmit={handleSubmit} className="space-y-3">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="annee" className="text-xs">Année *</Label>
+          <form onSubmit={handleSubmit} className="flex flex-col flex-1 min-h-0 overflow-y-auto">
+            <div className="p-6 space-y-4 flex-1">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="annee" className="text-sm font-medium text-foreground">Année *</Label>
                 <Input
                   id="annee"
                   type="number"
@@ -901,8 +934,8 @@ export default function AdminCotisationsDuMois() {
                   disabled={!!editingCotisation}
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="mois" className="text-xs">Mois *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="mois" className="text-sm font-medium text-foreground">Mois *</Label>
                 <Select
                   value={formData.mois.toString()}
                   onValueChange={(value) => setFormData({ ...formData, mois: parseInt(value) })}
@@ -922,8 +955,8 @@ export default function AdminCotisationsDuMois() {
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="typeCotisationId" className="text-xs">Type de cotisation *</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="typeCotisationId" className="text-sm font-medium text-foreground">Type de cotisation *</Label>
               <Select
                 value={formData.typeCotisationId}
                 onValueChange={(value) => setFormData({ ...formData, typeCotisationId: value })}
@@ -942,9 +975,9 @@ export default function AdminCotisationsDuMois() {
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1">
-                <Label htmlFor="montantBase" className="text-xs">Montant de base (€) *</Label>
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="montantBase" className="text-sm font-medium text-foreground">Montant de base (€) *</Label>
                 <Input
                   id="montantBase"
                   type="number"
@@ -955,8 +988,8 @@ export default function AdminCotisationsDuMois() {
                   required
                 />
               </div>
-              <div className="space-y-1">
-                <Label htmlFor="dateEcheance" className="text-xs">Échéance *</Label>
+              <div className="space-y-1.5">
+                <Label htmlFor="dateEcheance" className="text-sm font-medium text-foreground">Échéance *</Label>
                 <Input
                   id="dateEcheance"
                   type="date"
@@ -967,8 +1000,8 @@ export default function AdminCotisationsDuMois() {
               </div>
             </div>
 
-            <div className="space-y-1">
-              <Label htmlFor="description" className="text-xs">Description</Label>
+            <div className="space-y-1.5">
+              <Label htmlFor="description" className="text-sm font-medium text-foreground">Description</Label>
               <Textarea
                 id="description"
                 value={formData.description}
@@ -985,8 +1018,8 @@ export default function AdminCotisationsDuMois() {
               
               if (aBeneficiaire) {
                 return (
-                  <div className="space-y-1">
-                    <Label className="text-xs">Adhérent bénéficiaire *</Label>
+                  <div className="space-y-1.5">
+                    <Label className="text-sm font-medium text-foreground">Adhérent bénéficiaire *</Label>
                     <div className="flex gap-2 flex-wrap">
                       <Select
                         value={formData.adherentBeneficiaireId}
@@ -1037,7 +1070,7 @@ export default function AdminCotisationsDuMois() {
                         </Button>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 dark:text-gray-400">
+                    <p className="text-xs text-muted-foreground">
                       Les cotisations ne concernent que les adhérents MEMBRE. L&apos;adhérent bénéficiaire ne paiera pas cette cotisation d&apos;assistance.
                     </p>
                   </div>
@@ -1045,8 +1078,9 @@ export default function AdminCotisationsDuMois() {
               }
               return null;
             })()}
+            </div>
 
-            <DialogFooter className="!py-0 pt-3">
+            <DialogFooter className="shrink-0 flex flex-row justify-end gap-2 border-t border-border bg-muted/30 px-6 py-4 pb-6 sm:pb-6">
               <Button
                 type="button"
                 variant="outline"
@@ -1055,14 +1089,67 @@ export default function AdminCotisationsDuMois() {
                   setShowForm(false);
                   setEditingCotisation(null);
                 }}
+                className="min-w-[5rem]"
               >
                 Annuler
               </Button>
-              <Button type="submit" size="sm" disabled={loading}>
+              <Button type="submit" size="sm" disabled={loading} className="min-w-[5rem]">
                 {loading ? "Enregistrement..." : editingCotisation ? "Modifier" : "Créer"}
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog choix période pour affectation (même style que /admin/cotisations) */}
+      <Dialog open={showAffecterDialog} onOpenChange={setShowAffecterDialog}>
+        <DialogContent className="max-w-sm sm:max-w-md border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-blue-800 dark:text-blue-200">Choisir le mois à affecter</DialogTitle>
+            <DialogDescription className="text-blue-700 dark:text-blue-300">
+              Sélectionnez une date dans le calendrier pour choisir le mois et l&apos;année. Les cotisations du mois doivent déjà exister pour cette période.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex justify-center py-2 rounded-lg bg-white/80 dark:bg-gray-900/80 p-2">
+            <CalendarUI
+              mode="single"
+              selected={affecterDate}
+              onSelect={(date) => date && setAffecterDate(date)}
+              defaultMonth={affecterDate}
+              locale={fr}
+              className="rounded-md border border-blue-200 dark:border-blue-800"
+            />
+          </div>
+          <p className="text-sm text-blue-800 dark:text-blue-200 text-center font-medium">
+            Période sélectionnée : <strong>{moisOptions.find((m) => m.value === affecterDate.getMonth() + 1)?.label} {affecterDate.getFullYear()}</strong>
+          </p>
+          <DialogFooter className="gap-4 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setShowAffecterDialog(false)}
+            >
+              Annuler
+            </Button>
+            <Button
+              type="button"
+              disabled={loadingAffecter}
+              onClick={handleAffecterCotisations}
+              className="bg-blue-600 hover:bg-blue-700"
+            >
+              {loadingAffecter ? (
+                <>
+                  <Clock className="h-4 w-4 mr-2 animate-spin" />
+                  Affectation...
+                </>
+              ) : (
+                <>
+                  <CheckCircle2 className="h-4 w-4 mr-2" />
+                  Affecter pour {moisOptions.find((m) => m.value === affecterDate.getMonth() + 1)?.label} {affecterDate.getFullYear()}
+                </>
+              )}
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
 
@@ -1077,6 +1164,28 @@ export default function AdminCotisationsDuMois() {
         title="Sélectionner l'adhérent bénéficiaire"
         description="Recherchez l'adhérent qui bénéficiera de cette assistance (il ne paiera pas cette cotisation)"
       />
+
+      {/* Informations importantes */}
+      <Card className="mx-auto max-w-[96rem] w-full border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 mt-6">
+        <CardContent className="p-6">
+          <div className="flex items-start space-x-3">
+            <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+            <div>
+              <h3 className="font-medium text-amber-800 dark:text-amber-200">
+                Informations Importantes
+              </h3>
+              <ul className="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1">
+                <li>• Les cotisations seront créées pour tous les adhérents actifs</li>
+                <li>• La date d&apos;échéance sera fixée au 15 du mois sélectionné</li>
+                <li>• Les adhérents recevront une notification de leur obligation</li>
+                <li>• Un système de relance automatique sera activé pour les retards</li>
+                <li>• <strong>Les cotisations du mois en cours ou du mois suivant peuvent être modifiées</strong> après création (montant, date d&apos;échéance, statut, description)</li>
+                <li>• Utilisez le bouton d&apos;édition (icône crayon) sur les cotisations modifiables pour les modifier</li>
+              </ul>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   );
 }

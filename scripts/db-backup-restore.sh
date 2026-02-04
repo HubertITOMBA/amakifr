@@ -17,6 +17,29 @@ YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
+# Connexion : utiliser DATABASE_URL si défini, sinon -U et -d
+psql_conn() {
+    if [ -n "$DATABASE_URL" ]; then
+        psql "$DATABASE_URL" "$@"
+    else
+        psql -U "$DB_USER" -d "$DB_NAME" "$@"
+    fi
+}
+pg_dump_conn() {
+    if [ -n "$DATABASE_URL" ]; then
+        pg_dump "$DATABASE_URL" "$@"
+    else
+        pg_dump -U "$DB_USER" -d "$DB_NAME" "$@"
+    fi
+}
+pg_restore_conn() {
+    if [ -n "$DATABASE_URL" ]; then
+        pg_restore "$DATABASE_URL" "$@"
+    else
+        pg_restore -U "$DB_USER" -d "$DB_NAME" "$@"
+    fi
+}
+
 # Fonction d'aide
 show_help() {
     cat << EOF
@@ -24,33 +47,46 @@ Usage: $0 [COMMAND] [OPTIONS]
 
 Commandes disponibles:
   backup          Créer une sauvegarde de la base de données
-  restore         Restaurer une sauvegarde
+  restore         Restaurer une sauvegarde (globale ou tables choisies)
   list            Lister les sauvegardes disponibles
+  list-tables     Lister les tables contenues dans un fichier de sauvegarde (format custom)
   clean           Nettoyer les anciennes sauvegardes (garde les 10 plus récentes)
 
 Options:
   -u, --user USER         Utilisateur PostgreSQL (défaut: hubert)
   -d, --database DB       Nom de la base de données (défaut: amakifr)
   -f, --file FILE         Fichier de sauvegarde à restaurer
-  -t, --type TYPE         Type de dump: complete, custom, data-only (défaut: complete)
+  -t, --type TYPE         Type de dump: complete, custom, data-only, non-empty (défaut: complete)
+  -T, --tables T1,T2,...   Restaurer uniquement ces tables (format custom uniquement)
   -b, --backup-dir DIR    Répertoire de sauvegarde (défaut: ./backups)
   -h, --help              Afficher cette aide
+
+  Connexion: définir DATABASE_URL pour utiliser une URL (ex. production), sinon -u et -d.
+
+Types de dump:
+  complete    Dump complet (schéma + données), format SQL.
+  custom      Dump complet, format binaire (permet restauration par table).
+  data-only   Données uniquement, format SQL.
+  non-empty   Uniquement les tables non vides (schéma + données), format custom.
 
 Exemples:
   # Créer une sauvegarde complète
   $0 backup
 
-  # Créer une sauvegarde custom (binaire, plus compacte)
-  $0 backup -t custom
+  # Sauvegarder uniquement les tables non vides
+  $0 backup -t non-empty
 
   # Lister les sauvegardes disponibles
   $0 list
 
-  # Restaurer une sauvegarde complète
+  # Restaurer une sauvegarde complète (global)
   $0 restore -f backups/amakifr_complete_20260128_123456.sql
 
-  # Restaurer une sauvegarde custom
-  $0 restore -f backups/amakifr_custom_20260128_123456.dump
+  # Restaurer uniquement certaines tables (fichier custom ou non-empty)
+  $0 restore -f backups/amakifr_nonempty_20260128_123456.dump -T "User,adherent,cotisation"
+
+  # Lister les tables d'un fichier de sauvegarde
+  $0 list-tables -f backups/amakifr_nonempty_20260128_123456.dump
 
   # Nettoyer les anciennes sauvegardes
   $0 clean
@@ -65,13 +101,14 @@ backup_database() {
     # Créer le répertoire de sauvegarde s'il n'existe pas
     mkdir -p "$BACKUP_DIR"
     
-    echo -e "${BLUE}🔄 Début de la sauvegarde de la base de données $DB_NAME...${NC}"
+    local db_label="${DB_NAME:-base (DATABASE_URL)}"
+    echo -e "${BLUE}🔄 Début de la sauvegarde de la base de données ${db_label}...${NC}"
     
     case "$dump_type" in
         complete)
             BACKUP_FILE="$BACKUP_DIR/amakifr_complete_${TIMESTAMP}.sql"
             echo -e "${BLUE}📦 Création du dump complet (recommandé)...${NC}"
-            if pg_dump -U "$DB_USER" -F p "$DB_NAME" > "$BACKUP_FILE" 2>&1; then
+            if pg_dump_conn -F p > "$BACKUP_FILE" 2>&1; then
                 echo -e "${GREEN}✅ Dump complet créé : $BACKUP_FILE${NC}"
             else
                 echo -e "${RED}❌ Erreur lors de la création du dump complet${NC}"
@@ -81,7 +118,7 @@ backup_database() {
         custom)
             BACKUP_FILE="$BACKUP_DIR/amakifr_custom_${TIMESTAMP}.dump"
             echo -e "${BLUE}📦 Création du dump custom (format binaire, plus compact)...${NC}"
-            if pg_dump -U "$DB_USER" -F c -f "$BACKUP_FILE" "$DB_NAME" 2>&1; then
+            if pg_dump_conn -F c -f "$BACKUP_FILE" 2>&1; then
                 echo -e "${GREEN}✅ Dump custom créé : $BACKUP_FILE${NC}"
             else
                 echo -e "${RED}❌ Erreur lors de la création du dump custom${NC}"
@@ -91,17 +128,42 @@ backup_database() {
         data-only)
             BACKUP_FILE="$BACKUP_DIR/amakifr_data_${TIMESTAMP}.sql"
             echo -e "${YELLOW}⚠️  Création du dump data-only (peut avoir des avertissements sur contraintes circulaires)...${NC}"
-            if pg_dump -U "$DB_USER" --data-only "$DB_NAME" > "$BACKUP_FILE" 2>&1; then
+            if pg_dump_conn --data-only > "$BACKUP_FILE" 2>&1; then
                 echo -e "${GREEN}✅ Dump data-only créé : $BACKUP_FILE${NC}"
-                echo -e "${YELLOW}ℹ️  Pour restaurer ce dump, utilisez : psql -U $DB_USER -d $DB_NAME --set=session_replication_role=replica < $BACKUP_FILE${NC}"
+                echo -e "${YELLOW}ℹ️  Pour restaurer : psql ... --set=session_replication_role=replica < $BACKUP_FILE${NC}"
             else
                 echo -e "${RED}❌ Erreur lors de la création du dump data-only${NC}"
                 exit 1
             fi
             ;;
+        non-empty)
+            BACKUP_FILE="$BACKUP_DIR/amakifr_nonempty_${TIMESTAMP}.dump"
+            echo -e "${BLUE}📦 Sauvegarde des tables non vides uniquement...${NC}"
+            local dump_tables=()
+            while IFS= read -r tab; do
+                [ -z "$tab" ] && continue
+                local cnt
+                cnt=$(psql_conn -t -A -c "SELECT count(*) FROM public.\"$tab\"" 2>/dev/null) || \
+                cnt=$(psql_conn -t -A -c "SELECT count(*) FROM public.$tab" 2>/dev/null) || cnt=0
+                if [ -n "$cnt" ] && [ "${cnt:-0}" -gt 0 ]; then
+                    dump_tables+=(-t "public.\"$tab\"")
+                fi
+            done < <(psql_conn -t -A -c "SELECT tablename FROM pg_tables WHERE schemaname = 'public' ORDER BY tablename")
+            if [ ${#dump_tables[@]} -eq 0 ]; then
+                echo -e "${YELLOW}⚠️  Aucune table non vide trouvée.${NC}"
+                exit 0
+            fi
+            echo -e "${BLUE}   ${#dump_tables[@]} table(s) non vide(s) à sauvegarder.${NC}"
+            if pg_dump_conn -F c "${dump_tables[@]}" -f "$BACKUP_FILE" 2>&1; then
+                echo -e "${GREEN}✅ Dump tables non vides créé : $BACKUP_FILE${NC}"
+            else
+                echo -e "${RED}❌ Erreur lors de la création du dump non-empty${NC}"
+                exit 1
+            fi
+            ;;
         *)
             echo -e "${RED}❌ Type de dump invalide : $dump_type${NC}"
-            echo "Types valides : complete, custom, data-only"
+            echo "Types valides : complete, custom, data-only, non-empty"
             exit 1
             ;;
     esac
@@ -118,6 +180,7 @@ backup_database() {
 # Fonction pour restaurer une sauvegarde
 restore_database() {
     local backup_file="$1"
+    local tables_opt="$2"
     
     if [ -z "$backup_file" ]; then
         echo -e "${RED}❌ Erreur : Fichier de sauvegarde non spécifié${NC}"
@@ -130,7 +193,11 @@ restore_database() {
         exit 1
     fi
     
-    echo -e "${YELLOW}⚠️  ATTENTION : Cette opération va écraser la base de données $DB_NAME !${NC}"
+    local db_label="${DB_NAME:-base (DATABASE_URL)}"
+    echo -e "${YELLOW}⚠️  ATTENTION : Cette opération va modifier la base de données ${db_label} !${NC}"
+    if [ -n "$tables_opt" ]; then
+        echo -e "${YELLOW}   Tables à restaurer : $tables_opt${NC}"
+    fi
     read -p "Êtes-vous sûr de vouloir continuer ? (oui/non) " -r
     if [[ ! $REPLY =~ ^[Oo][Uu][Ii]$ ]]; then
         echo "Opération annulée."
@@ -141,9 +208,21 @@ restore_database() {
     
     # Détecter le type de fichier
     if [[ "$backup_file" == *.dump ]] || [[ "$backup_file" == *.custom ]]; then
-        # Format custom (binaire)
+        # Format custom (binaire) : restauration globale ou par table(s)
+        local restore_opts=(--clean --if-exists)
+        if [ -n "$tables_opt" ]; then
+            local t
+            while IFS=',' read -ra TABLIST; do
+                for t in "${TABLIST[@]}"; do
+                    t=$(echo "$t" | xargs)
+                    [ -z "$t" ] && continue
+                    restore_opts+=(-t "$t")
+                done
+            done <<< "$tables_opt"
+        fi
+        restore_opts+=("$backup_file")
         echo -e "${BLUE}📥 Restauration d'un dump custom...${NC}"
-        if pg_restore -U "$DB_USER" -d "$DB_NAME" --clean --if-exists "$backup_file" 2>&1; then
+        if pg_restore_conn "${restore_opts[@]}" 2>&1; then
             echo -e "${GREEN}✅ Restauration terminée avec succès !${NC}"
         else
             echo -e "${RED}❌ Erreur lors de la restauration${NC}"
@@ -151,8 +230,11 @@ restore_database() {
         fi
     elif [[ "$backup_file" == *data*.sql ]]; then
         # Format data-only (nécessite de désactiver les triggers)
+        if [ -n "$tables_opt" ]; then
+            echo -e "${YELLOW}ℹ️  Option -T/--tables ignorée pour un dump SQL data-only (restauration globale).${NC}"
+        fi
         echo -e "${BLUE}📥 Restauration d'un dump data-only (avec gestion des contraintes circulaires)...${NC}"
-        if psql -U "$DB_USER" -d "$DB_NAME" --set=session_replication_role=replica -f "$backup_file" 2>&1; then
+        if psql_conn --set=session_replication_role=replica -f "$backup_file" 2>&1; then
             echo -e "${GREEN}✅ Restauration terminée avec succès !${NC}"
         else
             echo -e "${RED}❌ Erreur lors de la restauration${NC}"
@@ -160,14 +242,37 @@ restore_database() {
         fi
     else
         # Format SQL complet
+        if [ -n "$tables_opt" ]; then
+            echo -e "${YELLOW}ℹ️  Option -T/--tables ignorée pour un dump SQL complet (restauration globale).${NC}"
+        fi
         echo -e "${BLUE}📥 Restauration d'un dump SQL complet...${NC}"
-        if psql -U "$DB_USER" -d "$DB_NAME" -f "$backup_file" 2>&1; then
+        if psql_conn -f "$backup_file" 2>&1; then
             echo -e "${GREEN}✅ Restauration terminée avec succès !${NC}"
         else
             echo -e "${RED}❌ Erreur lors de la restauration${NC}"
             exit 1
         fi
     fi
+}
+
+# Lister les tables contenues dans un fichier de sauvegarde (format custom)
+list_tables_backup() {
+    local backup_file="$1"
+    if [ -z "$backup_file" ]; then
+        echo -e "${RED}❌ Erreur : Fichier de sauvegarde non spécifié (-f <fichier>)${NC}"
+        exit 1
+    fi
+    if [ ! -f "$backup_file" ]; then
+        echo -e "${RED}❌ Fichier introuvable : $backup_file${NC}"
+        exit 1
+    fi
+    if [[ "$backup_file" != *.dump ]] && [[ "$backup_file" != *.custom ]]; then
+        echo -e "${YELLOW}⚠️  Seuls les fichiers .dump/.custom (format custom) supportent la liste des tables.${NC}"
+        exit 1
+    fi
+    echo -e "${BLUE}📋 Tables dans la sauvegarde : $backup_file${NC}"
+    echo ""
+    pg_restore -l "$backup_file" 2>/dev/null | grep "TABLE DATA" | sed 's/.*TABLE DATA public /  - /' | sed 's/ .*//' || echo "  (impossible de lire la liste)"
 }
 
 # Fonction pour lister les sauvegardes
@@ -193,7 +298,13 @@ list_backups() {
     ls -lh "$BACKUP_DIR"/amakifr_data_*.sql 2>/dev/null | awk '{printf "  %s %s %s\n", $6, $7, $9}' || echo "  Aucun"
     
     echo ""
-    echo -e "${BLUE}💡 Pour restaurer une sauvegarde : $0 restore -f <fichier>${NC}"
+    echo -e "${GREEN}Dumps tables non vides (custom):${NC}"
+    ls -lh "$BACKUP_DIR"/amakifr_nonempty_*.dump 2>/dev/null | awk '{printf "  %s %s %s\n", $6, $7, $9}' || echo "  Aucun"
+    
+    echo ""
+    echo -e "${BLUE}💡 Restaurer : $0 restore -f <fichier>${NC}"
+    echo -e "${BLUE}💡 Restaurer des tables choisies : $0 restore -f <fichier.dump> -T \"table1,table2\"${NC}"
+    echo -e "${BLUE}💡 Lister les tables d'un dump : $0 list-tables -f <fichier.dump>${NC}"
 }
 
 # Fonction pour nettoyer les anciennes sauvegardes
@@ -251,6 +362,20 @@ clean_backups() {
         kept=$((kept + data_count))
     fi
     
+    # Dumps non-empty
+    local nonempty_count=$(ls -1 "$BACKUP_DIR"/amakifr_nonempty_*.dump 2>/dev/null | wc -l)
+    if [ "$nonempty_count" -gt 10 ]; then
+        local to_delete=$((nonempty_count - 10))
+        ls -t "$BACKUP_DIR"/amakifr_nonempty_*.dump 2>/dev/null | tail -n "$to_delete" | while read file; do
+            rm -f "$file"
+            deleted=$((deleted + 1))
+            echo -e "${YELLOW}  Supprimé : $(basename $file)${NC}"
+        done
+        kept=$((kept + 10))
+    else
+        kept=$((kept + nonempty_count))
+    fi
+    
     echo -e "${GREEN}✅ Nettoyage terminé : $kept sauvegarde(s) conservée(s), $deleted supprimée(s)${NC}"
 }
 
@@ -258,10 +383,11 @@ clean_backups() {
 COMMAND=""
 DUMP_TYPE="complete"
 BACKUP_FILE=""
+RESTORE_TABLES=""
 
 while [[ $# -gt 0 ]]; do
     case $1 in
-        backup|restore|list|clean)
+        backup|restore|list|clean|list-tables)
             COMMAND="$1"
             shift
             ;;
@@ -279,6 +405,10 @@ while [[ $# -gt 0 ]]; do
             ;;
         -t|--type)
             DUMP_TYPE="$2"
+            shift 2
+            ;;
+        -T|--tables)
+            RESTORE_TABLES="$2"
             shift 2
             ;;
         -b|--backup-dir)
@@ -303,10 +433,13 @@ case "$COMMAND" in
         backup_database "$DUMP_TYPE"
         ;;
     restore)
-        restore_database "$BACKUP_FILE"
+        restore_database "$BACKUP_FILE" "$RESTORE_TABLES"
         ;;
     list)
         list_backups
+        ;;
+    list-tables)
+        list_tables_backup "$BACKUP_FILE"
         ;;
     clean)
         clean_backups

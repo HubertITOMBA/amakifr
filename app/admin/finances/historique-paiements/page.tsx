@@ -23,6 +23,9 @@ import {
   ChevronsRight,
   ArrowLeft,
   Eye,
+  AlertTriangle,
+  Euro,
+  Hash,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -263,6 +266,25 @@ export default function AdminHistoriquePaiementsPage() {
       return true;
     });
   }, [data, globalFilter, moyenFilter, moisFilter, anneeFilter]);
+
+  const stats = useMemo(() => {
+    const total = filteredData.length;
+    const montantTotal = filteredData.reduce((s, p) => s + (Number(p.montant) || 0), 0);
+    const now = new Date();
+    const ceMois = filteredData.filter((p) => {
+      if (!p.datePaiement) return false;
+      const d = new Date(p.datePaiement);
+      return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+    }).length;
+    const montantCeMois = filteredData
+      .filter((p) => {
+        if (!p.datePaiement) return false;
+        const d = new Date(p.datePaiement);
+        return d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear();
+      })
+      .reduce((s, p) => s + (Number(p.montant) || 0), 0);
+    return { total, montantTotal, ceMois, montantCeMois };
+  }, [filteredData]);
 
   const anneesOptions = useMemo(() => {
     const years = new Set<number>();
@@ -559,7 +581,47 @@ export default function AdminHistoriquePaiementsPage() {
           </Link>
         </div>
 
-        <Card className="mx-auto max-w-screen-2xl w-full shadow-lg border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900 !py-0 flex-1 flex flex-col min-h-0">
+        {/* Statistiques */}
+        <div className="mx-auto max-w-screen-2xl w-full mt-4 grid grid-cols-2 lg:grid-cols-4 gap-1">
+          <Card className="overflow-hidden pt-0 gap-0 py-0">
+            <CardContent className="p-1.5 flex items-center justify-between gap-1 py-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 leading-tight">Paiements</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white leading-tight">{stats.total}</p>
+              </div>
+              <Hash className="h-4 w-4 shrink-0 text-emerald-600" />
+            </CardContent>
+          </Card>
+          <Card className="overflow-hidden pt-0 gap-0 py-0">
+            <CardContent className="p-1.5 flex items-center justify-between gap-1 py-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 leading-tight">Total (€)</p>
+                <p className="text-sm font-bold text-emerald-600 leading-tight">{stats.montantTotal.toFixed(2).replace(".", ",")}</p>
+              </div>
+              <Euro className="h-4 w-4 shrink-0 text-emerald-600" />
+            </CardContent>
+          </Card>
+          <Card className="overflow-hidden pt-0 gap-0 py-0">
+            <CardContent className="p-1.5 flex items-center justify-between gap-1 py-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 leading-tight">Ce mois</p>
+                <p className="text-sm font-bold text-gray-900 dark:text-white leading-tight">{stats.ceMois}</p>
+              </div>
+              <Receipt className="h-4 w-4 shrink-0 text-emerald-600" />
+            </CardContent>
+          </Card>
+          <Card className="overflow-hidden pt-0 gap-0 py-0">
+            <CardContent className="p-1.5 flex items-center justify-between gap-1 py-2">
+              <div className="min-w-0">
+                <p className="text-[10px] font-medium text-gray-500 dark:text-gray-400 leading-tight">Montant mois</p>
+                <p className="text-sm font-bold text-emerald-600 leading-tight">{stats.montantCeMois.toFixed(2).replace(".", ",")} €</p>
+              </div>
+              <Euro className="h-4 w-4 shrink-0 text-emerald-600" />
+            </CardContent>
+          </Card>
+        </div>
+
+        <Card className="mx-auto max-w-screen-2xl w-full mt-4 shadow-lg border-2 border-emerald-200 dark:border-emerald-800/50 bg-white dark:bg-gray-900 !py-0 flex-1 flex flex-col min-h-0">
           <CardHeader className="bg-gradient-to-r from-green-500/90 via-emerald-400/80 to-green-500/90 dark:from-green-700/50 dark:via-emerald-600/40 dark:to-green-700/50 text-white pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0 shadow-md">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 sm:gap-0">
               <CardTitle className="flex items-center gap-2 text-lg sm:text-xl font-bold text-white">
@@ -966,6 +1028,26 @@ export default function AdminHistoriquePaiementsPage() {
                 </div>
               </>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Informations importantes */}
+        <Card className="mx-auto max-w-screen-2xl w-full mt-4 border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20">
+          <CardContent className="p-4">
+            <div className="flex items-start space-x-3">
+              <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
+              <div>
+                <h3 className="font-medium text-amber-800 dark:text-amber-200">
+                  Informations importantes
+                </h3>
+                <ul className="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1">
+                  <li>• Les paiements enregistrés ici sont liés aux cotisations mensuelles, dettes initiales ou assistances.</li>
+                  <li>• Pour modifier le montant attendu ou la date d&apos;échéance d&apos;une cotisation, consultez la page &quot;Cotisations du mois&quot;.</li>
+                  <li>• Un paiement peut être partiel (plusieurs paiements pour une même cotisation) ou complet.</li>
+                  <li>• <strong>Les cotisations</strong> (montant, échéance, statut) se consultent et se modifient depuis Admin &gt; Cotisations du mois.</li>
+                </ul>
+              </div>
+            </div>
           </CardContent>
         </Card>
 
