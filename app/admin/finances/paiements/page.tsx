@@ -11,25 +11,20 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Calendar } from "@/components/ui/calendar";
 import { fr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
-import { Search, Euro, ArrowLeft, MoreHorizontal, Loader2, CalendarDays, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
+import { Search, Euro, ArrowLeft, Loader2, CalendarDays, Eye, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Pencil, ExternalLink, FileText, Upload } from "lucide-react";
+import { format } from "date-fns";
 import { toast } from "sonner";
 import Link from "next/link";
-import { createPaiement, getDettesInitialesByAdherent } from "@/actions/paiements";
+import { createPaiement, updatePaiement, getDettesInitialesByAdherent, uploadJustificatifPaiement } from "@/actions/paiements";
 import { getCotisationsMensuellesByPeriode } from "@/actions/cotisations-mensuelles";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
 import {
   createColumnHelper,
   getCoreRowModel,
   getPaginationRowModel,
+  getSortedRowModel,
   useReactTable,
   type VisibilityState,
+  type SortingState,
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
@@ -53,11 +48,18 @@ export default function AdminPaiementsPage() {
     moyenPaiement: "Especes" as "Especes" | "Cheque" | "Virement" | "CarteBancaire",
     reference: "",
   });
+  const [payJustificatifFile, setPayJustificatifFile] = useState<File | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
   const [calendarOpen, setCalendarOpen] = useState(false);
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedCotisationForDetail, setSelectedCotisationForDetail] = useState<any | null>(null);
   const [dettesInitialesAdherent, setDettesInitialesAdherent] = useState<{ id: string; annee: number; montant: number; montantPaye: number; montantRestant: number; description?: string | null }[]>([]);
+  const [sorting, setSorting] = useState<SortingState>([]);
+  const [editPaiementOpen, setEditPaiementOpen] = useState(false);
+  const [editingPaiement, setEditingPaiement] = useState<{ id: string; montant: number; datePaiement: string; moyenPaiement: string; reference?: string | null; justificatifChemin?: string | null } | null>(null);
+  const [editPaiementForm, setEditPaiementForm] = useState({ montant: "", datePaiement: "", moyenPaiement: "Especes" as "Especes" | "Cheque" | "Virement" | "CarteBancaire", reference: "" });
+  const [editJustificatifFile, setEditJustificatifFile] = useState<File | null>(null);
+  const [savingPaiement, setSavingPaiement] = useState(false);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [isMobile, setIsMobile] = useState(false);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
@@ -257,35 +259,30 @@ export default function AdminPaiementsPage() {
         cell: ({ row }) => {
           const c = row.original;
           return (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="h-8 w-8 p-0 data-[state=open]:bg-emerald-100 dark:data-[state=open]:bg-emerald-900/40" aria-label="Menu actions">
-                  <MoreHorizontal className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-                <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  className="cursor-pointer text-gray-900 dark:text-gray-100"
-                  onClick={() => {
-                    setSelectedCotisationForDetail(c);
-                    setDetailDialogOpen(true);
-                  }}
-                >
-                  <Eye className="h-4 w-4 mr-2" />
-                  Voir les détails
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="cursor-pointer text-gray-900 dark:text-gray-100"
-                  onClick={() => openPaiementManuel(c)}
-                  disabled={Number(c.montantRestant) <= 0}
-                >
-                  <Euro className="h-4 w-4 mr-2" />
-                  Paiement manuel
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-600 dark:text-gray-400 hover:text-indigo-600 dark:hover:text-indigo-400"
+                onClick={() => {
+                  setSelectedCotisationForDetail(c);
+                  setDetailDialogOpen(true);
+                }}
+                aria-label="Voir les détails"
+              >
+                <Eye className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-blue-600 dark:text-blue-400 hover:text-blue-700 dark:hover:text-blue-300"
+                onClick={() => openPaiementManuel(c)}
+                disabled={Number(c.montantRestant) <= 0}
+                aria-label="Paiement en espèce"
+              >
+                <Euro className="h-4 w-4" />
+              </Button>
+            </div>
           );
         },
       }),
@@ -297,6 +294,7 @@ export default function AdminPaiementsPage() {
     data: filteredCotisations,
     columns,
     getCoreRowModel: getCoreRowModel(),
+    getSortedRowModel: getSortedRowModel(),
     getPaginationRowModel: getPaginationRowModel(),
     onColumnVisibilityChange: (updater) => {
       const next = typeof updater === "function" ? updater(columnVisibility) : updater;
@@ -307,7 +305,8 @@ export default function AdminPaiementsPage() {
         console.error(e);
       }
     },
-    state: { columnVisibility, pagination },
+    onSortingChange: setSorting,
+    state: { columnVisibility, pagination, sorting },
     onPaginationChange: setPagination,
     initialState: { pagination: { pageSize: 10 } },
   });
@@ -321,6 +320,7 @@ export default function AdminPaiementsPage() {
       moyenPaiement: "Especes",
       reference: "",
     });
+    setPayJustificatifFile(null);
     setPayDialogOpen(true);
   };
 
@@ -334,8 +334,26 @@ export default function AdminPaiementsPage() {
       toast.error("Montant invalide");
       return;
     }
+    if (payForm.moyenPaiement === "Virement") {
+      if (!payJustificatifFile?.size) {
+        toast.error("Un justificatif (preuve de virement) est obligatoire. Téléchargez un document (PDF ou image).");
+        return;
+      }
+    }
     setPayingId(selectedCotisationForPay.id);
     try {
+      let justificatifChemin: string | undefined;
+      if (payForm.moyenPaiement === "Virement" && payJustificatifFile?.size) {
+        const formData = new FormData();
+        formData.set("file", payJustificatifFile);
+        const uploadRes = await uploadJustificatifPaiement(formData);
+        if (!uploadRes.success || !uploadRes.data?.chemin) {
+          toast.error(uploadRes.error ?? "Erreur lors du téléversement du justificatif.");
+          setPayingId(null);
+          return;
+        }
+        justificatifChemin = uploadRes.data.chemin;
+      }
       const result = await createPaiement({
         adherentId: selectedCotisationForPay.adherentId,
         montant,
@@ -343,11 +361,13 @@ export default function AdminPaiementsPage() {
         moyenPaiement: payForm.moyenPaiement,
         reference: payForm.reference || undefined,
         cotisationMensuelleId: selectedCotisationForPay.id,
+        justificatifChemin,
       });
       if (result.success) {
         toast.success(result.message);
         setPayDialogOpen(false);
         setSelectedCotisationForPay(null);
+        setPayJustificatifFile(null);
         loadCotisations();
       } else {
         toast.error(result.error || "Erreur");
@@ -356,6 +376,66 @@ export default function AdminPaiementsPage() {
       toast.error("Erreur lors de l'enregistrement");
     } finally {
       setPayingId(null);
+    }
+  };
+
+  const openEditPaiement = (p: { id: string; montant: number; datePaiement: Date | string; moyenPaiement: string; reference?: string | null; justificatifChemin?: string | null }) => {
+    const date = typeof p.datePaiement === "string" ? p.datePaiement : format(new Date(p.datePaiement), "yyyy-MM-dd");
+    setEditingPaiement({ id: p.id, montant: p.montant, datePaiement: date, moyenPaiement: p.moyenPaiement, reference: p.reference ?? undefined, justificatifChemin: p.justificatifChemin ?? undefined });
+    setEditPaiementForm({ montant: String(p.montant), datePaiement: date, moyenPaiement: (p.moyenPaiement as "Especes" | "Cheque" | "Virement" | "CarteBancaire") || "Especes", reference: p.reference ?? "" });
+    setEditJustificatifFile(null);
+    setEditPaiementOpen(true);
+  };
+
+  const handleSaveEditPaiement = async () => {
+    if (!editingPaiement) return;
+    const montant = parseFloat(editPaiementForm.montant.replace(",", "."));
+    if (isNaN(montant) || montant <= 0) {
+      toast.error("Montant invalide");
+      return;
+    }
+    const isVirement = editPaiementForm.moyenPaiement === "Virement";
+    const hasExistingJustificatif = !!(editingPaiement.justificatifChemin?.trim());
+    const hasNewJustificatif = !!(editJustificatifFile?.size);
+    if (isVirement && !hasExistingJustificatif && !hasNewJustificatif) {
+      toast.error("Un justificatif est obligatoire pour un paiement par virement.");
+      return;
+    }
+    setSavingPaiement(true);
+    try {
+      let justificatifChemin: string | undefined = editingPaiement.justificatifChemin ?? undefined;
+      if (editJustificatifFile?.size) {
+        const formData = new FormData();
+        formData.append("file", editJustificatifFile);
+        const uploadRes = await uploadJustificatifPaiement(formData);
+        if (!uploadRes?.success || !uploadRes.data?.chemin) {
+          toast.error(uploadRes?.error ?? "Erreur lors du téléversement du justificatif.");
+          setSavingPaiement(false);
+          return;
+        }
+        justificatifChemin = uploadRes.data.chemin;
+      }
+      const res = await updatePaiement({
+        id: editingPaiement.id,
+        montant,
+        datePaiement: editPaiementForm.datePaiement,
+        moyenPaiement: editPaiementForm.moyenPaiement,
+        reference: editPaiementForm.reference || undefined,
+        justificatifChemin: isVirement ? justificatifChemin : undefined,
+      });
+      if (res.success) {
+        toast.success(res.message ?? "Paiement mis à jour.");
+        setEditPaiementOpen(false);
+        setEditingPaiement(null);
+        setEditJustificatifFile(null);
+        loadCotisations();
+      } else {
+        toast.error(res.error ?? "Erreur");
+      }
+    } catch (e) {
+      toast.error("Erreur lors de la modification");
+    } finally {
+      setSavingPaiement(false);
     }
   };
 
@@ -464,36 +544,13 @@ export default function AdminPaiementsPage() {
                             Payé : {Number(c.montantPaye).toFixed(2)} €
                           </span>
                         </div>
-                        <div className="shrink-0">
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="sm" className="h-8 w-8 p-0 data-[state=open]:bg-emerald-100 dark:data-[state=open]:bg-emerald-900/40" aria-label="Menu actions">
-                                <MoreHorizontal className="h-4 w-4 text-gray-600 dark:text-gray-400" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-48 bg-white dark:bg-gray-800 border-gray-200 dark:border-gray-700">
-                              <DropdownMenuLabel>Actions</DropdownMenuLabel>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="cursor-pointer text-gray-900 dark:text-gray-100"
-                                onClick={() => {
-                                  setSelectedCotisationForDetail(c);
-                                  setDetailDialogOpen(true);
-                                }}
-                              >
-                                <Eye className="h-4 w-4 mr-2" />
-                                Voir les détails
-                              </DropdownMenuItem>
-                              <DropdownMenuItem
-                                className="cursor-pointer text-gray-900 dark:text-gray-100"
-                                onClick={() => openPaiementManuel(c)}
-                                disabled={Number(c.montantRestant) <= 0}
-                              >
-                                <Euro className="h-4 w-4 mr-2" />
-                                Paiement manuel
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
+                        <div className="shrink-0 flex items-center gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-gray-600 dark:text-gray-400" onClick={() => { setSelectedCotisationForDetail(c); setDetailDialogOpen(true); }} aria-label="Voir les détails">
+                            <Eye className="h-4 w-4" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-blue-600 dark:text-blue-400" onClick={() => openPaiementManuel(c)} disabled={Number(c.montantRestant) <= 0} aria-label="Paiement en espèce">
+                            <Euro className="h-4 w-4" />
+                          </Button>
                         </div>
                       </div>
                     ))}
@@ -567,7 +624,7 @@ export default function AdminPaiementsPage() {
       {/* Dialog Paiement manuel (depuis la liste cotisations, adhérent déjà connu) */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
         <DialogContent className="max-w-sm bg-white dark:bg-gray-900 border-2 border-emerald-200 dark:border-emerald-800 shadow-lg">
-          <DialogHeader className="pb-2 border-b border-emerald-100 dark:border-emerald-900/50">
+          <DialogHeader className="rounded-t-lg -mx-6 -mt-6 px-6 py-3 bg-emerald-100 dark:bg-emerald-900/40 border-b border-emerald-200 dark:border-emerald-800">
             <DialogTitle className="text-base text-emerald-800 dark:text-emerald-100">
               Paiement en espèce
             </DialogTitle>
@@ -618,9 +675,10 @@ export default function AdminPaiementsPage() {
               <Label className="text-sm text-gray-700 dark:text-gray-300">Moyen</Label>
               <Select
                 value={payForm.moyenPaiement}
-                onValueChange={(v: "Especes" | "Cheque" | "Virement" | "CarteBancaire") =>
-                  setPayForm((p) => ({ ...p, moyenPaiement: v }))
-                }
+                onValueChange={(v: "Especes" | "Cheque" | "Virement" | "CarteBancaire") => {
+                  setPayForm((p) => ({ ...p, moyenPaiement: v }));
+                  if (v !== "Virement") setPayJustificatifFile(null);
+                }}
               >
                 <SelectTrigger className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">
                   <SelectValue />
@@ -642,13 +700,32 @@ export default function AdminPaiementsPage() {
                 className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
               />
             </div>
+            {payForm.moyenPaiement === "Virement" && (
+              <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <Upload className="h-4 w-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                  <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Justificatif (preuve de virement) *</Label>
+                </div>
+                <p className="text-xs text-emerald-800 dark:text-emerald-200 flex items-center gap-1.5">
+                  <Upload className="h-3.5 w-3.5 shrink-0" />
+                  Parcourir pour sélectionner un fichier (PDF ou image)
+                </p>
+                <Input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,application/pdf,image/jpeg,image/png,image/gif,image/webp"
+                  onChange={(e) => setPayJustificatifFile(e.target.files?.[0] ?? null)}
+                  className="mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-400">PDF, JPG, PNG, GIF ou WEBP — max 10 Mo</p>
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
               <Button variant="outline" onClick={() => setPayDialogOpen(false)} className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600">
                 Annuler
               </Button>
               <Button
                 onClick={handleSubmitPaiementManuel}
-                disabled={payingId !== null}
+                disabled={payingId !== null || (payForm.moyenPaiement === "Virement" && !payJustificatifFile?.size)}
                 className="bg-emerald-600 hover:bg-emerald-700 text-white shadow-sm"
               >
                 {payingId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enregistrer"}
@@ -661,7 +738,7 @@ export default function AdminPaiementsPage() {
         {/* Dialog Voir les détails (cotisation) */}
         <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border-2 border-indigo-200 dark:border-indigo-800 shadow-lg">
-            <DialogHeader className="pb-2 border-b border-indigo-100 dark:border-indigo-900/50">
+            <DialogHeader className="rounded-t-lg -mx-6 -mt-6 px-6 py-3 bg-indigo-100 dark:bg-indigo-900/40 border-b border-indigo-200 dark:border-indigo-800">
               <DialogTitle className="text-base text-indigo-800 dark:text-indigo-100">Détails de la cotisation</DialogTitle>
               <DialogDescription className="text-sm text-indigo-700/90 dark:text-indigo-200/80">
                 Informations de la cotisation mensuelle
@@ -734,6 +811,115 @@ export default function AdminPaiementsPage() {
                     </ul>
                   </div>
                 )}
+                {(selectedCotisationForDetail.Paiements?.length ?? 0) > 0 && (
+                  <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/20 p-3 space-y-2">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-200">Paiements enregistrés</p>
+                    <ul className="text-xs space-y-2">
+                      {selectedCotisationForDetail.Paiements.map((p: any) => (
+                        <li key={p.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-emerald-100 dark:border-emerald-900/50 last:border-0">
+                          <span>{format(new Date(p.datePaiement), "dd/MM/yyyy", { locale: fr })} · {Number(p.montant).toFixed(2)} € · {p.moyenPaiement}</span>
+                          <Button variant="ghost" size="sm" className="h-7 text-emerald-700 dark:text-emerald-300 shrink-0" onClick={() => openEditPaiement(p)}>
+                            <Pencil className="h-3.5 w-3.5 mr-1" />
+                            Modifier
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+
+        {/* Dialog Modifier le paiement */}
+        <Dialog open={editPaiementOpen} onOpenChange={(open) => { setEditPaiementOpen(open); if (!open) { setEditingPaiement(null); setEditJustificatifFile(null); } }}>
+          <DialogContent className="max-w-sm bg-white dark:bg-gray-900 border-2 border-emerald-200 dark:border-emerald-800">
+            <DialogHeader className="rounded-t-lg -mx-6 -mt-6 px-6 py-3 bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800">
+              <DialogTitle className="text-base text-amber-900 dark:text-amber-100">Modifier le paiement</DialogTitle>
+              <DialogDescription className="text-sm text-amber-800/90 dark:text-amber-200/80">Corriger les erreurs de saisie puis enregistrer.</DialogDescription>
+            </DialogHeader>
+            {editingPaiement && (
+              <div className="space-y-3 pt-2">
+                <div>
+                  <Label className="text-sm text-gray-700 dark:text-gray-300">Montant (€) *</Label>
+                  <Input type="text" inputMode="decimal" value={editPaiementForm.montant} onChange={(e) => setEditPaiementForm((f) => ({ ...f, montant: e.target.value }))} className="mt-1 bg-gray-50 dark:bg-gray-800" />
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-700 dark:text-gray-300">Date</Label>
+                  <Input type="date" value={editPaiementForm.datePaiement} onChange={(e) => setEditPaiementForm((f) => ({ ...f, datePaiement: e.target.value }))} className="mt-1 bg-gray-50 dark:bg-gray-800" />
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-700 dark:text-gray-300">Moyen</Label>
+                  <Select value={editPaiementForm.moyenPaiement} onValueChange={(v: "Especes" | "Cheque" | "Virement" | "CarteBancaire") => setEditPaiementForm((f) => ({ ...f, moyenPaiement: v }))}>
+                    <SelectTrigger className="mt-1 bg-gray-50 dark:bg-gray-800"><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Especes">Espèces</SelectItem>
+                      <SelectItem value="Cheque">Chèque</SelectItem>
+                      <SelectItem value="Virement">Virement</SelectItem>
+                      <SelectItem value="CarteBancaire">Carte bancaire</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-700 dark:text-gray-300">Référence</Label>
+                  <Input value={editPaiementForm.reference} onChange={(e) => setEditPaiementForm((f) => ({ ...f, reference: e.target.value }))} placeholder="N° chèque, virement..." className="mt-1 bg-gray-50 dark:bg-gray-800" />
+                </div>
+                {editPaiementForm.moyenPaiement === "Virement" && (
+                  <div className="space-y-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30 p-3">
+                    <div className="flex items-center gap-2">
+                      <Upload className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                      <Label className="text-sm font-medium text-amber-900 dark:text-amber-100">Justificatif de virement</Label>
+                    </div>
+                    {editingPaiement?.justificatifChemin?.trim() ? (
+                      <div className="flex flex-col gap-2">
+                        <div className="flex flex-col gap-0.5">
+                          <a
+                            href={editingPaiement.justificatifChemin}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="inline-flex items-center gap-1.5 text-sm text-emerald-700 dark:text-emerald-300 underline hover:no-underline w-fit"
+                          >
+                            <FileText className="h-4 w-4 shrink-0" />
+                            Voir le justificatif actuel
+                            <ExternalLink className="h-3.5 w-3.5 shrink-0" />
+                          </a>
+                          {editingPaiement.justificatifChemin.split("/").pop() && (
+                            <span className="text-xs text-gray-500 dark:text-gray-400 truncate max-w-full">
+                              {editingPaiement.justificatifChemin.split("/").pop()}
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-xs text-gray-600 dark:text-gray-400 flex items-center gap-1.5">
+                          <Upload className="h-3.5 w-3.5 shrink-0" />
+                          Remplacer par un autre fichier (parcourir) :
+                        </p>
+                      </div>
+                    ) : (
+                      <p className="text-xs text-amber-800 dark:text-amber-200 flex items-center gap-1.5">
+                        <Upload className="h-3.5 w-3.5 shrink-0" />
+                        Aucun justificatif enregistré. Parcourir pour en joindre un.
+                      </p>
+                    )}
+                    <Input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png,.gif,.webp"
+                      className="bg-white dark:bg-gray-800 text-sm"
+                      onChange={(e) => setEditJustificatifFile(e.target.files?.[0] ?? null)}
+                    />
+                    <p className="text-xs text-gray-500 dark:text-gray-400">PDF, JPG, PNG, GIF ou WEBP — max 10 Mo</p>
+                  </div>
+                )}
+                <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                  <Button variant="outline" onClick={() => setEditPaiementOpen(false)}>Annuler</Button>
+                  <Button
+                    onClick={handleSaveEditPaiement}
+                    disabled={savingPaiement || (editPaiementForm.moyenPaiement === "Virement" && !editingPaiement?.justificatifChemin?.trim() && !editJustificatifFile?.size)}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {savingPaiement ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enregistrer"}
+                  </Button>
+                </div>
               </div>
             )}
           </DialogContent>

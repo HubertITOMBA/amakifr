@@ -16,6 +16,7 @@ import {
   AlertCircle
 } from "lucide-react";
 import { createPaymentSession } from "@/actions/paiements/create-payment-session";
+import { createPaiement, uploadJustificatifPaiement } from "@/actions/paiements";
 import { toast } from "sonner";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
@@ -23,6 +24,7 @@ import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Footer } from "@/components/home/Footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Upload } from "lucide-react";
 
 export default function PaymentPage() {
   const searchParams = useSearchParams();
@@ -38,11 +40,20 @@ export default function PaymentPage() {
     itemId?: string;
     description?: string;
   } | null>(null);
+  const [virementJustificatifFile, setVirementJustificatifFile] = useState<File | null>(null);
+  const [showVirementForm, setShowVirementForm] = useState(false);
+  const [loadingVirement, setLoadingVirement] = useState(false);
 
   const type = searchParams.get("type");
   const id = searchParams.get("id");
   const adherentId = searchParams.get("adherentId");
   const montant = searchParams.get("montant");
+
+  const canPayByVirement =
+    !!adherentId &&
+    !!paymentInfo &&
+    !!id &&
+    ["cotisation-mensuelle", "assistance", "dette-initiale", "obligation"].includes(paymentInfo.type);
 
   useEffect(() => {
     if (status === "loading") return;
@@ -138,6 +149,68 @@ export default function PaymentPage() {
       console.error("Erreur:", error);
       toast.error("Une erreur est survenue");
       setLoading(false);
+    }
+  };
+
+  const handleVirementPayment = async () => {
+    if (!paymentInfo || !adherentId) {
+      toast.error("Informations de paiement incomplètes");
+      return;
+    }
+    const montantAPayer = useCustomAmount
+      ? parseFloat(customAmount.replace(",", "."))
+      : paymentInfo.montant;
+    if (isNaN(montantAPayer) || montantAPayer <= 0) {
+      toast.error("Le montant doit être supérieur à 0");
+      return;
+    }
+    if (paymentInfo.montantMax && montantAPayer > paymentInfo.montantMax) {
+      toast.error(`Le montant ne peut pas dépasser ${paymentInfo.montantMax.toFixed(2)} €`);
+      return;
+    }
+    if (!virementJustificatifFile?.size) {
+      toast.error("Un justificatif (preuve de virement) est obligatoire. Parcourez pour sélectionner un document (PDF ou image).");
+      return;
+    }
+    setLoadingVirement(true);
+    try {
+      const formData = new FormData();
+      formData.set("file", virementJustificatifFile);
+      const uploadRes = await uploadJustificatifPaiement(formData);
+      if (!uploadRes?.success || !uploadRes.data?.chemin) {
+        toast.error(uploadRes?.error ?? "Erreur lors du téléversement du justificatif.");
+        setLoadingVirement(false);
+        return;
+      }
+      const payload: Parameters<typeof createPaiement>[0] = {
+        adherentId,
+        montant: montantAPayer,
+        datePaiement: new Date().toISOString().split("T")[0],
+        moyenPaiement: "Virement",
+        description: paymentInfo.description,
+        justificatifChemin: uploadRes.data.chemin,
+      };
+      if (paymentInfo.type === "cotisation-mensuelle" && id) payload.cotisationMensuelleId = id;
+      else if (paymentInfo.type === "assistance" && id) payload.assistanceId = id;
+      else if (paymentInfo.type === "dette-initiale" && id) payload.detteInitialeId = id;
+      else if (paymentInfo.type === "obligation" && id) payload.obligationCotisationId = id;
+      const result = await createPaiement(payload);
+      if (result.success) {
+        toast.success(result.message ?? "Paiement par virement enregistré. Il sera validé après vérification.");
+        setShowVirementForm(false);
+        setVirementJustificatifFile(null);
+        await updateSession();
+        await new Promise((r) => setTimeout(r, 200));
+        router.push("/user/profile?section=cotisations");
+        router.refresh();
+      } else {
+        toast.error(result.error ?? "Erreur");
+      }
+    } catch (e) {
+      console.error(e);
+      toast.error("Une erreur est survenue");
+    } finally {
+      setLoadingVirement(false);
     }
   };
 
@@ -322,7 +395,7 @@ export default function PaymentPage() {
               </Card>
 
               {/* Virement bancaire */}
-              <Card className="border-2 border-gray-200 dark:border-gray-700 !py-0">
+              <Card className={`border-2 !py-0 ${canPayByVirement ? "border-green-200 dark:border-green-800" : "border-gray-200 dark:border-gray-700"}`}>
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 flex-1">
@@ -334,14 +407,79 @@ export default function PaymentPage() {
                           Virement bancaire
                         </h4>
                         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                          Les coordonnées bancaires vous seront communiquées après validation
+                          {canPayByVirement
+                            ? "Joignez une preuve de virement (capture d&apos;écran ou reçu) pour enregistrer votre paiement."
+                            : "Disponible uniquement pour un élément précis (cotisation, assistance, dette, obligation)."}
                         </p>
                       </div>
                     </div>
-                    <Button variant="outline" disabled className="h-8 sm:h-9 text-xs sm:text-sm px-3 sm:px-4 shrink-0">
-                      Bientôt disponible
-                    </Button>
+                    {canPayByVirement && !showVirementForm && (
+                      <Button
+                        variant="outline"
+                        className="h-8 sm:h-9 text-xs sm:text-sm px-3 sm:px-4 shrink-0 border-green-300 dark:border-green-700 text-green-700 dark:text-green-300"
+                        onClick={() => setShowVirementForm(true)}
+                      >
+                        <Upload className="h-3.5 w-3.5 mr-1" />
+                        Joindre un justificatif
+                      </Button>
+                    )}
+                    {canPayByVirement && showVirementForm && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="shrink-0"
+                        onClick={() => {
+                          setShowVirementForm(false);
+                          setVirementJustificatifFile(null);
+                        }}
+                      >
+                        Réduire
+                      </Button>
+                    )}
+                    {!canPayByVirement && (
+                      <Button variant="outline" disabled className="h-8 sm:h-9 text-xs sm:text-sm px-3 sm:px-4 shrink-0">
+                        Non disponible
+                      </Button>
+                    )}
                   </div>
+                  {canPayByVirement && showVirementForm && (
+                    <div className="mt-3 pt-3 border-t border-green-200 dark:border-green-800 rounded-lg bg-green-50/50 dark:bg-green-950/30 p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Upload className="h-4 w-4 text-green-600 dark:text-green-400 shrink-0" />
+                        <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+                          Justificatif (preuve de virement) *
+                        </Label>
+                      </div>
+                      <p className="text-xs text-green-800 dark:text-green-200 flex items-center gap-1.5">
+                        <Upload className="h-3.5 w-3.5 shrink-0" />
+                        Parcourir pour sélectionner un fichier (PDF ou image)
+                      </p>
+                      <Input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,application/pdf,image/jpeg,image/png,image/gif,image/webp"
+                        onChange={(e) => setVirementJustificatifFile(e.target.files?.[0] ?? null)}
+                        className="bg-white dark:bg-gray-800 text-sm"
+                      />
+                      <p className="text-xs text-gray-500 dark:text-gray-400">PDF, JPG, PNG, GIF ou WEBP — max 10 Mo</p>
+                      <Button
+                        onClick={handleVirementPayment}
+                        disabled={loadingVirement || !virementJustificatifFile?.size}
+                        className="w-full sm:w-auto bg-green-600 hover:bg-green-700 text-white"
+                      >
+                        {loadingVirement ? (
+                          <>
+                            <Loader2 className="h-4 w-4 animate-spin mr-1.5" />
+                            Enregistrement…
+                          </>
+                        ) : (
+                          <>
+                            <Upload className="h-4 w-4 mr-1.5" />
+                            Enregistrer le paiement par virement
+                          </>
+                        )}
+                      </Button>
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 

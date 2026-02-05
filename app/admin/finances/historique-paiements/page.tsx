@@ -1053,30 +1053,33 @@ export default function AdminHistoriquePaiementsPage() {
 
         {/* Dialog Détails du paiement */}
         <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle className="flex items-center gap-2">
-                <Receipt className="h-5 w-5 text-emerald-600" />
+          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border-2 border-emerald-200 dark:border-emerald-800 shadow-xl">
+            <DialogHeader className="rounded-t-lg -mx-6 -mt-6 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-emerald-700 dark:to-teal-800 border-b border-emerald-200 dark:border-emerald-800">
+              <DialogTitle className="flex items-center gap-2 text-white">
+                <Receipt className="h-5 w-5" />
                 Détails du paiement
               </DialogTitle>
-              <DialogDescription>
+              <DialogDescription className="text-emerald-100 dark:text-emerald-200/90 text-sm mt-0.5">
                 Toutes les informations enregistrées pour ce paiement
               </DialogDescription>
             </DialogHeader>
             {selectedPaiement && (
-              <div className="space-y-4 pt-2">
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Adhérent</Label>
-                  <p className="text-sm font-medium text-gray-900 dark:text-gray-100">
+              <div className="space-y-4 pt-4">
+                <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3 space-y-1">
+                  <Label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
+                    <User className="h-3.5 w-3.5" />
+                    Adhérent
+                  </Label>
+                  <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
                     {selectedPaiement.Adherent?.firstname} {selectedPaiement.Adherent?.lastname}
                   </p>
                   {selectedPaiement.Adherent?.User?.email && (
-                    <p className="text-xs text-gray-600 dark:text-gray-400">{selectedPaiement.Adherent.User.email}</p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">{selectedPaiement.Adherent.User.email}</p>
                   )}
                 </div>
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Description / Objet</Label>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-3 space-y-1">
+                  <Label className="text-xs font-semibold text-blue-800 dark:text-blue-300 uppercase tracking-wide">Description / Objet</Label>
+                  <p className="text-sm text-blue-900 dark:text-blue-100">
                     {selectedPaiement.CotisationMensuelle
                       ? selectedPaiement.CotisationMensuelle.TypeCotisation?.nom
                         ? `${selectedPaiement.CotisationMensuelle.TypeCotisation.nom} ${selectedPaiement.CotisationMensuelle.mois != null && selectedPaiement.CotisationMensuelle.annee != null ? `${MOIS_LABELS[selectedPaiement.CotisationMensuelle.mois] ?? selectedPaiement.CotisationMensuelle.mois} ${selectedPaiement.CotisationMensuelle.annee}` : ""}`.trim()
@@ -1088,15 +1091,18 @@ export default function AdminHistoriquePaiementsPage() {
                           : selectedPaiement.description || "—"}
                   </p>
                 </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Montant</Label>
-                    <p className="text-sm font-semibold text-green-600 dark:text-green-400">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/30 p-3 space-y-1">
+                    <Label className="text-xs font-semibold text-green-800 dark:text-green-300 uppercase tracking-wide flex items-center gap-1.5">
+                      <Euro className="h-3.5 w-3.5" />
+                      Montant
+                    </Label>
+                    <p className="text-base font-semibold text-green-700 dark:text-green-300">
                       {Number(selectedPaiement.montant).toFixed(2)} €
                     </p>
                   </div>
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Moyen de paiement</Label>
+                  <div className="rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-950/30 p-3 space-y-1">
+                    <Label className="text-xs font-semibold text-purple-800 dark:text-purple-300 uppercase tracking-wide">Moyen</Label>
                     <p className="text-sm">
                       <Badge className={getMoyenPaiementColor(selectedPaiement.moyenPaiement)}>
                         {getMoyenPaiementLabel(selectedPaiement.moyenPaiement)}
@@ -1104,18 +1110,37 @@ export default function AdminHistoriquePaiementsPage() {
                     </p>
                   </div>
                 </div>
-                <div className="grid gap-2">
-                  <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Date de paiement</Label>
-                  <p className="text-sm text-gray-700 dark:text-gray-300">
+                <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30 p-3 space-y-1">
+                  <Label className="text-xs font-semibold text-amber-800 dark:text-amber-300 uppercase tracking-wide flex items-center gap-1.5">
+                    <Calendar className="h-3.5 w-3.5" />
+                    Date de paiement
+                  </Label>
+                  <p className="text-sm text-amber-900 dark:text-amber-100">
                     {selectedPaiement.datePaiement
                       ? format(new Date(selectedPaiement.datePaiement), "EEEE d MMMM yyyy", { locale: fr })
                       : "—"}
                   </p>
                 </div>
                 {selectedPaiement.reference && (
-                  <div className="grid gap-2">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Référence</Label>
-                    <p className="text-sm font-mono text-gray-700 dark:text-gray-300">{selectedPaiement.reference}</p>
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-3 space-y-1">
+                    <Label className="text-xs font-semibold text-gray-600 dark:text-gray-400 uppercase tracking-wide flex items-center gap-1.5">
+                      <Hash className="h-3.5 w-3.5" />
+                      Référence
+                    </Label>
+                    <p className="text-sm font-mono text-gray-800 dark:text-gray-200">{selectedPaiement.reference}</p>
+                  </div>
+                )}
+                {selectedPaiement.justificatifChemin && (
+                  <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-3 space-y-1">
+                    <Label className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide">Justificatif (virement)</Label>
+                    <a
+                      href={selectedPaiement.justificatifChemin}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-sm text-emerald-700 dark:text-emerald-300 underline hover:no-underline"
+                    >
+                      Voir le justificatif
+                    </a>
                   </div>
                 )}
                 {selectedPaiement.description && (
@@ -1125,8 +1150,8 @@ export default function AdminHistoriquePaiementsPage() {
                   </div>
                 )}
                 {selectedPaiement.CreatedBy && (
-                  <div className="grid gap-2 pt-2 border-t border-gray-200 dark:border-gray-700">
-                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase">Enregistré par</Label>
+                  <div className="rounded-lg border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800/50 p-3 space-y-1 pt-3">
+                    <Label className="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Enregistré par</Label>
                     <p className="text-sm text-gray-600 dark:text-gray-400">
                       {selectedPaiement.CreatedBy.name}
                       {selectedPaiement.CreatedBy.email && ` (${selectedPaiement.CreatedBy.email})`}

@@ -904,6 +904,7 @@ model PaiementCotisation {
   transactionId         String? @unique @db.VarChar(255) // ID de transaction unique (pour tous les prestataires)
   receiptUrl            String? @db.VarChar(500) // URL du reçu PDF généré
   receiptGenerated      Boolean @default(false) // Si le reçu a été généré
+  justificatifChemin    String? @db.VarChar(500) // Preuve du virement (obligatoire si moyenPaiement = Virement)
 
   statut    String @default("Valide") // Valide, Annule, EnAttente, EnCours (pour paiements en ligne)
   createdBy String // ID de l'admin qui a enregistré le paiement (ou "system" pour paiements en ligne)

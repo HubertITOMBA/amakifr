@@ -118,7 +118,7 @@ const CreatePaiementSchema = z.object({
   moyenPaiement: z.enum(["Especes", "Cheque", "Virement", "CarteBancaire"]),
   reference: z.string().optional(),
   description: z.string().optional(),
-  // Liens optionnels
+  justificatifChemin: z.string().optional(), // Obligatoire si moyenPaiement === "Virement"
   obligationCotisationId: z.string().optional(),
   cotisationMensuelleId: z.string().optional(),
   detteInitialeId: z.string().optional(),
@@ -230,11 +230,31 @@ export async function appliquerAvoirSurDettesInitiales(adherentId: string): Prom
 export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    let hasAccess = await canWrite(session.user.id, "createPaiement");
+    if (!hasAccess) {
+      // Autoriser l'adhérent à enregistrer un paiement par virement pour lui-même (page /paiement)
+      const selfAdherent = await prisma.adherent.findFirst({
+        where: { userId: session.user.id },
+      });
+      const isSelfVirement =
+        data.moyenPaiement === "Virement" &&
+        !!data.justificatifChemin?.trim() &&
+        selfAdherent?.id === data.adherentId;
+      if (isSelfVirement) {
+        hasAccess = true;
+      } else {
+        return { success: false, error: "Non autorisé" };
+      }
     }
 
     const validatedData = CreatePaiementSchema.parse(data);
+    if (validatedData.moyenPaiement === "Virement" && !validatedData.justificatifChemin?.trim()) {
+      return { success: false, error: "Un justificatif (preuve de virement) est obligatoire pour valider un paiement par virement. Téléchargez un document en guise de preuve." };
+    }
     const montantPaiement = new Decimal(validatedData.montant);
     const datePaiement = validatedData.datePaiement ? new Date(validatedData.datePaiement) : new Date();
 
@@ -372,11 +392,12 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
     const paiement = await prisma.paiementCotisation.create({
       data: {
         adherentId: validatedData.adherentId,
-        montant: montantPaiement, // Montant total du paiement
+        montant: montantPaiement,
         datePaiement,
         moyenPaiement: validatedData.moyenPaiement as MoyenPaiement,
         reference: validatedData.reference,
         description: validatedData.description,
+        justificatifChemin: validatedData.justificatifChemin?.trim() || null,
         obligationCotisationId: validatedData.obligationCotisationId || null,
         cotisationMensuelleId: validatedData.cotisationMensuelleId || null,
         detteInitialeId: validatedData.detteInitialeId || null,
@@ -507,6 +528,155 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
     return { success: false, error: "Erreur lors de l'enregistrement du paiement" };
   } finally {
     revalidatePath("/admin");
+  }
+}
+
+/**
+ * Upload un justificatif (preuve de virement) pour un paiement par virement.
+ * Retourne le chemin du fichier à passer à createPaiement (justificatifChemin).
+ */
+export async function uploadJustificatifPaiement(formData: FormData) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    // Admins (createPaiement) ou adhérent pour son propre virement (page /paiement)
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAdminAccess = await canWrite(session.user.id, "createPaiement");
+    if (!hasAdminAccess) {
+      // Autoriser tout utilisateur connecté pour upload justificatif (restriction côté createPaiement)
+      // Aucune restriction supplémentaire : l'adhérent peut uploader pour son virement sur /paiement
+    }
+    const file = formData.get("file") as File | null;
+    if (!file?.size) {
+      return { success: false, error: "Aucun fichier fourni" };
+    }
+    const allowedTypes = ["application/pdf", "image/jpeg", "image/jpg", "image/png", "image/gif", "image/webp"];
+    if (!allowedTypes.includes(file.type)) {
+      return { success: false, error: "Type non autorisé. Utilisez PDF, JPG, PNG, GIF ou WEBP." };
+    }
+    const maxSize = 10 * 1024 * 1024; // 10 MB
+    if (file.size > maxSize) {
+      return { success: false, error: "Fichier trop volumineux (max 10 Mo)." };
+    }
+    const { writeFile, mkdir } = await import("fs/promises");
+    const { join } = await import("path");
+    const { existsSync } = await import("fs");
+    const timestamp = Date.now();
+    const ext = file.name.split(".").pop()?.toLowerCase() || "pdf";
+    const fileName = `virement_${timestamp}_${Math.random().toString(36).slice(2, 10)}.${ext}`;
+    const uploadDir = join(process.cwd(), "public", "ressources", "justificatifs-paiements");
+    if (!existsSync(uploadDir)) {
+      await mkdir(uploadDir, { recursive: true });
+    }
+    const filePath = join(uploadDir, fileName);
+    const buffer = Buffer.from(await file.arrayBuffer());
+    await writeFile(filePath, buffer);
+    const chemin = `/ressources/justificatifs-paiements/${fileName}`;
+    return { success: true, data: { chemin } };
+  } catch (error) {
+    console.error("Upload justificatif paiement:", error);
+    return { success: false, error: "Erreur lors du téléversement du justificatif." };
+  }
+}
+
+const UpdatePaiementSchema = z.object({
+  id: z.string().min(1, "L'ID du paiement est requis"),
+  montant: z.number().positive("Le montant doit être positif"),
+  datePaiement: z.string().min(1, "La date est requise"),
+  moyenPaiement: z.enum(["Especes", "Cheque", "Virement", "CarteBancaire"]),
+  reference: z.string().optional(),
+  description: z.string().optional(),
+  justificatifChemin: z.string().max(500).optional(),
+});
+
+/**
+ * Modifie un paiement existant (correction d'erreurs de saisie) et recalcule la cotisation liée si besoin.
+ */
+export async function updatePaiement(data: z.infer<typeof UpdatePaiementSchema>) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updatePaiement");
+    if (!hasAccess) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const validatedData = UpdatePaiementSchema.parse(data);
+    const datePaiement = new Date(validatedData.datePaiement);
+    const montant = new Decimal(validatedData.montant);
+
+    const existing = await prisma.paiementCotisation.findUnique({
+      where: { id: validatedData.id },
+      include: { CotisationMensuelle: true },
+    });
+    if (!existing) {
+      return { success: false, error: "Paiement introuvable" };
+    }
+
+    // Virement : exiger un justificatif (existant ou fourni)
+    const newJustificatif = validatedData.justificatifChemin?.trim() || null;
+    const keptJustificatif = existing.justificatifChemin;
+    if (validatedData.moyenPaiement === "Virement") {
+      const hasJustificatif = (newJustificatif && newJustificatif.length > 0) || (keptJustificatif && keptJustificatif.length > 0);
+      if (!hasJustificatif) {
+        return { success: false, error: "Un justificatif est obligatoire pour un paiement par virement." };
+      }
+    }
+
+    const justificatifCheminFinal = newJustificatif ?? keptJustificatif ?? null;
+
+    await prisma.paiementCotisation.update({
+      where: { id: validatedData.id },
+      data: {
+        montant,
+        datePaiement,
+        moyenPaiement: validatedData.moyenPaiement as MoyenPaiement,
+        reference: validatedData.reference ?? existing.reference,
+        description: validatedData.description ?? existing.description,
+        justificatifChemin: validatedData.moyenPaiement === "Virement" ? justificatifCheminFinal : null,
+      },
+    });
+
+    if (existing.cotisationMensuelleId && existing.CotisationMensuelle) {
+      const paiements = await prisma.paiementCotisation.findMany({
+        where: { cotisationMensuelleId: existing.cotisationMensuelleId, statut: "Valide" },
+      });
+      const totalPaye = paiements.reduce((sum, p) => sum.plus(p.montant), new Decimal(0));
+      const montantAttendu = new Decimal(existing.CotisationMensuelle.montantAttendu);
+      const montantRestant = montantAttendu.minus(totalPaye).gt(0) ? montantAttendu.minus(totalPaye) : new Decimal(0);
+      const nouveauStatut = montantRestant.lte(0) ? "Paye" : totalPaye.gt(0) ? "PartiellementPaye" : "EnAttente";
+      await prisma.cotisationMensuelle.update({
+        where: { id: existing.cotisationMensuelleId },
+        data: {
+          montantPaye: totalPaye,
+          montantRestant: montantRestant,
+          statut: nouveauStatut,
+        },
+      });
+    }
+
+    try {
+      await logModification(
+        `Modification du paiement ${validatedData.id} : ${validatedData.montant}€`,
+        "PaiementCotisation",
+        validatedData.id,
+        { montant: validatedData.montant, datePaiement: validatedData.datePaiement }
+      );
+    } catch (logError) {
+      console.error("Log modification paiement:", logError);
+    }
+    revalidatePath("/admin/finances/paiements");
+    return { success: true, message: "Paiement mis à jour." };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Erreur updatePaiement:", error);
+    return { success: false, error: "Erreur lors de la modification du paiement" };
   }
 }
 

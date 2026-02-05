@@ -808,7 +808,12 @@ export async function updateCotisationMensuelle(data: z.infer<typeof UpdateCotis
 export async function getCotisationsMensuellesByPeriode(periode: string) {
   try {
     const session = await auth();
-    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getCotisationsMensuellesByPeriode");
+    if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
@@ -864,6 +869,19 @@ export async function getCotisationsMensuellesByPeriode(periode: string) {
             email: true
           }
         },
+        Paiements: {
+          select: {
+            id: true,
+            montant: true,
+            datePaiement: true,
+            moyenPaiement: true,
+            reference: true,
+            description: true,
+            justificatifChemin: true,
+            createdAt: true,
+          },
+          orderBy: { datePaiement: "desc" }
+        },
         _count: {
           select: {
             Paiements: true
@@ -890,7 +908,11 @@ export async function getCotisationsMensuellesByPeriode(periode: string) {
         TypeCotisation: {
           ...cotisation.TypeCotisation,
           montant: Number(cotisation.TypeCotisation.montant)
-        }
+        },
+        Paiements: (cotisation.Paiements ?? []).map((p: any) => ({
+          ...p,
+          montant: Number(p.montant),
+        })),
       };
     });
 

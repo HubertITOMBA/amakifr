@@ -483,6 +483,23 @@ export default function EvenementDetailPage() {
   };
 
 
+  // Pendant le chargement : afficher un spinner / skeleton pour faire patienter
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 dark:bg-slate-900">
+        <DynamicNavbar />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+            <Loader2 className="h-10 w-10 animate-spin text-primary" />
+            <p className="text-sm text-muted-foreground">Chargement de l&apos;événement...</p>
+          </div>
+        </main>
+        <Footer />
+      </div>
+    );
+  }
+
+  // Chargement terminé mais aucun événement trouvé
   if (!evenement) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -490,7 +507,7 @@ export default function EvenementDetailPage() {
           <CardContent className="p-12 text-center">
             <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-2xl font-bold mb-2">Événement non trouvé</h2>
-            <p className="text-gray-600 mb-4">L'événement que vous recherchez n'existe pas ou a été supprimé.</p>
+            <p className="text-gray-600 mb-4">L&apos;événement que vous recherchez n&apos;existe pas ou a été supprimé.</p>
             <Button onClick={() => router.push("/evenements")}>
               Retour aux événements
             </Button>
@@ -533,32 +550,7 @@ export default function EvenementDetailPage() {
           </Button>
         </Link>
 
-        {loading ? (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 animate-pulse">
-            <div className="lg:col-span-2 space-y-6">
-              <div className="h-64 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-              <div className="h-8 bg-gray-200 dark:bg-gray-700 rounded w-3/4" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-full" />
-              <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded w-5/6" />
-            </div>
-            <div className="space-y-4">
-              <div className="h-32 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-              <div className="h-24 bg-gray-200 dark:bg-gray-700 rounded-lg" />
-            </div>
-          </div>
-        ) : !evenement ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <AlertCircle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-              <h2 className="text-2xl font-bold mb-2">Événement non trouvé</h2>
-              <p className="text-gray-600 mb-4">L'événement que vous recherchez n'existe pas ou a été supprimé.</p>
-              <Button onClick={() => router.push("/evenements")}>
-                Retour aux événements
-              </Button>
-            </CardContent>
-          </Card>
-        ) : (
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Colonne principale */}
           <div className="lg:col-span-2 space-y-6">
             {/* Galerie d'images */}
@@ -1204,7 +1196,6 @@ export default function EvenementDetailPage() {
             )}
           </div>
         </div>
-        )}
       </main>
 
       {/* Modal d'inscription */}
