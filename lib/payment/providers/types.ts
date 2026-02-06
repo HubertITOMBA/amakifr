@@ -2,7 +2,7 @@
  * Types et interfaces pour les providers de paiement
  */
 
-export type PaymentProvider = 'stripe' | 'paypal' | 'virement';
+export type PaymentProvider = 'stripe' | 'paypal' | 'mollie' | 'virement';
 
 export interface PaymentSessionOptions {
   montant: number;

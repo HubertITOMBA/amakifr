@@ -1,5 +1,5 @@
--- AlterTable
-ALTER TABLE "paiements_cotisation" ADD COLUMN     "justificatifChemin" VARCHAR(500);
+-- AlterTable: justificatif de virement sur les paiements
+ALTER TABLE "paiements_cotisation" ADD COLUMN IF NOT EXISTS "justificatifChemin" VARCHAR(500);
 
--- RenameIndex
-ALTER INDEX "pass_assistance_type_unique" RENAME TO "pass_assistance_typeCotisationId_key";
+-- Note: le renommage d'index pass_assistance était incorrect ici (l'index pass_assistance_type_unique
+-- n'existe qu'après la migration 20260226120000). L'état final est géré par 20260226120000.

@@ -6,7 +6,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, Download, ArrowLeft, Loader2 } from "lucide-react";
-import { getStripeSession } from "@/actions/paiements/stripe";
+import { getStripePaymentSuccessData } from "@/actions/paiements/stripe";
+import { getMolliePaymentSuccessData } from "@/actions/paiements/mollie";
 import { generateReceiptPDF } from "@/actions/paiements/receipt";
 import { toast } from "sonner";
 import Link from "next/link";
@@ -17,43 +18,50 @@ export default function PaymentSuccessPage() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const sessionId = searchParams.get("session_id");
+  const paymentId = searchParams.get("payment_id"); // Mollie
   const [loading, setLoading] = useState(true);
   const [paymentData, setPaymentData] = useState<any>(null);
   const [paiementId, setPaiementId] = useState<string | null>(null);
 
   useEffect(() => {
-    if (sessionId) {
+    if (sessionId || paymentId) {
       loadPaymentData();
     } else {
       toast.error("Session de paiement introuvable");
       router.push("/");
     }
-  }, [sessionId]);
+  }, [sessionId, paymentId]);
 
   const loadPaymentData = async () => {
     try {
       setLoading(true);
-      const result = await getStripeSession(sessionId!);
-      
-      if (result.success && result.session) {
-        // Récupérer l'ID du paiement depuis les métadonnées ou la base
-        const { db } = await import("@/lib/db");
-        const paiement = await db.paiementCotisation.findFirst({
-          where: { stripeSessionId: sessionId! },
-        });
-
-        if (paiement) {
-          setPaiementId(paiement.id);
+      if (paymentId) {
+        // Mollie
+        const result = await getMolliePaymentSuccessData(paymentId);
+        if (result.success && result.amount != null) {
+          setPaiementId(result.paiementId ?? null);
+          setPaymentData({
+            amount: result.amount,
+            currency: result.currency || "eur",
+            paymentStatus: result.paymentStatus === "paid" ? "paid" : result.paymentStatus,
+          });
+        } else {
+          toast.error(result.error || "Impossible de récupérer les informations de paiement");
         }
-
+        return;
+      }
+      // Stripe
+      const result = await getStripePaymentSuccessData(sessionId!);
+      if (result.success && result.amount != null) {
+        setPaiementId(result.paiementId ?? null);
         setPaymentData({
-          amount: (result.session.amount_total || 0) / 100,
-          currency: result.session.currency,
-          customerEmail: result.session.customer_email,
-          paymentStatus: result.session.payment_status,
+          amount: result.amount,
+          currency: result.currency || "eur",
+          customerEmail: result.customerEmail,
+          paymentStatus: result.paymentStatus,
         });
       } else {
-        toast.error("Impossible de récupérer les informations de paiement");
+        toast.error(result.error || "Impossible de récupérer les informations de paiement");
       }
     } catch (error) {
       console.error("Erreur:", error);

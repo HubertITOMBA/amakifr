@@ -75,7 +75,7 @@ import {
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUserProfile } from "@/hooks/use-user-profile";
-import { updateUserData, getUserCandidatures, getUserVotes, getAllCandidatesForProfile } from "@/actions/user";
+import { updateUserData, getUserCandidatures, getUserVotes, getAllCandidatesForProfile, getUserDataForAdminView } from "@/actions/user";
 import { downloadPasseportPDF } from "@/actions/passeport";
 import { differenceInYears, differenceInMonths } from "date-fns";
 import { toast } from "sonner";
@@ -906,8 +906,39 @@ function CotisationsMoisTable({
 
 function UserProfilePageContent() {
   const searchParams = useSearchParams();
+  const router = useRouter();
   const user = useCurrentUser();
   const { userProfile, loading: profileLoading, error: profileError, refetch: refetchProfile } = useUserProfile();
+
+  // Vue admin "voir comme l'adhérent"
+  const viewAsUserId = searchParams.get("viewAs");
+  const isAdminViewAs = Boolean(viewAsUserId && user?.role === "ADMIN");
+  const [viewAsProfile, setViewAsProfile] = useState<any>(null);
+  const [viewAsLoading, setViewAsLoading] = useState(false);
+  useEffect(() => {
+    if (!isAdminViewAs || !viewAsUserId) {
+      setViewAsProfile(null);
+      return;
+    }
+    let cancelled = false;
+    setViewAsLoading(true);
+    getUserDataForAdminView(viewAsUserId)
+      .then((res) => {
+        if (!cancelled && res.success && res.user) setViewAsProfile(res.user);
+        else if (!cancelled) setViewAsProfile(null);
+      })
+      .finally(() => {
+        if (!cancelled) setViewAsLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isAdminViewAs, viewAsUserId]);
+
+  const effectiveProfile = isAdminViewAs && viewAsProfile ? viewAsProfile : userProfile;
+  const displayUser = isAdminViewAs && viewAsProfile ? viewAsProfile : user;
+  const isViewAsMode = isAdminViewAs && viewAsProfile;
+  const effectiveLoading = isAdminViewAs ? viewAsLoading : profileLoading;
 
   // Initialiser activeSection depuis les paramètres d'URL ou par défaut 'profile'
   const sectionFromUrl = searchParams.get('section') as MenuSection | null;
@@ -991,14 +1022,14 @@ function UserProfilePageContent() {
 
   // Cotisations affichées selon le mode : un mois / une année / toutes
   const cotisationsMoisAffichage = useMemo(() => {
-    if (activeSection !== 'cotisations' || !userProfile?.adherent || user?.role === 'ADMIN') {
+    if (activeSection !== 'cotisations' || !effectiveProfile?.adherent || (displayUser as any)?.role === 'ADMIN') {
       return [];
     }
-    const adherent = userProfile.adherent as any;
+    const adherent = effectiveProfile.adherent as any;
     const cotisationsMensuelles = adherent.CotisationsMensuelles || [];
     const assistances = adherent.Assistances || [];
     const adherentId = adherent.id;
-    const typeForfait = (userProfile as any)?.typeForfait;
+    const typeForfait = (effectiveProfile as any)?.typeForfait;
     const montantForfaitDefaut = typeForfait?.montant ?? 15.00;
 
     function buildItemsForMonth(annee: number, mois: number): any[] {
@@ -1102,7 +1133,7 @@ function UserProfilePageContent() {
       all.push(...buildItemsForMonth(annee, mois));
     });
     return all;
-  }, [activeSection, userProfile, user?.role, selectedCotisationsMois, selectedCotisationsAnnee, cotisationsVue]);
+  }, [activeSection, effectiveProfile, (displayUser as any)?.role, selectedCotisationsMois, selectedCotisationsAnnee, cotisationsVue]);
 
   // Filtre et totaux pour l'historique des cotisations par mois
   const filteredHistoriqueCotisations = useMemo(() => {
@@ -1128,18 +1159,18 @@ function UserProfilePageContent() {
         switch (activeSection) {
           case 'cotisations':
             // Charger les cotisations, obligations, dettes initiales et cotisations du mois depuis le profil utilisateur
-            // SAUF si l'utilisateur est admin (l'admin ne cotise ni ne bénéficie d'assistances)
-            const isAdmin = user?.role === 'ADMIN';
+            // SAUF si l'utilisateur affiché est admin (l'admin ne cotise ni ne bénéficie d'assistances)
+            const isAdmin = (displayUser as any)?.role === 'ADMIN';
             
-            if (userProfile?.adherent && !isAdmin) {
-              setCotisations((userProfile.adherent as any).Cotisations || []);
-              setObligationsCotisation((userProfile.adherent as any).ObligationsCotisation || []);
-              setDettesInitiales((userProfile.adherent as any).DettesInitiales || []);
-              setAvoirs((userProfile.adherent as any).Avoirs || []);
+            if (effectiveProfile?.adherent && !isAdmin) {
+              setCotisations((effectiveProfile.adherent as any).Cotisations || []);
+              setObligationsCotisation((effectiveProfile.adherent as any).ObligationsCotisation || []);
+              setDettesInitiales((effectiveProfile.adherent as any).DettesInitiales || []);
+              setAvoirs((effectiveProfile.adherent as any).Avoirs || []);
               
               // Construire la liste des cotisations du mois : forfait mensuel + assistances du mois (séparés)
-              const cotisationsMensuelles = ((userProfile.adherent as any).CotisationsMensuelles || []);
-              const assistances = ((userProfile.adherent as any).Assistances || []);
+              const cotisationsMensuelles = ((effectiveProfile.adherent as any).CotisationsMensuelles || []);
+              const assistances = ((effectiveProfile.adherent as any).Assistances || []);
               
               // Filtrer les cotisations mensuelles du mois en cours
               const moisCourant = new Date().getMonth() + 1;
@@ -1187,7 +1218,7 @@ function UserProfilePageContent() {
                 // Si aucune cotisation mensuelle n'existe pour le mois en cours, calculer dynamiquement
                 // (comme pour la cotisation prévisionnelle du mois prochain)
                 // Utiliser le typeForfait récupéré depuis getUserData
-                const typeForfait = (userProfile as any)?.typeForfait;
+                const typeForfait = (effectiveProfile as any)?.typeForfait;
                 const montantForfait = typeForfait?.montant || 15.00; // 15€ par défaut si pas de type
                 const periode = `${anneeCourante}-${String(moisCourant).padStart(2, '0')}`;
                 
@@ -1210,7 +1241,7 @@ function UserProfilePageContent() {
               
               // Créer une ligne pour chaque assistance du mois en cours
               // IMPORTANT: On affiche seulement les assistances que l'adhérent doit payer (pas celles dont il est bénéficiaire)
-              const adherentId = (userProfile.adherent as any)?.id;
+              const adherentId = (effectiveProfile.adherent as any)?.id;
               const assistanceItems = assistances
                 .filter((ass: any) => {
                   // Filtrer par mois en cours
@@ -1241,7 +1272,7 @@ function UserProfilePageContent() {
               setCotisationsMois([...items, ...assistanceItems]);
               
               // Construire l'historique des cotisations mensuelles avec leurs paiements
-              const toutesCotisationsMensuelles = ((userProfile.adherent as any).CotisationsMensuelles || []);
+              const toutesCotisationsMensuelles = ((effectiveProfile.adherent as any).CotisationsMensuelles || []);
               setHistoriqueCotisations(toutesCotisationsMensuelles);
             } else if (isAdmin) {
               // Si l'utilisateur est admin, ne pas afficher de cotisations
@@ -1304,8 +1335,8 @@ function UserProfilePageContent() {
             setBadgesLoading(false);
             break;
           case 'enfants':
-            if (userProfile?.adherent) {
-              setEnfants((userProfile.adherent as any).Enfants || []);
+            if (effectiveProfile?.adherent) {
+              setEnfants((effectiveProfile.adherent as any).Enfants || []);
             } else {
               setEnfants([]);
             }
@@ -1340,7 +1371,7 @@ function UserProfilePageContent() {
     };
 
     loadSectionData();
-  }, [activeSection, user]);
+  }, [activeSection, user, effectiveProfile]);
 
   const handleDownloadPasseport = async () => {
     try {
@@ -1758,12 +1789,14 @@ function UserProfilePageContent() {
                 <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Mon Profil</h2>
                 <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Gérez vos informations personnelles</p>
               </div>
-              <Link href="/user/update" className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white">
-                  <Edit className="h-4 w-4 mr-2" />
-                  Modifier le profil
-                </Button>
-              </Link>
+              {!isViewAsMode && (
+                <Link href="/user/update" className="w-full sm:w-auto">
+                  <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white">
+                    <Edit className="h-4 w-4 mr-2" />
+                    Modifier le profil
+                  </Button>
+                </Link>
+              )}
             </div>
 
             {/* Informations de base */}
@@ -1783,7 +1816,7 @@ function UserProfilePageContent() {
                     <Mail className="h-5 w-5 text-gray-500" />
                     <div>
                       <p className="text-sm text-gray-500">Email</p>
-                      <p className="font-medium">{user.email || "Non renseigné"}</p>
+                      <p className="font-medium">{displayUser?.email || "Non renseigné"}</p>
                     </div>
                   </div>
                   
@@ -1791,7 +1824,7 @@ function UserProfilePageContent() {
                     <User className="h-5 w-5 text-gray-500" />
                     <div>
                       <p className="text-sm text-gray-500">Nom complet</p>
-                      <p className="font-medium">{user.name || "Non renseigné"}</p>
+                      <p className="font-medium">{displayUser?.name || "Non renseigné"}</p>
                     </div>
                   </div>
                   
@@ -1822,7 +1855,7 @@ function UserProfilePageContent() {
             </Card>
 
             {/* Informations Adhérent */}
-            {profileLoading ? (
+            {effectiveLoading ? (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1838,7 +1871,7 @@ function UserProfilePageContent() {
                   </div>
                 </CardContent>
               </Card>
-            ) : userProfile?.adherent ? (
+            ) : effectiveProfile?.adherent ? (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1849,15 +1882,15 @@ function UserProfilePageContent() {
                 <CardContent className="space-y-3">
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-300">Civilité</span>
-                    <span className="font-medium">{userProfile.adherent.civility || "Non renseigné"}</span>
+                    <span className="font-medium">{effectiveProfile?.adherent?.civility || "Non renseigné"}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-300">Prénom</span>
-                    <span className="font-medium">{userProfile.adherent.firstname}</span>
+                    <span className="font-medium">{effectiveProfile?.adherent?.firstname}</span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-300">Nom</span>
-                    <span className="font-medium">{userProfile.adherent.lastname}</span>
+                    <span className="font-medium">{effectiveProfile?.adherent?.lastname}</span>
                   </div>
                 </CardContent>
               </Card> 
@@ -1878,19 +1911,21 @@ function UserProfilePageContent() {
                     <p className="text-gray-600 dark:text-gray-300">
                       Complétez vos informations d'adhérent
                     </p>
+                    {!isViewAsMode && (
                     <Link href="/user/update">
                       <Button className="mt-4">
                         <Plus className="h-4 w-4 mr-2" />
                         Compléter mon profil
                       </Button>
                     </Link>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             )}
 
             {/* Informations d'Adresse */}
-            {profileLoading ? (
+            {effectiveLoading ? (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1906,7 +1941,7 @@ function UserProfilePageContent() {
                   </div>
                 </CardContent>
               </Card>
-            ) : userProfile?.adherent?.Adresse && userProfile.adherent.Adresse.length > 0 ? (
+            ) : effectiveProfile?.adherent?.Adresse && effectiveProfile.adherent.Adresse.length > 0 ? (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -1918,7 +1953,7 @@ function UserProfilePageContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {userProfile.adherent.Adresse.map((adresse, index) => (
+                  {effectiveProfile.adherent.Adresse.map((adresse, index) => (
                     <div key={adresse.id} className="border rounded-lg p-4 space-y-3">
                       {index > 0 && <hr className="my-4" />}
                       
@@ -2006,19 +2041,21 @@ function UserProfilePageContent() {
                     <p className="text-gray-600 dark:text-gray-300 mb-4">
                       Ajoutez votre adresse pour compléter votre profil
                     </p>
+                    {!isViewAsMode && (
                     <Link href="/user/update">
                       <Button>
                         <Plus className="h-4 w-4 mr-2" />
                         Ajouter une adresse
                       </Button>
                     </Link>
+                    )}
                   </div>
                 </CardContent>
               </Card>
             )}
 
             {/* Informations des Téléphones */}
-            {profileLoading ? (
+            {effectiveLoading ? (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -2033,7 +2070,7 @@ function UserProfilePageContent() {
                   </div>
                 </CardContent>
               </Card>
-            ) : userProfile?.adherent?.Telephones && userProfile.adherent.Telephones.length > 0 ? (
+            ) : effectiveProfile?.adherent?.Telephones && effectiveProfile.adherent.Telephones.length > 0 ? (
               <Card>
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
@@ -2045,7 +2082,7 @@ function UserProfilePageContent() {
                   </CardDescription>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  {userProfile.adherent.Telephones.map((telephone, index) => (
+                  {effectiveProfile.adherent.Telephones.map((telephone, index) => (
                     <div key={telephone.id} className="border rounded-lg p-4 space-y-3">
                       {index > 0 && <hr className="my-4" />}
                       
@@ -2111,12 +2148,14 @@ function UserProfilePageContent() {
                     <p className="text-gray-600 dark:text-gray-300 mb-4">
                       Ajoutez vos numéros de téléphone pour être contacté
                     </p>
+                    {!isViewAsMode && (
                     <Link href="/user/update">
                       <Button>
                         <Plus className="h-4 w-4 mr-2" />
                         Ajouter un téléphone
                       </Button>
                     </Link>
+                    )}
                   </div>
                 </CardContent>
               </Card>
@@ -3473,7 +3512,7 @@ function UserProfilePageContent() {
 
         // Calculer l'ancienneté
         const dateAdhesion = userProfile?.adherent?.datePremiereAdhesion 
-          ? new Date(userProfile.adherent.datePremiereAdhesion)
+          ? new Date((effectiveProfile?.adherent as any)?.datePremiereAdhesion)
           : userCreatedAt ? new Date(userCreatedAt) : new Date();
         const ancienneteAnnees = differenceInYears(new Date(), dateAdhesion);
         const ancienneteMois = differenceInMonths(new Date(), dateAdhesion) % 12;
@@ -4372,7 +4411,7 @@ function UserProfilePageContent() {
                   <div className="flex justify-between">
                     <span className="text-gray-600 dark:text-gray-300">Image de profil</span>
                     <span className="text-sm font-medium">
-                      {user.image ? "Définie" : "Non définie"}
+                      {(displayUser as any)?.image ? "Définie" : "Non définie"}
                     </span>
                   </div>
                 </CardContent>
@@ -4386,6 +4425,8 @@ function UserProfilePageContent() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
+                  {!isViewAsMode && (
+                  <>
                   <Link href="/user/update" className="block">
                     <Button className="w-full" variant="outline">
                       <Edit className="h-4 w-4 mr-2" />
@@ -4404,6 +4445,8 @@ function UserProfilePageContent() {
                     <Settings className="h-4 w-4 mr-2" />
                     Préférences
                   </Button>
+                  </>
+                  )}
                 </CardContent>
               </Card>
             </div>
@@ -5033,7 +5076,7 @@ function UserProfilePageContent() {
 
       case 'taches':
         // Vérifier si l'utilisateur a un profil adhérent
-        if (profileLoading) {
+        if (effectiveLoading) {
           return (
             <div className="flex items-center justify-center py-12">
               <div className="h-8 w-8 animate-spin rounded-full border-2 border-blue-600 border-t-transparent" />
@@ -5042,7 +5085,7 @@ function UserProfilePageContent() {
         }
         
         // Vérifier si l'utilisateur est un adhérent
-        const hasAdherentProfile = userProfile?.adherent && userProfile.adherent.id;
+        const hasAdherentProfile = effectiveProfile?.adherent && effectiveProfile.adherent.id;
         const userRole = user?.role || userProfile?.role;
         const isAdmin = userRole === 'ADMIN';
         
@@ -5127,7 +5170,24 @@ function UserProfilePageContent() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
       <DynamicNavbar />
-      
+
+      {/* Bannière "Vue comme l'adhérent" (admin) */}
+      {isViewAsMode && (
+        <div className="sticky top-0 z-30 flex items-center justify-between gap-4 bg-amber-500 text-amber-950 px-4 py-2 shadow-md">
+          <span className="text-sm font-medium">
+            Vous consultez le profil de <strong>{displayUser?.name || (effectiveProfile?.adherent as any)?.firstname + " " + (effectiveProfile?.adherent as any)?.lastname || "cet adhérent"}</strong> en tant qu&apos;administrateur (lecture seule).
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            className="bg-white/90 border-amber-700 text-amber-900 hover:bg-white shrink-0"
+            onClick={() => router.push("/user/profile")}
+          >
+            Quitter la vue adhérent
+          </Button>
+        </div>
+      )}
+
       {/* Hero Section */}
       <section className="relative py-3 sm:py-4 md:py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white">
         <div className="absolute inset-0 bg-black/20" />
@@ -5136,64 +5196,68 @@ function UserProfilePageContent() {
             <div className="relative flex-shrink-0">
               <Avatar className="h-16 w-16 sm:h-20 sm:w-20 md:h-24 md:w-24 border-4 border-white shadow-2xl">
                 <AvatarImage 
-                  src={userProfile?.image || user?.image || ""} 
-                  alt={user.name || "Utilisateur"}
+                  src={effectiveProfile?.image || (user as any)?.image || ""} 
+                  alt={displayUser?.name || "Utilisateur"}
                   className="object-cover"
                 />
                 <AvatarFallback className="text-2xl sm:text-3xl md:text-4xl bg-white text-gray-800">
-                  {(user.name || "U").charAt(0).toUpperCase()}
+                  {(displayUser?.name || "U").charAt(0).toUpperCase()}
                 </AvatarFallback>
               </Avatar>
             </div>
             
             <div className="flex-1 text-center sm:text-left min-w-0">
               <h1 className="text-lg sm:text-xl md:text-2xl font-bold mb-0.5 sm:mb-1">
-                {user.name || "Utilisateur"}
+                {displayUser?.name || "Utilisateur"}
               </h1>
-              <p className="text-xs sm:text-sm md:text-base text-blue-100 mb-1 sm:mb-2 truncate">{user.email}</p>
+              <p className="text-xs sm:text-sm md:text-base text-blue-100 mb-1 sm:mb-2 truncate">{displayUser?.email}</p>
               <div className="flex flex-wrap justify-center sm:justify-start gap-1.5 sm:gap-2">
-                <Badge className={`${getStatusColor(userStatus)} text-xs`}>
+                <Badge className={`${getStatusColor((displayUser as any)?.status || userStatus)} text-xs`}>
                   <CheckCircle className="h-3 w-3 mr-0.5" />
-                  {userStatus}
+                  {(displayUser as any)?.status || userStatus}
                 </Badge>
-                <Badge className={`${getRoleColor(userRole)} text-xs`}>
+                <Badge className={`${getRoleColor((displayUser as any)?.role || userRole)} text-xs`}>
                   <Shield className="h-3 w-3 mr-0.5" />
-                  {userRole}
+                  {(displayUser as any)?.role || userRole}
                 </Badge>
-                {userProfile?.adherent?.PosteTemplate && (
+                {effectiveProfile?.adherent?.PosteTemplate && (
                   <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 text-xs">
                     <Award className="h-3 w-3 mr-0.5" />
-                    {userProfile.adherent.PosteTemplate.libelle}
+                    {effectiveProfile.adherent.PosteTemplate.libelle}
                   </Badge>
                 )}
               </div>
             </div>
             
             <div className="flex gap-1.5 sm:gap-2 flex-shrink-0">
-              {userProfile?.adherent?.numeroPasseport && user?.status === 'Actif' && (
+              {effectiveProfile?.adherent?.numeroPasseport && (displayUser as any)?.status === "Actif" && (
                 <Button 
                   onClick={handleDownloadPasseport}
                   className="bg-white text-blue-600 hover:bg-blue-50 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 font-medium shadow-sm"
-                  title={`Télécharger le passeport ${userProfile.adherent.numeroPasseport}`}
+                  title={`Télécharger le passeport ${effectiveProfile.adherent.numeroPasseport}`}
                 >
                   <Download className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
                   <span className="hidden sm:inline">Passeport</span>
                 </Button>
               )}
-              <Link href="/user/update">
-                <Button className="bg-white text-blue-600 hover:bg-blue-50 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 font-medium shadow-sm">
-                  <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
-                  <span className="hidden sm:inline">Modifier</span>
-                </Button>
-              </Link>
-              <ChangePasswordDialog
-                trigger={
-                  <Button className="bg-white/90 text-blue-600 hover:bg-white dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 font-medium shadow-sm">
-                    <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
-                    <span className="hidden sm:inline ml-1">Paramètres</span>
-                  </Button>
-                }
-              />
+              {!isViewAsMode && (
+                <>
+                  <Link href="/user/update">
+                    <Button className="bg-white text-blue-600 hover:bg-blue-50 dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 font-medium shadow-sm">
+                      <Edit className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1" />
+                      <span className="hidden sm:inline">Modifier</span>
+                    </Button>
+                  </Link>
+                      <ChangePasswordDialog
+                    trigger={
+                      <Button className="bg-white/90 text-blue-600 hover:bg-white dark:bg-gray-800 dark:text-blue-400 dark:hover:bg-gray-700 text-xs sm:text-sm h-8 sm:h-9 px-2 sm:px-3 font-medium shadow-sm">
+                        <Settings className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+                        <span className="hidden sm:inline ml-1">Paramètres</span>
+                      </Button>
+                    }
+                  />
+                </>
+              )}
             </div>
           </div>
         </div>

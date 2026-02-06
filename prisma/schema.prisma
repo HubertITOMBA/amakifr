@@ -105,6 +105,7 @@ enum MoyenPaiement {
   CarteBancaire
   Stripe
   PayPal
+  Mollie
   GooglePay
 }
 
@@ -901,6 +902,7 @@ model PaiementCotisation {
   stripePaymentIntentId String? @unique @db.VarChar(255) // ID du PaymentIntent Stripe
   stripeSessionId       String? @unique @db.VarChar(255) // ID de la session Stripe Checkout
   paypalOrderId         String? @unique @db.VarChar(255) // ID de la commande PayPal
+  molliePaymentId       String? @unique @db.VarChar(255) // ID du paiement Mollie (tr_xxx)
   transactionId         String? @unique @db.VarChar(255) // ID de transaction unique (pour tous les prestataires)
   receiptUrl            String? @db.VarChar(500) // URL du reçu PDF généré
   receiptGenerated      Boolean @default(false) // Si le reçu a été généré

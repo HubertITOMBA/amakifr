@@ -517,6 +517,411 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
   }
 }
 
+/**
+ * Récupère les données profil d'un utilisateur cible pour qu'un admin puisse
+ * visualiser le profil comme si c'était l'adhérent connecté. Réservé aux ADMIN.
+ */
+export async function getUserDataForAdminView(
+  targetUserId: string
+): Promise<{ success: boolean; user?: any; error?: string }> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+    if ((session.user as any).role !== UserRole.ADMIN) {
+      return { success: false, error: "Réservé aux administrateurs" };
+    }
+    if (!targetUserId?.trim()) {
+      return { success: false, error: "Utilisateur cible requis" };
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: targetUserId },
+      include: {
+        adherent: {
+          include: {
+            Adresse: true,
+            Telephones: true,
+            Cotisations: true,
+            ObligationsCotisation: true,
+            PosteTemplate: true,
+            DettesInitiales: {
+              orderBy: { annee: "desc" },
+            },
+            CotisationsMensuelles: {
+              orderBy: [
+                { annee: "desc" },
+                { mois: "desc" },
+              ],
+              include: {
+                TypeCotisation: true,
+                CotisationDuMois: {
+                  include: {
+                    AdherentBeneficiaire: {
+                      select: {
+                        id: true,
+                        firstname: true,
+                        lastname: true,
+                      },
+                    },
+                  },
+                },
+                Paiements: {
+                  orderBy: { datePaiement: "desc" },
+                  include: {
+                    CreatedBy: {
+                      select: {
+                        id: true,
+                        name: true,
+                        email: true,
+                      },
+                    },
+                  },
+                },
+              },
+            },
+            Assistances: {
+              where: {
+                dateEvenement: {
+                  gte: new Date(new Date().getFullYear(), new Date().getMonth(), 1),
+                  lt: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1),
+                },
+              },
+              include: {
+                Adherent: {
+                  select: {
+                    id: true,
+                    firstname: true,
+                    lastname: true,
+                  },
+                },
+              },
+            },
+            Avoirs: {
+              where: {
+                statut: "Disponible",
+                montantRestant: { gt: 0 },
+              },
+              orderBy: { createdAt: "desc" },
+            },
+            Enfants: true,
+          },
+        },
+      },
+    });
+
+    if (!user) {
+      return { success: false, error: "Utilisateur non trouvé" };
+    }
+
+    const isAdmin = user.role === UserRole.ADMIN;
+    const anneeCourante = new Date().getFullYear();
+    const startOfYear = new Date(anneeCourante, 0, 1);
+    const endOfYear = new Date(anneeCourante, 11, 31, 23, 59, 59);
+
+    const toutesAssistancesAnnee =
+      isAdmin || !user.adherent
+        ? []
+        : await prisma.assistance.findMany({
+            where: {
+              adherentId: (user.adherent as any).id,
+              dateEvenement: { gte: startOfYear, lte: endOfYear },
+              statut: { not: "Annule" },
+            },
+            include: {
+              Adherent: {
+                select: {
+                  id: true,
+                  firstname: true,
+                  lastname: true,
+                },
+              },
+            },
+          });
+
+    let cdmBeneficiairesByPeriodeType: Map<string, { id: string; firstname: string; lastname: string }> = new Map();
+    if (user.adherent && !isAdmin && (user.adherent as any).CotisationsMensuelles?.length) {
+      const periodesTypes = new Set<string>();
+      (user.adherent as any).CotisationsMensuelles.forEach((cot: any) => {
+        if (cot.TypeCotisation?.aBeneficiaire && cot.periode && cot.typeCotisationId) {
+          periodesTypes.add(`${cot.periode}|${cot.typeCotisationId}`);
+        }
+      });
+      if (periodesTypes.size > 0) {
+        const cdmWithBenef = await prisma.cotisationDuMois.findMany({
+          where: {
+            adherentBeneficiaireId: { not: null },
+            OR: Array.from(periodesTypes).map((key) => {
+              const [periode, typeCotisationId] = key.split("|");
+              return { periode, typeCotisationId };
+            }),
+          },
+          include: {
+            AdherentBeneficiaire: {
+              select: { id: true, firstname: true, lastname: true },
+            },
+          },
+        });
+        cdmWithBenef.forEach((cdm: any) => {
+          if (cdm.AdherentBeneficiaire) {
+            cdmBeneficiairesByPeriodeType.set(`${cdm.periode}|${cdm.typeCotisationId}`, {
+              id: cdm.AdherentBeneficiaire.id,
+              firstname: cdm.AdherentBeneficiaire.firstname ?? "",
+              lastname: cdm.AdherentBeneficiaire.lastname ?? "",
+            });
+          }
+        });
+      }
+    }
+
+    const userWithConvertedDecimals = {
+      ...user,
+      adherent: user.adherent
+        ? {
+            ...user.adherent,
+            Cotisations: isAdmin
+              ? []
+              : ((user.adherent as any).Cotisations?.map((cotisation: any) => ({
+                  ...cotisation,
+                  montant: Number(cotisation.montant),
+                })) ?? []),
+            ObligationsCotisation: isAdmin
+              ? []
+              : ((user.adherent as any).ObligationsCotisation?.map((obligation: any) => ({
+                  ...obligation,
+                  montantAttendu: Number(obligation.montantAttendu),
+                  montantPaye: Number(obligation.montantPaye),
+                  montantRestant: Number(obligation.montantRestant),
+                })) ?? []),
+            DettesInitiales: isAdmin
+              ? []
+              : ((user.adherent as any).DettesInitiales?.map((dette: any) => ({
+                  ...dette,
+                  montant: Number(dette.montant),
+                  montantPaye: Number(dette.montantPaye),
+                  montantRestant: Number(dette.montantRestant),
+                })) ?? []),
+            CotisationsMensuelles: isAdmin
+              ? []
+              : ((user.adherent as any).CotisationsMensuelles?.map((cot: any) => {
+                  const cotisationDuMois = cot.CotisationDuMois;
+                  const benefFromCdm = cotisationDuMois?.AdherentBeneficiaire;
+                  const benefFallback =
+                    cot.TypeCotisation?.aBeneficiaire && cot.periode && cot.typeCotisationId
+                      ? cdmBeneficiairesByPeriodeType.get(`${cot.periode}|${cot.typeCotisationId}`)
+                      : undefined;
+                  const adherentBeneficiaire = benefFromCdm
+                    ? {
+                        id: benefFromCdm.id,
+                        firstname: benefFromCdm.firstname,
+                        lastname: benefFromCdm.lastname,
+                      }
+                    : benefFallback
+                      ? {
+                          id: benefFallback.id,
+                          firstname: benefFallback.firstname,
+                          lastname: benefFallback.lastname,
+                        }
+                      : null;
+                  return {
+                    ...cot,
+                    montantAttendu: Number(cot.montantAttendu),
+                    montantPaye: Number(cot.montantPaye),
+                    montantRestant: Number(cot.montantRestant),
+                    TypeCotisation: cot.TypeCotisation
+                      ? {
+                          ...cot.TypeCotisation,
+                          montant: Number(cot.TypeCotisation.montant),
+                        }
+                      : null,
+                    CotisationDuMois: cotisationDuMois
+                      ? {
+                          ...cotisationDuMois,
+                          montantBase: Number(cotisationDuMois.montantBase),
+                          AdherentBeneficiaire: adherentBeneficiaire,
+                        }
+                      : adherentBeneficiaire
+                        ? {
+                            periode: cot.periode,
+                            typeCotisationId: cot.typeCotisationId,
+                            montantBase: 0,
+                            AdherentBeneficiaire: adherentBeneficiaire,
+                          }
+                        : null,
+                    Paiements:
+                      cot.Paiements?.map((paiement: any) => ({
+                        ...paiement,
+                        montant: Number(paiement.montant),
+                        CreatedBy: paiement.CreatedBy
+                          ? {
+                              id: paiement.CreatedBy.id,
+                              name: paiement.CreatedBy.name,
+                              email: paiement.CreatedBy.email,
+                            }
+                          : null,
+                      })) ?? [],
+                  };
+                }) ?? []),
+            Assistances: isAdmin
+              ? []
+              : (toutesAssistancesAnnee.map((ass: any) => ({
+                  ...ass,
+                  montant: Number(ass.montant),
+                  montantPaye: Number(ass.montantPaye),
+                  montantRestant: Number(ass.montantRestant),
+                  Adherent: ass.Adherent
+                    ? {
+                        id: ass.Adherent.id,
+                        firstname: ass.Adherent.firstname,
+                        lastname: ass.Adherent.lastname,
+                      }
+                    : null,
+                })) ?? []),
+            Avoirs: isAdmin
+              ? []
+              : ((user.adherent as any).Avoirs?.map((avoir: any) => ({
+                  ...avoir,
+                  montant: Number(avoir.montant),
+                  montantUtilise: Number(avoir.montantUtilise),
+                  montantRestant: Number(avoir.montantRestant),
+                })) ?? []),
+          }
+        : null,
+    };
+
+    const typeForfait =
+      isAdmin
+        ? null
+        : await prisma.typeCotisationMensuelle.findFirst({
+            where: {
+              actif: true,
+              OR: [
+                { categorie: "ForfaitMensuel" },
+                { nom: { contains: "Forfait", mode: "insensitive" } },
+              ],
+            },
+            orderBy: { ordre: "asc" },
+          });
+
+    let cotisationMoisProchain: any = null;
+    if (user.adherent && !isAdmin) {
+      const moisProchain = new Date();
+      moisProchain.setMonth(moisProchain.getMonth() + 1);
+      const startOfNextMonth = new Date(
+        moisProchain.getFullYear(),
+        moisProchain.getMonth(),
+        1
+      );
+      const endOfNextMonth = new Date(
+        moisProchain.getFullYear(),
+        moisProchain.getMonth() + 1,
+        0,
+        23,
+        59,
+        59
+      );
+
+      const toutesAssistancesMoisProchain = await prisma.assistance.findMany({
+        where: {
+          dateEvenement: {
+            gte: startOfNextMonth,
+            lte: endOfNextMonth,
+          },
+          statut: { not: "Annule" },
+        },
+        include: {
+          Adherent: {
+            select: {
+              id: true,
+              firstname: true,
+              lastname: true,
+            },
+          },
+        },
+      });
+
+      if (typeForfait) {
+        const montantForfait = Number(typeForfait.montant);
+        const adherentId = (user.adherent as any).id;
+        const assistancesBeneficiaires = toutesAssistancesMoisProchain.filter(
+          (ass: any) => ass.adherentId === adherentId
+        );
+        const isBeneficiaire = assistancesBeneficiaires.length > 0;
+        let montantTotal = montantForfait;
+        let description = `Cotisation ${moisProchain.getFullYear()}-${String(moisProchain.getMonth() + 1).padStart(2, "0")} : Forfait ${montantForfait.toFixed(2)}€`;
+
+        if (isBeneficiaire) {
+          const assistancesDetails = assistancesBeneficiaires
+            .map((ass: any) => `${ass.type} (bénéficiaire)`)
+            .join(", ");
+          description += ` - Bénéficiaire de: ${assistancesDetails} (ne paie pas l'assistance)`;
+        } else if (toutesAssistancesMoisProchain.length > 0) {
+          const montantAssistances = toutesAssistancesMoisProchain.reduce(
+            (sum: number, ass: any) =>
+              sum + Number(ass.montantRestant > 0 ? ass.montantRestant : ass.montant),
+            0
+          );
+          montantTotal = montantForfait + montantAssistances;
+          const assistancesDetails = toutesAssistancesMoisProchain
+            .map(
+              (ass: any) =>
+                `${ass.type} pour ${ass.Adherent?.firstname || ""} ${ass.Adherent?.lastname || ""} (${Number(ass.montantRestant > 0 ? ass.montantRestant : ass.montant).toFixed(2)}€)`
+            )
+            .join(", ");
+          description += ` + Assistances: ${assistancesDetails}`;
+          description += ` = Total: ${montantTotal.toFixed(2)}€`;
+        }
+
+        cotisationMoisProchain = {
+          periode: `${moisProchain.getFullYear()}-${String(moisProchain.getMonth() + 1).padStart(2, "0")}`,
+          nomMois:
+            moisProchain.toLocaleDateString("fr-FR", { month: "long" }).charAt(0).toUpperCase() +
+            moisProchain.toLocaleDateString("fr-FR", { month: "long" }).slice(1),
+          montantForfait,
+          montantTotal,
+          description,
+          assistances: toutesAssistancesMoisProchain.map((ass: any) => ({
+            id: ass.id,
+            type: ass.type,
+            montant: Number(ass.montant),
+            adherent: ass.Adherent
+              ? {
+                  id: ass.Adherent.id,
+                  firstname: ass.Adherent.firstname,
+                  lastname: ass.Adherent.lastname,
+                }
+              : null,
+          })),
+          isBeneficiaire,
+        };
+      }
+    }
+
+    return {
+      success: true,
+      user: {
+        ...userWithConvertedDecimals,
+        cotisationMoisProchain: isAdmin ? null : cotisationMoisProchain,
+        typeForfait: isAdmin
+          ? null
+          : typeForfait
+            ? {
+                id: typeForfait.id,
+                nom: typeForfait.nom,
+                montant: Number(typeForfait.montant),
+                obligatoire: typeForfait.obligatoire,
+                actif: typeForfait.actif,
+              }
+            : null,
+      },
+    };
+  } catch (error) {
+    console.error("Erreur getUserDataForAdminView:", error);
+    return { success: false, error: "Erreur serveur" };
+  }
+}
+
 // Server Action pour mettre à jour les données utilisateur
 export async function updateUserData(
   userData: any,

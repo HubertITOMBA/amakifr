@@ -88,8 +88,11 @@ const baseEnvSchema = z.object({
     z.string().url().optional()
   ),
   
+  // Paiement par carte (Stripe/Mollie) : désactiver en production si besoin
+  NEXT_PUBLIC_ENABLE_CARD_PAYMENT: z.enum(['true', 'false']).optional(),
+
   // Payment Provider
-  PAYMENT_PROVIDER: z.enum(['stripe', 'paypal', 'virement']).optional().default('stripe'),
+  PAYMENT_PROVIDER: z.enum(['stripe', 'paypal', 'mollie', 'virement']).optional().default('stripe'),
   
   // Stripe (optionnel mais requis si PAYMENT_PROVIDER=stripe)
   STRIPE_SECRET_KEY: z.preprocess(
@@ -103,6 +106,9 @@ const baseEnvSchema = z.object({
   ),
   STRIPE_WEBHOOK_SECRET: emptyStringToUndefined,
   
+  // Mollie (optionnel mais requis si PAYMENT_PROVIDER=mollie)
+  MOLLIE_API_KEY: z.string().optional(),
+
   // PayPal (optionnel mais requis si PAYMENT_PROVIDER=paypal)
   PAYPAL_CLIENT_ID: z.string().optional(),
   PAYPAL_CLIENT_SECRET: z.string().optional(),

@@ -39,7 +39,8 @@ import {
   ChevronsRight,
   KeyRound,
   Trash2,
-  Download
+  Download,
+  UserCircle
 } from "lucide-react";
 import { UserRole, UserStatus } from "@prisma/client";
 import { 
@@ -68,7 +69,6 @@ import { toast } from "sonner";
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 import { SendEmailModal } from "@/components/admin/SendEmailModal";
-import { Checkbox } from "@/components/ui/checkbox";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
 
 type UserData = {
@@ -504,28 +504,6 @@ export default function AdminUsersPage() {
 
   // Colonnes du tableau
   const columns = useMemo(() => [
-    columnHelper.display({
-      id: "select",
-      header: ({ table }) => (
-        <Checkbox
-          checked={table.getIsAllPageRowsSelected()}
-          onCheckedChange={(value) => {
-            table.toggleAllPageRowsSelected(!!value);
-          }}
-          aria-label="Sélectionner tout"
-        />
-      ),
-      cell: ({ row }) => (
-        <Checkbox
-          checked={row.getIsSelected()}
-          onCheckedChange={(value) => {
-            row.toggleSelected(!!value);
-          }}
-          aria-label="Sélectionner la ligne"
-        />
-      ),
-      meta: { forceVisible: true },
-    }),
     columnHelper.accessor((row) => {
       return row.adherent?.civility || "—";
     }, {
@@ -718,9 +696,9 @@ export default function AdminUsersPage() {
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
-                  <Link href={`/admin/users/${user.id}/consultation`} className="flex items-center gap-2 cursor-pointer">
-                    <Eye className="h-4 w-4" />
-                    <span>Voir les détails</span>
+                  <Link href={`/user/profile?viewAs=${user.id}`} className="flex items-center gap-2 cursor-pointer">
+                    <UserCircle className="h-4 w-4" />
+                    <span>Voir le profil comme l&apos;adhérent</span>
                   </Link>
                 </DropdownMenuItem>
                 {isAdminOnly && (
@@ -1379,7 +1357,7 @@ export default function AdminUsersPage() {
     getPaginationRowModel: getPaginationRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
-    enableRowSelection: true,
+    enableRowSelection: false,
     onSortingChange: setSorting,
     onColumnFiltersChange: setColumnFilters,
     onGlobalFilterChange: setGlobalFilter,

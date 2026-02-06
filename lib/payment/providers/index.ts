@@ -5,6 +5,7 @@
 import type { PaymentProvider, PaymentProviderInterface } from "./types";
 import { StripeProvider } from "./stripe-provider";
 import { PayPalProvider } from "./paypal-provider";
+import { MollieProvider } from "./mollie-provider";
 import { VirementProvider } from "./virement-provider";
 
 /**
@@ -34,12 +35,20 @@ export function createPaymentProvider(): PaymentProviderInterface {
       return new PayPalProvider(clientId, clientSecret, mode);
     }
 
+    case 'mollie': {
+      const apiKey = process.env.MOLLIE_API_KEY;
+      if (!apiKey) {
+        throw new Error("MOLLIE_API_KEY est requis quand PAYMENT_PROVIDER=mollie");
+      }
+      return new MollieProvider(apiKey);
+    }
+
     case 'virement': {
       return new VirementProvider();
     }
 
     default:
-      throw new Error(`Provider de paiement non supporté: ${provider}. Valeurs possibles: stripe, paypal, virement`);
+      throw new Error(`Provider de paiement non supporté: ${provider}. Valeurs possibles: stripe, paypal, mollie, virement`);
   }
 }
 

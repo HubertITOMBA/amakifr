@@ -163,3 +163,29 @@ export async function getStripeSession(sessionId: string) {
   }
 }
 
+/**
+ * Données de succès Stripe pour la page /paiement/success (montant, statut, id paiement en base).
+ */
+export async function getStripePaymentSuccessData(sessionId: string) {
+  try {
+    const session = await stripe.checkout.sessions.retrieve(sessionId);
+    const paiement = await db.paiementCotisation.findFirst({
+      where: { stripeSessionId: sessionId },
+    });
+    return {
+      success: true,
+      amount: (session.amount_total || 0) / 100,
+      currency: session.currency || "eur",
+      customerEmail: session.customer_email ?? undefined,
+      paymentStatus: session.payment_status,
+      paiementId: paiement?.id,
+    };
+  } catch (error) {
+    console.error("getStripePaymentSuccessData:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erreur inconnue",
+    };
+  }
+}
+

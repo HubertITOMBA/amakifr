@@ -9,10 +9,11 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEffect, useState } from "react";
 import { getUserByIdForAdmin } from "@/actions/user";
 import { UserRole, UserStatus } from "@prisma/client";
-import { Calendar, Users, Briefcase, Shield, Mail, Phone, MapPin, Building, CheckCircle2, XCircle, User, Sparkles, FileText, Download } from "lucide-react";
+import { Calendar, Users, Briefcase, Shield, Mail, Phone, MapPin, Building, CheckCircle2, XCircle, User, Sparkles, FileText, Download, UserCircle } from "lucide-react";
 import { adminGeneratePasseport } from "@/actions/passeport";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 const getRoleColor = (role: UserRole) => {
   switch (role) {
@@ -250,6 +251,14 @@ export default function ConsultationUserPage() {
                   </div>
                 </div>
               )}
+            </div>
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+              <Link href={`/user/profile?viewAs=${user.id}`}>
+                <Button variant="outline" size="sm" className="w-full sm:w-auto gap-2 bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                  <UserCircle className="h-4 w-4" />
+                  Voir le profil comme l&apos;adhérent
+                </Button>
+              </Link>
             </div>
           </CardContent>
         </Card>

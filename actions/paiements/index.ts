@@ -611,7 +611,12 @@ export async function updatePaiement(data: z.infer<typeof UpdatePaiementSchema>)
 
     const existing = await prisma.paiementCotisation.findUnique({
       where: { id: validatedData.id },
-      include: { CotisationMensuelle: true },
+      include: {
+        CotisationMensuelle: true,
+        DetteInitiale: true,
+        Assistance: true,
+        ObligationCotisation: true,
+      },
     });
     if (!existing) {
       return { success: false, error: "Paiement introuvable" };
@@ -657,6 +662,128 @@ export async function updatePaiement(data: z.infer<typeof UpdatePaiementSchema>)
           statut: nouveauStatut,
         },
       });
+    } else if (existing.detteInitialeId && existing.DetteInitiale) {
+      const paiements = await prisma.paiementCotisation.findMany({
+        where: { detteInitialeId: existing.detteInitialeId, statut: "Valide" },
+      });
+      const totalPaye = paiements.reduce((sum, p) => sum.plus(p.montant), new Decimal(0));
+      const montantTotal = new Decimal(existing.DetteInitiale.montant);
+      const montantRestant = montantTotal.minus(totalPaye).gt(0) ? montantTotal.minus(totalPaye) : new Decimal(0);
+      await prisma.detteInitiale.update({
+        where: { id: existing.detteInitialeId },
+        data: {
+          montantPaye: totalPaye,
+          montantRestant,
+        },
+      });
+    } else if (existing.assistanceId && existing.Assistance) {
+      const paiements = await prisma.paiementCotisation.findMany({
+        where: { assistanceId: existing.assistanceId, statut: "Valide" },
+      });
+      const totalPaye = paiements.reduce((sum, p) => sum.plus(p.montant), new Decimal(0));
+      const montantTotal = new Decimal(existing.Assistance.montant);
+      const montantRestant = montantTotal.minus(totalPaye).gt(0) ? montantTotal.minus(totalPaye) : new Decimal(0);
+      const nouveauStatut = montantRestant.lte(0) ? "Paye" : "EnAttente";
+      await prisma.assistance.update({
+        where: { id: existing.assistanceId },
+        data: {
+          montantPaye: totalPaye,
+          montantRestant,
+          statut: nouveauStatut,
+        },
+      });
+    } else if (existing.obligationCotisationId && existing.ObligationCotisation) {
+      const paiements = await prisma.paiementCotisation.findMany({
+        where: { obligationCotisationId: existing.obligationCotisationId, statut: "Valide" },
+      });
+      const totalPaye = paiements.reduce((sum, p) => sum.plus(p.montant), new Decimal(0));
+      const montantTotal = new Decimal(existing.ObligationCotisation.montant);
+      const montantRestant = montantTotal.minus(totalPaye).gt(0) ? montantTotal.minus(totalPaye) : new Decimal(0);
+      const nouveauStatut = montantRestant.lte(0) ? "Paye" : totalPaye.gt(0) ? "PartiellementPaye" : "EnAttente";
+      await prisma.obligationCotisation.update({
+        where: { id: existing.obligationCotisationId },
+        data: {
+          montantPaye: totalPaye,
+          montantRestant,
+          statut: nouveauStatut,
+        },
+      });
+    }
+
+    // Recalculer l'avoir éventuel créé par ce paiement (excédent)
+    const avoirLie = await prisma.avoir.findUnique({
+      where: { paiementId: existing.id },
+    });
+    const itemId = existing.cotisationMensuelleId ?? existing.detteInitialeId ?? existing.assistanceId ?? existing.obligationCotisationId;
+    if (itemId && (existing.cotisationMensuelleId || existing.detteInitialeId || existing.assistanceId || existing.obligationCotisationId)) {
+      const paiementsValides = await prisma.paiementCotisation.findMany({
+        where: {
+          statut: "Valide",
+          ...(existing.cotisationMensuelleId && { cotisationMensuelleId: existing.cotisationMensuelleId }),
+          ...(existing.detteInitialeId && { detteInitialeId: existing.detteInitialeId }),
+          ...(existing.assistanceId && { assistanceId: existing.assistanceId }),
+          ...(existing.obligationCotisationId && { obligationCotisationId: existing.obligationCotisationId }),
+        },
+      });
+      const totalPaye = paiementsValides.reduce((sum, p) => sum.plus(p.montant), new Decimal(0));
+      let montantTotal: Decimal;
+      if (existing.cotisationMensuelleId && existing.CotisationMensuelle) {
+        montantTotal = new Decimal(existing.CotisationMensuelle.montantAttendu);
+      } else if (existing.detteInitialeId && existing.DetteInitiale) {
+        montantTotal = new Decimal(existing.DetteInitiale.montant);
+      } else if (existing.assistanceId && existing.Assistance) {
+        montantTotal = new Decimal(existing.Assistance.montant);
+      } else if (existing.obligationCotisationId && existing.ObligationCotisation) {
+        montantTotal = new Decimal(existing.ObligationCotisation.montant);
+      } else {
+        montantTotal = new Decimal(0);
+      }
+      const restantApresTousPaiements = montantTotal.minus(totalPaye).gt(0) ? montantTotal.minus(totalPaye) : new Decimal(0);
+      const autresPaiements = totalPaye.minus(montant);
+      const restantAvantCePaiement = montantTotal.minus(autresPaiements).gt(0) ? montantTotal.minus(autresPaiements) : new Decimal(0);
+      const appliqueDepuisCePaiement = Decimal.min(montant, restantAvantCePaiement);
+      const excedent = montant.minus(appliqueDepuisCePaiement);
+
+      if (excedent.gt(0)) {
+        if (avoirLie) {
+          const montantUtilise = new Decimal(avoirLie.montantUtilise);
+          const nouveauMontant = Decimal.max(excedent, montantUtilise);
+          const nouveauRestant = nouveauMontant.minus(montantUtilise);
+          await prisma.avoir.update({
+            where: { id: avoirLie.id },
+            data: {
+              montant: nouveauMontant,
+              montantRestant: nouveauRestant.gt(0) ? nouveauRestant : new Decimal(0),
+              statut: nouveauRestant.lte(0) ? "Utilise" : "Disponible",
+            },
+          });
+        } else {
+          await prisma.avoir.create({
+            data: {
+              adherentId: existing.adherentId,
+              montant: excedent,
+              montantUtilise: new Decimal(0),
+              montantRestant: excedent,
+              paiementId: existing.id,
+              description: `Avoir créé suite à un excédent de paiement (modification) de ${excedent.toFixed(2)}€`,
+              statut: "Disponible",
+            },
+          });
+        }
+      } else if (avoirLie) {
+        if (new Decimal(avoirLie.montantUtilise).lte(0)) {
+          await prisma.avoir.delete({ where: { id: avoirLie.id } });
+        } else {
+          await prisma.avoir.update({
+            where: { id: avoirLie.id },
+            data: {
+              montant: avoirLie.montantUtilise,
+              montantRestant: new Decimal(0),
+              statut: "Utilise",
+            },
+          });
+        }
+      }
     }
 
     try {

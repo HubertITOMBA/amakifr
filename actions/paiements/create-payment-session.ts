@@ -97,11 +97,17 @@ export async function createPaymentSession(data: {
       description = "Frais d'adhésion AMAKI France";
     }
 
+    // Obtenir le type de provider (string) pour déterminer le moyen de paiement
+    const paymentProviderType = (process.env.PAYMENT_PROVIDER || 'stripe') as 'stripe' | 'paypal' | 'mollie' | 'virement';
+
+    const cardPaymentEnabled = process.env.NEXT_PUBLIC_ENABLE_CARD_PAYMENT !== "false";
+    const isCardProvider = paymentProviderType === "stripe" || paymentProviderType === "paypal" || paymentProviderType === "mollie";
+    if (isCardProvider && !cardPaymentEnabled) {
+      return { success: false, error: "Le paiement par carte est temporairement indisponible." };
+    }
+
     // Obtenir le provider de paiement configuré
     const paymentProvider = getPaymentProvider();
-    
-    // Obtenir le type de provider (string) pour déterminer le moyen de paiement
-    const paymentProviderType = (process.env.PAYMENT_PROVIDER || 'stripe') as 'stripe' | 'paypal' | 'virement';
 
     // Créer la session de paiement
     const result = await paymentProvider.createCheckoutSession({
@@ -123,7 +129,7 @@ export async function createPaymentSession(data: {
     }
 
     // Déterminer le moyen de paiement et les champs selon le provider
-    let moyenPaiement: "Stripe" | "PayPal" | "Virement" = "Stripe";
+    let moyenPaiement: "Stripe" | "PayPal" | "Mollie" | "Virement" = "Stripe";
     let paiementData: any = {
       adherentId: data.adherentId,
       montant: new Decimal(data.montant),
@@ -144,6 +150,9 @@ export async function createPaymentSession(data: {
     } else if (paymentProviderType === 'paypal') {
       moyenPaiement = "PayPal";
       paiementData.paypalOrderId = result.sessionId || null;
+    } else if (paymentProviderType === 'mollie') {
+      moyenPaiement = "Mollie";
+      paiementData.molliePaymentId = result.sessionId || null;
     } else if (paymentProviderType === 'virement') {
       moyenPaiement = "Virement";
       paiementData.reference = result.sessionId || null;

@@ -675,37 +675,61 @@ export default function AdminSettingsPage() {
 
       {/* Onglets */}
       <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-        <TabsList className="grid w-full grid-cols-8">
-          <TabsTrigger value="general">
-            <Globe className="h-4 w-4 mr-2" />
+        <TabsList className="grid w-full grid-cols-8 h-auto p-1.5 gap-1 bg-muted/80">
+          <TabsTrigger
+            value="general"
+            className="data-[state=active]:bg-sky-100 data-[state=active]:text-sky-800 data-[state=active]:border-sky-300 data-[state=active]:shadow-sm border-l-4 border-l-sky-400 data-[state=inactive]:border-l-transparent dark:data-[state=active]:bg-sky-900/40 dark:data-[state=active]:text-sky-200 dark:data-[state=active]:border-sky-600"
+          >
+            <Globe className="h-4 w-4 mr-2 shrink-0 text-sky-600 dark:text-sky-400" />
             Général
           </TabsTrigger>
-          <TabsTrigger value="email">
-            <Mail className="h-4 w-4 mr-2" />
+          <TabsTrigger
+            value="email"
+            className="data-[state=active]:bg-amber-100 data-[state=active]:text-amber-800 data-[state=active]:border-amber-300 data-[state=active]:shadow-sm border-l-4 border-l-amber-400 data-[state=inactive]:border-l-transparent dark:data-[state=active]:bg-amber-900/40 dark:data-[state=active]:text-amber-200 dark:data-[state=active]:border-amber-600"
+          >
+            <Mail className="h-4 w-4 mr-2 shrink-0 text-amber-600 dark:text-amber-400" />
             Email
           </TabsTrigger>
-          <TabsTrigger value="cotisations">
-            <Euro className="h-4 w-4 mr-2" />
+          <TabsTrigger
+            value="cotisations"
+            className="data-[state=active]:bg-emerald-100 data-[state=active]:text-emerald-800 data-[state=active]:border-emerald-300 data-[state=active]:shadow-sm border-l-4 border-l-emerald-400 data-[state=inactive]:border-l-transparent dark:data-[state=active]:bg-emerald-900/40 dark:data-[state=active]:text-emerald-200 dark:data-[state=active]:border-emerald-600"
+          >
+            <Euro className="h-4 w-4 mr-2 shrink-0 text-emerald-600 dark:text-emerald-400" />
             Cotisations
           </TabsTrigger>
-          <TabsTrigger value="assistance">
-            <HandHeart className="h-4 w-4 mr-2" />
+          <TabsTrigger
+            value="assistance"
+            className="data-[state=active]:bg-rose-100 data-[state=active]:text-rose-800 data-[state=active]:border-rose-300 data-[state=active]:shadow-sm border-l-4 border-l-rose-400 data-[state=inactive]:border-l-transparent dark:data-[state=active]:bg-rose-900/40 dark:data-[state=active]:text-rose-200 dark:data-[state=active]:border-rose-600"
+          >
+            <HandHeart className="h-4 w-4 mr-2 shrink-0 text-rose-600 dark:text-rose-400" />
             Assistance
           </TabsTrigger>
-          <TabsTrigger value="display">
-            <Palette className="h-4 w-4 mr-2" />
+          <TabsTrigger
+            value="display"
+            className="data-[state=active]:bg-violet-100 data-[state=active]:text-violet-800 data-[state=active]:border-violet-300 data-[state=active]:shadow-sm border-l-4 border-l-violet-400 data-[state=inactive]:border-l-transparent dark:data-[state=active]:bg-violet-900/40 dark:data-[state=active]:text-violet-200 dark:data-[state=active]:border-violet-600"
+          >
+            <Palette className="h-4 w-4 mr-2 shrink-0 text-violet-600 dark:text-violet-400" />
             Affichage
           </TabsTrigger>
-          <TabsTrigger value="permissions">
-            <Shield className="h-4 w-4 mr-2" />
+          <TabsTrigger
+            value="permissions"
+            className="data-[state=active]:bg-blue-100 data-[state=active]:text-blue-800 data-[state=active]:border-blue-300 data-[state=active]:shadow-sm border-l-4 border-l-blue-400 data-[state=inactive]:border-l-transparent dark:data-[state=active]:bg-blue-900/40 dark:data-[state=active]:text-blue-200 dark:data-[state=active]:border-blue-600"
+          >
+            <Shield className="h-4 w-4 mr-2 shrink-0 text-blue-600 dark:text-blue-400" />
             Permissions
           </TabsTrigger>
-          <TabsTrigger value="system">
-            <Database className="h-4 w-4 mr-2" />
+          <TabsTrigger
+            value="system"
+            className="data-[state=active]:bg-cyan-100 data-[state=active]:text-cyan-800 data-[state=active]:border-cyan-300 data-[state=active]:shadow-sm border-l-4 border-l-cyan-400 data-[state=inactive]:border-l-transparent dark:data-[state=active]:bg-cyan-900/40 dark:data-[state=active]:text-cyan-200 dark:data-[state=active]:border-cyan-600"
+          >
+            <Database className="h-4 w-4 mr-2 shrink-0 text-cyan-600 dark:text-cyan-400" />
             Système
           </TabsTrigger>
-          <TabsTrigger value="sessions">
-            <Users className="h-4 w-4 mr-2" />
+          <TabsTrigger
+            value="sessions"
+            className="data-[state=active]:bg-indigo-100 data-[state=active]:text-indigo-800 data-[state=active]:border-indigo-300 data-[state=active]:shadow-sm border-l-4 border-l-indigo-400 data-[state=inactive]:border-l-transparent dark:data-[state=active]:bg-indigo-900/40 dark:data-[state=active]:text-indigo-200 dark:data-[state=active]:border-indigo-600"
+          >
+            <Users className="h-4 w-4 mr-2 shrink-0 text-indigo-600 dark:text-indigo-400" />
             Sessions
           </TabsTrigger>
         </TabsList>

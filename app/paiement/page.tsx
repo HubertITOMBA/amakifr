@@ -55,6 +55,8 @@ export default function PaymentPage() {
     !!id &&
     ["cotisation-mensuelle", "assistance", "dette-initiale", "obligation"].includes(paymentInfo.type);
 
+  const cardPaymentEnabled = process.env.NEXT_PUBLIC_ENABLE_CARD_PAYMENT !== "false";
+
   useEffect(() => {
     if (status === "loading") return;
 
@@ -343,8 +345,11 @@ export default function PaymentPage() {
                 Méthodes de paiement disponibles
               </h3>
 
-              {/* Stripe (Cartes bancaires) */}
-              <Card className="border-2 hover:border-blue-400 transition-colors cursor-pointer !py-0" onClick={handleStripePayment}>
+              {/* Carte bancaire (Stripe / Mollie) — désactivable via NEXT_PUBLIC_ENABLE_CARD_PAYMENT=false */}
+              <Card
+                className={`border-2 !py-0 ${cardPaymentEnabled ? "hover:border-blue-400 transition-colors cursor-pointer" : "border-gray-200 dark:border-gray-700 opacity-90"}`}
+                onClick={cardPaymentEnabled ? handleStripePayment : undefined}
+              >
                 <CardContent className="p-3">
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 flex-1">
@@ -356,40 +361,50 @@ export default function PaymentPage() {
                           Carte bancaire
                         </h4>
                         <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-400">
-                          Visa, Mastercard, American Express
+                          {cardPaymentEnabled
+                            ? "Visa, Mastercard, American Express"
+                            : "Paiement par carte bientôt disponible."}
                         </p>
-                        <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">Sécurisé</Badge>
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">Google Pay</Badge>
-                          <Badge variant="outline" className="text-[10px] px-1.5 py-0">Apple Pay</Badge>
-                        </div>
-                        {useCustomAmount && (
+                        {cardPaymentEnabled && (
+                          <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">Sécurisé</Badge>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">Google Pay</Badge>
+                            <Badge variant="outline" className="text-[10px] px-1.5 py-0">Apple Pay</Badge>
+                          </div>
+                        )}
+                        {cardPaymentEnabled && useCustomAmount && (
                           <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">
                             Montant : {parseFloat(customAmount.replace(",", ".") || "0").toFixed(2)} €
                           </p>
                         )}
                       </div>
                     </div>
-                    <Button 
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleStripePayment();
-                      }}
-                      disabled={loading}
-                      className="bg-blue-600 hover:bg-blue-700 text-white h-8 sm:h-9 text-xs sm:text-sm px-3 sm:px-4 shrink-0"
-                    >
-                      {loading ? (
-                        <>
-                          <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 animate-spin" />
-                          <span className="hidden sm:inline">Chargement...</span>
-                        </>
-                      ) : (
-                        <>
-                          <Euro className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
-                          Payer
-                        </>
-                      )}
-                    </Button>
+                    {cardPaymentEnabled ? (
+                      <Button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleStripePayment();
+                        }}
+                        disabled={loading}
+                        className="bg-blue-600 hover:bg-blue-700 text-white h-8 sm:h-9 text-xs sm:text-sm px-3 sm:px-4 shrink-0"
+                      >
+                        {loading ? (
+                          <>
+                            <Loader2 className="h-3 w-3 sm:h-4 sm:w-4 mr-1.5 animate-spin" />
+                            <span className="hidden sm:inline">Chargement...</span>
+                          </>
+                        ) : (
+                          <>
+                            <Euro className="h-3 w-3 sm:h-4 sm:w-4 mr-1" />
+                            Payer
+                          </>
+                        )}
+                      </Button>
+                    ) : (
+                      <Button variant="outline" disabled className="h-8 sm:h-9 text-xs sm:text-sm px-3 sm:px-4 shrink-0">
+                        Bientôt disponible
+                      </Button>
+                    )}
                   </div>
                 </CardContent>
               </Card>

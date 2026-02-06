@@ -99,7 +99,7 @@ export default function ContactPage() {
               </div>
               <div className="space-y-3 text-gray-600 dark:text-gray-300">
                 <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">+33 7 58 43 47 58</p>
+                  <p className="font-semibold text-gray-900 dark:text-white">+33 7 58 43 47 28</p>
                   <p className="text-sm">Contact association</p>
                 </div>
                 <div>

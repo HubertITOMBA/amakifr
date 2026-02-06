@@ -275,7 +275,7 @@ export function Footer() {
                       <Phone className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <p className="text-white font-medium">+33 7 58 43 47 58</p>
+                      <p className="text-white font-medium">+33 7 58 43 47 28</p>
                       <p className="text-sm text-gray-400">Contact association</p>
                     </div>
                   </div>
