@@ -4004,38 +4004,194 @@ function UserProfilePageContent() {
                 </h2>
                 <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Droits et obligations de l'adhérent</p>
               </div>
-              <Button 
-                onClick={async () => {
-                  try {
-                    const result = await downloadPasseportPDF();
-                    if (result.success && result.pdfBuffer) {
-                      const blob = new Blob([result.pdfBuffer], { type: 'application/pdf' });
-                      const url = window.URL.createObjectURL(blob);
-                      const a = document.createElement('a');
-                      a.href = url;
-                      a.download = `passeport-amaki-${result.numeroPasseport || 'adhérent'}.pdf`;
-                      document.body.appendChild(a);
-                      a.click();
-                      window.URL.revokeObjectURL(url);
-                      document.body.removeChild(a);
-                      toast.success("Passeport téléchargé avec succès");
-                    } else {
-                      toast.error(result.error || "Erreur lors du téléchargement");
+              <div className="flex flex-col gap-2 w-full sm:w-auto">
+                <Button 
+                  onClick={async () => {
+                    try {
+                      const result = await downloadPasseportPDF();
+                      if (result.success && result.pdfBuffer) {
+                        const blob = new Blob([result.pdfBuffer], { type: 'application/pdf' });
+                        const url = window.URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `passeport-amaki-${result.numeroPasseport || 'adhérent'}.pdf`;
+                        document.body.appendChild(a);
+                        a.click();
+                        window.URL.revokeObjectURL(url);
+                        document.body.removeChild(a);
+                        toast.success("Passeport téléchargé avec succès");
+                      } else {
+                        toast.error(result.error || "Erreur lors du téléchargement");
+                      }
+                    } catch (error) {
+                      console.error("Erreur:", error);
+                      toast.error("Erreur lors du téléchargement du passeport");
                     }
-                  } catch (error) {
-                    console.error("Erreur:", error);
-                    toast.error("Erreur lors du téléchargement du passeport");
-                  }
-                }}
-                className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                <Download className="h-4 w-4 mr-2" />
-                Télécharger le passeport PDF
-              </Button>
+                  }}
+                  className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Télécharger le passeport PDF
+                </Button>
+                <div className="flex flex-wrap gap-2 justify-center sm:justify-start" role="navigation" aria-label="Accès rapide passeport">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-purple-300 text-purple-700 hover:bg-purple-50 dark:border-purple-600 dark:text-purple-300 dark:hover:bg-purple-900/30"
+                    onClick={() => document.getElementById("passeport-roi")?.scrollIntoView({ behavior: "smooth" })}
+                  >
+                    <BookOpen className="h-3.5 w-3.5 mr-1" />
+                    ROI
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-green-300 text-green-700 hover:bg-green-50 dark:border-green-600 dark:text-green-300 dark:hover:bg-green-900/30"
+                    onClick={() => document.getElementById("passeport-droits")?.scrollIntoView({ behavior: "smooth" })}
+                  >
+                    <CheckCircle className="h-3.5 w-3.5 mr-1" />
+                    Droits
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-orange-300 text-orange-700 hover:bg-orange-50 dark:border-orange-600 dark:text-orange-300 dark:hover:bg-orange-900/30"
+                    onClick={() => document.getElementById("passeport-obligations")?.scrollIntoView({ behavior: "smooth" })}
+                  >
+                    <Scale className="h-3.5 w-3.5 mr-1" />
+                    Obligations
+                  </Button>
+                </div>
+              </div>
             </div>
 
-            {/* Droits de l'adhérent */}
-            <Card className="!py-0 border-2 border-green-200 dark:border-green-800 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30">
+            {/* Règlements d'ordre intérieur (en premier) */}
+            <Card id="passeport-roi" className="!py-0 border-2 border-purple-200 dark:border-purple-800 shadow-lg bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/30 dark:to-violet-900/30 scroll-mt-4">
+              <CardHeader className="py-3 sm:py-4 bg-gradient-to-r from-purple-100 to-violet-100 dark:from-purple-900/50 dark:to-violet-900/50 border-b-2 border-purple-200 dark:border-purple-800">
+                <CardTitle className="text-base sm:text-lg text-purple-900 dark:text-purple-100 flex items-center gap-2">
+                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
+                  Règlements d&apos;Ordre Intérieur
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-3 sm:p-4 space-y-3">
+                {/* Article 1 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 1 – Objet du règlement intérieur
+                  </h4>
+                  <p className="text-xs text-purple-800 dark:text-purple-200 leading-relaxed">
+                    Le présent règlement intérieur a pour objet de préciser les règles de fonctionnement de l&apos;association, conformément aux statuts. Il s&apos;impose à tous les membres.
+                  </p>
+                </div>
+
+                {/* Article 2 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 2 – Cotisation
+                  </h4>
+                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
+                    <p className="leading-relaxed">
+                      <strong>1.</strong> Le montant de la cotisation est fixé à <strong>15 € par mois</strong>, soit <strong>180 € par an</strong>.
+                    </p>
+                    <p className="leading-relaxed">
+                      <strong>2.</strong> La cotisation est due par tous les membres actifs.
+                    </p>
+                    <p className="leading-relaxed">
+                      <strong>3.</strong> Tout retard de cotisation supérieur ou égal à trois (3) mois entraîne :
+                    </p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li>la perte du droit d&apos;assistance financière de l&apos;association ;</li>
+                      <li>la suspension du droit de vote jusqu&apos;à régularisation.</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Article 3 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 3 – Perte de la qualité de membre
+                  </h4>
+                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
+                    <p className="leading-relaxed mb-2">
+                      La qualité de membre se perd automatiquement dans les cas suivants :
+                    </p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li>Retard de cotisation de trois (3) mois ou plus non régularisé malgré relance ;</li>
+                      <li>Absence prolongée et injustifiée aux activités de l&apos;association ;</li>
+                      <li>Indiscipline grave ou faute portant préjudice moral ou matériel à l&apos;association.</li>
+                    </ul>
+                    <p className="leading-relaxed mt-2">
+                      La radiation est prononcée conformément aux statuts, après audition éventuelle du membre concerné.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Article 4 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 4 – Assistance financière et solidarité
+                  </h4>
+                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
+                    <p className="leading-relaxed">
+                      L&apos;association peut accorder une aide financière ou matérielle aux membres en difficulté. Toutefois, cette aide est réservée exclusivement aux membres :
+                    </p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li>À jour de leurs cotisations ;</li>
+                      <li>Ayant une participation active et régulière à la vie de l&apos;association ;</li>
+                      <li>Respectueux du règlement intérieur et du code de conduite.</li>
+                    </ul>
+                    <p className="leading-relaxed mt-2 font-semibold">
+                      Aucun membre en retard de cotisation de trois (3) mois ou plus ne pourra bénéficier d&apos;une assistance.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Article 5 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 5 – Discipline et sanctions
+                  </h4>
+                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
+                    <p className="leading-relaxed">
+                      <strong>1.</strong> Les membres doivent observer une attitude respectueuse vis-à-vis des autres membres et des organes dirigeants.
+                    </p>
+                    <p className="leading-relaxed">
+                      <strong>2.</strong> Tout comportement indiscipliné, violent, diffamatoire ou portant atteinte à l&apos;image de l&apos;association est interdit.
+                    </p>
+                    <p className="leading-relaxed">
+                      <strong>3.</strong> Les sanctions applicables sont :
+                    </p>
+                    <ul className="list-disc list-inside ml-2 space-y-1">
+                      <li>Avertissement ;</li>
+                      <li>Suspension temporaire ;</li>
+                      <li>Exclusion définitive (radiation).</li>
+                    </ul>
+                  </div>
+                </div>
+
+                {/* Article 6 */}
+                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
+                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
+                    Article 6 – Application et modification
+                  </h4>
+                  <p className="text-xs text-purple-800 dark:text-purple-200 leading-relaxed">
+                    Le présent règlement intérieur entre en vigueur dès son adoption par l&apos;Assemblée Générale. Il peut être modifié par décision de l&apos;Assemblée Générale sur proposition du Conseil d&apos;Administration.
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Droits de l'adhérent (en second) */}
+            <Card id="passeport-droits" className="!py-0 border-2 border-green-200 dark:border-green-800 shadow-lg bg-gradient-to-br from-green-50 to-emerald-50 dark:from-green-900/30 dark:to-emerald-900/30 scroll-mt-4">
               <CardHeader className="py-3 sm:py-4 bg-gradient-to-r from-green-100 to-emerald-100 dark:from-green-900/50 dark:to-emerald-900/50 border-b-2 border-green-200 dark:border-green-800">
                 <CardTitle className="text-base sm:text-lg text-green-900 dark:text-green-100 flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5 text-green-600 dark:text-green-400" />
@@ -4117,8 +4273,8 @@ function UserProfilePageContent() {
               </CardContent>
             </Card>
 
-            {/* Obligations de l'adhérent */}
-            <Card className="!py-0 border-2 border-orange-200 dark:border-orange-800 shadow-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/30 dark:to-amber-900/30">
+            {/* Obligations de l'adhérent (en troisième) */}
+            <Card id="passeport-obligations" className="!py-0 border-2 border-orange-200 dark:border-orange-800 shadow-lg bg-gradient-to-br from-orange-50 to-amber-50 dark:from-orange-900/30 dark:to-amber-900/30 scroll-mt-4">
               <CardHeader className="py-3 sm:py-4 bg-gradient-to-r from-orange-100 to-amber-100 dark:from-orange-900/50 dark:to-amber-900/50 border-b-2 border-orange-200 dark:border-orange-800">
                 <CardTitle className="text-base sm:text-lg text-orange-900 dark:text-orange-100 flex items-center gap-2">
                   <Scale className="h-4 w-4 sm:h-5 sm:w-5 text-orange-600 dark:text-orange-400" />
@@ -4196,129 +4352,6 @@ function UserProfilePageContent() {
                       </p>
                     </div>
                   </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Règlement intérieur */}
-            <Card className="!py-0 border-2 border-purple-200 dark:border-purple-800 shadow-lg bg-gradient-to-br from-purple-50 to-violet-50 dark:from-purple-900/30 dark:to-violet-900/30">
-              <CardHeader className="py-3 sm:py-4 bg-gradient-to-r from-purple-100 to-violet-100 dark:from-purple-900/50 dark:to-violet-900/50 border-b-2 border-purple-200 dark:border-purple-800">
-                <CardTitle className="text-base sm:text-lg text-purple-900 dark:text-purple-100 flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 sm:h-5 sm:w-5 text-purple-600 dark:text-purple-400" />
-                  Règlement d'Ordre Intérieur
-                </CardTitle>
-                
-              </CardHeader>
-              <CardContent className="p-3 sm:p-4 space-y-3">
-                {/* Article 1 */}
-                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
-                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    Article 1 – Objet du règlement intérieur
-                  </h4>
-                  <p className="text-xs text-purple-800 dark:text-purple-200 leading-relaxed">
-                    Le présent règlement intérieur a pour objet de préciser les règles de fonctionnement de l'association, conformément aux statuts. Il s'impose à tous les membres.
-                  </p>
-                </div>
-
-                {/* Article 2 */}
-                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
-                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    Article 2 – Cotisation
-                  </h4>
-                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
-                    <p className="leading-relaxed">
-                      <strong>1.</strong> Le montant de la cotisation est fixé à <strong>15 € par mois</strong>, soit <strong>180 € par an</strong>.
-                    </p>
-                    <p className="leading-relaxed">
-                      <strong>2.</strong> La cotisation est due par tous les membres actifs.
-                    </p>
-                    <p className="leading-relaxed">
-                      <strong>3.</strong> Tout retard de cotisation supérieur ou égal à trois (3) mois entraîne :
-                    </p>
-                    <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li>la perte du droit d'assistance financière de l'association ;</li>
-                      <li>la suspension du droit de vote jusqu'à régularisation.</li>
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Article 3 */}
-                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
-                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    Article 3 – Perte de la qualité de membre
-                  </h4>
-                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
-                    <p className="leading-relaxed mb-2">
-                      La qualité de membre se perd automatiquement dans les cas suivants :
-                    </p>
-                    <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li>Retard de cotisation de trois (3) mois ou plus non régularisé malgré relance ;</li>
-                      <li>Absence prolongée et injustifiée aux activités de l'association ;</li>
-                      <li>Indiscipline grave ou faute portant préjudice moral ou matériel à l'association.</li>
-                    </ul>
-                    <p className="leading-relaxed mt-2">
-                      La radiation est prononcée conformément aux statuts, après audition éventuelle du membre concerné.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Article 4 */}
-                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
-                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    Article 4 – Assistance financière et solidarité
-                  </h4>
-                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
-                    <p className="leading-relaxed">
-                      L'association peut accorder une aide financière ou matérielle aux membres en difficulté. Toutefois, cette aide est réservée exclusivement aux membres :
-                    </p>
-                    <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li>À jour de leurs cotisations ;</li>
-                      <li>Ayant une participation active et régulière à la vie de l'association ;</li>
-                      <li>Respectueux du règlement intérieur et du code de conduite.</li>
-                    </ul>
-                    <p className="leading-relaxed mt-2 font-semibold">
-                      Aucun membre en retard de cotisation de trois (3) mois ou plus ne pourra bénéficier d'une assistance.
-                    </p>
-                  </div>
-                </div>
-
-                {/* Article 5 */}
-                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
-                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    Article 5 – Discipline et sanctions
-                  </h4>
-                  <div className="space-y-2 text-xs text-purple-800 dark:text-purple-200">
-                    <p className="leading-relaxed">
-                      <strong>1.</strong> Les membres doivent observer une attitude respectueuse vis-à-vis des autres membres et des organes dirigeants.
-                    </p>
-                    <p className="leading-relaxed">
-                      <strong>2.</strong> Tout comportement indiscipliné, violent, diffamatoire ou portant atteinte à l'image de l'association est interdit.
-                    </p>
-                    <p className="leading-relaxed">
-                      <strong>3.</strong> Les sanctions applicables sont :
-                    </p>
-                    <ul className="list-disc list-inside ml-2 space-y-1">
-                      <li>Avertissement ;</li>
-                      <li>Suspension temporaire ;</li>
-                      <li>Exclusion définitive (radiation).</li>
-                    </ul>
-                  </div>
-                </div>
-
-                {/* Article 6 */}
-                <div className="p-3 bg-white/50 dark:bg-white/10 rounded-md border border-purple-200 dark:border-purple-800">
-                  <h4 className="text-sm font-bold text-purple-900 dark:text-purple-100 mb-2 flex items-center gap-2">
-                    <FileText className="h-4 w-4 text-purple-600 dark:text-purple-400" />
-                    Article 6 – Application et modification
-                  </h4>
-                  <p className="text-xs text-purple-800 dark:text-purple-200 leading-relaxed">
-                    Le présent règlement intérieur entre en vigueur dès son adoption par l'Assemblée Générale. Il peut être modifié par décision de l'Assemblée Générale sur proposition du Conseil d'Administration.
-                  </p>
                 </div>
               </CardContent>
             </Card>
