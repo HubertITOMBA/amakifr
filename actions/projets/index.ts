@@ -390,6 +390,136 @@ export async function getProjetById(projetId: string) {
 }
 
 /**
+ * Récupère tous les projets (lecture seule, pour l’espace adhérent /user/projets)
+ * Tout utilisateur connecté peut consulter la liste.
+ */
+export async function getProjetsForUser() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const projets = await db.projet.findMany({
+      include: {
+        CreatedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        SousProjets: {
+          include: {
+            Affectations: {
+              include: {
+                Adherent: {
+                  select: {
+                    id: true,
+                    firstname: true,
+                    lastname: true,
+                  },
+                },
+              },
+            },
+            _count: {
+              select: {
+                Commentaires: true,
+              },
+            },
+          },
+          orderBy: {
+            ordre: "asc",
+          },
+        },
+        _count: {
+          select: {
+            SousProjets: true,
+          },
+        },
+      },
+      orderBy: {
+        createdAt: "desc",
+      },
+    });
+
+    return { success: true, data: projets };
+  } catch (error) {
+    console.error("Erreur lors de la récupération des projets (user):", error);
+    return { success: false, error: "Erreur lors de la récupération des projets" };
+  }
+}
+
+/**
+ * Récupère un projet par son ID (lecture seule, pour l’espace adhérent /user/projets/[id])
+ * Tout utilisateur connecté peut consulter un projet.
+ */
+export async function getProjetByIdForUser(projetId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const projet = await db.projet.findUnique({
+      where: { id: projetId },
+      include: {
+        CreatedBy: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+          },
+        },
+        SousProjets: {
+          include: {
+            Affectations: {
+              include: {
+                Adherent: {
+                  select: {
+                    id: true,
+                    firstname: true,
+                    lastname: true,
+                    civility: true,
+                  },
+                },
+              },
+            },
+            Commentaires: {
+              include: {
+                Adherent: {
+                  select: {
+                    id: true,
+                    firstname: true,
+                    lastname: true,
+                    civility: true,
+                  },
+                },
+              },
+              orderBy: {
+                createdAt: "desc",
+              },
+            },
+          },
+          orderBy: {
+            ordre: "asc",
+          },
+        },
+      },
+    });
+
+    if (!projet) {
+      return { success: false, error: "Projet non trouvé" };
+    }
+
+    return { success: true, data: projet };
+  } catch (error) {
+    console.error("Erreur lors de la récupération du projet (user):", error);
+    return { success: false, error: "Erreur lors de la récupération du projet" };
+  }
+}
+
+/**
  * Crée un sous-projet/tâche
  */
 export async function createSousProjet(formData: FormData) {

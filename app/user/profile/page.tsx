@@ -71,7 +71,8 @@ import {
   BookOpen,
   Scale,
   Bell,
-  Printer
+  Printer,
+  FolderKanban
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUserProfile } from "@/hooks/use-user-profile";
@@ -117,7 +118,7 @@ import {
 } from "@tanstack/react-table";
 
 // Types pour les sections du menu
-type MenuSection = 'profile' | 'statistiques' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'idees' | 'documents' | 'badges' | 'enfants' | 'passeport' | 'notifications' | 'settings' | 'rapports' | 'taches';
+type MenuSection = 'profile' | 'statistiques' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'idees' | 'documents' | 'badges' | 'enfants' | 'passeport' | 'notifications' | 'settings' | 'rapports' | 'taches' | 'projets';
 
 // Type pour les dettes initiales
 interface DetteInitiale {
@@ -1684,6 +1685,13 @@ function UserProfilePageContent() {
       label: 'Mes Tâches',
       icon: FileText,
       description: 'Voir et suivre mes tâches assignées',
+      electoral: false
+    },
+    {
+      id: 'projets' as MenuSection,
+      label: 'Projets Amaki',
+      icon: FolderKanban,
+      description: 'Consulter les projets de l\'association',
       electoral: false
     },
     {
@@ -5154,6 +5162,40 @@ function UserProfilePageContent() {
                     <Button className="bg-blue-600 hover:bg-blue-700 text-white">
                       <FileText className="h-4 w-4 mr-2" />
                       Accéder à mes tâches
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        );
+
+      case 'projets':
+        return (
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-4 sm:mb-6">
+              <div>
+                <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Projets Amaki</h2>
+                <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300">Consulter les projets de l&apos;association en lecture seule</p>
+              </div>
+              <Link href="/user/projets">
+                <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                  <FolderKanban className="h-4 w-4 mr-2" />
+                  Voir les projets
+                </Button>
+              </Link>
+            </div>
+            <Card>
+              <CardContent className="p-6">
+                <div className="text-center py-8">
+                  <FolderKanban className="h-12 w-12 text-gray-400 mx-auto mb-4" />
+                  <p className="text-gray-600 dark:text-gray-400 mb-4">
+                    Consultez la liste des projets Amaki et leurs détails (description, tâches, adhérents affectés).
+                  </p>
+                  <Link href="/user/projets">
+                    <Button className="bg-blue-600 hover:bg-blue-700 text-white">
+                      <FolderKanban className="h-4 w-4 mr-2" />
+                      Accéder aux projets Amaki
                     </Button>
                   </Link>
                 </div>
