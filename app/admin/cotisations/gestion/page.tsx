@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useCallback } from "react";
 import {
   ColumnDef,
   flexRender,
@@ -38,6 +38,7 @@ import {
   Calendar,
   Info,
   Settings,
+  Send,
   ChevronLeft,
   ChevronRight,
   ChevronsLeft,
@@ -50,6 +51,9 @@ import { toast } from "sonner";
 import { getAdherentsWithCotisations, createManualCotisation, updateCotisation } from "@/actions/cotisations";
 import { isAuthorizationError } from "@/lib/utils";
 import { createPaiementGeneral } from "@/actions/paiements";
+import { sendRappelManuelCotisations, type TypeRappelMail } from "@/actions/notifications/rappel";
+import { getLettreRelancePDF } from "@/actions/notifications/lettre-relance-pdf";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Modal } from "@/components/Modal";
 import { Label } from "@/components/ui/label";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
@@ -89,8 +93,28 @@ interface AdherentWithCotisations {
   montantOccasionnel: number;
   forfaitMoisCourant: number;
   assistanceMoisCourant: number;
+  periodeMoisCourant?: string; // Format "YYYY-MM" (ex: "2025-01")
   montantAPayerPourAnnulerDette: number;
   totalAvoirs: number;
+}
+
+// Formater la période "YYYY-MM" en "Jan 2025"
+function formatPeriode(periode: string): string {
+  try {
+    const [year, month] = periode.split('-');
+    const monthIndex = parseInt(month, 10) - 1;
+    const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+    return `${monthNames[monthIndex]} ${year}`;
+  } catch {
+    return periode;
+  }
+}
+
+// Obtenir le mois courant formaté (ex: "Jan 2025")
+function getCurrentMonthFormatted(): string {
+  const now = new Date();
+  const monthNames = ['Jan', 'Fév', 'Mar', 'Avr', 'Mai', 'Jun', 'Jul', 'Aoû', 'Sep', 'Oct', 'Nov', 'Déc'];
+  return `${monthNames[now.getMonth()]} ${now.getFullYear()}`;
 }
 
 export default function AdminCotisationManagement() {
@@ -100,6 +124,10 @@ export default function AdminCotisationManagement() {
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [selectedAdherent, setSelectedAdherent] = useState<AdherentWithCotisations | null>(null);
+  const [selectedAdherentIds, setSelectedAdherentIds] = useState<Set<string>>(new Set());
+  const [sendingRappels, setSendingRappels] = useState(false);
+  const [rappelType, setRappelType] = useState<TypeRappelMail>("simple");
+  const [generatingLettrePDF, setGeneratingLettrePDF] = useState(false);
   
   // Visibilité des colonnes - charger depuis localStorage
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
@@ -203,8 +231,76 @@ export default function AdminCotisationManagement() {
     }
   };
 
+  // Fonctions pour gérer la sélection
+  const toggleSelectAdherent = (adherentId: string) => {
+    setSelectedAdherentIds((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(adherentId)) {
+        newSet.delete(adherentId);
+      } else {
+        newSet.add(adherentId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedAdherentIds.size === adherents.length) {
+      setSelectedAdherentIds(new Set());
+    } else {
+      setSelectedAdherentIds(new Set(adherents.map((a) => a.id)));
+    }
+  };
+
+  const handleSendRappels = async () => {
+    if (selectedAdherentIds.size === 0) {
+      toast.error("Veuillez sélectionner au moins un adhérent");
+      return;
+    }
+
+    try {
+      setSendingRappels(true);
+      const result = await sendRappelManuelCotisations(Array.from(selectedAdherentIds), rappelType);
+      
+      if (result.success) {
+        toast.success(result.message || `${result.data?.envoyes.length || 0} rappel(s) envoyé(s)`);
+        if (result.data?.erreurs && result.data.erreurs.length > 0) {
+          console.warn("Erreurs lors de l'envoi:", result.data.erreurs);
+        }
+        setSelectedAdherentIds(new Set()); // Réinitialiser la sélection
+      } else {
+        toast.error(result.error || "Erreur lors de l'envoi des rappels");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors de l'envoi des rappels");
+    } finally {
+      setSendingRappels(false);
+    }
+  };
+
   const columns: ColumnDef<AdherentWithCotisations>[] = useMemo(
     () => [
+      {
+        id: "select",
+        header: ({ table }) => (
+          <Checkbox
+            checked={selectedAdherentIds.size === adherents.length && adherents.length > 0}
+            onCheckedChange={toggleSelectAll}
+            aria-label="Sélectionner tout"
+          />
+        ),
+        cell: ({ row }) => (
+          <Checkbox
+            checked={selectedAdherentIds.has(row.original.id)}
+            onCheckedChange={() => toggleSelectAdherent(row.original.id)}
+            aria-label={`Sélectionner ${row.original.firstname} ${row.original.lastname}`}
+          />
+        ),
+        enableSorting: false,
+        enableHiding: false,
+        size: 50,
+      },
       {
         accessorKey: "civility",
         header: "Civilité",
@@ -312,28 +408,68 @@ export default function AdminCotisationManagement() {
       },
       {
         accessorKey: "forfaitMoisCourant",
-        header: "Forfait",
+        header: () => (
+          <div className="flex flex-col items-center gap-0.5">
+            <span>Forfait</span>
+            <span className="text-[10px] font-normal text-gray-500 dark:text-gray-400">
+              ({getCurrentMonthFormatted()})
+            </span>
+          </div>
+        ),
         cell: ({ row }) => {
+          const adherent = row.original;
           const montant = row.getValue("forfaitMoisCourant") as number;
+          const periode = adherent.periodeMoisCourant;
           return (
             <div className="text-right">
-              <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
-                {montant.toFixed(2).replace('.', ',')} €
-              </span>
+              <div className="flex flex-col gap-0.5 items-end">
+                <span className="text-sm font-medium text-blue-600 dark:text-blue-400">
+                  {montant.toFixed(2).replace('.', ',')} €
+                </span>
+                {periode ? (
+                  <span className="text-[10px] font-semibold text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/20 px-1.5 py-0.5 rounded">
+                    {formatPeriode(periode)}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">
+                    Non créé
+                  </span>
+                )}
+              </div>
             </div>
           );
         },
       },
       {
         accessorKey: "assistanceMoisCourant",
-        header: "Assistance",
+        header: () => (
+          <div className="flex flex-col items-center gap-0.5">
+            <span>Assistance</span>
+            <span className="text-[10px] font-normal text-gray-500 dark:text-gray-400">
+              ({getCurrentMonthFormatted()})
+            </span>
+          </div>
+        ),
         cell: ({ row }) => {
+          const adherent = row.original;
           const montant = row.getValue("assistanceMoisCourant") as number;
+          const periode = adherent.periodeMoisCourant;
           return (
             <div className="text-right">
-              <span className="text-sm font-medium text-purple-600 dark:text-purple-400">
-                {montant.toFixed(2).replace('.', ',')} €
-              </span>
+              <div className="flex flex-col gap-0.5 items-end">
+                <span className="text-sm font-medium text-purple-600 dark:text-purple-400">
+                  {montant.toFixed(2).replace('.', ',')} €
+                </span>
+                {periode ? (
+                  <span className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-900/20 px-1.5 py-0.5 rounded">
+                    {formatPeriode(periode)}
+                  </span>
+                ) : (
+                  <span className="text-[10px] text-gray-400 dark:text-gray-500 italic">
+                    Non créé
+                  </span>
+                )}
+              </div>
             </div>
           );
         },
@@ -496,7 +632,7 @@ export default function AdminCotisationManagement() {
         },
       },
     ],
-    []
+    [selectedAdherentIds, adherents, toggleSelectAll, toggleSelectAdherent]
   );
 
   const table = useReactTable({
@@ -693,7 +829,105 @@ export default function AdminCotisationManagement() {
                 Gestion des cotisations et suivi des dettes
               </CardDescription>
             </div>
-            <div className="flex items-center space-x-2 w-full sm:w-auto">
+            <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+              {selectedAdherentIds.size > 0 && (
+                <>
+                  <Select
+                    value={rappelType}
+                    onValueChange={(v) => setRappelType(v as TypeRappelMail)}
+                    disabled={sendingRappels}
+                  >
+                    <SelectTrigger className="w-[180px] h-9 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200">
+                      <SelectValue placeholder="Type de rappel" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="simple">Rappel simple</SelectItem>
+                      <SelectItem value="detail">Rappel détaillé</SelectItem>
+                    </SelectContent>
+                  </Select>
+                  <Button
+                    variant="default"
+                    size="sm"
+                    className="bg-orange-600 hover:bg-orange-700 text-white border-0"
+                    onClick={handleSendRappels}
+                    disabled={sendingRappels}
+                  >
+                    <Send className="h-4 w-4 mr-2" />
+                    {sendingRappels ? (
+                      "Envoi..."
+                    ) : (
+                      `Envoyer rappel${selectedAdherentIds.size > 1 ? "s" : ""} (${selectedAdherentIds.size})`
+                    )}
+                  </Button>
+                </>
+              )}
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700"
+                    disabled={generatingLettrePDF}
+                  >
+                    <FileText className="h-4 w-4 mr-2" />
+                    {generatingLettrePDF ? "Génération..." : "Lettre de relance PDF"}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuLabel>Lettre de relance à imprimer</DropdownMenuLabel>
+                  <DropdownMenuSeparator />
+                  {selectedAdherentIds.size === 1 && (
+                    <DropdownMenuItem
+                      onClick={async () => {
+                        const id = Array.from(selectedAdherentIds)[0];
+                        if (!id) return;
+                        setGeneratingLettrePDF(true);
+                        try {
+                          const result = await getLettreRelancePDF(id);
+                          if (result.success && result.pdfData && result.fileName) {
+                            const a = document.createElement("a");
+                            a.href = result.pdfData;
+                            a.download = result.fileName;
+                            a.click();
+                            toast.success("Lettre de relance téléchargée");
+                          } else {
+                            toast.error(result.error || "Erreur lors de la génération");
+                          }
+                        } catch (e) {
+                          toast.error("Erreur lors de la génération du PDF");
+                        } finally {
+                          setGeneratingLettrePDF(false);
+                        }
+                      }}
+                    >
+                      Lettre pré-remplie (adhérent sélectionné)
+                    </DropdownMenuItem>
+                  )}
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      setGeneratingLettrePDF(true);
+                      try {
+                        const result = await getLettreRelancePDF(null);
+                        if (result.success && result.pdfData && result.fileName) {
+                          const a = document.createElement("a");
+                          a.href = result.pdfData;
+                          a.download = result.fileName;
+                          a.click();
+                          toast.success("Modèle vierge téléchargé");
+                        } else {
+                          toast.error(result.error || "Erreur lors de la génération");
+                        }
+                      } catch (e) {
+                        toast.error("Erreur lors de la génération du PDF");
+                      } finally {
+                        setGeneratingLettrePDF(false);
+                      }
+                    }}
+                  >
+                    Modèle vierge (à remplir à la main)
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
               <ColumnVisibilityToggle 
                 table={table} 
                 storageKey="admin-cotisations-column-visibility"

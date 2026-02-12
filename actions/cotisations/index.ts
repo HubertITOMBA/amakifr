@@ -511,6 +511,7 @@ export async function getAdherentsWithCotisations() {
         montantOccasionnel: Number(obligations.find((o: any) => o.type === "Assistance")?.montantRestant || 0),
         forfaitMoisCourant: Number(forfaitMoisCourant.toFixed(2)),
         assistanceMoisCourant: Number(assistanceMoisCourant.toFixed(2)),
+        periodeMoisCourant: cotisationMensuelleCourante ? periodeCourante : undefined,
         montantAPayerPourAnnulerDette: Number(montantAPayerPourAnnulerDette.toFixed(2)),
         totalAvoirs: Number(totalAvoirs.toFixed(2)),
       };

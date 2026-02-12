@@ -1,10 +1,12 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { UserRole, TypeNotification } from "@prisma/client";
+import { UserRole, TypeNotification, TypeCotisation } from "@prisma/client";
 import { addDays, subDays, isAfter, isBefore, format, differenceInDays } from "date-fns";
-import { sendCustomEmailToUsers } from "@/lib/mail";
+import { sendCustomEmailToUsers, sendRappelDetailleCotisationEmail, REGLEMENT_COTISATIONS_EXCERPT_TEXT } from "@/lib/mail";
+import type { RappelDetailleData } from "@/lib/mail";
 import { createNotification } from "@/actions/notifications";
 
 /**
@@ -228,7 +230,7 @@ async function sendRappelsLimiteCandidature(now: Date) {
     include: {
       candidacies: {
         include: {
-          Adherent: {
+          adherent: {
             include: {
               User: {
                 select: {
@@ -476,6 +478,222 @@ async function sendRappelsCotisations(now: Date) {
   }
 
   return rappelsEnvoyes;
+}
+
+/**
+ * Envoie un rappel manuel de cotisation à un ou plusieurs adhérents sélectionnés
+ * @param adherentIds - Tableau des IDs des adhérents à relancer
+ */
+export type TypeRappelMail = "simple" | "detail";
+
+export async function sendRappelManuelCotisations(
+  adherentIds: string[],
+  typeRappel: TypeRappelMail = "simple"
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    if (!adherentIds || adherentIds.length === 0) {
+      return { success: false, error: "Aucun adhérent sélectionné" };
+    }
+
+    const now = new Date();
+    const rappelsEnvoyes: any[] = [];
+    const erreurs: string[] = [];
+
+    // Récupérer les adhérents avec leurs obligations et informations
+    const adherents = await prisma.adherent.findMany({
+      where: {
+        id: { in: adherentIds },
+      },
+      include: {
+        User: {
+          select: {
+            id: true,
+            email: true,
+            status: true,
+          },
+        },
+        ObligationsCotisation: {
+          where: {
+            statut: { in: ["EnAttente", "PartiellementPaye"] },
+          },
+          orderBy: {
+            dateEcheance: "asc",
+          },
+        },
+        DettesInitiales: {
+          where: {
+            montantRestant: { gt: 0 },
+          },
+        },
+      },
+    });
+
+    for (const adherent of adherents) {
+      if (!adherent.User || adherent.User.status !== "Actif") {
+        erreurs.push(`${adherent.firstname} ${adherent.lastname} : compte non actif`);
+        continue;
+      }
+
+      const email = adherent.User.email;
+      if (!email) {
+        erreurs.push(`${adherent.firstname} ${adherent.lastname} : pas d'email`);
+        continue;
+      }
+
+      // Calculer la dette totale
+      const detteObligations = adherent.ObligationsCotisation.reduce(
+        (sum, ob) => sum + Number(ob.montantRestant),
+        0
+      );
+      const detteInitiale = adherent.DettesInitiales.reduce(
+        (sum, dette) => sum + Number(dette.montantRestant),
+        0
+      );
+      const totalDette = detteObligations + detteInitiale;
+
+      if (totalDette <= 0) {
+        erreurs.push(`${adherent.firstname} ${adherent.lastname} : aucune dette`);
+        continue;
+      }
+
+      // Trouver la prochaine échéance
+      const prochaineEcheance = adherent.ObligationsCotisation[0]?.dateEcheance;
+      const joursRestants = prochaineEcheance
+        ? differenceInDays(prochaineEcheance, now)
+        : null;
+
+      // Construire le message
+      let message = `Bonjour ${adherent.firstname},\n\n`;
+      message += `Nous vous rappelons que vous avez une dette de cotisation de ${totalDette.toFixed(2).replace(".", ",")} €.\n\n`;
+
+      if (prochaineEcheance) {
+        if (joursRestants === 0) {
+          message += `⚠️ Une échéance arrive aujourd'hui (${format(prochaineEcheance, "dd MMMM yyyy")}).\n\n`;
+        } else if (joursRestants > 0) {
+          message += `Une échéance est prévue le ${format(prochaineEcheance, "dd MMMM yyyy")} (dans ${joursRestants} jour${joursRestants > 1 ? "s" : ""}).\n\n`;
+        } else {
+          message += `⚠️ Une échéance est en retard depuis ${Math.abs(joursRestants)} jour${Math.abs(joursRestants) > 1 ? "s" : ""} (${format(prochaineEcheance, "dd MMMM yyyy")}).\n\n`;
+        }
+      }
+
+      message += `Merci de régulariser votre situation au plus vite.\n\n`;
+      message += `Vous pouvez consulter vos cotisations et effectuer un paiement depuis votre profil : https://amakifr.fr/user/profile\n\n`;
+      message += `${REGLEMENT_COTISATIONS_EXCERPT_TEXT}\n\n`;
+      message += `Cordialement,\nL'équipe AMAKI France`;
+
+      const sujet = joursRestants !== null && joursRestants <= 0
+        ? `💰 Rappel urgent : Échéance de cotisation`
+        : `💰 Rappel : Échéance de cotisation`;
+
+      // Créer la notification
+      await createNotification({
+        userId: adherent.User.id,
+        type: TypeNotification.Cotisation,
+        titre: sujet,
+        message,
+        lien: `/user/profile`,
+      });
+
+      // Envoyer l'email (simple ou détaillé) et historiser dans /admin/emails
+      const bodyForHistory = message; // texte commun pour l'historique (simple ou résumé cohérent)
+      try {
+        if (typeRappel === "detail") {
+          const forfaits = adherent.ObligationsCotisation.filter(
+            (ob) => ob.type === TypeCotisation.Forfait
+          );
+          const assistances = adherent.ObligationsCotisation.filter(
+            (ob) => ob.type === TypeCotisation.Assistance
+          );
+          const rappelDetailleData: RappelDetailleData = {
+            dettesInitiales: adherent.DettesInitiales.map((d) => ({
+              annee: d.annee,
+              montantRestant: Number(d.montantRestant),
+              description: d.description,
+            })),
+            forfaitsNonPayes: forfaits.map((ob) => ({
+              periode: ob.periode,
+              montantRestant: Number(ob.montantRestant),
+              dateEcheance: ob.dateEcheance,
+            })),
+            assistancesNonPayees: assistances.map((ob) => ({
+              periode: ob.periode,
+              montantRestant: Number(ob.montantRestant),
+              dateEcheance: ob.dateEcheance,
+              description: ob.description,
+            })),
+            total: totalDette,
+            prochaineEcheance: prochaineEcheance ?? null,
+            joursRestants: joursRestants ?? null,
+          };
+          await sendRappelDetailleCotisationEmail(
+            email,
+            `${adherent.firstname} ${adherent.lastname}`,
+            sujet,
+            rappelDetailleData
+          );
+        } else {
+          await sendCustomEmailToUsers(
+            email,
+            `${adherent.firstname} ${adherent.lastname}`,
+            sujet,
+            message
+          );
+        }
+        rappelsEnvoyes.push({
+          adherent: `${adherent.firstname} ${adherent.lastname}`,
+          email,
+          dette: totalDette,
+        });
+        // Historiser l'email envoyé (visible dans /admin/emails)
+        await prisma.email.create({
+          data: {
+            userId: adherent.User.id,
+            createdBy: session.user.id,
+            subject: sujet,
+            body: bodyForHistory,
+            recipientEmail: email,
+            sent: true,
+          },
+        });
+      } catch (error) {
+        console.error(`Erreur lors de l'envoi de l'email à ${email}:`, error);
+        erreurs.push(`${adherent.firstname} ${adherent.lastname} : erreur d'envoi email`);
+        // Historiser l'échec
+        await prisma.email.create({
+          data: {
+            userId: adherent.User.id,
+            createdBy: session.user.id,
+            subject: sujet,
+            body: bodyForHistory,
+            recipientEmail: email,
+            sent: false,
+            error: error instanceof Error ? error.message : "Erreur d'envoi",
+          },
+        }).catch((e) => console.error("Erreur historisation email:", e));
+      }
+    }
+
+    revalidatePath("/admin/emails");
+    return {
+      success: true,
+      message: `${rappelsEnvoyes.length} rappel(s) envoyé(s)${erreurs.length > 0 ? `, ${erreurs.length} erreur(s)` : ""}`,
+      data: {
+        envoyes: rappelsEnvoyes,
+        erreurs,
+      },
+    };
+  } catch (error) {
+    console.error("Erreur lors de l'envoi des rappels manuels:", error);
+    return {
+      success: false,
+      error: "Erreur lors de l'envoi des rappels manuels",
+    };
+  }
 }
 
 /**

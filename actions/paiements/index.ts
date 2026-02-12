@@ -2518,6 +2518,131 @@ export async function getVersementAssistanceBreakdown(assistanceId: string) {
 }
 
 /**
+ * Retourne les types d'assistance disponibles pour la simulation (tout adhérent connecté).
+ * Chaque type a son montant fixe (PassAssistance ou type.montant).
+ */
+export async function getTypesAssistancePourSimulation() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé", data: [] };
+    }
+    const types = await prisma.typeCotisationMensuelle.findMany({
+      where: { categorie: CategorieTypeCotisation.Assistance, actif: true },
+      select: {
+        id: true,
+        nom: true,
+        montant: true,
+        PassAssistance: { select: { montant: true } },
+      },
+      orderBy: { nom: "asc" },
+    });
+    const list = types.map((t) => ({
+      id: t.id,
+      nom: t.nom,
+      montant: t.PassAssistance ? Number(t.PassAssistance.montant) : Number(t.montant),
+    }));
+    return { success: true, data: list };
+  } catch (error) {
+    console.error("getTypesAssistancePourSimulation:", error);
+    return { success: false, error: "Erreur serveur", data: [] };
+  }
+}
+
+/**
+ * Simulation du versement assistance pour l'utilisateur connecté (lecture seule).
+ * Calcule ce que l'adhérent recevrait s'il était bénéficiaire d'une assistance,
+ * en tenant compte de ses dettes initiales, avoirs et cotisations non payées.
+ * @param typeCotisationId - ID du type d'assistance (optionnel). Si fourni, utilise le montant fixe de ce type ; sinon moyenne des PassAssistance ou 50€.
+ */
+export async function getSimulationVersementAssistance(typeCotisationId?: string | null) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    // Récupérer l'adhérent de l'utilisateur connecté
+    const adherent = await prisma.adherent.findUnique({
+      where: { userId: session.user.id },
+      select: {
+        id: true,
+        firstname: true,
+        lastname: true,
+      },
+    });
+
+    if (!adherent) {
+      return { success: false, error: "Adhérent non trouvé" };
+    }
+
+    const adherentId = adherent.id;
+
+    let montantFixe: number;
+    let typeAssistanceNom: string | null = null;
+    if (typeCotisationId) {
+      const pass = await prisma.passAssistance.findFirst({
+        where: { typeCotisationId },
+        select: { montant: true },
+      });
+      const typeCotisation = await prisma.typeCotisationMensuelle.findUnique({
+        where: { id: typeCotisationId },
+        select: { nom: true, montant: true },
+      });
+      montantFixe = pass ? Number(pass.montant) : typeCotisation ? Number(typeCotisation.montant) : 50;
+      typeAssistanceNom = typeCotisation?.nom ?? null;
+    } else {
+      const passAssistances = await prisma.passAssistance.findMany({
+        select: { montant: true },
+      });
+      montantFixe = passAssistances.length > 0
+        ? passAssistances.reduce((sum, p) => sum + Number(p.montant), 0) / passAssistances.length
+        : 50;
+    }
+
+    // Dettes initiales de l'adhérent (montant restant à payer)
+    const dettes = await prisma.detteInitiale.findMany({
+      where: { adherentId, montantRestant: { gt: 0 } },
+    });
+    const totalDettes = dettes.reduce((s, d) => s + Number(d.montantRestant), 0);
+
+    // Cotisations non payées de l'adhérent (cotisations mensuelles avec solde restant)
+    const cotisationsNonPayees = await prisma.cotisationMensuelle.findMany({
+      where: { adherentId, montantRestant: { gt: 0 } },
+    });
+    const totalCotisationsNonPayees = cotisationsNonPayees.reduce((s, c) => s + Number(c.montantRestant), 0);
+
+    // Avoirs disponibles (excédents de paiement)
+    const avoirs = await prisma.avoir.findMany({
+      where: { adherentId, montantRestant: { gt: 0 } },
+    });
+    const totalAvoirs = avoirs.reduce((s, a) => s + Number(a.montantRestant), 0);
+
+    const aDeduire = totalDettes + totalCotisationsNonPayees;
+    const montantAVerser = Math.max(0, montantFixe - aDeduire);
+
+    const adherentName = `${adherent.firstname} ${adherent.lastname}`.trim();
+
+    return {
+      success: true,
+      data: {
+        montantFixe,
+        totalDettes,
+        totalCotisationsNonPayees,
+        totalAvoirs,
+        aDeduire,
+        montantAVerser,
+        adherentName,
+        typeAssistanceNom,
+      },
+    };
+  } catch (error) {
+    console.error("Erreur getSimulationVersementAssistance:", error);
+    return { success: false, error: "Erreur lors du calcul de la simulation" };
+  }
+}
+
+/**
  * Enregistre le versement à l'adhérent bénéficiaire : crée une dépense du montant à verser (comptabilisée dans les comptes).
  * Montant versé = montant fixe (PassAssistance via typeCotisationId) − (dettes initiales + cotisations non payées).
  */

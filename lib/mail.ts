@@ -679,6 +679,106 @@ export const sendCustomEmailToUsers = async(
   });
 }
 
+/** Données pour le mail de rappel détaillé */
+export type RappelDetailleData = {
+  dettesInitiales: { annee: number; montantRestant: number; description?: string | null }[];
+  forfaitsNonPayes: { periode: string; montantRestant: number; dateEcheance: Date }[];
+  assistancesNonPayees: { periode: string; montantRestant: number; dateEcheance: Date; description?: string | null }[];
+  total: number;
+  prochaineEcheance?: Date | null;
+  joursRestants?: number | null;
+};
+
+/** Extrait du règlement d'ordre intérieur – cotisations en retard et sanctions (pour mails de rappel) */
+export const REGLEMENT_COTISATIONS_EXCERPT_TEXT = `Rappel (Règlement d'ordre intérieur) :
+• Article 2 – Cotisation : Tout retard de cotisation supérieur ou égal à trois (3) mois entraîne la perte du droit d'assistance financière de l'association et la suspension du droit de vote jusqu'à régularisation.
+• Article 3 – Perte de la qualité de membre : La qualité de membre se perd automatiquement en cas de retard de cotisation de trois (3) mois ou plus non régularisé malgré relance.
+• Article 5 – Sanctions applicables : Avertissement ; suspension temporaire ; exclusion définitive (radiation).`;
+
+/**
+ * Envoyer un email de rappel détaillé (dettes initiales, forfaits, assistances, total)
+ */
+export const sendRappelDetailleCotisationEmail = async(
+  email: string,
+  userName: string,
+  subject: string,
+  data: RappelDetailleData
+) => {
+  const fmt = (n: number) => n.toFixed(2).replace('.', ',');
+  const fmtDate = (d: Date) => new Date(d).toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  let sectionsHtml = '';
+
+  if (data.dettesInitiales.length > 0) {
+    sectionsHtml += `
+      <h3 style="color: #333; font-size: 14px; margin: 16px 0 8px;">Dettes initiales</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px;">
+        <thead><tr style="background: #f0f0f0;"><th style="text-align: left; padding: 8px; border: 1px solid #ddd;">Année</th><th style="text-align: right; padding: 8px; border: 1px solid #ddd;">Restant dû</th></tr></thead>
+        <tbody>
+          ${data.dettesInitiales.map(d => `<tr><td style="padding: 8px; border: 1px solid #ddd;">${d.annee}</td><td style="text-align: right; padding: 8px; border: 1px solid #ddd;">${fmt(d.montantRestant)} €</td></tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  if (data.forfaitsNonPayes.length > 0) {
+    sectionsHtml += `
+      <h3 style="color: #333; font-size: 14px; margin: 16px 0 8px;">Forfaits non payés</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px;">
+        <thead><tr style="background: #f0f0f0;"><th style="text-align: left; padding: 8px; border: 1px solid #ddd;">Période</th><th style="text-align: right; padding: 8px; border: 1px solid #ddd;">Échéance</th><th style="text-align: right; padding: 8px; border: 1px solid #ddd;">Restant dû</th></tr></thead>
+        <tbody>
+          ${data.forfaitsNonPayes.map(f => `<tr><td style="padding: 8px; border: 1px solid #ddd;">${f.periode}</td><td style="text-align: right; padding: 8px; border: 1px solid #ddd;">${fmtDate(f.dateEcheance)}</td><td style="text-align: right; padding: 8px; border: 1px solid #ddd;">${fmt(f.montantRestant)} €</td></tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  if (data.assistancesNonPayees.length > 0) {
+    sectionsHtml += `
+      <h3 style="color: #333; font-size: 14px; margin: 16px 0 8px;">Assistances non payées</h3>
+      <table style="width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 13px;">
+        <thead><tr style="background: #f0f0f0;"><th style="text-align: left; padding: 8px; border: 1px solid #ddd;">Période / Libellé</th><th style="text-align: right; padding: 8px; border: 1px solid #ddd;">Échéance</th><th style="text-align: right; padding: 8px; border: 1px solid #ddd;">Restant dû</th></tr></thead>
+        <tbody>
+          ${data.assistancesNonPayees.map(a => `<tr><td style="padding: 8px; border: 1px solid #ddd;">${a.description || a.periode}</td><td style="text-align: right; padding: 8px; border: 1px solid #ddd;">${fmtDate(a.dateEcheance)}</td><td style="text-align: right; padding: 8px; border: 1px solid #ddd;">${fmt(a.montantRestant)} €</td></tr>`).join('')}
+        </tbody>
+      </table>`;
+  }
+
+  let alerteHtml = '';
+  if (data.prochaineEcheance != null && data.joursRestants != null) {
+    if (data.joursRestants === 0) {
+      alerteHtml = `<p style="margin: 12px 0; padding: 10px; background: #fff3cd; border-left: 4px solid #ffc107;">⚠️ Une échéance arrive aujourd'hui (${fmtDate(data.prochaineEcheance)}).</p>`;
+    } else if (data.joursRestants < 0) {
+      alerteHtml = `<p style="margin: 12px 0; padding: 10px; background: #f8d7da; border-left: 4px solid #dc3545;">⚠️ Une échéance est en retard depuis ${Math.abs(data.joursRestants)} jour(s) (${fmtDate(data.prochaineEcheance)}).</p>`;
+    } else {
+      alerteHtml = `<p style="margin: 12px 0; padding: 10px; background: #e7f3ff; border-left: 4px solid #0d6efd;">Une échéance est prévue le ${fmtDate(data.prochaineEcheance)} (dans ${data.joursRestants} jour(s)).</p>`;
+    }
+  }
+
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Rappel de cotisation – AMAKI France</h1>
+    <p style="margin: 10px 0; color: #666;">Bonjour ${userName},</p>
+    <p style="margin: 10px 0; color: #333;">Vous trouverez ci-dessous le détail de votre situation au regard des cotisations.</p>
+    ${alerteHtml}
+    ${sectionsHtml}
+    <p style="margin: 16px 0; font-size: 16px; font-weight: bold; color: #0d6efd;">Montant total à régler : ${fmt(data.total)} €</p>
+    <p style="margin: 16px 0; color: #333;">Merci de régulariser votre situation au plus vite.</p>
+    <p style="margin: 10px 0;"><a href="https://amakifr.fr/user/profile" style="color: #4a90e2;">Consulter mes cotisations et payer</a></p>
+    <div style="margin-top: 24px; padding: 14px; background: #f8f9fa; border-left: 4px solid #6c757d; font-size: 12px; color: #495057;">
+      <p style="margin: 0 0 8px; font-weight: bold; color: #333;">Règlement d'ordre intérieur – Cotisations et sanctions</p>
+      <p style="margin: 4px 0;"><strong>Article 2 – Cotisation :</strong> Tout retard de cotisation supérieur ou égal à trois (3) mois entraîne la perte du droit d'assistance financière de l'association et la suspension du droit de vote jusqu'à régularisation.</p>
+      <p style="margin: 4px 0;"><strong>Article 3 – Perte de la qualité de membre :</strong> La qualité de membre se perd automatiquement en cas de retard de cotisation de trois (3) mois ou plus non régularisé malgré relance.</p>
+      <p style="margin: 4px 0;"><strong>Article 5 – Sanctions applicables :</strong> Avertissement ; suspension temporaire ; exclusion définitive (radiation).</p>
+    </div>
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">Cet email vous a été envoyé par l'administration de l'association AMAKI France.</p>
+  `;
+
+  await sendEmail({
+    from: 'noreply@amaki.fr',
+    to: email,
+    subject,
+    html: wrapEmailContent(content),
+  });
+};
+
 /**
  * Envoyer un email d'invitation à un événement
  */

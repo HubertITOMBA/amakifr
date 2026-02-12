@@ -30,6 +30,7 @@ import {
   Scale
 } from "lucide-react";
 import Image from "next/image";
+import Link from "next/link";
 
 // Données pour les objectifs
 const objectives = [
@@ -395,6 +396,50 @@ export default function AmicalePage() {
         </div>
       </section>
 
+      {/* Section Interview du Président */}
+      <section className="py-8 sm:py-12 md:py-16 bg-gradient-to-br from-blue-50 via-purple-50 to-pink-50 dark:from-slate-800 dark:to-slate-700">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-6 sm:mb-8 md:mb-12">
+            <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white mb-2 sm:mb-3 md:mb-4">
+              Notre Président
+            </h2>
+            <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto px-4">
+              Découvrez l&apos;interview de notre nouveau président, élu le 29 novembre 2025
+            </p>
+          </div>
+          <div className="flex justify-center">
+            <Card className="p-4 sm:p-6 md:p-8 hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-purple-500 max-w-md w-full group">
+              <Link href="/amicale/president-interview" className="block">
+                <div className="text-center">
+                  <div className="flex justify-center mb-4">
+                    <div className="p-4 bg-gradient-to-br from-purple-500 to-pink-500 rounded-full group-hover:scale-110 transition-transform duration-300">
+                      <Star className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
+                    Interview du Président
+                  </h3>
+                  <div className="mb-4">
+                    <Badge className="bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200 border-purple-300">
+                      <Calendar className="h-3 w-3 mr-1" />
+                      Élu le 29 novembre 2025
+                    </Badge>
+                  </div>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4 sm:mb-6">
+                    Monsieur Simon Bavueza Tongi
+                  </p>
+                  <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white">
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Lire l&apos;interview
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </Link>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Section Informations Légales */}
       <section className="py-8 sm:py-12 md:py-16 bg-gradient-to-r from-indigo-50 to-purple-50 dark:from-slate-800 dark:to-slate-700">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -403,7 +448,7 @@ export default function AmicalePage() {
               Informations Légales
             </h2>
             <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto px-4">
-              Consultez notre statut juridique et les conditions d'adhésion à l'association
+              Consultez notre statut juridique et les conditions d&apos;adhésion à l&apos;association
             </p>
           </div>
 

@@ -72,7 +72,9 @@ import {
   Scale,
   Bell,
   Printer,
-  FolderKanban
+  FolderKanban,
+  HandHeart,
+  Loader2
 } from "lucide-react";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUserProfile } from "@/hooks/use-user-profile";
@@ -86,6 +88,7 @@ import { getIdeesByUser, getAllIdees, createIdee, updateIdee, deleteIdee, create
 import { getDocuments, deleteDocument } from "@/actions/documents";
 import { getRapportsReunionForAdherents, getRapportReunionById } from "@/actions/rapports-reunion";
 import { getUserBadges } from "@/actions/badges";
+import { getSimulationVersementAssistance, getTypesAssistancePourSimulation } from "@/actions/paiements";
 import { StatutIdee, TypeDocument } from "@prisma/client";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -964,6 +967,54 @@ function UserProfilePageContent() {
     }
     prevActiveSectionRef.current = activeSection;
   }, [activeSection, refetchProfile]);
+
+  // États pour le dialog simulation versement assistance
+  const [simulationDialogOpen, setSimulationDialogOpen] = useState(false);
+  const [typesAssistanceList, setTypesAssistanceList] = useState<{ id: string; nom: string; montant: number }[]>([]);
+  const [selectedTypeId, setSelectedTypeId] = useState<string>("");
+  const [simulationVersement, setSimulationVersement] = useState<{
+    montantFixe: number;
+    totalDettes: number;
+    totalCotisationsNonPayees: number;
+    totalAvoirs: number;
+    aDeduire: number;
+    montantAVerser: number;
+    adherentName: string;
+    typeAssistanceNom?: string | null;
+  } | null>(null);
+  const [loadingSimulation, setLoadingSimulation] = useState(false);
+
+  // Charger les types d'assistance à l'ouverture du dialog ; réinitialiser à la fermeture
+  useEffect(() => {
+    if (simulationDialogOpen) {
+      if (typesAssistanceList.length === 0) {
+        getTypesAssistancePourSimulation().then((r) => {
+          if (r.success && r.data?.length) {
+            setTypesAssistanceList(r.data);
+            setSelectedTypeId(r.data[0].id);
+          }
+        });
+      } else if (!selectedTypeId) {
+        setSelectedTypeId(typesAssistanceList[0].id);
+      }
+    } else {
+      setSelectedTypeId("");
+      setSimulationVersement(null);
+    }
+  }, [simulationDialogOpen]);
+
+  // Charger la simulation quand un type est sélectionné
+  useEffect(() => {
+    if (!simulationDialogOpen || !selectedTypeId) return;
+    setLoadingSimulation(true);
+    setSimulationVersement(null);
+    getSimulationVersementAssistance(selectedTypeId)
+      .then((result) => {
+        if (result.success && result.data) setSimulationVersement(result.data);
+      })
+      .catch(() => {})
+      .finally(() => setLoadingSimulation(false));
+  }, [simulationDialogOpen, selectedTypeId]);
 
   const [candidatures, setCandidatures] = useState<any[]>([]);
   const [votes, setVotes] = useState<any[]>([]);
@@ -2385,6 +2436,106 @@ function UserProfilePageContent() {
                 </>
               )}
             </div>
+
+            {/* Bouton ouvrant le dialog Simulation versement assistance */}
+            <div className="mb-4">
+              <Button
+                type="button"
+                variant="outline"
+                className="border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+                onClick={() => setSimulationDialogOpen(true)}
+              >
+                <HandHeart className="h-4 w-4 mr-2" />
+                Simulation versement assistance
+              </Button>
+            </div>
+
+            <Dialog open={simulationDialogOpen} onOpenChange={setSimulationDialogOpen}>
+              <DialogContent className="max-w-md">
+                <DialogHeader className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 -m-6 mb-4 p-6 rounded-t-lg">
+                  <DialogTitle className="flex items-center gap-2 text-white">
+                    <HandHeart className="h-5 w-5 text-purple-100" />
+                    Simulation de versement assistance
+                  </DialogTitle>
+                  <DialogDescription className="text-purple-100 dark:text-purple-200 mt-2">
+                    Choisissez un type d&apos;assistance pour voir une estimation de ce que vous recevriez si vous étiez bénéficiaire (déductions dettes et cotisations).
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-2">
+                  <div className="space-y-2">
+                    <Label className="text-sm font-semibold text-purple-700 dark:text-purple-300">Type d&apos;assistance</Label>
+                    <Select value={selectedTypeId} onValueChange={setSelectedTypeId} disabled={typesAssistanceList.length === 0}>
+                      <SelectTrigger className="border-purple-300 dark:border-purple-700 focus:ring-purple-500">
+                        <SelectValue placeholder={typesAssistanceList.length === 0 ? "Chargement..." : "Sélectionnez un type"} />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {typesAssistanceList.map((t) => (
+                          <SelectItem key={t.id} value={t.id} className="focus:bg-purple-50 dark:focus:bg-purple-950">
+                            <span className="font-medium">{t.nom}</span> <span className="text-purple-600 dark:text-purple-400 ml-1">({t.montant.toFixed(2)} €)</span>
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {loadingSimulation ? (
+                    <div className="flex justify-center py-8">
+                      <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
+                    </div>
+                  ) : simulationVersement ? (
+                    <div className="space-y-3 text-sm">
+                      <div className="rounded-lg border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/20 p-4 space-y-3 shadow-sm">
+                        {simulationVersement.typeAssistanceNom && (
+                          <div className="pb-2 border-b border-purple-200 dark:border-purple-800">
+                            <p className="text-xs font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wide">{simulationVersement.typeAssistanceNom}</p>
+                          </div>
+                        )}
+                        <div className="flex justify-between items-center py-1.5 px-2 rounded-md bg-blue-50 dark:bg-blue-950/30">
+                          <span className="text-muted-foreground font-medium">Montant fixe assistance</span>
+                          <span className="font-bold text-blue-700 dark:text-blue-300 text-base">{simulationVersement.montantFixe.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 px-2 rounded-md bg-red-50 dark:bg-red-950/20">
+                          <span className="text-muted-foreground">Dettes initiales à déduire</span>
+                          <span className="font-semibold text-red-600 dark:text-red-400">− {simulationVersement.totalDettes.toFixed(2)} €</span>
+                        </div>
+                        <div className="flex justify-between items-center py-1.5 px-2 rounded-md bg-orange-50 dark:bg-orange-950/20">
+                          <span className="text-muted-foreground">Cotisations non payées à déduire</span>
+                          <span className="font-semibold text-orange-600 dark:text-orange-400">− {simulationVersement.totalCotisationsNonPayees.toFixed(2)} €</span>
+                        </div>
+                        {simulationVersement.totalAvoirs > 0 && (
+                          <div className="flex justify-between items-center py-1.5 px-2 rounded-md bg-emerald-50 dark:bg-emerald-950/30">
+                            <span className="text-muted-foreground">Avoirs disponibles</span>
+                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">+ {simulationVersement.totalAvoirs.toFixed(2)} €</span>
+                          </div>
+                        )}
+                        <div className={`border-t-2 pt-3 mt-2 flex justify-between items-center font-bold text-lg px-2 py-2 rounded-md ${simulationVersement.montantAVerser > 0 ? "bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-800" : "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700"}`}>
+                          <span className={simulationVersement.montantAVerser > 0 ? "text-green-800 dark:text-green-200" : "text-gray-600 dark:text-gray-400"}>Montant à verser</span>
+                          <span className={simulationVersement.montantAVerser > 0 ? "text-green-700 dark:text-green-300 text-xl" : "text-gray-500 dark:text-gray-500 text-xl"}>
+                            {simulationVersement.montantAVerser.toFixed(2)} €
+                          </span>
+                        </div>
+                      </div>
+                      {simulationVersement.montantAVerser <= 0 ? (
+                        <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3">
+                          <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
+                            ⚠️ Le montant fixe est entièrement absorbé par vos dettes et cotisations non payées.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3">
+                          <p className="text-xs text-blue-700 dark:text-blue-300">
+                            ℹ️ Cette simulation est indicative. Le montant réel dépendra de votre situation au moment de la demande.
+                          </p>
+                        </div>
+                      )}
+                    </div>
+                  ) : selectedTypeId ? (
+                    <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3">
+                      <p className="text-sm text-red-700 dark:text-red-300">Impossible de charger la simulation.</p>
+                    </div>
+                  ) : null}
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Carte cotisations selon le mode */}
             {(() => {
