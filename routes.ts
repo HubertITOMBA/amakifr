@@ -7,6 +7,7 @@ export const publicRoutes = [
     "/",
     "/agenda",
     "/amicale",
+    "/amicale/president-interview",
     "/contact",
     "/evenements",
     "/galerie",
@@ -27,6 +28,11 @@ export const publicRoutes = [
 export function isPublicRoute(pathname: string): boolean {
     // Routes exactes publiques
     if (publicRoutes.includes(pathname)) {
+        return true;
+    }
+    
+    // API publique (interview président, etc.)
+    if (pathname === "/api/president-interview") {
         return true;
     }
     

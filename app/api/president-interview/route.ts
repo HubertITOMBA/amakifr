@@ -2,26 +2,39 @@ import { NextResponse } from "next/server";
 import { readFile } from "fs/promises";
 import { join } from "path";
 import { existsSync } from "fs";
+import { PRESIDENT_INTERVIEW_MARKDOWN_FALLBACK } from "@/lib/president-interview-fallback";
+
+/**
+ * Chemins candidats pour trouver interview.md (production peut avoir un cwd différent)
+ */
+function getInterviewMdPath(): string | null {
+  const cwd = process.cwd();
+  const candidates = [
+    join(cwd, "docs", "interview.md"),
+    join(cwd, "..", "docs", "interview.md"),
+    join(cwd, "..", "..", "docs", "interview.md"),
+  ];
+  return candidates.find((p) => existsSync(p)) ?? null;
+}
 
 /**
  * Route API pour lire et parser le fichier markdown de l'interview du président
- * Convertit le markdown en sections HTML structurées
+ * Convertit le markdown en sections HTML structurées.
+ * Si docs/interview.md est absent (ex. production sans fichier déployé), utilise le contenu de repli intégré.
  */
 export async function GET() {
   try {
-    const mdPath = join(process.cwd(), "docs", "interview.md");
-    
-    if (!existsSync(mdPath)) {
-      return NextResponse.json({
-        success: false,
-        error: "Fichier d'interview non trouvé",
-        sections: [],
-      });
+    const mdPath = getInterviewMdPath();
+    let markdownContent: string;
+
+    if (mdPath) {
+      markdownContent = await readFile(mdPath, "utf-8");
+    } else {
+      // Repli intégré (production sans docs/ ou *.md ignoré par git)
+      markdownContent = PRESIDENT_INTERVIEW_MARKDOWN_FALLBACK;
     }
 
-    // Lire le fichier markdown
     try {
-      const markdownContent = await readFile(mdPath, "utf-8");
       
       // Parser le markdown pour extraire les sections
       const sections: Array<{ title: string; content: string }> = [];
