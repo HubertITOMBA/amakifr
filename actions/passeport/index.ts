@@ -4,6 +4,7 @@ import { auth } from "@/auth";
 import { db } from "@/lib/db";
 import { revalidatePath } from "next/cache";
 import { generateNumeroPasseport, generatePasseportPDF } from "@/lib/passeport-helpers";
+import { buildReglementDroitsObligationsPDF } from "@/lib/reglement-droits-obligations-pdf";
 import { sendPasseportEmail } from "@/lib/mail";
 import { UserRole } from "@prisma/client";
 import { z } from "zod";
@@ -269,6 +270,38 @@ export async function adminGeneratePasseport(formData: FormData) {
     return {
       success: false,
       error: "Erreur lors de la génération du passeport",
+    };
+  }
+}
+
+/**
+ * Génère et retourne un PDF contenant le Règlement d'ordre intérieur, les Droits et les Obligations de l'adhérent.
+ * Accessible à tout utilisateur connecté (adhérent).
+ */
+export async function downloadReglementDroitsObligationsPDF(): Promise<{
+  success: boolean;
+  pdfBuffer?: number[];
+  error?: string;
+}> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    buildReglementDroitsObligationsPDF(doc);
+    const pdfBuffer = Buffer.from(doc.output("arraybuffer"));
+
+    return {
+      success: true,
+      pdfBuffer: Array.from(pdfBuffer),
+    };
+  } catch (error) {
+    console.error("Erreur lors de la génération du PDF règlement/droits/obligations:", error);
+    return {
+      success: false,
+      error: "Erreur lors de la génération du PDF",
     };
   }
 }

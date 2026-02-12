@@ -77,7 +77,7 @@ import {
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { updateUserData, getUserCandidatures, getUserVotes, getAllCandidatesForProfile, getUserDataForAdminView } from "@/actions/user";
-import { downloadPasseportPDF } from "@/actions/passeport";
+import { downloadPasseportPDF, downloadReglementDroitsObligationsPDF } from "@/actions/passeport";
 import { differenceInYears, differenceInMonths } from "date-fns";
 import { toast } from "sonner";
 import { NotificationPreferences } from "@/components/user/NotificationPreferences";
@@ -4010,7 +4010,8 @@ function UserProfilePageContent() {
                     try {
                       const result = await downloadPasseportPDF();
                       if (result.success && result.pdfBuffer) {
-                        const blob = new Blob([result.pdfBuffer], { type: 'application/pdf' });
+                        // pdfBuffer est un Array (sérialisé depuis le serveur) : convertir en Uint8Array pour un Blob binaire valide
+                        const blob = new Blob([new Uint8Array(result.pdfBuffer)], { type: 'application/pdf' });
                         const url = window.URL.createObjectURL(blob);
                         const a = document.createElement('a');
                         a.href = url;
@@ -4063,6 +4064,40 @@ function UserProfilePageContent() {
                   >
                     <Scale className="h-3.5 w-3.5 mr-1" />
                     Obligations
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="text-xs border-slate-400 text-slate-700 hover:bg-slate-50 dark:border-slate-500 dark:text-slate-300 dark:hover:bg-slate-800/50"
+                    onClick={async () => {
+                      const loadingId = toast.loading("Génération du PDF en cours...");
+                      try {
+                        const result = await downloadReglementDroitsObligationsPDF();
+                        toast.dismiss(loadingId);
+                        if (result.success && result.pdfBuffer) {
+                          const blob = new Blob([new Uint8Array(result.pdfBuffer)], { type: "application/pdf" });
+                          const url = window.URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = "Reglement-droits-obligations-AMAKI.pdf";
+                          document.body.appendChild(a);
+                          a.click();
+                          window.URL.revokeObjectURL(url);
+                          document.body.removeChild(a);
+                          toast.success("PDF téléchargé avec succès");
+                        } else {
+                          toast.error(result.error || "Erreur lors du téléchargement");
+                        }
+                      } catch (error) {
+                        toast.dismiss(loadingId);
+                        console.error("Erreur:", error);
+                        toast.error("Erreur lors de la génération du PDF");
+                      }
+                    }}
+                  >
+                    <Printer className="h-3.5 w-3.5 mr-1" />
+                    PDF ROI, Droits & Obligations
                   </Button>
                 </div>
               </div>
