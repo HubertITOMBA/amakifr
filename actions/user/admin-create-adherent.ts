@@ -265,7 +265,9 @@ export async function adminCreateAdherent(formData: FormData) {
     // Envoyer l'email de bienvenue uniquement si le rôle est MEMBRE (non bloquant)
     const userRole = validatedData.role || UserRole.MEMBRE;
     const isMembre = userRole === UserRole.MEMBRE;
-    
+    const subjectCreation = `Création de compte – Bienvenue ${validatedData.firstname || ""} !`;
+    const bodyForHistory = "Email de bienvenue envoyé lors de la création du compte par un administrateur.";
+
     if (isMembre) {
       try {
         const { sendAdminCreatedAccountEmail } = await import("@/lib/mail");
@@ -279,10 +281,34 @@ export async function adminCreateAdherent(formData: FormData) {
           !!hashedPassword, // true si un mot de passe a été défini
           validatedData.name && validatedData.name.trim() !== "" ? validatedData.name : null
         );
+        // Historiser l'email envoyé (visible dans /admin/emails)
+        await db.email.create({
+          data: {
+            userId: result.user.id,
+            createdBy: session.user.id,
+            subject: subjectCreation,
+            body: bodyForHistory,
+            recipientEmail: normalizedEmail,
+            sent: true,
+          },
+        });
       } catch (emailError) {
         console.error("Erreur lors de l'envoi de l'email de bienvenue:", emailError);
+        // Historiser l'échec d'envoi
+        await db.email.create({
+          data: {
+            userId: result.user.id,
+            createdBy: session.user.id,
+            subject: subjectCreation,
+            body: bodyForHistory,
+            recipientEmail: normalizedEmail,
+            sent: false,
+            error: emailError instanceof Error ? emailError.message : "Erreur d'envoi",
+          },
+        }).catch((e) => console.error("Erreur historisation email:", e));
         // Ne pas bloquer la création si l'envoi d'email échoue
       }
+      revalidatePath("/admin/emails");
     }
 
     // Logger l'activité

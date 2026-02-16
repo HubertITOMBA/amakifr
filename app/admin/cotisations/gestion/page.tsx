@@ -20,7 +20,7 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { 
+import {
   Users, 
   User,
   Euro, 
@@ -47,6 +47,7 @@ import {
   X,
   MoreHorizontal
 } from "lucide-react";
+import { SortButton } from "@/components/admin/SortButton";
 import { toast } from "sonner";
 import { getAdherentsWithCotisations, createManualCotisation, updateCotisation } from "@/actions/cotisations";
 import { isAuthorizationError } from "@/lib/utils";
@@ -314,7 +315,8 @@ export default function AdminCotisationManagement() {
         },
       },
       {
-        accessorKey: "name",
+        id: "name",
+        accessorFn: (row) => `${(row.lastname || "").toLowerCase()} ${(row.firstname || "").toLowerCase()}`,
         header: "Nom complet",
         cell: ({ row }) => {
           const adherent = row.original;
@@ -354,11 +356,18 @@ export default function AdminCotisationManagement() {
         },
       },
       {
-        accessorKey: "status",
+        id: "status",
+        accessorFn: (row) => row.User?.status ?? "",
         header: "Statut",
+        filterFn: (row, columnId, filterValue) => {
+          const cellValue = String(row.getValue(columnId) ?? "").trim();
+          const filter = String(filterValue ?? "").trim();
+          if (!filter || filter === "all") return true;
+          return cellValue === filter;
+        },
         cell: ({ row }) => {
           const adherent = row.original;
-          const status = adherent.User.status;
+          const status = adherent.User?.status ?? "";
           return (
             <Badge 
               className={
@@ -541,6 +550,7 @@ export default function AdminCotisationManagement() {
       {
         id: "actions",
         header: () => <div className="text-center w-full">Actions</div>,
+        enableSorting: false,
         meta: { forceVisible: true }, // Cette colonne ne peut pas être masquée
         cell: ({ row }) => {
           const adherent = row.original;
@@ -1036,9 +1046,9 @@ export default function AdminCotisationManagement() {
               />
             </div>
             <Select
-              value={(table.getColumn("status")?.getFilterValue() as string) ?? ""}
+              value={(table.getColumn("status")?.getFilterValue() as string) || "all"}
               onValueChange={(value) =>
-                table.getColumn("status")?.setFilterValue(value === "all" ? "" : value)
+                table.getColumn("status")?.setFilterValue(value === "all" ? undefined : value)
               }
             >
               <SelectTrigger className="w-full sm:w-48 border-gray-300 dark:border-gray-600">
@@ -1067,17 +1077,27 @@ export default function AdminCotisationManagement() {
                       
                       if (!isVisible) return null;
                       
+                      const canSort = header.column.getCanSort();
+                      const isSorted = header.column.getIsSorted();
                       return (
                         <th
                           key={header.id}
-                          className={`px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 ${headerIndex === headerGroup.headers.length - 1 ? 'border-r-0' : ''} ${isMobileHidden ? 'hidden md:table-cell' : ''}`}
+                          className={`px-2 sm:px-4 py-2 sm:py-3 text-left text-xs font-bold text-gray-800 dark:text-gray-100 uppercase tracking-wider border-r border-gray-200 dark:border-gray-700 ${headerIndex === headerGroup.headers.length - 1 ? 'border-r-0' : ''} ${isMobileHidden ? 'hidden md:table-cell' : ''} ${canSort ? 'cursor-pointer select-none' : ''}`}
                         >
-                          {header.isPlaceholder
-                            ? null
-                            : flexRender(
-                                header.column.columnDef.header,
-                                header.getContext()
-                              )}
+                          {header.isPlaceholder ? null : canSort ? (
+                            <SortButton
+                              canSort={canSort}
+                              isSorted={isSorted === "asc" ? "asc" : isSorted === "desc" ? "desc" : false}
+                              onToggleSorting={(e) => {
+                                e?.preventDefault?.();
+                                header.column.toggleSorting(header.column.getIsSorted() === "asc");
+                              }}
+                            >
+                              {flexRender(header.column.columnDef.header, header.getContext())}
+                            </SortButton>
+                          ) : (
+                            flexRender(header.column.columnDef.header, header.getContext())
+                          )}
                         </th>
                       );
                     })}

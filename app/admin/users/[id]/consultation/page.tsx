@@ -9,7 +9,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useEffect, useState } from "react";
 import { getUserByIdForAdmin } from "@/actions/user";
 import { UserRole, UserStatus } from "@prisma/client";
-import { Calendar, Users, Briefcase, Shield, Mail, Phone, MapPin, Building, CheckCircle2, XCircle, User, Sparkles, FileText, Download, UserCircle } from "lucide-react";
+import { Calendar, Users, Briefcase, Shield, Mail, Phone, MapPin, Building, CheckCircle2, XCircle, User, Sparkles, FileText, Download, UserCircle, Pencil } from "lucide-react";
 import { adminGeneratePasseport } from "@/actions/passeport";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -252,9 +252,15 @@ export default function ConsultationUserPage() {
                 </div>
               )}
             </div>
-            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+            <div className="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700 flex flex-wrap gap-2">
+              <Link href={`/admin/users/${user.id}/edition`}>
+                <Button variant="default" size="sm" className="gap-2 bg-indigo-600 hover:bg-indigo-700 text-white">
+                  <Pencil className="h-4 w-4" />
+                  Modifier (profil, type d&apos;adhésion, etc.)
+                </Button>
+              </Link>
               <Link href={`/user/profile?viewAs=${user.id}`}>
-                <Button variant="outline" size="sm" className="w-full sm:w-auto gap-2 bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20">
+                <Button variant="outline" size="sm" className="gap-2 bg-white dark:bg-gray-800 border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 hover:bg-blue-50 dark:hover:bg-blue-900/20">
                   <UserCircle className="h-4 w-4" />
                   Voir le profil comme l&apos;adhérent
                 </Button>
@@ -473,10 +479,13 @@ export default function ConsultationUserPage() {
               <CardContent className="pt-2 px-3 sm:px-4 pb-3 sm:pb-4">
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3">
                   <div className="space-y-1">
-                    <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Type d'adhésion</Label>
+                    <Label className="text-[9px] sm:text-[10px] font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide flex items-center gap-1 sm:gap-2 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-t-md">Type d&apos;adhésion</Label>
                     <div className="p-2 sm:p-2.5 bg-blue-50 dark:bg-slate-800 rounded-md rounded-tl-none border border-blue-200 dark:border-slate-600 border-t-0 text-xs font-medium text-slate-900 dark:text-slate-100 font-mono shadow-sm">
                       {getTypeAdhesionLabel(adherent.typeAdhesion)}
                     </div>
+                    <p className="text-[10px] text-gray-500 dark:text-gray-400 mt-0.5">
+                      Modifiable via <Link href={`/admin/users/${user.id}/edition`} className="text-indigo-600 dark:text-indigo-400 underline hover:no-underline">Éditer l&apos;utilisateur</Link>
+                    </p>
                   </div>
                   {adherent.PosteTemplate && (
                     <div className="space-y-1">

@@ -109,7 +109,7 @@ export function QRCodeShare() {
         <Button
           variant="outline"
           size="sm"
-          className="flex items-center gap-2 border-white/20 hover:bg-white/10 text-white hover:text-white dark:border-white/30 dark:hover:bg-white/20 backdrop-blur-sm"
+          className="flex items-center gap-2 border-slate-300 dark:border-white/20 hover:bg-slate-100 dark:hover:bg-white/10 text-slate-800 dark:text-white hover:text-slate-900 dark:hover:text-white backdrop-blur-sm"
         >
           <QrCode className="h-4 w-4" />
           <span className="hidden sm:inline">QR Code</span>
