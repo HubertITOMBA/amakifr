@@ -52,6 +52,7 @@
     "db:recalculer-cotisations": "tsx scripts/recalculer-cotisations-mensuelles.ts",
     "db:sync-adherent-beneficiaire-cotisations": "tsx scripts/sync-adherent-beneficiaire-cotisations-mensuelles.ts",
     "db:update-cotisations-description-beneficiaire": "tsx scripts/update-cotisations-mensuelles-description-beneficiaire.ts",
+    "db:nettoyer-cotisations-beneficiaires": "tsx scripts/nettoyer-cotisations-beneficiaires.ts",
     "db:insert-test-adherents": "tsx scripts/insert-test-adherents.ts",
     "deploy:check": "tsx scripts/verify-production-ready.ts",
     "deploy:migrate": "prisma migrate deploy",

@@ -71,8 +71,15 @@ export async function createCotisationDuMois(formData: FormData) {
     }
 
     // Vérifications selon le type de cotisation
-    if (typeCotisation.aBeneficiaire && validatedData.adherentBeneficiaireId) {
-      // Pour les assistances (avec bénéficiaire) :
+    if (typeCotisation.aBeneficiaire) {
+      // Assistance : un bénéficiaire est obligatoire
+      if (!validatedData.adherentBeneficiaireId) {
+        return {
+          success: false,
+          error: "Une assistance doit obligatoirement avoir un adhérent bénéficiaire.",
+        };
+      }
+      // Pour les assistances :
       // - Un adhérent ne peut avoir qu'une seule assistance par mois (peu importe le type)
       // - Plusieurs assistances du même type sont possibles si elles sont pour des adhérents différents
       const existingAssistance = await db.cotisationDuMois.findFirst({
@@ -86,9 +93,9 @@ export async function createCotisationDuMois(formData: FormData) {
         const existingType = await db.typeCotisationMensuelle.findUnique({
           where: { id: existingAssistance.typeCotisationId },
         });
-        return { 
-          success: false, 
-          error: `L'adhérent bénéficiaire a déjà une assistance pour ${periode} (${existingType?.nom || "type inconnu"})` 
+        return {
+          success: false,
+          error: `L'adhérent bénéficiaire a déjà une assistance pour ${periode} (${existingType?.nom || "type inconnu"})`,
         };
       }
     } else {
@@ -233,6 +240,34 @@ export async function updateCotisationDuMois(formData: FormData) {
       };
     }
 
+    // Règle métier : on ne doit pas avoir d'assistance sans bénéficiaire
+    const existingType = await db.typeCotisationMensuelle.findUnique({
+      where: { id: existing.typeCotisationId },
+      select: { id: true, nom: true, aBeneficiaire: true },
+    });
+    if (!existingType) {
+      return { success: false, error: "Type de cotisation introuvable" };
+    }
+    const nextBeneficiaireId =
+      validatedData.adherentBeneficiaireId !== undefined
+        ? (validatedData.adherentBeneficiaireId || null)
+        : (existing.adherentBeneficiaireId ?? null);
+
+    if (existingType.aBeneficiaire) {
+      if (!nextBeneficiaireId) {
+        return {
+          success: false,
+          error: "Une assistance doit obligatoirement avoir un adhérent bénéficiaire.",
+        };
+      }
+    } else if (validatedData.adherentBeneficiaireId !== undefined && nextBeneficiaireId) {
+      // Sécurité : un type sans bénéficiaire ne doit pas recevoir de bénéficiaire
+      return {
+        success: false,
+        error: `Le type "${existingType.nom}" ne prend pas de bénéficiaire.`,
+      };
+    }
+
     // Préparer les données de mise à jour
     const updateData: any = {};
     if (validatedData.montantBase !== undefined) {
@@ -307,8 +342,17 @@ export async function updateCotisationDuMois(formData: FormData) {
               )
             : undefined;
 
+          const beneficiaireId = updated.TypeCotisation?.aBeneficiaire ? updated.adherentBeneficiaireId : null;
+
           // Pour chaque cotisation mensuelle existante, recalculer le montant
           for (const cotisationMensuelle of updated.CotisationsMensuelles) {
+            // Sécurité: le bénéficiaire ne doit jamais avoir de ligne à payer pour cette assistance
+            if (beneficiaireId && cotisationMensuelle.adherentId === beneficiaireId) {
+              console.log(
+                `[updateCotisationDuMois] ✓ Cotisation mensuelle ${cotisationMensuelle.id} ignorée (adhérent bénéficiaire ${beneficiaireId})`
+              );
+              continue;
+            }
             // Récupérer l'adhérent
             const adherent = await db.adherent.findUnique({
               where: { id: cotisationMensuelle.adherentId },
@@ -368,6 +412,21 @@ export async function updateCotisationDuMois(formData: FormData) {
             });
 
             console.log(`[updateCotisationDuMois] ✅ Cotisation mensuelle ${cotisationMensuelle.id} mise à jour: ${result.montantTotal}€ (payé: ${montantPaye}€, restant: ${nouveauMontantRestant}€)`);
+          }
+
+          // Nettoyage: supprimer toute ligne "assistance" existante pour le bénéficiaire (si elle a été créée par erreur)
+          if (beneficiaireId) {
+            const deleted = await db.cotisationMensuelle.deleteMany({
+              where: {
+                cotisationDuMoisId: updated.id,
+                adherentId: beneficiaireId,
+              },
+            });
+            if (deleted.count > 0) {
+              console.warn(
+                `[updateCotisationDuMois] ⚠️ ${deleted.count} ligne(s) supprimée(s) car le bénéficiaire ne doit pas payer (beneficiaireId=${beneficiaireId})`
+              );
+            }
           }
         }
       } catch (syncError) {

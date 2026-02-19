@@ -20,6 +20,7 @@ import {
   CheckCircle2, 
   Clock, 
   AlertTriangle,
+  CalendarPlus,
   Search,
   ChevronLeft,
   ChevronRight,
@@ -42,7 +43,7 @@ import {
   deleteCotisationDuMois,
   getAdherentsMembres,
 } from "@/actions/cotisations-du-mois";
-import { getAllTypesCotisationMensuelle, createCotisationsMensuelles } from "@/actions/cotisations-mensuelles";
+import { getAllTypesCotisationMensuelle, createCotisationsMensuelles, getAdherentsSansCotisationPourPeriode, affecterCotisationPourAdherents, getAdherentEligibiliteCotisation } from "@/actions/cotisations-mensuelles";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -145,10 +146,21 @@ export default function AdminCotisationsDuMois() {
     adherentBeneficiaireId: "",
   });
   const [adherentSearchOpen, setAdherentSearchOpen] = useState(false);
-  const [showAffecterDialog, setShowAffecterDialog] = useState(false);
-  const [affecterDate, setAffecterDate] = useState<Date>(() => new Date());
   const [loadingAffecter, setLoadingAffecter] = useState(false);
+  const [showAffecterDialog, setShowAffecterDialog] = useState(false);
+  const [affecterDate, setAffecterDate] = useState<Date>(new Date());
+  const [affecterLigneId, setAffecterLigneId] = useState<string | null>(null);
   const [adherentsMembres, setAdherentsMembres] = useState<Array<{ id: string; firstname: string; lastname: string; email: string }>>([]);
+  const [showSansCotisationDialog, setShowSansCotisationDialog] = useState(false);
+  const [sansCotisationPeriode, setSansCotisationPeriode] = useState({ annee: new Date().getFullYear(), mois: new Date().getMonth() + 1 });
+  const [sansCotisationResult, setSansCotisationResult] = useState<{ periode: string; adherents: Array<{ id: string; firstname: string; lastname: string; civility?: string; email: string }>; total: number; message?: string } | null>(null);
+  const [loadingSansCotisation, setLoadingSansCotisation] = useState(false);
+  const [loadingAffecterSansCotisation, setLoadingAffecterSansCotisation] = useState(false);
+  const [affectingAdherentId, setAffectingAdherentId] = useState<string | null>(null);
+  const [showEligibiliteDialog, setShowEligibiliteDialog] = useState(false);
+  const [eligibiliteAdherentId, setEligibiliteAdherentId] = useState("");
+  const [eligibiliteResult, setEligibiliteResult] = useState<{ eligible: boolean; reason: string; userStatus: string | null; userRole: string | null; email?: string | null } | null>(null);
+  const [loadingEligibilite, setLoadingEligibilite] = useState(false);
   const [selectedAdherent, setSelectedAdherent] = useState<{
     id: string;
     firstname: string;
@@ -267,7 +279,8 @@ export default function AdminCotisationsDuMois() {
       }
 
       if (typesResult.success && typesResult.data) {
-        setTypesCotisation(typesResult.data.filter((t: TypeCotisationMensuelle) => t.actif));
+        // Charger tous les types (comme /admin/cotisations) pour que l'affectation ait toujours des types
+        setTypesCotisation((typesResult.data as TypeCotisationMensuelle[]) ?? []);
       } else {
         console.error("Erreur getAllTypesCotisationMensuelle:", typesResult.error);
       }
@@ -278,6 +291,9 @@ export default function AdminCotisationsDuMois() {
       setLoading(false);
     }
   }, []);
+
+  // Types actifs uniquement (pour le formulaire Nouvelle/Modifier cotisation)
+  const typesActifs = useMemo(() => typesCotisation.filter((t) => t.actif), [typesCotisation]);
 
   // Obtenir les années uniques
   const anneeOptions = useMemo(() => {
@@ -471,6 +487,20 @@ export default function AdminCotisationsDuMois() {
                 <Edit className="h-4 w-4" />
                 Modifier
               </DropdownMenuItem>
+              {item._count.CotisationsMensuelles === 0 && (item.statut === "Planifie" || item.statut === "Cree") && (
+                <DropdownMenuItem
+                  className="flex items-center gap-2 cursor-pointer"
+                  onClick={() => handleAffecterCotisations(item.id, item)}
+                  disabled={loadingAffecter}
+                >
+                  {loadingAffecter ? (
+                    <Clock className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <CalendarPlus className="h-4 w-4" />
+                  )}
+                  Affecter à la cotisation du mois
+                </DropdownMenuItem>
+              )}
               <DropdownMenuItem
                 className="flex items-center gap-2 cursor-pointer text-red-600 focus:text-red-600"
                 onClick={() => handleDelete(item.id)}
@@ -590,58 +620,84 @@ export default function AdminCotisationsDuMois() {
     }
   };
 
-  const handleOpenAffecterDialog = () => {
-    setAffecterDate(new Date());
-    setShowAffecterDialog(true);
-  };
+  const handleAffecterCotisations = async (ligneId?: string, ligneData?: CotisationDuMois) => {
+    let affecterAnnee: number;
+    let affecterMois: number;
+    let ligne: CotisationDuMois | null = null;
 
-  const handleAffecterCotisations = async () => {
-    const affecterAnnee = affecterDate.getFullYear();
-    const affecterMois = affecterDate.getMonth() + 1;
+    // Un clic sur une ligne = affecter toute la période (forfait + toutes les assistances du mois), pas seulement cette ligne
+    if (ligneId) {
+      ligne = ligneData || cotisations.find((c) => c.id === ligneId) || null;
+      if (!ligne) {
+        toast.error("Ligne introuvable");
+        return;
+      }
+      affecterAnnee = ligne.annee;
+      affecterMois = ligne.mois;
+
+      if (ligne.statut !== "Planifie" && ligne.statut !== "Cree") {
+        toast.warning(
+          `Cette cotisation du mois a le statut "${ligne.statut}". Seules les cotisations "Planifié" ou "Créé" sont prises en compte. L'affectation portera sur toutes les lignes du mois.`
+        );
+      }
+    } else {
+      affecterAnnee = affecterDate.getFullYear();
+      affecterMois = affecterDate.getMonth() + 1;
+    }
+
     const periode = `${affecterAnnee}-${String(affecterMois).padStart(2, "0")}`;
     const moisLabel = moisOptions.find((m) => m.value === affecterMois)?.label ?? affecterMois;
-    // Vérifier qu'il existe au moins une ligne "cotisation du mois" pour cette période (créée via "Nouvelle cotisation")
-    const cotisationsForPeriod = cotisations.filter((c) => c.periode === periode);
-    const hasCotisationsDuMoisForPeriod = cotisationsForPeriod.length > 0;
-    if (!hasCotisationsDuMoisForPeriod) {
-      toast.warning(
-        `Aucune ligne de cotisation du mois pour ${moisLabel} ${affecterAnnee}. Créez d'abord au moins une cotisation du mois (bouton "Nouvelle cotisation", ex. forfait) pour cette période, puis réessayez.`
-      );
-      return;
+
+    // Si les types n'ont pas été chargés (state vide), recharger depuis l'API avant de continuer
+    let typesToUse = typesCotisation;
+    if (typesToUse.length === 0) {
+      const resTypes = await getAllTypesCotisationMensuelle();
+      if (resTypes.success && resTypes.data && Array.isArray(resTypes.data)) {
+        typesToUse = resTypes.data as TypeCotisationMensuelle[];
+        setTypesCotisation(typesToUse);
+      }
     }
-    // Vérifier si la période est déjà affectée (cotisations mensuelles déjà créées)
-    const alreadyAffected = cotisationsForPeriod.some((c) => (c._count?.CotisationsMensuelles ?? 0) > 0);
-    if (alreadyAffected) {
-      toast.info(
-        `${moisLabel} ${affecterAnnee} est déjà affecté. Les cotisations mensuelles existent déjà pour cette période. Consultez Admin > Cotisations pour les modifier.`
-      );
-      return;
-    }
-    const typeCotisationIds = typesCotisation.filter((t) => t.obligatoire && t.actif).map((t) => t.id);
+
+    // Types à utiliser : obligatoire + actif si au moins un, sinon tous les types
+    let typeCotisationIds = typesToUse.filter((t) => t.obligatoire && t.actif).map((t) => t.id);
     if (typeCotisationIds.length === 0) {
-      toast.error("Aucun type de cotisation obligatoire actif. Configurez les types sur /admin/cotisations.");
+      typeCotisationIds = typesToUse.map((t) => t.id);
+    }
+    if (typeCotisationIds.length === 0) {
+      toast.error("Aucun type de cotisation actif. Configurez les types sur /admin/cotisations (Types des cotisations).");
       return;
     }
-    const forfaitSelected = typesCotisation.some(
+    const hasForfait = typesToUse.some(
       (t) => typeCotisationIds.includes(t.id) && t.nom.toLowerCase().includes("forfait")
     );
-    if (!forfaitSelected) {
-      toast.error("Veuillez avoir au moins le type 'Forfait Mensuel' actif et obligatoire.");
+    if (!hasForfait) {
+      toast.error("Veuillez avoir au moins un type de cotisation actif dont le nom contient \"Forfait\" (ex. Forfait Mensuel).");
       return;
     }
+
     setLoadingAffecter(true);
     try {
+      // Ne jamais passer cotisationDuMoisId : on affecte toujours toute la période (forfait + assistances du mois)
       const result = await createCotisationsMensuelles({
         periode,
         annee: affecterAnnee,
         mois: affecterMois,
         typeCotisationIds,
+        cotisationDuMoisId: undefined,
       });
       if (result.success) {
-        toast.success(
-          result.message + " Consultez la page Admin > Cotisations pour voir les cotisations par adhérent."
-        );
-        setShowAffecterDialog(false);
+        const alreadyAllAffected = (result.message ?? "").includes("déjà affectées") || (result.message ?? "").includes("déjà affecté");
+        if (alreadyAllAffected) {
+          toast.info(result.message ?? `${moisLabel} ${affecterAnnee} est déjà affecté.`);
+        } else {
+          toast.success(
+            (result.message ?? "Affectation effectuée.") + " Consultez la page Admin > Cotisations pour voir les cotisations par adhérent."
+          );
+        }
+        if (!ligneId) {
+          setShowAffecterDialog(false);
+        }
+        setAffecterLigneId(null);
         loadData();
       } else {
         const msg = result.error ?? "";
@@ -711,19 +767,6 @@ export default function AdminCotisationsDuMois() {
                 </Link>
               </Button>
               <Button
-                onClick={handleOpenAffecterDialog}
-                disabled={loadingAffecter}
-                className="bg-white text-blue-600 hover:bg-blue-50 border-white shadow-sm font-medium"
-                title="Choisir la période puis créer les cotisations mensuelles pour tous les adhérents actifs"
-              >
-                {loadingAffecter ? (
-                  <Clock className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <CheckCircle2 className="h-4 w-4 mr-2" />
-                )}
-                Affecter les Cotisations
-              </Button>
-              <Button
                 onClick={() => {
                   setEditingCotisation(null);
                   const now = new Date();
@@ -750,6 +793,30 @@ export default function AdminCotisationsDuMois() {
               >
                 <Plus className="h-4 w-4 mr-2" />
                 Nouvelle cotisation
+              </Button>
+              <Button
+                variant="outline"
+                className="bg-white text-blue-600 hover:bg-blue-50 border-white shadow-sm font-medium"
+                onClick={() => {
+                  setSansCotisationResult(null);
+                  setSansCotisationPeriode({ annee: new Date().getFullYear(), mois: new Date().getMonth() + 1 });
+                  setShowSansCotisationDialog(true);
+                }}
+              >
+                <User className="h-4 w-4 mr-2" />
+                Adhérents sans cotisation
+              </Button>
+              <Button
+                variant="outline"
+                className="bg-white text-blue-600 hover:bg-blue-50 border-white shadow-sm font-medium"
+                onClick={() => {
+                  setEligibiliteResult(null);
+                  setEligibiliteAdherentId("");
+                  setShowEligibiliteDialog(true);
+                }}
+              >
+                <Info className="h-4 w-4 mr-2" />
+                Vérifier éligibilité
               </Button>
             </div>
           </div>
@@ -966,7 +1033,7 @@ export default function AdminCotisationsDuMois() {
                   <SelectValue placeholder="Sélectionnez un type de cotisation" />
                 </SelectTrigger>
                 <SelectContent>
-                  {typesCotisation.map(type => (
+                  {typesActifs.map(type => (
                     <SelectItem key={type.id} value={type.id}>
                       {type.nom} {type.obligatoire && "(Obligatoire)"}
                     </SelectItem>
@@ -1013,7 +1080,7 @@ export default function AdminCotisationsDuMois() {
 
             {/* Champ pour l'adhérent bénéficiaire (pour les types assistance : choix depuis la liste des adhérents MEMBRE) */}
             {formData.typeCotisationId && (() => {
-              const selectedType = typesCotisation.find(t => t.id === formData.typeCotisationId);
+              const selectedType = typesActifs.find(t => t.id === formData.typeCotisationId) ?? typesCotisation.find(t => t.id === formData.typeCotisationId);
               const aBeneficiaire = selectedType?.aBeneficiaire || false;
               
               if (aBeneficiaire) {
@@ -1148,6 +1215,247 @@ export default function AdminCotisationsDuMois() {
                   Affecter pour {moisOptions.find((m) => m.value === affecterDate.getMonth() + 1)?.label} {affecterDate.getFullYear()}
                 </>
               )}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog : Adhérents sans cotisation pour un mois donné */}
+      <Dialog open={showSansCotisationDialog} onOpenChange={setShowSansCotisationDialog}>
+        <DialogContent className="max-w-lg border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-blue-800 dark:text-blue-200">Adhérents sans cotisation pour un mois</DialogTitle>
+            <DialogDescription className="text-blue-700 dark:text-blue-300">
+              Choisissez une période pour afficher les adhérents (MEMBRE actifs) pour qui la cotisation forfait de ce mois n&apos;a pas été créée.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-blue-800 dark:text-blue-200">Année</Label>
+                <Select
+                  value={sansCotisationPeriode.annee.toString()}
+                  onValueChange={(v) => setSansCotisationPeriode((p) => ({ ...p, annee: parseInt(v) }))}
+                >
+                  <SelectTrigger className="bg-white dark:bg-gray-900">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {anneeOptions.map((a) => (
+                      <SelectItem key={a} value={a.toString()}>{a}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm font-medium text-blue-800 dark:text-blue-200">Mois</Label>
+                <Select
+                  value={sansCotisationPeriode.mois.toString()}
+                  onValueChange={(v) => setSansCotisationPeriode((p) => ({ ...p, mois: parseInt(v) }))}
+                >
+                  <SelectTrigger className="bg-white dark:bg-gray-900">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {moisOptions.map((m) => (
+                      <SelectItem key={m.value} value={m.value.toString()}>{m.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            <Button
+              type="button"
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              disabled={loadingSansCotisation}
+              onClick={async () => {
+                setLoadingSansCotisation(true);
+                setSansCotisationResult(null);
+                try {
+                  const periode = `${sansCotisationPeriode.annee}-${String(sansCotisationPeriode.mois).padStart(2, "0")}`;
+                  const res = await getAdherentsSansCotisationPourPeriode(periode);
+                  if (res.success && res.data) {
+                    setSansCotisationResult({
+                      periode: res.data.periode,
+                      adherents: res.data.adherents,
+                      total: (res.data as { total?: number }).total ?? res.data.adherents.length,
+                      message: (res.data as { message?: string }).message,
+                    });
+                  } else {
+                    toast.error(res.error ?? "Erreur lors de la vérification");
+                  }
+                } finally {
+                  setLoadingSansCotisation(false);
+                }
+              }}
+            >
+              {loadingSansCotisation ? "Vérification..." : "Vérifier"}
+            </Button>
+            {sansCotisationResult && (
+              <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 p-3 text-sm">
+                {sansCotisationResult.message && (
+                  <p className="text-amber-700 dark:text-amber-300 text-xs mb-2">{sansCotisationResult.message}</p>
+                )}
+                <p className="font-medium text-blue-800 dark:text-blue-200 mb-2">
+                  {sansCotisationResult.total === 0
+                    ? `Période ${sansCotisationResult.periode} — Tous les adhérents ont une cotisation pour ce mois`
+                    : `Période ${sansCotisationResult.periode} — ${sansCotisationResult.total} adhérent${sansCotisationResult.total > 1 ? "s" : ""} sans cotisation créée pour ce mois`}
+                </p>
+                {sansCotisationResult.adherents.length === 0 ? (
+                  <p className="text-green-700 dark:text-green-300">Aucun adhérent manquant : tous les membres actifs ont au moins une cotisation pour ce mois.</p>
+                ) : (
+                  <>
+                    <ul className="space-y-1.5 max-h-48 overflow-y-auto">
+                      {sansCotisationResult.adherents.map((a) => (
+                        <li key={a.id} className="flex justify-between items-center gap-2 py-1 border-b border-gray-100 dark:border-gray-800 last:border-0">
+                          <span className="font-medium text-gray-900 dark:text-gray-100">{(a.civility ? a.civility + " " : "")}{a.firstname} {a.lastname}</span>
+                          <span className="text-xs text-gray-500 truncate max-w-[140px]">{a.email}</span>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            className="shrink-0 h-7 text-xs bg-green-50 hover:bg-green-100 dark:bg-green-950 dark:hover:bg-green-900 border-green-300"
+                            disabled={loadingAffecterSansCotisation || affectingAdherentId !== null}
+                            onClick={async () => {
+                              setAffectingAdherentId(a.id);
+                              try {
+                                const res = await affecterCotisationPourAdherents(sansCotisationResult.periode, [a.id]);
+                                if (res.success) {
+                                  toast.success(res.message ?? "Cotisation créée pour cet adhérent.");
+                                  loadData();
+                                  const refetch = await getAdherentsSansCotisationPourPeriode(sansCotisationResult.periode);
+                                  if (refetch.success && refetch.data) {
+                                    setSansCotisationResult({
+                                      periode: refetch.data.periode,
+                                      adherents: refetch.data.adherents,
+                                      total: refetch.data.adherents.length,
+                                      message: (refetch.data as { message?: string }).message,
+                                    });
+                                  }
+                                } else {
+                                  toast.error(res.error ?? "Erreur");
+                                }
+                              } finally {
+                                setAffectingAdherentId(null);
+                              }
+                            }}
+                          >
+                            {affectingAdherentId === a.id ? "..." : "Affecter"}
+                          </Button>
+                        </li>
+                      ))}
+                    </ul>
+                    <Button
+                      type="button"
+                      className="w-full mt-3 bg-green-600 hover:bg-green-700"
+                      disabled={loadingAffecterSansCotisation}
+                      onClick={async () => {
+                        if (!sansCotisationResult?.adherents.length) return;
+                        setLoadingAffecterSansCotisation(true);
+                        try {
+                          const res = await affecterCotisationPourAdherents(
+                            sansCotisationResult.periode,
+                            sansCotisationResult.adherents.map((a) => a.id)
+                          );
+                          if (res.success) {
+                            toast.success(res.message ?? "Cotisations créées.");
+                            loadData();
+                            const refetch = await getAdherentsSansCotisationPourPeriode(sansCotisationResult.periode);
+                            if (refetch.success && refetch.data) {
+                              setSansCotisationResult({
+                                periode: refetch.data.periode,
+                                adherents: refetch.data.adherents,
+                                total: refetch.data.adherents.length,
+                                message: (refetch.data as { message?: string }).message,
+                              });
+                            } else {
+                              setSansCotisationResult(null);
+                            }
+                          } else {
+                            toast.error(res.error ?? "Erreur lors de l'affectation");
+                          }
+                        } finally {
+                          setLoadingAffecterSansCotisation(false);
+                        }
+                      }}
+                    >
+                      {loadingAffecterSansCotisation ? "Affectation..." : "Affecter la cotisation du mois à ces adhérents"}
+                    </Button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => setShowSansCotisationDialog(false)}>
+              Fermer
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      {/* Dialog : Vérifier l'éligibilité cotisation d'un adhérent (diagnostic) */}
+      <Dialog open={showEligibiliteDialog} onOpenChange={setShowEligibiliteDialog}>
+        <DialogContent className="max-w-lg border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-blue-800 dark:text-blue-200">Vérifier l&apos;éligibilité cotisation</DialogTitle>
+            <DialogDescription className="text-blue-700 dark:text-blue-300">
+              Saisissez l&apos;ID de l&apos;adhérent pour savoir pourquoi il ne reçoit pas de cotisation lors de l&apos;affectation. Seuls les adhérents avec <strong>User statut = Actif</strong> et <strong>rôle = MEMBRE</strong> sont inclus.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-sm font-medium text-blue-800 dark:text-blue-200">ID adhérent</Label>
+              <Input
+                placeholder="ex. cmkfngd5b003kmeepw18hsfiz"
+                value={eligibiliteAdherentId}
+                onChange={(e) => setEligibiliteAdherentId(e.target.value)}
+                className="bg-white dark:bg-gray-900 font-mono text-sm"
+              />
+            </div>
+            <Button
+              type="button"
+              className="w-full bg-blue-600 hover:bg-blue-700"
+              disabled={loadingEligibilite || !eligibiliteAdherentId.trim()}
+              onClick={async () => {
+                setLoadingEligibilite(true);
+                setEligibiliteResult(null);
+                try {
+                  const res = await getAdherentEligibiliteCotisation(eligibiliteAdherentId.trim());
+                  if (res.success && res.data) {
+                    setEligibiliteResult({
+                      eligible: res.data.eligible,
+                      reason: res.data.reason,
+                      userStatus: res.data.userStatus ?? null,
+                      userRole: res.data.userRole ?? null,
+                      email: res.data.email ?? null,
+                    });
+                  } else {
+                    toast.error(res.error ?? "Erreur lors de la vérification");
+                  }
+                } finally {
+                  setLoadingEligibilite(false);
+                }
+              }}
+            >
+              {loadingEligibilite ? "Vérification..." : "Vérifier"}
+            </Button>
+            {eligibiliteResult && (
+              <div className={`rounded-lg border p-3 text-sm ${eligibiliteResult.eligible ? "border-green-300 bg-green-50 dark:border-green-800 dark:bg-green-950/30" : "border-amber-300 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"}`}>
+                <p className="font-medium mb-1">{eligibiliteResult.eligible ? "Éligible" : "Non éligible"}</p>
+                <p className="text-gray-700 dark:text-gray-300">{eligibiliteResult.reason}</p>
+                {(eligibiliteResult.userStatus != null || eligibiliteResult.userRole != null) && (
+                  <p className="mt-2 text-xs text-gray-600 dark:text-gray-400">
+                    User : statut = {eligibiliteResult.userStatus ?? "—"}, rôle = {eligibiliteResult.userRole ?? "—"}
+                    {eligibiliteResult.email ? ` • ${eligibiliteResult.email}` : ""}
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+          <DialogFooter className="pt-2">
+            <Button type="button" variant="outline" onClick={() => setShowEligibiliteDialog(false)}>
+              Fermer
             </Button>
           </DialogFooter>
         </DialogContent>

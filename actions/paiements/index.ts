@@ -1357,6 +1357,54 @@ export async function getDettesInitialesByAdherent(adherentId: string) {
 }
 
 /**
+ * Récupère les obligations en attente (frais d'adhésion, etc.) pour la page admin paiements
+ */
+export async function getObligationsEnAttente() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canRead(session.user.id, "getAllPaiements");
+    if (!hasAccess) return { success: false, error: "Non autorisé" };
+    const obligations = await prisma.obligationCotisation.findMany({
+      where: { montantRestant: { gt: 0 } },
+      include: {
+        Adherent: {
+          include: { User: { select: { id: true, email: true, name: true } } },
+        },
+      },
+      orderBy: [{ Adherent: { lastname: "asc" } }, { Adherent: { firstname: "asc" } }],
+    });
+    return {
+      success: true,
+      data: obligations.map((o) => ({
+        id: o.id,
+        adherentId: o.adherentId,
+        type: o.type,
+        montantAttendu: Number(o.montantAttendu),
+        montantPaye: Number(o.montantPaye),
+        montantRestant: Number(o.montantRestant),
+        statut: o.statut,
+        description: o.description,
+        periode: o.periode,
+        dateEcheance: o.dateEcheance,
+        Adherent: o.Adherent
+          ? {
+              id: o.Adherent.id,
+              firstname: o.Adherent.firstname,
+              lastname: o.Adherent.lastname,
+              User: o.Adherent.User,
+            }
+          : null,
+      })),
+    };
+  } catch (error) {
+    console.error("Erreur getObligationsEnAttente:", error);
+    return { success: false, error: "Erreur lors de la récupération des obligations" };
+  }
+}
+
+/**
  * Schéma de validation pour mettre à jour une dette initiale
  */
 const UpdateDetteInitialeSchema = z.object({
@@ -2328,6 +2376,22 @@ export async function affecterAssistanceToCotisationDuMois(data: {
       return { success: false, error: "Assistance introuvable" };
     }
 
+    // Vérifier si l'assistance est déjà affectée
+    if (assistance.statut === "Affecte") {
+      return {
+        success: false,
+        error: "Cette assistance est déjà affectée à une cotisation du mois. Consultez Admin > Cotisations du mois pour voir la cotisation associée.",
+      };
+    }
+
+    // Vérifier si l'assistance est annulée
+    if (assistance.statut === "Annule") {
+      return {
+        success: false,
+        error: "Cette assistance est annulée et ne peut pas être affectée à une cotisation du mois.",
+      };
+    }
+
     const periode = `${data.annee}-${String(data.mois).padStart(2, "0")}`;
     const nomsPossibles = typeCotisationNamesByAssistance[assistance.type] ?? ["Décès", "Assistance décès"];
 
@@ -2372,20 +2436,36 @@ export async function affecterAssistanceToCotisationDuMois(data: {
       };
     }
 
+    // Vérifier si une cotisation du mois existe déjà pour cet adhérent bénéficiaire sur cette période
+    // Règle métier : un adhérent ne peut avoir qu'une seule assistance par mois (peu importe le type)
     const existing = await prisma.cotisationDuMois.findFirst({
       where: {
         periode,
         adherentBeneficiaireId: assistance.adherentId,
       },
+      include: {
+        TypeCotisation: {
+          select: { nom: true },
+        },
+      },
     });
     if (existing) {
+      // Vérifier si l'assistance est déjà affectée à cette cotisation du mois
+      if (assistance.statut === "Affecte") {
+        return {
+          success: false,
+          error: `Cette assistance est déjà affectée. Une cotisation du mois existe déjà pour ${assistance.Adherent?.firstname} ${assistance.Adherent?.lastname} sur la période ${periode} (type: ${existing.TypeCotisation?.nom || "inconnu"}).`,
+        };
+      }
       return {
         success: false,
-        error: `Une cotisation du mois existe déjà pour ${assistance.Adherent?.firstname} ${assistance.Adherent?.lastname} sur la période ${periode}`,
+        error: `Une cotisation du mois existe déjà pour ${assistance.Adherent?.firstname} ${assistance.Adherent?.lastname} sur la période ${periode} (type: ${existing.TypeCotisation?.nom || "inconnu"}). Un adhérent ne peut avoir qu'une seule assistance par mois. Consultez Admin > Cotisations du mois pour modifier ou supprimer la cotisation existante.`,
       };
     }
 
     const dateEcheance = new Date(data.annee, data.mois - 1, 15);
+    // Stocker l'adhérent bénéficiaire (assistances.adherentId) dans cotisations_du_mois.adherentBeneficiaireId.
+    // Lors de l'affectation des cotisations (createCotisationsMensuelles), ce champ sera recopié sur chaque cotisation_mensuelle.adherentBeneficiaireId.
     await prisma.cotisationDuMois.create({
       data: {
         periode,
@@ -2414,7 +2494,15 @@ export async function affecterAssistanceToCotisationDuMois(data: {
     };
   } catch (error) {
     console.error("Erreur lors de l'affectation:", error);
-    return { success: false, error: "Erreur lors de l'affectation à la cotisation du mois" };
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    // En développement, retourner le message d'erreur complet pour le débogage
+    const isDev = process.env.NODE_ENV === 'development';
+    return { 
+      success: false, 
+      error: isDev 
+        ? `Erreur lors de l'affectation à la cotisation du mois: ${errorMessage}` 
+        : "Erreur lors de l'affectation à la cotisation du mois. Veuillez réessayer ou contacter l'administrateur."
+    };
   }
 }
 

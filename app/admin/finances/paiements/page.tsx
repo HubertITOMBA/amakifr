@@ -15,7 +15,7 @@ import { Search, Euro, ArrowLeft, Loader2, CalendarDays, Eye, ChevronLeft, Chevr
 import { format } from "date-fns";
 import { toast } from "sonner";
 import Link from "next/link";
-import { createPaiement, updatePaiement, getDettesInitialesByAdherent, uploadJustificatifPaiement } from "@/actions/paiements";
+import { createPaiement, updatePaiement, getDettesInitialesByAdherent, getObligationsEnAttente, uploadJustificatifPaiement } from "@/actions/paiements";
 import { getCotisationsMensuellesByPeriode } from "@/actions/cotisations-mensuelles";
 import {
   createColumnHelper,
@@ -28,6 +28,14 @@ import {
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
+import {
+  Table,
+  TableHeader,
+  TableBody,
+  TableRow,
+  TableHead,
+  TableCell,
+} from "@/components/ui/table";
 
 const MOIS_LABELS: Record<number, string> = { 1: "Janvier", 2: "Février", 3: "Mars", 4: "Avril", 5: "Mai", 6: "Juin", 7: "Juillet", 8: "Août", 9: "Septembre", 10: "Octobre", 11: "Novembre", 12: "Décembre" };
 
@@ -62,6 +70,19 @@ export default function AdminPaiementsPage() {
   const [savingPaiement, setSavingPaiement] = useState(false);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [isMobile, setIsMobile] = useState(false);
+  // Obligations en attente (frais d'adhésion, etc.)
+  const [obligationsEnAttente, setObligationsEnAttente] = useState<any[]>([]);
+  const [loadingObligations, setLoadingObligations] = useState(true);
+  const [payObligationDialogOpen, setPayObligationDialogOpen] = useState(false);
+  const [selectedObligationForPay, setSelectedObligationForPay] = useState<any | null>(null);
+  const [payObligationForm, setPayObligationForm] = useState({
+    montant: "",
+    datePaiement: new Date().toISOString().split("T")[0],
+    moyenPaiement: "Especes" as "Especes" | "Cheque" | "Virement" | "CarteBancaire",
+    reference: "",
+  });
+  const [payObligationJustificatifFile, setPayObligationJustificatifFile] = useState<File | null>(null);
+  const [payingObligationId, setPayingObligationId] = useState<string | null>(null);
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
     if (typeof window !== "undefined") {
       try {
@@ -85,7 +106,7 @@ export default function AdminPaiementsPage() {
         console.error(e);
       }
     }
-    return { type: false };
+    return {};
   });
 
   useEffect(() => {
@@ -95,10 +116,27 @@ export default function AdminPaiementsPage() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Charger les dettes initiales de l'adhérent à l'ouverture du dialog paiement ou détails
-  const adherentIdForDialogs = selectedCotisationForPay?.adherentId ?? selectedCotisationForDetail?.adherentId ?? null;
+  // Charger les obligations en attente (frais d'adhésion, etc.)
+  const loadObligations = useCallback(async () => {
+    try {
+      setLoadingObligations(true);
+      const res = await getObligationsEnAttente();
+      const list = res?.success && Array.isArray(res?.data) ? res.data : [];
+      setObligationsEnAttente(list);
+    } catch {
+      setObligationsEnAttente([]);
+    } finally {
+      setLoadingObligations(false);
+    }
+  }, []);
   useEffect(() => {
-    if (!adherentIdForDialogs || (!payDialogOpen && !detailDialogOpen)) {
+    loadObligations();
+  }, [loadObligations]);
+
+  // Charger les dettes initiales de l'adhérent à l'ouverture du dialog paiement ou détails
+  const adherentIdForDialogs = selectedCotisationForPay?.adherentId ?? selectedCotisationForDetail?.adherentId ?? selectedObligationForPay?.adherentId ?? null;
+  useEffect(() => {
+    if (!adherentIdForDialogs || (!payDialogOpen && !detailDialogOpen && !payObligationDialogOpen)) {
       if (!adherentIdForDialogs) setDettesInitialesAdherent([]);
       return;
     }
@@ -108,7 +146,7 @@ export default function AdminPaiementsPage() {
       setDettesInitialesAdherent(res.data);
     });
     return () => { cancelled = true; };
-  }, [adherentIdForDialogs, payDialogOpen, detailDialogOpen]);
+  }, [adherentIdForDialogs, payDialogOpen, detailDialogOpen, payObligationDialogOpen]);
 
   useEffect(() => {
     setPagination((prev) => ({
@@ -141,11 +179,8 @@ export default function AdminPaiementsPage() {
     try {
       setLoadingCotisations(true);
       const res = await getCotisationsMensuellesByPeriode(periode);
-      if (res.success && res.data) {
-        setCotisations(res.data);
-      } else {
-        setCotisations([]);
-      }
+      const list = res?.success && Array.isArray(res?.data) ? res.data : [];
+      setCotisations(list);
     } catch (e) {
       setCotisations([]);
     } finally {
@@ -157,13 +192,14 @@ export default function AdminPaiementsPage() {
     loadCotisations();
   }, [loadCotisations]);
 
-  // Filtrer les cotisations par adhérent
+  // Filtrer les cotisations par adhérent (ignorer les entrées invalides)
   const filteredCotisations = useMemo(() => {
-    if (!adherentFilterCotisations.trim()) return cotisations;
+    const list = Array.isArray(cotisations) ? cotisations.filter(Boolean) : [];
+    if (!adherentFilterCotisations.trim()) return list;
     const q = adherentFilterCotisations.trim().toLowerCase();
-    return cotisations.filter((c) => {
-      const name = [c.Adherent?.firstname, c.Adherent?.lastname].filter(Boolean).join(" ");
-      const email = c.Adherent?.User?.email || "";
+    return list.filter((c: any) => {
+      const name = [c?.Adherent?.firstname, c?.Adherent?.lastname].filter(Boolean).join(" ");
+      const email = c?.Adherent?.User?.email || "";
       return name.toLowerCase().includes(q) || email.toLowerCase().includes(q);
     });
   }, [cotisations, adherentFilterCotisations]);
@@ -183,27 +219,52 @@ export default function AdminPaiementsPage() {
       columnHelper.accessor((r) => `${r.mois}-${r.annee}`, {
         id: "periode",
         header: "Période",
-        cell: ({ row }) => (
-          <span className="text-gray-900 dark:text-gray-100">
-            {MOIS_LABELS[row.original.mois] ?? row.original.mois} {row.original.annee}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const o = row.original ?? {};
+          return (
+            <span className="text-gray-900 dark:text-gray-100">
+              {MOIS_LABELS[o.mois] ?? o.mois} {o.annee}
+            </span>
+          );
+        },
       }),
       columnHelper.accessor("Adherent", {
         id: "adherent",
         header: "Adhérent",
-        cell: ({ row }) => (
-          <span className="font-medium text-gray-900 dark:text-gray-100">
-            {row.original.Adherent?.firstname} {row.original.Adherent?.lastname}
-          </span>
-        ),
+        cell: ({ row }) => {
+          const o = row.original ?? {};
+          const adh = o.Adherent;
+          return (
+            <span className="font-medium text-gray-900 dark:text-gray-100">
+              {adh?.firstname} {adh?.lastname}
+            </span>
+          );
+        },
       }),
       columnHelper.accessor("description", {
         id: "description",
         header: "Description",
         cell: ({ row }) => {
-          const c = row.original;
-          const label = c.description ?? c.TypeCotisation?.nom ?? (c.mois != null && c.annee != null ? `Cotisation ${MOIS_LABELS[c.mois] ?? c.mois} ${c.annee}` : "—");
+          const c = row.original ?? {};
+          const typeNom = c.TypeCotisation?.nom ?? "";
+          const estAssistance = c.TypeCotisation?.aBeneficiaire === true
+            || /assistance|décès|naissance|mariage|anniversaire/i.test(typeNom);
+          // Assistances : afficher "Type - Civilité Prénom Nom" (ex. "Assistance décès - Madame Henriette Ekote")
+          // L'API renvoie déjà ce format dans c.description ou c.descriptionWithBeneficiaire
+          let label: string;
+          if (estAssistance) {
+            const fromApi = c.descriptionWithBeneficiaire ?? c.description;
+            const isFormatTypeBeneficiaire = typeof fromApi === "string" && fromApi.includes(" - ") && fromApi.startsWith(typeNom);
+            if (isFormatTypeBeneficiaire) {
+              label = fromApi;
+            } else {
+              const b = c.AdherentBeneficiaire ?? c.CotisationDuMois?.AdherentBeneficiaire;
+              const parts = b ? [b.civility, b.firstname, b.lastname].filter(Boolean) : [];
+              label = parts.length > 0 ? `${typeNom} - ${parts.join(" ")}` : typeNom;
+            }
+          } else {
+            label = c.description ?? typeNom ?? (c.mois != null && c.annee != null ? `Cotisation ${MOIS_LABELS[c.mois] ?? c.mois} ${c.annee}` : "—");
+          }
           return <span className="text-gray-700 dark:text-gray-300" title={label}>{label}</span>;
         },
       }),
@@ -376,6 +437,81 @@ export default function AdminPaiementsPage() {
       toast.error("Erreur lors de l'enregistrement");
     } finally {
       setPayingId(null);
+    }
+  };
+
+  const getTypeObligationLabel = (type: string) => {
+    if (type === "Adhesion") return "Frais d'adhésion";
+    if (type === "Forfait") return "Forfait";
+    if (type === "Assistance") return "Assistance";
+    if (type === "Anniversaire") return "Anniversaire";
+    return type || "Obligation";
+  };
+
+  const openPayObligation = (ob: any) => {
+    setSelectedObligationForPay(ob);
+    const restant = Number(ob.montantRestant ?? 0);
+    setPayObligationForm({
+      montant: restant > 0 ? restant.toFixed(2) : "",
+      datePaiement: new Date().toISOString().split("T")[0],
+      moyenPaiement: "Especes",
+      reference: "",
+    });
+    setPayObligationJustificatifFile(null);
+    setPayObligationDialogOpen(true);
+  };
+
+  const handleSubmitPaiementObligation = async () => {
+    if (!selectedObligationForPay || !payObligationForm.montant) {
+      toast.error("Montant requis");
+      return;
+    }
+    const montant = parseFloat(payObligationForm.montant.replace(",", "."));
+    if (isNaN(montant) || montant <= 0) {
+      toast.error("Montant invalide");
+      return;
+    }
+    if (payObligationForm.moyenPaiement === "Virement" && !payObligationJustificatifFile?.size) {
+      toast.error("Un justificatif (preuve de virement) est obligatoire.");
+      return;
+    }
+    setPayingObligationId(selectedObligationForPay.id);
+    try {
+      let justificatifChemin: string | undefined;
+      if (payObligationForm.moyenPaiement === "Virement" && payObligationJustificatifFile?.size) {
+        const formData = new FormData();
+        formData.set("file", payObligationJustificatifFile);
+        const uploadRes = await uploadJustificatifPaiement(formData);
+        if (!uploadRes.success || !uploadRes.data?.chemin) {
+          toast.error(uploadRes.error ?? "Erreur lors du téléversement du justificatif.");
+          setPayingObligationId(null);
+          return;
+        }
+        justificatifChemin = uploadRes.data.chemin;
+      }
+      const result = await createPaiement({
+        adherentId: selectedObligationForPay.adherentId,
+        montant,
+        datePaiement: payObligationForm.datePaiement,
+        moyenPaiement: payObligationForm.moyenPaiement,
+        reference: payObligationForm.reference || undefined,
+        obligationCotisationId: selectedObligationForPay.id,
+        description: selectedObligationForPay.description || getTypeObligationLabel(selectedObligationForPay.type),
+        justificatifChemin,
+      });
+      if (result.success) {
+        toast.success(result.message);
+        setPayObligationDialogOpen(false);
+        setSelectedObligationForPay(null);
+        setPayObligationJustificatifFile(null);
+        loadObligations();
+      } else {
+        toast.error(result.error || "Erreur");
+      }
+    } catch (e) {
+      toast.error("Erreur lors de l'enregistrement");
+    } finally {
+      setPayingObligationId(null);
     }
   };
 
@@ -621,6 +757,72 @@ export default function AdminPaiementsPage() {
           </CardContent>
         </Card>
 
+        {/* Section Obligations à payer (frais d'adhésion, etc.) */}
+        <Card className="mx-auto max-w-screen-2xl w-full shadow-lg border-2 border-amber-200 dark:border-amber-800/50 bg-white dark:bg-gray-900 mb-6 !py-0">
+          <CardHeader className="bg-gradient-to-r from-amber-500/90 to-amber-600/90 dark:from-amber-700/50 dark:to-amber-800/50 text-white pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+            <CardTitle className="text-lg sm:text-xl font-bold text-white">
+              Obligations à payer ({(obligationsEnAttente ?? []).length})
+            </CardTitle>
+            <p className="text-sm text-amber-100 dark:text-amber-200/90 mt-1">
+              Frais d&apos;adhésion et autres obligations. Enregistrer un paiement en espèce ou rappeler à l&apos;adhérent de payer en ligne.
+            </p>
+          </CardHeader>
+          <CardContent className="pt-0 px-4 sm:px-6 pb-4">
+            {loadingObligations ? (
+              <div className="flex justify-center py-8">
+                <Loader2 className="h-8 w-8 animate-spin text-amber-600 dark:text-amber-400" />
+              </div>
+            ) : !Array.isArray(obligationsEnAttente) || obligationsEnAttente.length === 0 ? (
+              <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                Aucune obligation en attente.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="bg-amber-50 dark:bg-amber-900/20">
+                      <TableHead className="font-semibold text-xs text-left">Adhérent</TableHead>
+                      <TableHead className="font-semibold text-xs text-left">Description / Type</TableHead>
+                      <TableHead className="font-semibold text-xs text-center">Attendu</TableHead>
+                      <TableHead className="font-semibold text-xs text-center">Restant</TableHead>
+                      <TableHead className="font-semibold text-xs text-center w-[100px]">Action</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {(obligationsEnAttente ?? []).map((ob: any) => (
+                      <TableRow key={ob?.id ?? Math.random()} className="hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                        <TableCell className="text-xs text-gray-900 dark:text-gray-100 font-medium">
+                          {ob?.Adherent?.firstname} {ob?.Adherent?.lastname}
+                        </TableCell>
+                        <TableCell className="text-xs text-gray-700 dark:text-gray-300 text-left">
+                          {ob?.description?.trim() || getTypeObligationLabel(ob?.type ?? "")}
+                        </TableCell>
+                        <TableCell className="text-xs text-gray-700 dark:text-gray-300 text-center">
+                          {Number(ob?.montantAttendu ?? 0).toFixed(2)} €
+                        </TableCell>
+                        <TableCell className="text-xs font-medium text-amber-700 dark:text-amber-300 text-center">
+                          {Number(ob?.montantRestant ?? 0).toFixed(2)} €
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/30"
+                            onClick={() => openPayObligation(ob)}
+                          >
+                            <Euro className="h-3.5 w-3.5 mr-1" />
+                            Payer (espèces)
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
       {/* Dialog Paiement manuel (depuis la liste cotisations, adhérent déjà connu) */}
       <Dialog open={payDialogOpen} onOpenChange={setPayDialogOpen}>
         <DialogContent className="max-w-sm bg-white dark:bg-gray-900 border-2 border-emerald-200 dark:border-emerald-800 shadow-lg">
@@ -734,6 +936,116 @@ export default function AdminPaiementsPage() {
           </div>
         </DialogContent>
       </Dialog>
+
+        {/* Dialog Paiement obligation (frais d'adhésion, etc.) */}
+        <Dialog open={payObligationDialogOpen} onOpenChange={setPayObligationDialogOpen}>
+          <DialogContent className="max-w-sm bg-white dark:bg-gray-900 border-2 border-amber-200 dark:border-amber-800 shadow-lg">
+            <DialogHeader className="rounded-t-lg -mx-6 -mt-6 px-6 py-3 bg-amber-100 dark:bg-amber-900/40 border-b border-amber-200 dark:border-amber-800">
+              <DialogTitle className="text-base text-amber-800 dark:text-amber-100">
+                Paiement obligation (espèces / chèque / virement)
+              </DialogTitle>
+              <DialogDescription className="text-sm text-amber-700/90 dark:text-amber-200/80">
+                {selectedObligationForPay && (
+                  <> {selectedObligationForPay.Adherent?.firstname} {selectedObligationForPay.Adherent?.lastname} · {selectedObligationForPay.description?.trim() || getTypeObligationLabel(selectedObligationForPay.type)} · Reste {Number(selectedObligationForPay.montantRestant).toFixed(2)} €</>
+                )}
+              </DialogDescription>
+            </DialogHeader>
+            {dettesInitialesAdherent.length > 0 && (
+              <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/80 dark:bg-amber-950/30 p-3 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wider text-amber-800 dark:text-amber-200">Dettes initiales (adhérent)</p>
+                <ul className="text-xs space-y-1 text-amber-900 dark:text-amber-100">
+                  {dettesInitialesAdherent.map((d) => (
+                    <li key={d.id} className="flex justify-between gap-2">
+                      <span>Année {d.annee}</span>
+                      <span>Restant : <strong>{d.montantRestant.toFixed(2)} €</strong></span>
+                    </li>
+                  ))}
+                  <li className="pt-1 border-t border-amber-200 dark:border-amber-800 font-medium">
+                    Total restant : {dettesInitialesAdherent.reduce((s, d) => s + d.montantRestant, 0).toFixed(2)} €
+                  </li>
+                </ul>
+              </div>
+            )}
+            <div className="space-y-3 pt-2">
+              <div>
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Montant (€) *</Label>
+                <Input
+                  type="text"
+                  inputMode="decimal"
+                  value={payObligationForm.montant}
+                  onChange={(e) => setPayObligationForm((p) => ({ ...p, montant: e.target.value }))}
+                  placeholder="0,00"
+                  className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Date</Label>
+                <Input
+                  type="date"
+                  value={payObligationForm.datePaiement}
+                  onChange={(e) => setPayObligationForm((p) => ({ ...p, datePaiement: e.target.value }))}
+                  className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Moyen</Label>
+                <Select
+                  value={payObligationForm.moyenPaiement}
+                  onValueChange={(v: "Especes" | "Cheque" | "Virement" | "CarteBancaire") => {
+                    setPayObligationForm((p) => ({ ...p, moyenPaiement: v }));
+                    if (v !== "Virement") setPayObligationJustificatifFile(null);
+                  }}
+                >
+                  <SelectTrigger className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="Especes">Espèces</SelectItem>
+                    <SelectItem value="Cheque">Chèque</SelectItem>
+                    <SelectItem value="Virement">Virement</SelectItem>
+                    <SelectItem value="CarteBancaire">Carte bancaire</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div>
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Référence</Label>
+                <Input
+                  value={payObligationForm.reference}
+                  onChange={(e) => setPayObligationForm((p) => ({ ...p, reference: e.target.value }))}
+                  placeholder="N° chèque, virement..."
+                  className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              {payObligationForm.moyenPaiement === "Virement" && (
+                <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30 p-3 space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Upload className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
+                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300">Justificatif (preuve de virement) *</Label>
+                  </div>
+                  <Input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,application/pdf,image/jpeg,image/png,image/gif,image/webp"
+                    onChange={(e) => setPayObligationJustificatifFile(e.target.files?.[0] ?? null)}
+                    className="mt-1 bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                  />
+                  <p className="text-xs text-gray-500 dark:text-gray-400">PDF, JPG, PNG, GIF ou WEBP — max 10 Mo</p>
+                </div>
+              )}
+              <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 dark:border-gray-800">
+                <Button variant="outline" onClick={() => setPayObligationDialogOpen(false)} className="text-gray-700 dark:text-gray-300 border-gray-300 dark:border-gray-600">
+                  Annuler
+                </Button>
+                <Button
+                  onClick={handleSubmitPaiementObligation}
+                  disabled={payingObligationId !== null || (payObligationForm.moyenPaiement === "Virement" && !payObligationJustificatifFile?.size)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white shadow-sm"
+                >
+                  {payingObligationId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enregistrer"}
+                </Button>
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
 
         {/* Dialog Voir les détails (cotisation) */}
         <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>

@@ -192,6 +192,7 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
                     AdherentBeneficiaire: {
                       select: {
                         id: true,
+                        civility: true,
                         firstname: true,
                         lastname: true
                       }
@@ -281,7 +282,7 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
 
     // Fallback : pour les cotisations assistance sans AdherentBeneficiaire (ex. cotisationDuMoisId non renseigné),
     // récupérer le bénéficiaire depuis CotisationDuMois (periode + typeCotisationId)
-    let cdmBeneficiairesByPeriodeType: Map<string, { id: string; firstname: string; lastname: string }> = new Map();
+    let cdmBeneficiairesByPeriodeType: Map<string, { id: string; civility: string | null; firstname: string; lastname: string }> = new Map();
     if (user.adherent && !isAdmin && user.adherent.CotisationsMensuelles?.length) {
       const periodesTypes = new Set<string>();
       user.adherent.CotisationsMensuelles.forEach((cot: any) => {
@@ -300,7 +301,7 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
           },
           include: {
             AdherentBeneficiaire: {
-              select: { id: true, firstname: true, lastname: true },
+              select: { id: true, civility: true, firstname: true, lastname: true },
             },
           },
         });
@@ -308,6 +309,7 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
           if (cdm.AdherentBeneficiaire) {
             cdmBeneficiairesByPeriodeType.set(`${cdm.periode}|${cdm.typeCotisationId}`, {
               id: cdm.AdherentBeneficiaire.id,
+              civility: cdm.AdherentBeneficiaire.civility ?? null,
               firstname: cdm.AdherentBeneficiaire.firstname ?? "",
               lastname: cdm.AdherentBeneficiaire.lastname ?? "",
             });
@@ -339,42 +341,53 @@ export async function getUserData(): Promise<{ success: boolean; user?: any; err
           montantPaye: Number(dette.montantPaye),
           montantRestant: Number(dette.montantRestant)
         })) || []),
-        CotisationsMensuelles: isAdmin ? [] : (user.adherent.CotisationsMensuelles?.map((cot: any) => {
-          const cotisationDuMois = cot.CotisationDuMois;
-          const benefFromCdm = cotisationDuMois?.AdherentBeneficiaire;
-          const benefFallback = cot.TypeCotisation?.aBeneficiaire && cot.periode && cot.typeCotisationId
-            ? cdmBeneficiairesByPeriodeType.get(`${cot.periode}|${cot.typeCotisationId}`)
-            : undefined;
-          const adherentBeneficiaire = benefFromCdm
-            ? { id: benefFromCdm.id, firstname: benefFromCdm.firstname, lastname: benefFromCdm.lastname }
-            : benefFallback
-              ? { id: benefFallback.id, firstname: benefFallback.firstname, lastname: benefFallback.lastname }
-              : null;
-          return {
-          ...cot,
-          montantAttendu: Number(cot.montantAttendu),
-          montantPaye: Number(cot.montantPaye),
-          montantRestant: Number(cot.montantRestant),
-          TypeCotisation: cot.TypeCotisation ? {
-            ...cot.TypeCotisation,
-            montant: Number(cot.TypeCotisation.montant)
-          } : null,
-          CotisationDuMois: cotisationDuMois ? {
-            ...cotisationDuMois,
-            montantBase: Number(cotisationDuMois.montantBase),
-            AdherentBeneficiaire: adherentBeneficiaire
-          } : (adherentBeneficiaire ? { periode: cot.periode, typeCotisationId: cot.typeCotisationId, montantBase: 0, AdherentBeneficiaire: adherentBeneficiaire } : null),
-          Paiements: cot.Paiements?.map((paiement: any) => ({
-            ...paiement,
-            montant: Number(paiement.montant),
-            CreatedBy: paiement.CreatedBy ? {
-              id: paiement.CreatedBy.id,
-              name: paiement.CreatedBy.name,
-              email: paiement.CreatedBy.email
-            } : null
-          })) || []
-        };
-        }) || []),
+        CotisationsMensuelles: isAdmin ? [] : (user.adherent.CotisationsMensuelles
+          ?.filter((cot: any) => {
+            // FILTRE CRITIQUE : Exclure les lignes où l'adhérent payeur est le bénéficiaire (il ne doit pas payer son assistance)
+            const adherentBeneficiaireId = cot.adherentBeneficiaireId ?? cot.CotisationDuMois?.adherentBeneficiaireId;
+            const typeNom = cot.TypeCotisation?.nom ?? '';
+            const estAssistance = cot.TypeCotisation?.aBeneficiaire === true || (typeNom && String(typeNom).toLowerCase().includes('assistance'));
+            if (estAssistance && adherentBeneficiaireId && cot.adherentId === adherentBeneficiaireId) {
+              return false; // Exclure cette ligne
+            }
+            return true;
+          })
+          ?.map((cot: any) => {
+            const cotisationDuMois = cot.CotisationDuMois;
+            const benefFromCdm = cotisationDuMois?.AdherentBeneficiaire;
+            const benefFallback = cot.TypeCotisation?.aBeneficiaire && cot.periode && cot.typeCotisationId
+              ? cdmBeneficiairesByPeriodeType.get(`${cot.periode}|${cot.typeCotisationId}`)
+              : undefined;
+            const adherentBeneficiaire = benefFromCdm
+              ? { id: benefFromCdm.id, civility: benefFromCdm.civility ?? null, firstname: benefFromCdm.firstname, lastname: benefFromCdm.lastname }
+              : benefFallback
+                ? { id: benefFallback.id, civility: benefFallback.civility ?? null, firstname: benefFallback.firstname, lastname: benefFallback.lastname }
+                : null;
+            return {
+            ...cot,
+            montantAttendu: Number(cot.montantAttendu),
+            montantPaye: Number(cot.montantPaye),
+            montantRestant: Number(cot.montantRestant),
+            TypeCotisation: cot.TypeCotisation ? {
+              ...cot.TypeCotisation,
+              montant: Number(cot.TypeCotisation.montant)
+            } : null,
+            CotisationDuMois: cotisationDuMois ? {
+              ...cotisationDuMois,
+              montantBase: Number(cotisationDuMois.montantBase),
+              AdherentBeneficiaire: adherentBeneficiaire
+            } : (adherentBeneficiaire ? { periode: cot.periode, typeCotisationId: cot.typeCotisationId, montantBase: 0, AdherentBeneficiaire: adherentBeneficiaire } : null),
+            Paiements: cot.Paiements?.map((paiement: any) => ({
+              ...paiement,
+              montant: Number(paiement.montant),
+              CreatedBy: paiement.CreatedBy ? {
+                id: paiement.CreatedBy.id,
+                name: paiement.CreatedBy.name,
+                email: paiement.CreatedBy.email
+              } : null
+            })) || []
+          };
+          }) || []),
         // Remplacer les assistances par TOUTES les assistances de l'année (pour vues mois / année / toutes)
         // SAUF si c'est un admin (il ne paie rien)
         Assistances: isAdmin ? [] : (toutesAssistancesAnnee.map((ass: any) => ({
@@ -561,6 +574,7 @@ export async function getUserDataForAdminView(
                     AdherentBeneficiaire: {
                       select: {
                         id: true,
+                        civility: true,
                         firstname: true,
                         lastname: true,
                       },
@@ -640,7 +654,7 @@ export async function getUserDataForAdminView(
             },
           });
 
-    let cdmBeneficiairesByPeriodeType: Map<string, { id: string; firstname: string; lastname: string }> = new Map();
+    let cdmBeneficiairesByPeriodeType: Map<string, { id: string; civility: string | null; firstname: string; lastname: string }> = new Map();
     if (user.adherent && !isAdmin && (user.adherent as any).CotisationsMensuelles?.length) {
       const periodesTypes = new Set<string>();
       (user.adherent as any).CotisationsMensuelles.forEach((cot: any) => {
@@ -659,7 +673,7 @@ export async function getUserDataForAdminView(
           },
           include: {
             AdherentBeneficiaire: {
-              select: { id: true, firstname: true, lastname: true },
+              select: { id: true, civility: true, firstname: true, lastname: true },
             },
           },
         });
@@ -667,6 +681,7 @@ export async function getUserDataForAdminView(
           if (cdm.AdherentBeneficiaire) {
             cdmBeneficiairesByPeriodeType.set(`${cdm.periode}|${cdm.typeCotisationId}`, {
               id: cdm.AdherentBeneficiaire.id,
+              civility: cdm.AdherentBeneficiaire.civility ?? null,
               firstname: cdm.AdherentBeneficiaire.firstname ?? "",
               lastname: cdm.AdherentBeneficiaire.lastname ?? "",
             });
@@ -704,65 +719,78 @@ export async function getUserDataForAdminView(
                 })) ?? []),
             CotisationsMensuelles: isAdmin
               ? []
-              : ((user.adherent as any).CotisationsMensuelles?.map((cot: any) => {
-                  const cotisationDuMois = cot.CotisationDuMois;
-                  const benefFromCdm = cotisationDuMois?.AdherentBeneficiaire;
-                  const benefFallback =
-                    cot.TypeCotisation?.aBeneficiaire && cot.periode && cot.typeCotisationId
-                      ? cdmBeneficiairesByPeriodeType.get(`${cot.periode}|${cot.typeCotisationId}`)
-                      : undefined;
-                  const adherentBeneficiaire = benefFromCdm
-                    ? {
-                        id: benefFromCdm.id,
-                        firstname: benefFromCdm.firstname,
-                        lastname: benefFromCdm.lastname,
-                      }
-                    : benefFallback
+              : ((user.adherent as any).CotisationsMensuelles
+                  ?.filter((cot: any) => {
+                    // FILTRE CRITIQUE : Exclure les lignes où l'adhérent payeur est le bénéficiaire (il ne doit pas payer son assistance)
+                    const adherentBeneficiaireId = cot.adherentBeneficiaireId ?? cot.CotisationDuMois?.adherentBeneficiaireId;
+                    const typeNom = cot.TypeCotisation?.nom ?? '';
+                    const estAssistance = cot.TypeCotisation?.aBeneficiaire === true || (typeNom && String(typeNom).toLowerCase().includes('assistance'));
+                    if (estAssistance && adherentBeneficiaireId && cot.adherentId === adherentBeneficiaireId) {
+                      return false; // Exclure cette ligne
+                    }
+                    return true;
+                  })
+                  ?.map((cot: any) => {
+                    const cotisationDuMois = cot.CotisationDuMois;
+                    const benefFromCdm = cotisationDuMois?.AdherentBeneficiaire;
+                    const benefFallback =
+                      cot.TypeCotisation?.aBeneficiaire && cot.periode && cot.typeCotisationId
+                        ? cdmBeneficiairesByPeriodeType.get(`${cot.periode}|${cot.typeCotisationId}`)
+                        : undefined;
+                    const adherentBeneficiaire = benefFromCdm
                       ? {
-                          id: benefFallback.id,
-                          firstname: benefFallback.firstname,
-                          lastname: benefFallback.lastname,
+                          id: benefFromCdm.id,
+                          civility: benefFromCdm.civility ?? null,
+                          firstname: benefFromCdm.firstname,
+                          lastname: benefFromCdm.lastname,
                         }
-                      : null;
-                  return {
-                    ...cot,
-                    montantAttendu: Number(cot.montantAttendu),
-                    montantPaye: Number(cot.montantPaye),
-                    montantRestant: Number(cot.montantRestant),
-                    TypeCotisation: cot.TypeCotisation
-                      ? {
-                          ...cot.TypeCotisation,
-                          montant: Number(cot.TypeCotisation.montant),
-                        }
-                      : null,
-                    CotisationDuMois: cotisationDuMois
-                      ? {
-                          ...cotisationDuMois,
-                          montantBase: Number(cotisationDuMois.montantBase),
-                          AdherentBeneficiaire: adherentBeneficiaire,
-                        }
-                      : adherentBeneficiaire
+                      : benefFallback
                         ? {
-                            periode: cot.periode,
-                            typeCotisationId: cot.typeCotisationId,
-                            montantBase: 0,
-                            AdherentBeneficiaire: adherentBeneficiaire,
+                            id: benefFallback.id,
+                            civility: benefFallback.civility ?? null,
+                            firstname: benefFallback.firstname,
+                            lastname: benefFallback.lastname,
+                          }
+                        : null;
+                    return {
+                      ...cot,
+                      montantAttendu: Number(cot.montantAttendu),
+                      montantPaye: Number(cot.montantPaye),
+                      montantRestant: Number(cot.montantRestant),
+                      TypeCotisation: cot.TypeCotisation
+                        ? {
+                            ...cot.TypeCotisation,
+                            montant: Number(cot.TypeCotisation.montant),
                           }
                         : null,
-                    Paiements:
-                      cot.Paiements?.map((paiement: any) => ({
-                        ...paiement,
-                        montant: Number(paiement.montant),
-                        CreatedBy: paiement.CreatedBy
+                      CotisationDuMois: cotisationDuMois
+                        ? {
+                            ...cotisationDuMois,
+                            montantBase: Number(cotisationDuMois.montantBase),
+                            AdherentBeneficiaire: adherentBeneficiaire,
+                          }
+                        : adherentBeneficiaire
                           ? {
-                              id: paiement.CreatedBy.id,
-                              name: paiement.CreatedBy.name,
-                              email: paiement.CreatedBy.email,
+                              periode: cot.periode,
+                              typeCotisationId: cot.typeCotisationId,
+                              montantBase: 0,
+                              AdherentBeneficiaire: adherentBeneficiaire,
                             }
                           : null,
-                      })) ?? [],
-                  };
-                }) ?? []),
+                      Paiements:
+                        cot.Paiements?.map((paiement: any) => ({
+                          ...paiement,
+                          montant: Number(paiement.montant),
+                          CreatedBy: paiement.CreatedBy
+                            ? {
+                                id: paiement.CreatedBy.id,
+                                name: paiement.CreatedBy.name,
+                                email: paiement.CreatedBy.email,
+                              }
+                            : null,
+                        })) ?? [],
+                    };
+                  }) ?? []),
             Assistances: isAdmin
               ? []
               : (toutesAssistancesAnnee.map((ass: any) => ({

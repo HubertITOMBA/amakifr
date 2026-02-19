@@ -476,9 +476,19 @@ function HistoriqueCotisationsTable({ cotisations }: { cotisations: HistoriqueCo
         id: 'description',
         header: 'Description',
         cell: ({ row }) => {
-          const desc = (row.original as any).description;
-          const typeNom = (row.original as any).TypeCotisation?.nom;
-          const label = desc || typeNom || '—';
+          const o = row.original as any;
+          const desc = o.description;
+          const typeNom = o.TypeCotisation?.nom;
+          const estAssistance = o.TypeCotisation?.aBeneficiaire === true || (typeNom && String(typeNom).toLowerCase().includes('assistance'));
+          const benef = o.AdherentBeneficiaire ?? o.CotisationDuMois?.AdherentBeneficiaire;
+          // Même formule que /admin/finances/paiements : "Type - civilité Prénom Nom"
+          let label: string;
+          if (estAssistance && benef) {
+            const parts = [benef.civility, benef.firstname, benef.lastname].filter(Boolean);
+            label = parts.length > 0 ? `${typeNom ?? ''} - ${parts.join(' ')}` : (desc || typeNom || '—');
+          } else {
+            label = desc || typeNom || '—';
+          }
           return (
             <span className="text-xs text-gray-700 dark:text-gray-300" title={label}>
               {label}
@@ -573,9 +583,9 @@ function HistoriqueCotisationsTable({ cotisations }: { cotisations: HistoriqueCo
   });
 
   return (
-    <div className="overflow-x-auto -mx-4 sm:mx-0">
-      <div className="inline-block min-w-full align-middle px-4 sm:px-0">
-        <Table className="min-w-[640px]">
+    <div className="w-full overflow-x-auto">
+      <div className="min-w-full align-middle">
+        <Table className="min-w-[640px] w-full">
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id} className="bg-indigo-50 dark:bg-indigo-900/20">
@@ -673,7 +683,7 @@ function CotisationsMoisTable({
   vueCotisations?: 'mois' | 'annee' | 'toutes';
 }) {
   const router = useRouter();
-  const [sorting, setSorting] = useState<SortingState>([{ id: 'type', desc: false }]);
+  const [sorting, setSorting] = useState<SortingState>([{ id: 'description', desc: false }]);
   const { userProfile, loading: profileLoading } = useUserProfile();
 
   const labelTotal =
@@ -696,26 +706,19 @@ function CotisationsMoisTable({
 
   const columns = useMemo<ColumnDef<CotisationMois>[]>(
     () => [
-      columnHelper.accessor('type', {
-        header: 'Type',
-        cell: ({ row }) => (
-          <div className="flex items-center gap-2">
-            {row.original.isCotisationMensuelle ? (
-              <Receipt className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-blue-600 dark:text-blue-400 flex-shrink-0" />
-            ) : (
-              <Heart className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-purple-600 dark:text-purple-400 flex-shrink-0" />
-            )}
-            <span className="font-medium text-xs sm:text-sm text-gray-900 dark:text-white">{row.getValue('type')}</span>
-          </div>
-        ),
-      }),
       columnHelper.accessor('description', {
         header: 'Description',
         cell: ({ row }) => {
           const description = row.getValue('description') as string | undefined;
+          const isCotisationMensuelle = row.original.isCotisationMensuelle;
+          const Icon = isCotisationMensuelle ? Receipt : Heart;
+          const iconClass = isCotisationMensuelle
+            ? 'text-blue-600 dark:text-blue-400'
+            : 'text-purple-600 dark:text-purple-400';
           return (
-            <div className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-left">
-              {description || '-'}
+            <div className="flex items-center gap-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400 text-left">
+              <Icon className={`h-3.5 w-3.5 sm:h-4 sm:w-4 shrink-0 ${iconClass}`} />
+              <span>{description || '-'}</span>
             </div>
           );
         },
@@ -1072,6 +1075,12 @@ function UserProfilePageContent() {
   const [editingEnfant, setEditingEnfant] = useState<any>(null);
   const [enfantFormData, setEnfantFormData] = useState({ prenom: '', dateNaissance: '', age: undefined as number | undefined });
 
+  const handlePrintHistoriqueCotisations = () => {
+    if (typeof window === 'undefined') return;
+    // Impression navigateur (l'utilisateur peut "Enregistrer en PDF")
+    window.print();
+  };
+
   // Cotisations affichées selon le mode : un mois / une année / toutes
   const cotisationsMoisAffichage = useMemo(() => {
     if (activeSection !== 'cotisations' || !effectiveProfile?.adherent || (displayUser as any)?.role === 'ADMIN') {
@@ -1086,9 +1095,18 @@ function UserProfilePageContent() {
 
     function buildItemsForMonth(annee: number, mois: number): any[] {
       // Une ligne par cotisation_mensuelle (forfait + assistances à payer) — aligné sur l'admin cotisations_du_mois
-      const cotisationsDuMois = cotisationsMensuelles.filter((cm: any) =>
-        Number(cm.mois) === mois && Number(cm.annee) === annee
-      );
+      const cotisationsDuMois = cotisationsMensuelles.filter((cm: any) => {
+        const matchPeriode = Number(cm.mois) === mois && Number(cm.annee) === annee;
+        if (!matchPeriode) return false;
+        // FILTRE CRITIQUE : Exclure les lignes où l'adhérent payeur est le bénéficiaire (il ne doit pas payer son assistance)
+        const adherentBeneficiaireId = cm.adherentBeneficiaireId ?? cm.CotisationDuMois?.adherentBeneficiaireId;
+        const typeNom = cm.TypeCotisation?.nom ?? '';
+        const estAssistance = cm.TypeCotisation?.aBeneficiaire === true || (typeNom && String(typeNom).toLowerCase().includes('assistance'));
+        if (estAssistance && adherentBeneficiaireId && cm.adherentId === adherentBeneficiaireId) {
+          return false; // Exclure cette ligne
+        }
+        return true;
+      });
       const items: any[] = [];
 
       cotisationsDuMois.forEach((cm: any) => {
@@ -1096,18 +1114,20 @@ function UserProfilePageContent() {
         const montantPaye = Number(cm.montantPaye);
         const montantRestant = Number(cm.montantRestant);
         const typeNom = cm.TypeCotisation?.nom ?? 'Cotisation';
-        const isForfait = !cm.TypeCotisation?.aBeneficiaire;
-        const benef = cm.CotisationDuMois?.AdherentBeneficiaire;
-        const nomBeneficiaire = benef
-          ? [benef.firstname, benef.lastname].filter(Boolean).join(' ').trim()
-          : '';
-        // Pour les assistances : afficher le bénéficiaire (depuis CotisationDuMois ou depuis la description stockée)
-        const descriptionAssistance = nomBeneficiaire
-          ? `${typeNom} — bénéficiaire : ${nomBeneficiaire}`
-          : (cm.description && typeof cm.description === 'string' && cm.description.includes(' pour ')
+        // Forfait uniquement si type sans bénéficiaire ET nom du type ne contient pas "Assistance" (cohérence Type / Description)
+        const estAssistance = cm.TypeCotisation?.aBeneficiaire === true || (typeNom && String(typeNom).toLowerCase().includes('assistance'));
+        const isForfait = !estAssistance;
+        const benef = cm.AdherentBeneficiaire ?? cm.CotisationDuMois?.AdherentBeneficiaire;
+        // Même formule que /admin/finances/paiements : "Type - civilité Prénom Nom"
+        const partsBenef = benef ? [benef.civility, benef.firstname, benef.lastname].filter(Boolean) : [];
+        const descriptionAssistance = partsBenef.length > 0
+          ? `${typeNom} - ${partsBenef.join(' ')}`
+          : (cm.description && typeof cm.description === 'string' && cm.description.includes(' - ')
               ? cm.description
               : typeNom);
-        const description = cm.description || (isForfait ? 'Cotisation mensuelle forfaitaire' : descriptionAssistance);
+        const description = (cm.description && typeof cm.description === 'string' && cm.description.includes(' - '))
+          ? cm.description
+          : (isForfait ? 'Cotisation mensuelle forfaitaire' : descriptionAssistance);
         items.push({
           id: `cotisation-${cm.id}`,
           type: typeNom,
@@ -2344,6 +2364,79 @@ function UserProfilePageContent() {
               </Card>
             )}
 
+            {/* Frais d'adhésion et autres obligations à payer (virement / carte) */}
+            {(() => {
+              const obligationsAPayer = (obligationsCotisation || []).filter(
+                (ob: any) => Number(ob.montantRestant ?? 0) > 0
+              );
+              if (obligationsAPayer.length === 0) return null;
+              const adherentId = (effectiveProfile?.adherent as any)?.id;
+              return (
+                <Card className="border-amber-200 dark:border-amber-800 bg-white dark:bg-gray-900 !py-0">
+                  <CardHeader className="bg-gradient-to-r from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-700 text-white pb-3 pt-3 px-6 gap-0">
+                    <CardTitle className="flex items-center gap-2 text-base">
+                      <CreditCard className="h-4 w-4" />
+                      Frais d&apos;adhésion et obligations à payer
+                    </CardTitle>
+                    <CardDescription className="text-amber-100 dark:text-amber-200 mt-1 text-xs">
+                      Payez par virement ou carte bancaire
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent className="pt-3 pb-4 px-6">
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow className="bg-amber-50 dark:bg-amber-900/20">
+                            <TableHead className="font-semibold text-xs text-left">Description</TableHead>
+                            <TableHead className="font-semibold text-xs text-center">Montant attendu</TableHead>
+                            <TableHead className="font-semibold text-xs text-center">Restant</TableHead>
+                            <TableHead className="font-semibold text-xs text-center w-[100px]">Action</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {obligationsAPayer.map((ob: any) => {
+                            const restant = Number(ob.montantRestant ?? 0);
+                            const label = ob.description?.trim() || getTypeCotisationLabel(ob.type ?? "");
+                            return (
+                              <TableRow key={ob.id} className="hover:bg-amber-50 dark:hover:bg-amber-900/20">
+                                <TableCell className="text-xs text-gray-700 dark:text-gray-300 text-left">
+                                  {label}
+                                </TableCell>
+                                <TableCell className="text-xs text-gray-700 dark:text-gray-300 text-center">
+                                  {Number(ob.montantAttendu ?? 0).toFixed(2).replace(".", ",")} €
+                                </TableCell>
+                                <TableCell className="text-xs font-medium text-amber-700 dark:text-amber-300 text-center">
+                                  {restant.toFixed(2).replace(".", ",")} €
+                                </TableCell>
+                                <TableCell className="text-center">
+                                  {!isViewAsMode && adherentId ? (
+                                    <Button
+                                      size="sm"
+                                      className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs px-2"
+                                      onClick={() =>
+                                        router.push(
+                                          `/paiement?adherentId=${adherentId}&montant=${restant}&type=obligation&id=${ob.id}`
+                                        )
+                                      }
+                                    >
+                                      <Euro className="h-3 w-3 mr-1" />
+                                      Payer
+                                    </Button>
+                                  ) : (
+                                    <span className="text-xs text-gray-500">—</span>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })()}
+
             {/* Sélecteur : Un mois / Une année / Toutes */}
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Afficher :</span>
@@ -2435,19 +2528,6 @@ function UserProfilePageContent() {
                   </Button>
                 </>
               )}
-            </div>
-
-            {/* Bouton ouvrant le dialog Simulation versement assistance */}
-            <div className="mb-4">
-              <Button
-                type="button"
-                variant="outline"
-                className="border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30"
-                onClick={() => setSimulationDialogOpen(true)}
-              >
-                <HandHeart className="h-4 w-4 mr-2" />
-                Simulation versement assistance
-              </Button>
             </div>
 
             <Dialog open={simulationDialogOpen} onOpenChange={setSimulationDialogOpen}>
@@ -2572,70 +2652,43 @@ function UserProfilePageContent() {
               );
             })()}
 
-            {/* Historique des cotisations par mois (toujours affiché) */}
-            {historiqueCotisations.length > 0 && (
-              <Card className="border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-900 !py-0">
-                <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white pb-3 pt-3 px-6 gap-0">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <History className="h-4 w-4" />
-                    Historique des Cotisations par Mois
-                  </CardTitle>
-                  <CardDescription className="text-indigo-100 dark:text-indigo-200 mt-1 text-xs">
-                    Détail de vos cotisations mensuelles et paiements effectués
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-3 pb-4 px-6">
-                  <div className="flex flex-wrap items-center gap-2 mb-4">
-                    <Label className="text-sm font-medium text-gray-700 dark:text-gray-300 whitespace-nowrap">Période</Label>
-                    <Popover open={historiqueCalendarOpen} onOpenChange={setHistoriqueCalendarOpen}>
-                      <PopoverTrigger asChild>
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          className="h-8 w-[200px] justify-start text-left font-normal bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
-                        >
-                          <CalendarDays className="mr-2 h-4 w-4" />
-                          {historiqueFilterMois === 'all' || historiqueFilterAnnee === 'all'
-                            ? 'Tous les mois et années'
-                            : format(new Date(Number(historiqueFilterAnnee), Number(historiqueFilterMois) - 1, 1), "MMMM yyyy", { locale: fr }).replace(/^\w/, (c) => c.toUpperCase())}
-                        </Button>
-                      </PopoverTrigger>
-                      <PopoverContent className="w-auto p-0 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700" align="start">
-                        <CalendarUI
-                          mode="single"
-                          selected={historiqueFilterMois !== 'all' && historiqueFilterAnnee !== 'all'
-                            ? new Date(Number(historiqueFilterAnnee), Number(historiqueFilterMois) - 1, 1)
-                            : undefined}
-                          onSelect={(date) => {
-                            if (date) {
-                              setHistoriqueFilterMois(String(date.getMonth() + 1));
-                              setHistoriqueFilterAnnee(String(date.getFullYear()));
-                              setHistoriqueCalendarOpen(false);
-                            }
-                          }}
-                          defaultMonth={historiqueFilterMois !== 'all' && historiqueFilterAnnee !== 'all'
-                            ? new Date(Number(historiqueFilterAnnee), Number(historiqueFilterMois) - 1, 1)
-                            : new Date()}
-                          locale={fr}
-                        />
-                      </PopoverContent>
-                    </Popover>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="h-8 text-xs text-indigo-600 dark:text-indigo-400"
-                      onClick={() => {
-                        setHistoriqueFilterMois('all');
-                        setHistoriqueFilterAnnee('all');
-                      }}
-                    >
-                      Voir tout
+            {/* Historique des cotisations par mois : page dédiée (lien) */}
+            <Card className="border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-900 !py-0">
+              <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white pb-3 pt-3 px-6 gap-0">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <History className="h-4 w-4" />
+                  Historique des Cotisations par Mois
+                </CardTitle>
+                <CardDescription className="text-indigo-100 dark:text-indigo-200 mt-1 text-xs">
+                  Consultez l&apos;historique détaillé et imprimez en PDF si besoin
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="pt-3 pb-4 px-6">
+                <div className="flex flex-wrap items-center gap-2">
+                  <Link
+                    href={
+                      isViewAsMode && viewAsUserId
+                        ? `/user/profile/historique-cotisations?viewAs=${viewAsUserId}`
+                        : "/user/profile/historique-cotisations"
+                    }
+                  >
+                    <Button variant="outline" className="border-indigo-300 dark:border-indigo-700">
+                      <Eye className="h-4 w-4 mr-2" />
+                      Voir l&apos;historique
                     </Button>
-                  </div>
-                  <HistoriqueCotisationsTable cotisations={filteredHistoriqueCotisations} />
-                </CardContent>
-              </Card>
-            )}
+                  </Link>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30"
+                    onClick={() => setSimulationDialogOpen(true)}
+                  >
+                    <HandHeart className="h-4 w-4 mr-2" />
+                    Simulation versement assistance
+                  </Button>
+                </div>
+              </CardContent>
+            </Card>
           </div>
         );
 
@@ -5442,7 +5495,7 @@ function UserProfilePageContent() {
             variant="outline"
             size="sm"
             className="bg-white/90 border-amber-700 text-amber-900 hover:bg-white shrink-0"
-            onClick={() => router.push("/user/profile")}
+            onClick={() => router.push("/admin")}
           >
             Quitter la vue adhérent
           </Button>

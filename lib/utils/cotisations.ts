@@ -35,14 +35,15 @@ export function libelleCivilite(civility: string | null | undefined): string {
 }
 
 /**
- * Construit la description d'une ligne de cotisation mensuelle (colonne description).
- * Pour une assistance avec bénéficiaire : "Type (Civilite Prénom Nom)".
- * Sinon : "Type (montant€)".
+ * Construit la description d'une ligne de cotisation mensuelle (colonne Description).
+ * Formule (équivalent SQL) : nom || ' - ' || civility || ' ' || firstname || ' ' || lastname
+ * - Assistance avec bénéficiaire : "Type - civilité Prénom Nom" (ex. "Assistance décès - Monsieur Jean Dupont").
+ * - Autres (forfait, etc.) : uniquement le nom du type (sans montant).
  */
 export function buildDescriptionLigne(
   typeNom: string,
   aBeneficiaire: boolean,
-  montantBase: number,
+  _montantBase: number,
   adherentBeneficiaire?: { civility?: string | null; firstname: string; lastname: string } | null
 ): string {
   if (aBeneficiaire && adherentBeneficiaire) {
@@ -52,10 +53,10 @@ export function buildDescriptionLigne(
       adherentBeneficiaire.lastname,
     ].filter(Boolean);
     if (parts.length > 0) {
-      return `${typeNom} (${parts.join(" ")})`;
+      return `${typeNom} - ${parts.join(" ")}`;
     }
   }
-  return `${typeNom} (${montantBase.toFixed(2)}€)`;
+  return typeNom;
 }
 
 /**

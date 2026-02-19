@@ -543,7 +543,7 @@ export default function AmicalePage() {
                 Téléphone
               </h3>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mb-3 sm:mb-4">
-                +33 7 58 43 47 58
+                +33 7 58 43 47 28
               </p>
               <Button variant="outline" className="w-full text-xs sm:text-sm">
                 <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />

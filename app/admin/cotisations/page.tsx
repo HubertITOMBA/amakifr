@@ -428,24 +428,77 @@ export default function AdminCotisationCreation() {
         )}
       </form>
 
-      {/* Dialog : choix du mois à affecter (calendrier) */}
+      {/* Dialog : choix du mois à affecter (calendrier + sélecteurs) */}
       <Dialog open={showAffecterDialog} onOpenChange={setShowAffecterDialog}>
         <DialogContent className="max-w-sm sm:max-w-md border-2 border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30">
           <DialogHeader className="pb-2">
             <DialogTitle className="text-blue-800 dark:text-blue-200">Choisir le mois à affecter</DialogTitle>
             <DialogDescription className="text-blue-700 dark:text-blue-300">
-              Sélectionnez une date dans le calendrier pour choisir le mois et l&apos;année. Les cotisations mensuelles seront créées pour tous les adhérents actifs sur cette période.
+              Sélectionnez le mois et l&apos;année pour créer les cotisations mensuelles pour tous les adhérents actifs sur cette période.
             </DialogDescription>
           </DialogHeader>
-          <div className="flex justify-center py-2 rounded-lg bg-white/80 dark:bg-gray-900/80 p-2">
-            <CalendarUI
-              mode="single"
-              selected={affecterDate}
-              onSelect={(date) => date && setAffecterDate(date)}
-              defaultMonth={affecterDate}
-              locale={fr}
-              className="rounded-md border border-blue-200 dark:border-blue-800"
-            />
+          <div className="space-y-4">
+            {/* Sélecteurs de mois et année */}
+            <div className="flex gap-3 items-center justify-center">
+              <div className="flex-1">
+                <Label className="text-xs text-blue-700 dark:text-blue-300 mb-1.5 block">Mois</Label>
+                <Select
+                  value={affecterDate.getMonth() + 1 + ""}
+                  onValueChange={(value) => {
+                    const newDate = new Date(affecterDate);
+                    newDate.setMonth(parseInt(value) - 1);
+                    setAffecterDate(newDate);
+                  }}
+                >
+                  <SelectTrigger className="bg-white dark:bg-gray-900 border-blue-200 dark:border-blue-800">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {moisOptions.map((mois) => (
+                      <SelectItem key={mois.value} value={mois.value + ""}>
+                        {mois.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="flex-1">
+                <Label className="text-xs text-blue-700 dark:text-blue-300 mb-1.5 block">Année</Label>
+                <Select
+                  value={affecterDate.getFullYear() + ""}
+                  onValueChange={(value) => {
+                    const newDate = new Date(affecterDate);
+                    newDate.setFullYear(parseInt(value));
+                    setAffecterDate(newDate);
+                  }}
+                >
+                  <SelectTrigger className="bg-white dark:bg-gray-900 border-blue-200 dark:border-blue-800">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {Array.from({ length: 5 }, (_, i) => {
+                      const year = new Date().getFullYear() - 1 + i;
+                      return (
+                        <SelectItem key={year} value={year + ""}>
+                          {year}
+                        </SelectItem>
+                      );
+                    })}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+            {/* Calendrier (optionnel, pour visualisation) */}
+            <div className="flex justify-center py-2 rounded-lg bg-white/80 dark:bg-gray-900/80 p-2">
+              <CalendarUI
+                mode="single"
+                selected={affecterDate}
+                onSelect={(date) => date && setAffecterDate(date)}
+                defaultMonth={affecterDate}
+                locale={fr}
+                className="rounded-md border border-blue-200 dark:border-blue-800"
+              />
+            </div>
           </div>
           <p className="text-sm text-blue-800 dark:text-blue-200 text-center font-medium">
             Période sélectionnée : <strong>{moisOptions.find((m) => m.value === affecterDate.getMonth() + 1)?.label} {affecterDate.getFullYear()}</strong>

@@ -98,6 +98,29 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
+    keywords: ['virement', 'payer par virement', 'effectuer un virement', 'justificatif virement', 'preuve de virement', 'preuve virement', 'joindre justificatif', 'ajouter justificatif', 'téléverser justificatif', 'justificatif paiement', 'preuve paiement', 'capture virement', 'reçu virement'],
+    title: 'Comment effectuer un virement et ajouter un justificatif',
+    steps: [
+      'Allez dans "Mon Profil" > "Mes Cotisations"',
+      'Cliquez sur le bouton "Payer" à côté de la cotisation ou de la dette à régler',
+      'Choisissez le moyen de paiement "Virement"',
+      'Vous serez redirigé vers la page de paiement par virement',
+      'Saisissez le montant que vous souhaitez payer (vous pouvez ajuster si besoin)',
+      '📎 Ajout du justificatif (obligatoire) :',
+      '  • Cliquez sur "Parcourir" ou "Joindre un justificatif"',
+      '  • Sélectionnez un fichier : capture d\'écran de votre virement bancaire, reçu de virement, ou tout document prouvant le paiement',
+      '  • Formats acceptés : PDF ou image (JPG, PNG, etc.)',
+      '  • Le justificatif permet à l\'association de valider votre paiement après vérification',
+      'Cliquez sur "Enregistrer le paiement par virement"',
+      'Votre paiement sera enregistré en attente de validation. Vous recevrez une confirmation une fois le justificatif vérifié.',
+      '',
+      '💡 Conseil : Effectuez le virement depuis votre banque (RIB de l\'association si communiqué), puis joignez une capture d\'écran ou le reçu pour accélérer la validation.'
+    ],
+    actions: [
+      { label: 'Voir mes cotisations', action: 'open_cotisations', href: '/user/profile?section=cotisations' }
+    ]
+  },
+  {
     keywords: ['profil', 'modifier profil', 'éditer profil', 'mettre à jour profil', 'informations personnelles', 'changer profil', 'modifier mon profil', 'éditer mon profil', 'mes informations'],
     title: 'Comment modifier mon profil',
     steps: [
@@ -856,17 +879,62 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
-    keywords: ['historique', 'historique paiement', 'historique cotisation', 'mes paiements', 'voir paiements'],
+    keywords: ['historique', 'historique paiement', 'historique cotisation', 'mes paiements', 'voir paiements', 'liste paiements'],
     title: 'Comment voir mon historique de paiements',
     steps: [
-      'Allez dans "Mon Profil" > "Mes Cotisations"',
-      'Vous verrez la section "Historique des cotisations"',
-      'Tous vos paiements sont listés avec la date, le montant et le moyen de paiement',
-      'Vous pouvez filtrer par période ou par type de cotisation',
-      'Chaque paiement affiche un reçu téléchargeable'
+      'Depuis "Mon Profil" > "Mes Cotisations", cliquez sur "Voir l\'historique" pour ouvrir la page dédiée',
+      'Ou accédez directement à la page "Historique des cotisations" (lien dans Mes Cotisations)',
+      'Sur cette page : tous vos paiements et cotisations sont listés avec date, montant, description et moyen de paiement',
+      'Vous pouvez filtrer par mois et par année avec les menus déroulants',
+      'Pour imprimer ou enregistrer en PDF : cliquez sur "Imprimer" puis utilisez "Enregistrer au format PDF" dans votre navigateur (Ctrl+P ou Cmd+P)',
+      'Un lien "Retour aux cotisations" vous ramène à Mes Cotisations'
     ],
     actions: [
-      { label: 'Voir mes cotisations', action: 'open_cotisations', href: '/user/profile?section=cotisations' }
+      { label: 'Voir l\'historique', action: 'open_historique_cotisations', href: '/user/profile/historique-cotisations' },
+      { label: 'Mes cotisations', action: 'open_cotisations', href: '/user/profile?section=cotisations' }
+    ]
+  },
+  {
+    keywords: ['historique des cotisations', 'imprimer historique', 'imprimer cotisations', 'voir historique', 'page historique', 'pdf historique', 'exporter historique', 'télécharger historique', 'historique détaillé'],
+    title: 'Comment voir et imprimer mon historique des cotisations',
+    steps: [
+      'Allez dans "Mon Profil" > "Mes Cotisations"',
+      'Cliquez sur le bouton "Voir l\'historique" (à côté de "Simulation versement assistance")',
+      'Vous accédez à la page dédiée "Historique des cotisations"',
+      '📋 Sur cette page :',
+      '  • Consultez toutes vos cotisations avec description, montants et statuts',
+      '  • Filtrez par mois et par année avec les menus déroulants',
+      '  • La liste affiche les cotisations du mois sélectionné ainsi que l\'historique',
+      '🖨️ Pour imprimer ou enregistrer en PDF :',
+      '  • Cliquez sur le bouton "Imprimer" en haut de la page',
+      '  • Utilisez la fonction "Imprimer" de votre navigateur (Ctrl+P ou Cmd+P)',
+      '  • Choisissez "Enregistrer au format PDF" si vous souhaitez un fichier PDF',
+      '💡 Conseil : Vous pouvez revenir à "Mes Cotisations" via le lien "Retour aux cotisations"'
+    ],
+    actions: [
+      { label: 'Voir l\'historique', action: 'open_historique_cotisations', href: '/user/profile/historique-cotisations' },
+      { label: 'Mes cotisations', action: 'open_cotisations', href: '/user/profile?section=cotisations' }
+    ]
+  },
+  {
+    keywords: ['simulation', 'simulation versement', 'versement assistance', 'simuler versement', 'simulation assistance', 'montant à verser', 'estimer versement', 'simuler assistance'],
+    title: 'Comment utiliser la simulation de versement assistance',
+    steps: [
+      'Allez dans "Mon Profil" > "Mes Cotisations"',
+      'Cliquez sur le bouton "Simulation versement assistance" (à côté de "Voir l\'historique")',
+      'Dans la fenêtre qui s\'ouvre, sélectionnez le type d\'assistance (ex. décès, mariage, anniversaire)',
+      '📊 La simulation affiche :',
+      '  • Le montant fixe de l\'assistance',
+      '  • Moins vos dettes éventuelles',
+      '  • Moins vos cotisations non encore payées',
+      '  • Plus vos avoirs disponibles (soldes en votre faveur)',
+      '  • Le montant à verser au final',
+      'Cette simulation est indicative : le montant réel dépend de votre situation au moment de la demande.',
+      '💡 Conseil : Utilisez cette simulation pour anticiper le montant à préparer avant de faire une demande d\'assistance.'
+    ],
+    actions: [
+      { label: 'Mes cotisations', action: 'open_cotisations', href: '/user/profile?section=cotisations' },
+      { label: 'Voir l\'historique', action: 'open_historique_cotisations', href: '/user/profile/historique-cotisations' }
     ]
   },
   {
@@ -897,6 +965,8 @@ export const chatbotGuides: Guide[] = [
       '• Comment modifier votre profil',
       '• Comment imprimer votre passeport',
       '• Comment voir vos obligations',
+      '• Comment simuler un versement assistance',
+      '• Comment voir et imprimer votre historique des cotisations',
       '• Comment voir vos droits',
       '• Comment consulter le règlement d\'ordre intérieur',
       '• Comment accéder à vos documents',
@@ -1789,7 +1859,7 @@ export function generateBotResponse(question: string): { message: string; guide?
   // Validation de type pour éviter les erreurs
   if (typeof question !== 'string' || !question || !question.trim()) {
     return {
-      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Téléverser un document\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses`
+      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Simuler un versement assistance\n• Voir et imprimer votre historique des cotisations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Téléverser un document\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses`
     };
   }
   
@@ -1806,7 +1876,7 @@ export function generateBotResponse(question: string): { message: string; guide?
   
   // Réponse par défaut avec suggestions
   return {
-    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Téléverser un document\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses\n\nPosez-moi une question plus précise en utilisant des mots-clés et je vous guiderai étape par étape !`
+    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Simuler un versement assistance\n• Voir et imprimer votre historique des cotisations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Téléverser un document\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses\n\nPosez-moi une question plus précise en utilisant des mots-clés et je vous guiderai étape par étape !`
   };
 }
 
@@ -1814,10 +1884,10 @@ export function generateBotResponse(question: string): { message: string; guide?
  * Messages de bienvenue
  */
 export const welcomeMessages = [
-  "Bonjour ! Je suis Amaki, votre assistant virtuel. Je suis là pour vous aider à naviguer sur la plateforme. Comment puis-je vous assister aujourd'hui ?",
-  "Salut ! Moi c'est Amaki. Je suis là pour vous guider dans l'utilisation de la plateforme AMAKI France. Que souhaitez-vous faire ?",
-  "Bonjour ! Je suis Amaki, votre assistant. Posez-moi une question et je vous expliquerai comment procéder étape par étape.",
-  "Bonjour ! Amaki à votre service. Je peux vous aider avec toutes vos questions sur la plateforme. Que puis-je faire pour vous ?"
+  "Bonjour ! Je suis Amaki, votre assistant virtuel. Je suis là pour vous aider à naviguer sur la plateforme (cotisations, simulation versement assistance, historique, profil…). Comment puis-je vous assister ?",
+  "Salut ! Moi c'est Amaki. Je suis là pour vous guider : payer vos cotisations, simuler un versement assistance, voir ou imprimer votre historique, modifier votre profil… Que souhaitez-vous faire ?",
+  "Bonjour ! Je suis Amaki, votre assistant. Posez-moi une question et je vous expliquerai étape par étape (ex. simulation assistance, historique des cotisations, impression PDF).",
+  "Bonjour ! Amaki à votre service. Je peux vous aider avec la plateforme : cotisations, simulation versement assistance, historique et impression, profil, documents… Que puis-je faire pour vous ?"
 ];
 
 /**
@@ -1838,6 +1908,8 @@ export const quickQuestions = [
   "Comment modifier ma photo ?",
   "Comment voir mes documents ?",
   "Comment voir mes obligations ?",
+  "Comment simuler un versement assistance ?",
+  "Comment voir et imprimer mon historique des cotisations ?",
   "Comment voir mes droits ?",
   "Comment consulter le règlement ?",
   "Comment participer à un événement ?",
