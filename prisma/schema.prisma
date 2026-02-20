@@ -94,8 +94,8 @@ enum TypeCotisation {
 /// Catégorie du type de cotisation mensuelle : forfait mensuel (obligatoire), assistance (bénéficiaire), ou divers/extra
 enum CategorieTypeCotisation {
   ForfaitMensuel // Cotisation forfait mensuelle obligatoire (une par mois)
-  Assistance     // Cotisation type assistance : naissance, décès, mariage, anniversaire (bénéficiaire)
-  Divers         // Cotisation diverse / extra : formation, matériel, etc.
+  Assistance // Cotisation type assistance : naissance, décès, mariage, anniversaire (bénéficiaire)
+  Divers // Cotisation diverse / extra : formation, matériel, etc.
 }
 
 enum MoyenPaiement {
@@ -266,6 +266,8 @@ model User {
   mediaGalerieCrees             MediaGalerie[]               @relation("MediaGalerieCreatedBy") // Médias de galerie créés
   rapportsReunionCrees          RapportReunion[]             @relation("RapportReunionCreatedBy") // Rapports de réunion créés
   rapportsReunionModifies       RapportReunion[]             @relation("RapportReunionUpdatedBy") // Rapports de réunion modifiés
+  reunionsMensuellesCrees       ReunionMensuelle[]           @relation("ReunionMensuelleCreatedBy") // Réunions mensuelles créées
+  reunionsMensuellesModifiees   ReunionMensuelle[]           @relation("ReunionMensuelleUpdatedBy") // Réunions mensuelles modifiées
   menusCreated                  Menu[]                       @relation("MenuCreatedBy") // Menus créés
   permissionsCreated            Permission[]                 @relation("PermissionCreatedBy") // Permissions créées
   activities                    UserActivity[]               @relation("UserActivities") // Activités de l'utilisateur
@@ -322,58 +324,60 @@ model TwoFactorConfirmation {
 }
 
 model Adherent {
-  id                            String                       @id @default(cuid())
-  civility                      Civilities?                  @default(Monsieur)
-  firstname                     String                       @db.VarChar(255)
-  lastname                      String                       @db.VarChar(255)
-  dateNaissance                 DateTime? // Date de naissance
-  typeAdhesion                  TypeAdhesion? // Type d'adhésion
-  profession                    String?                      @db.VarChar(255) // Profession (optionnel)
-  anneePromotion                String?                      @db.VarChar(10) // Année de promotion à Kipaku (ex: "2010" ou "Non")
-  centresInteret                String?                      @db.Text // Centres d'intérêt
-  autorisationImage             Boolean                      @default(false) // Autorisation d'utilisation de l'image
-  accepteCommunications         Boolean                      @default(true) // Acceptation des communications
-  nombreEnfants                 Int                          @default(0) // Nombre d'enfants
-  evenementsFamiliaux           String?                      @db.Text // JSON array des types d'événements familiaux
+  id                                String                       @id @default(cuid())
+  civility                          Civilities?                  @default(Monsieur)
+  firstname                         String                       @db.VarChar(255)
+  lastname                          String                       @db.VarChar(255)
+  dateNaissance                     DateTime? // Date de naissance
+  typeAdhesion                      TypeAdhesion? // Type d'adhésion
+  profession                        String?                      @db.VarChar(255) // Profession (optionnel)
+  anneePromotion                    String?                      @db.VarChar(10) // Année de promotion à Kipaku (ex: "2010" ou "Non")
+  centresInteret                    String?                      @db.Text // Centres d'intérêt
+  autorisationImage                 Boolean                      @default(false) // Autorisation d'utilisation de l'image
+  accepteCommunications             Boolean                      @default(true) // Acceptation des communications
+  nombreEnfants                     Int                          @default(0) // Nombre d'enfants
+  evenementsFamiliaux               String?                      @db.Text // JSON array des types d'événements familiaux
   // Champs pour la gestion des frais d'adhésion
-  datePremiereAdhesion          DateTime? // Date de première adhésion à l'association
-  fraisAdhesionPaye             Boolean                      @default(false) // Indique si les frais d'adhésion ont été payés
-  datePaiementFraisAdhesion     DateTime? // Date de paiement des frais d'adhésion
-  estAncienAdherent             Boolean                      @default(false) // Flag pour marquer les anciens adhérents
+  datePremiereAdhesion              DateTime? // Date de première adhésion à l'association
+  fraisAdhesionPaye                 Boolean                      @default(false) // Indique si les frais d'adhésion ont été payés
+  datePaiementFraisAdhesion         DateTime? // Date de paiement des frais d'adhésion
+  estAncienAdherent                 Boolean                      @default(false) // Flag pour marquer les anciens adhérents
   // Champs pour le passeport adhérent
-  numeroPasseport               String?                      @db.VarChar(50) // Numéro unique du passeport AMAKI
-  dateGenerationPasseport       DateTime? // Date de génération du passeport
+  numeroPasseport                   String?                      @db.VarChar(50) // Numéro unique du passeport AMAKI
+  dateGenerationPasseport           DateTime? // Date de génération du passeport
   // Poste de l'adhérent dans l'association
-  posteTemplateId               String? // Poste de l'adhérent (par défaut: Membre de l'association)
-  PosteTemplate                 PosteTemplate?               @relation(fields: [posteTemplateId], references: [id], onDelete: SetNull)
-  Adresse                       Adresse[]
-  Cotisations                   Cotisation[]
-  Telephones                    Telephone[]
-  ObligationsCotisation         ObligationCotisation[]
-  Relances                      Relance[]
-  Candidacies                   Candidacy[]
-  Votes                         Vote[]
-  CotisationsMensuelles         CotisationMensuelle[] // Cotisations mensuelles (payeur)
-  CotisationsMensuellesBeneficiaire CotisationMensuelle[]    @relation("CotisationMensuelleBeneficiaire") // Cotisations mensuelles dont l'adhérent est bénéficiaire (assistances)
-  RelancesCotisationMensuelle   RelanceCotisationMensuelle[] // Relances cotisations mensuelles
-  CotisationsDuMoisBeneficiaire CotisationDuMois[]           @relation("CotisationDuMoisBeneficiaire") // Cotisations du mois dont l'adhérent est bénéficiaire (assistances)
-  InscriptionsEvenements        InscriptionEvenement[] // Inscriptions aux événements
-  idees                         Idee[] // Idées soumises par l'adhérent
-  commentairesIdee              CommentaireIdee[] // Commentaires sur les idées
-  approbationsIdee              ApprobationIdee[] // Approbations des idées
-  Enfants                       Enfant[] // Enfants de l'adhérent
-  DettesInitiales               DetteInitiale[] // Dettes initiales
-  Paiements                     PaiementCotisation[] // Paiements effectués
-  Assistances                   Assistance[] // Assistances reçues
-  Avoirs                        Avoir[] // Avoirs (excédents de paiement)
-  documents                     Document[]                   @relation("DocumentAdherent") // Documents liés à l'adhérent
-  Reservations                  Reservation[] // Réservations effectuées
-  affectationsSousProjets       AffectationSousProjet[] // Affectations aux sous-projets/tâches
-  commentairesTaches            CommentaireTache[] // Commentaires sur les tâches
-  created_at                    DateTime?                    @db.Timestamp(0)
-  updated_at                    DateTime?                    @db.Timestamp(0)
-  userId                        String                       @unique
-  User                          User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  posteTemplateId                   String? // Poste de l'adhérent (par défaut: Membre de l'association)
+  PosteTemplate                     PosteTemplate?               @relation(fields: [posteTemplateId], references: [id], onDelete: SetNull)
+  Adresse                           Adresse[]
+  Cotisations                       Cotisation[]
+  Telephones                        Telephone[]
+  ObligationsCotisation             ObligationCotisation[]
+  Relances                          Relance[]
+  Candidacies                       Candidacy[]
+  Votes                             Vote[]
+  CotisationsMensuelles             CotisationMensuelle[] // Cotisations mensuelles (payeur)
+  CotisationsMensuellesBeneficiaire CotisationMensuelle[]        @relation("CotisationMensuelleBeneficiaire") // Cotisations mensuelles dont l'adhérent est bénéficiaire (assistances)
+  RelancesCotisationMensuelle       RelanceCotisationMensuelle[] // Relances cotisations mensuelles
+  CotisationsDuMoisBeneficiaire     CotisationDuMois[]           @relation("CotisationDuMoisBeneficiaire") // Cotisations du mois dont l'adhérent est bénéficiaire (assistances)
+  InscriptionsEvenements            InscriptionEvenement[] // Inscriptions aux événements
+  idees                             Idee[] // Idées soumises par l'adhérent
+  commentairesIdee                  CommentaireIdee[] // Commentaires sur les idées
+  approbationsIdee                  ApprobationIdee[] // Approbations des idées
+  Enfants                           Enfant[] // Enfants de l'adhérent
+  DettesInitiales                   DetteInitiale[] // Dettes initiales
+  Paiements                         PaiementCotisation[] // Paiements effectués
+  Assistances                       Assistance[] // Assistances reçues
+  Avoirs                            Avoir[] // Avoirs (excédents de paiement)
+  documents                         Document[]                   @relation("DocumentAdherent") // Documents liés à l'adhérent
+  Reservations                      Reservation[] // Réservations effectuées
+  affectationsSousProjets           AffectationSousProjet[] // Affectations aux sous-projets/tâches
+  commentairesTaches                CommentaireTache[] // Commentaires sur les tâches
+  ReunionsMensuellesHote            ReunionMensuelle[]           @relation("ReunionMensuelleHote") // Réunions où l'adhérent est hôte
+  ParticipationsReunion             ParticipationReunion[]       @relation("ParticipationReunionAdherent") // Participations aux réunions
+  created_at                        DateTime?                    @db.Timestamp(0)
+  updated_at                        DateTime?                    @db.Timestamp(0)
+  userId                            String                       @unique
+  User                              User                         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("adherent")
 }
@@ -733,24 +737,24 @@ model JustificatifDepense {
 }
 
 model TypeCotisationMensuelle {
-  id            String  @id @default(cuid())
-  nom           String  @db.VarChar(100) // ex: "Forfait Mensuel", "Décès", "Formation", etc.
-  description   String? @db.Text
-  montant       Decimal @db.Decimal(10, 2)
-  obligatoire   Boolean @default(true) // Si la cotisation est obligatoire
-  actif         Boolean @default(true) // Si le type est actuellement utilisé
-  ordre         Int     @default(0) // Ordre d'affichage
+  id            String                  @id @default(cuid())
+  nom           String                  @db.VarChar(100) // ex: "Forfait Mensuel", "Décès", "Formation", etc.
+  description   String?                 @db.Text
+  montant       Decimal                 @db.Decimal(10, 2)
+  obligatoire   Boolean                 @default(true) // Si la cotisation est obligatoire
+  actif         Boolean                 @default(true) // Si le type est actuellement utilisé
+  ordre         Int                     @default(0) // Ordre d'affichage
   /// Catégorie : ForfaitMensuel (obligatoire), Assistance (bénéficiaire), Divers (extra)
   categorie     CategorieTypeCotisation @default(Divers)
-  aBeneficiaire Boolean @default(false) // Si ce type nécessite un adhérent bénéficiaire (pour les assistances)
+  aBeneficiaire Boolean                 @default(false) // Si ce type nécessite un adhérent bénéficiaire (pour les assistances)
   createdBy     String // ID de l'admin qui a créé le type
 
   // Relations
-  CreatedBy             User                   @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-  CotisationsMensuelles CotisationMensuelle[]   // Les cotisations créées avec ce type
-  CotisationsDuMois     CotisationDuMois[]     // Les cotisations du mois avec ce type
-  PassAssistance        PassAssistance?        // Config montant fixe (une par type de cotisation Assistance)
-  Assistances           Assistance[]           // Assistances liées à ce type (pour montant)
+  CreatedBy             User                  @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  CotisationsMensuelles CotisationMensuelle[] // Les cotisations créées avec ce type
+  CotisationsDuMois     CotisationDuMois[] // Les cotisations du mois avec ce type
+  PassAssistance        PassAssistance? // Config montant fixe (une par type de cotisation Assistance)
+  Assistances           Assistance[] // Assistances liées à ce type (pour montant)
 
   // Métadonnées
   createdAt DateTime @default(now())
@@ -816,14 +820,14 @@ model CotisationMensuelle {
   createdBy              String // ID de l'admin qui a créé la cotisation
 
   // Relations
-  TypeCotisation        TypeCotisationMensuelle      @relation(fields: [typeCotisationId], references: [id], onDelete: Cascade)
-  Adherent              Adherent                     @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  AdherentBeneficiaire  Adherent?                    @relation("CotisationMensuelleBeneficiaire", fields: [adherentBeneficiaireId], references: [id], onDelete: SetNull)
-  CreatedBy             User                         @relation(fields: [createdBy], references: [id], onDelete: Cascade)
-  CotisationDuMois      CotisationDuMois?            @relation(fields: [cotisationDuMoisId], references: [id], onDelete: SetNull)
-  Relances          RelanceCotisationMensuelle[]
-  Paiements         PaiementCotisation[] // Paiements liés à cette cotisation mensuelle
-  UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette cotisation
+  TypeCotisation       TypeCotisationMensuelle      @relation(fields: [typeCotisationId], references: [id], onDelete: Cascade)
+  Adherent             Adherent                     @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  AdherentBeneficiaire Adherent?                    @relation("CotisationMensuelleBeneficiaire", fields: [adherentBeneficiaireId], references: [id], onDelete: SetNull)
+  CreatedBy            User                         @relation(fields: [createdBy], references: [id], onDelete: Cascade)
+  CotisationDuMois     CotisationDuMois?            @relation(fields: [cotisationDuMoisId], references: [id], onDelete: SetNull)
+  Relances             RelanceCotisationMensuelle[]
+  Paiements            PaiementCotisation[] // Paiements liés à cette cotisation mensuelle
+  UtilisationsAvoir    UtilisationAvoir[] // Utilisations d'avoirs pour cette cotisation
 
   // Métadonnées
   createdAt DateTime @default(now())
@@ -988,38 +992,38 @@ model UtilisationAvoir {
 
 // Modèle pour les assistances (50€ pour naissance, décès, anniversaire, mariage)
 model Assistance {
-  id               String                 @id @default(cuid())
+  id               String                @id @default(cuid())
   adherentId       String
-  type             TypeEvenementFamilial  // Naissance, MariageEnfant, DecesFamille, AnniversaireSalle, Autre
-  typeCotisationId String?                // Type de cotisation (Assistance) pour récupérer le montant depuis PassAssistance
-  montant          Decimal                @default(50.00) @db.Decimal(10, 2) // Montant fixe de 50€
-  dateEvenement    DateTime               // Date de l'événement
-  montantPaye      Decimal                @default(0) @db.Decimal(10, 2)
-  montantRestant   Decimal                @db.Decimal(10, 2)
-  statut           String                 @default("EnAttente") // EnAttente, Affecte, Paye, Annule
-  description      String?                @db.Text
-  createdAt        DateTime               @default(now())
-  updatedAt        DateTime               @updatedAt
-  createdBy        String                 // ID de l'admin qui a créé l'assistance
+  type             TypeEvenementFamilial // Naissance, MariageEnfant, DecesFamille, AnniversaireSalle, Autre
+  typeCotisationId String? // Type de cotisation (Assistance) pour récupérer le montant depuis PassAssistance
+  montant          Decimal               @default(50.00) @db.Decimal(10, 2) // Montant fixe de 50€
+  dateEvenement    DateTime // Date de l'événement
+  montantPaye      Decimal               @default(0) @db.Decimal(10, 2)
+  montantRestant   Decimal               @db.Decimal(10, 2)
+  statut           String                @default("EnAttente") // EnAttente, Affecte, Paye, Annule
+  description      String?               @db.Text
+  createdAt        DateTime              @default(now())
+  updatedAt        DateTime              @updatedAt
+  createdBy        String // ID de l'admin qui a créé l'assistance
 
   // Relations
-  Adherent            Adherent              @relation(fields: [adherentId], references: [id], onDelete: Cascade)
-  TypeCotisation      TypeCotisationMensuelle? @relation(fields: [typeCotisationId], references: [id], onDelete: SetNull)
-  CreatedBy           User                  @relation("AssistanceCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
-  Paiements           PaiementCotisation[]  // Paiements liés à cette assistance
-  UtilisationsAvoir   UtilisationAvoir[]   // Utilisations d'avoirs pour cette assistance
+  Adherent          Adherent                 @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  TypeCotisation    TypeCotisationMensuelle? @relation(fields: [typeCotisationId], references: [id], onDelete: SetNull)
+  CreatedBy         User                     @relation("AssistanceCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  Paiements         PaiementCotisation[] // Paiements liés à cette assistance
+  UtilisationsAvoir UtilisationAvoir[] // Utilisations d'avoirs pour cette assistance
 
   @@map("assistances")
 }
 
 /// Table de configuration du montant fixe par type d'assistance (créée à la demande, liée à un type de cotisation catégorie Assistance)
 model PassAssistance {
-  id                  String   @id @default(cuid())
-  description         String   @db.VarChar(500)
-  montant             Decimal  @db.Decimal(10, 2)
-  typeCotisationId    String   // Relation obligatoire avec TypeCotisationMensuelle (catégorie Assistance)
-  createdAt           DateTime @default(now())
-  updatedAt           DateTime @updatedAt
+  id               String   @id @default(cuid())
+  description      String   @db.VarChar(500)
+  montant          Decimal  @db.Decimal(10, 2)
+  typeCotisationId String // Relation obligatoire avec TypeCotisationMensuelle (catégorie Assistance)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   TypeCotisationMensuelle TypeCotisationMensuelle @relation(fields: [typeCotisationId], references: [id], onDelete: Restrict)
 
@@ -1489,25 +1493,100 @@ model Document {
   @@map("documents")
 }
 
-// Modèle pour les rapports de réunions mensuelles
+// Modèle pour les rapports de réunions mensuelles (rédigé après la réunion)
 model RapportReunion {
-  id          String   @id @default(cuid())
-  titre       String   @db.VarChar(255) // Titre du rapport (ex: "Réunion mensuelle - Janvier 2024")
-  dateReunion DateTime // Date de la réunion
-  contenu     String   @db.Text // Contenu du rapport (markdown ou texte)
-  createdBy   String // Admin qui a créé le rapport
-  updatedBy   String? // Admin qui a modifié le rapport
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id                   String   @id @default(cuid())
+  titre                String   @db.VarChar(255) // Titre du rapport (ex: "Réunion mensuelle - Janvier 2024")
+  dateReunion          DateTime // Date de la réunion
+  contenu              String   @db.Text // Contenu du rapport (markdown ou texte)
+  reunionMensuelleId   String?  @unique // Lien optionnel vers la réunion mensuelle concernée
+  createdBy            String // Admin qui a créé le rapport
+  updatedBy            String? // Admin qui a modifié le rapport
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
 
   // Relations
-  CreatedBy User  @relation("RapportReunionCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
-  UpdatedBy User? @relation("RapportReunionUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+  CreatedBy        User               @relation("RapportReunionCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  UpdatedBy        User?              @relation("RapportReunionUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+  ReunionMensuelle ReunionMensuelle?  @relation(fields: [reunionMensuelleId], references: [id], onDelete: SetNull)
 
   @@index([dateReunion])
   @@index([createdAt])
   @@index([createdBy])
+  @@index([reunionMensuelleId])
   @@map("rapports_reunion")
+}
+
+// Modèle pour les réunions mensuelles
+enum StatutReunionMensuelle {
+  EnAttente // L'adhérent a choisi le mois mais pas encore validé par l'admin
+  MoisValide // Le mois est validé par l'admin, l'adhérent peut confirmer la date
+  DateConfirmee // La date est confirmée, la réunion est planifiée
+  Annulee // La réunion est annulée
+}
+
+enum TypeLieuReunion {
+  Domicile // Au domicile de l'hôte (par défaut)
+  Restaurant // Dans un restaurant
+  Autre // Autre lieu (adresse personnalisée)
+}
+
+enum StatutParticipationReunion {
+  Present // L'adhérent sera présent
+  Absent // L'adhérent sera absent
+  Excuse // L'adhérent s'excuse (ne peut pas venir)
+  NonRepondu // Pas encore répondu
+}
+
+model ReunionMensuelle {
+  id             String                 @id @default(cuid())
+  annee          Int // Année de la réunion
+  mois           Int // Mois de la réunion (1-12)
+  statut         StatutReunionMensuelle @default(EnAttente)
+  adherentHoteId String?                // L'adhérent qui accueille (null si désistement, en attente d'un nouvel hôte)
+  dateReunion    DateTime? // Date confirmée de la réunion (null si pas encore confirmée)
+  typeLieu       TypeLieuReunion        @default(Domicile)
+  adresse        String?                @db.Text // Adresse si différent du domicile de l'hôte ou si Restaurant/Autre
+  nomRestaurant  String?                @db.VarChar(255) // Nom du restaurant si typeLieu = Restaurant
+  commentaires   String?                @db.Text // Commentaires additionnels
+  createdBy      String // Admin qui a créé/validé la réunion
+  updatedBy      String? // Admin qui a modifié la réunion
+  createdAt      DateTime               @default(now())
+  updatedAt      DateTime               @updatedAt
+
+  // Relations
+  AdherentHote   Adherent?              @relation("ReunionMensuelleHote", fields: [adherentHoteId], references: [id], onDelete: SetNull)
+  CreatedBy      User                   @relation("ReunionMensuelleCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  UpdatedBy      User?                  @relation("ReunionMensuelleUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+  Participations ParticipationReunion[] // Participations des adhérents
+  Rapport        RapportReunion?       // Rapport rédigé après la réunion (optionnel)
+
+  @@unique([annee, mois]) // Une seule réunion par mois
+  @@index([annee, mois])
+  @@index([adherentHoteId])
+  @@index([statut])
+  @@index([dateReunion])
+  @@map("reunions_mensuelles")
+}
+
+model ParticipationReunion {
+  id          String                     @id @default(cuid())
+  reunionId   String
+  adherentId  String
+  statut      StatutParticipationReunion @default(NonRepondu)
+  commentaire String?                    @db.Text // Message d'excuse ou commentaire
+  createdAt   DateTime                   @default(now())
+  updatedAt   DateTime                   @updatedAt
+
+  // Relations
+  Reunion  ReunionMensuelle @relation(fields: [reunionId], references: [id], onDelete: Cascade)
+  Adherent Adherent         @relation("ParticipationReunionAdherent", fields: [adherentId], references: [id], onDelete: Cascade)
+
+  @@unique([reunionId, adherentId]) // Un adhérent ne peut avoir qu'une participation par réunion
+  @@index([reunionId])
+  @@index([adherentId])
+  @@index([statut])
+  @@map("participations_reunion")
 }
 
 // Modèles pour le système de réservations et gestion de ressources

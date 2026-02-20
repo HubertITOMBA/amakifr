@@ -447,6 +447,39 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
+    keywords: ['réunion mensuelle', 'réunions mensuelles', 'calendrier réunions', 'choisir mois réunion', 'être hôte', 'hôte réunion', 'désistement', 'se désister réunion', 'se désister comme hôte', 'indiquer ma présence', 'participation réunion', 'date réunion mensuelle', 'valider réunion', 'mois validé', 'date confirmée réunion'],
+    title: 'Réunions mensuelles : calendrier, choix du mois, date, désistement, participation',
+    steps: [
+      '📅 Accéder au calendrier :',
+      'Ouvrez le menu latéral (profil) et cliquez sur "Réunions mensuelles", ou allez sur /reunions-mensuelles',
+      '',
+      '📌 Choisir un mois pour être hôte (adhérent) :',
+      'Cliquez sur un mois qui n\'a pas encore de réunion',
+      'Sélectionnez l\'année et le mois dans le dialogue, puis validez. Vous serez l\'hôte de cette réunion (un adhérent = une réunion hôte par an)',
+      'La réunion est alors "En attente" : l\'admin devra valider après que vous ayez choisi la date',
+      '',
+      '📆 Choisir la date (hôte) :',
+      'Cliquez sur le mois dont vous êtes hôte',
+      'Dans le dialogue, section "Date de la réunion" : choisissez un samedi du mois (uniquement les samedis, et au moins 7 jours à l\'avance)',
+      'Renseignez le type de lieu (Domicile, Restaurant, Autre), l\'adresse si besoin, et enregistrez',
+      'Une fois l\'admin aura validé la réunion, la date sera confirmée et les autres pourront indiquer leur présence',
+      '',
+      '🚪 Se désister comme hôte :',
+      'Allez sur Réunions mensuelles et cliquez sur le mois dont vous êtes hôte',
+      'En bas du dialogue, section "Se désister comme hôte"',
+      'Vous pouvez vous désister uniquement si la réunion a lieu dans 28 jours ou plus (ou si aucune date n\'est encore fixée)',
+      'Cliquez sur "Se désister comme hôte" et confirmez. Le mois reste réservé ; un admin pourra désigner un nouvel hôte',
+      '',
+      '✅ Indiquer ma présence (réunion à date confirmée) :',
+      'Sur le calendrier, les mois avec une date confirmée affichent "Indiquer ma présence"',
+      'Cliquez sur ce mois, puis dans le dialogue qui s\'ouvre choisissez "Indiquer ma présence" (ou le dialogue s\'ouvre directement selon l\'interface)',
+      'Choisissez : Présent, Absent ou Excuse, ajoutez un commentaire si besoin, et enregistrez'
+    ],
+    actions: [
+      { label: 'Ouvrir Réunions mensuelles', action: 'open_reunions_mensuelles', href: '/reunions-mensuelles' }
+    ]
+  },
+  {
     keywords: ['notification', 'notifications', 'alerte', 'alertes', 'préférences notification', 'gérer notifications', 'voir notifications', 'mes notifications', 'cloche notification'],
     title: 'Comment gérer mes notifications',
     steps: [
@@ -986,6 +1019,7 @@ export const chatbotGuides: Guide[] = [
       '• [ADMIN] Comment ajouter une assistance',
       '• [ADMIN] Comment affecter une assistance à la cotisation du mois',
       '• [ADMIN] Comment gérer les cotisations du mois (affectations)',
+      '• [ADMIN] Comment identifier et affecter les adhérents sans cotisation',
       '• [ADMIN] Comment créer un événement',
       '• [ADMIN] Comment créer un projet',
       '• [ADMIN] Comment ajouter une tâche à un projet',
@@ -1124,6 +1158,28 @@ export const chatbotGuides: Guide[] = [
       'Pour modifier une ligne : utilisez le menu d\'actions sur la ligne (mois en cours ou prochain uniquement)',
       'Pour supprimer une ligne : possible seulement si aucune cotisation mensuelle adhérent n\'a encore été générée à partir de celle-ci',
       'Les cotisations du mois servent de planification : la "Création de la cotisation mensuelle" génère ensuite les cotisations par adhérent'
+    ],
+    actions: [
+      { label: 'Cotisations du mois', action: 'open_admin_cotisations_du_mois', href: '/admin/cotisations-du-mois' }
+    ]
+  },
+  {
+    keywords: ['adhérents sans cotisation', 'adhérent sans cotisation', 'manquants cotisation', 'adhérents manquants', 'identifier adhérents sans cotisation', 'qui n\'a pas cotisation', 'adhérents non affectés', 'affecter adhérent manquant', 'nouvel adhérent cotisation'],
+    title: '[ADMIN] Comment identifier et affecter les adhérents sans cotisation',
+    steps: [
+      '📋 Cette fonction est utile après une affectation globale du mois ou pour un nouvel adhérent rendu éligible',
+      'Allez dans "ADMIN" > "Cotisations du mois"',
+      'Cliquez sur le bouton "Adhérents sans cotisation" (icône utilisateur)',
+      'Dans la fenêtre qui s\'ouvre :',
+      '  • Sélectionnez l\'année et le mois à vérifier',
+      '  • Cliquez sur "Vérifier"',
+      '📊 La liste affiche tous les adhérents (MEMBRE actifs) qui n\'ont pas de cotisation forfait créée pour ce mois',
+      '💡 Pour affecter la cotisation à un seul adhérent :',
+      '  • Cliquez sur "Affecter" à côté de son nom dans la liste',
+      '💡 Pour affecter la cotisation à tous les adhérents listés :',
+      '  • Cliquez sur "Affecter la cotisation du mois à ces adhérents" en bas de la liste',
+      'Les cotisations mensuelles seront créées pour les adhérents sélectionnés (forfait + assistances du mois)',
+      '💡 Conseil : Utilisez cette fonction quand un nouvel adhérent est ajouté ou qu\'un adhérent est rendu éligible (User Actif + MEMBRE) après l\'affectation globale du mois'
     ],
     actions: [
       { label: 'Cotisations du mois', action: 'open_admin_cotisations_du_mois', href: '/admin/cotisations-du-mois' }
@@ -1859,7 +1915,7 @@ export function generateBotResponse(question: string): { message: string; guide?
   // Validation de type pour éviter les erreurs
   if (typeof question !== 'string' || !question || !question.trim()) {
     return {
-      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Simuler un versement assistance\n• Voir et imprimer votre historique des cotisations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Téléverser un document\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses`
+      message: `Bonjour ! Je suis Amaki, votre assistant virtuel. Posez-moi une question et je vous guiderai étape par étape !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Simuler un versement assistance\n• Voir et imprimer votre historique des cotisations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Téléverser un document\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Réunions mensuelles (calendrier, être hôte, désistement, indiquer présence)\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses`
     };
   }
   
@@ -1876,7 +1932,7 @@ export function generateBotResponse(question: string): { message: string; guide?
   
   // Réponse par défaut avec suggestions
   return {
-    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Simuler un versement assistance\n• Voir et imprimer votre historique des cotisations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Téléverser un document\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses\n\nPosez-moi une question plus précise en utilisant des mots-clés et je vous guiderai étape par étape !`
+    message: `Je n'ai pas trouvé de guide spécifique pour votre question "${question}". Mais ne vous inquiétez pas, je suis là pour vous aider !\n\n👤 Pour tous les adhérents :\n• Modifier votre mot de passe\n• Payer vos cotisations\n• Modifier votre photo de profil\n• Modifier votre profil\n• Imprimer votre passeport\n• Voir vos obligations\n• Simuler un versement assistance\n• Voir et imprimer votre historique des cotisations\n• Voir vos droits\n• Consulter le règlement d'ordre intérieur\n• Accéder à vos documents\n• Téléverser un document\n• Voir vos badges\n• Postuler à une élection\n• Voter\n• Participer à un événement\n• Consulter les rapports de réunion\n• Réunions mensuelles (calendrier, être hôte, désistement, indiquer présence)\n• Gérer vos notifications\n• Utiliser la messagerie interne\n• Commenter ou documenter l'avancement de vos tâches\n• Ajouter une idée dans la boîte à idées\n• Consulter la galerie\n• Contacter l'association\n\n👨‍💼 Pour les administrateurs :\n• Encaisser une cotisation manuelle\n• Créer la cotisation mensuelle\n• Ajouter ou créer une assistance\n• Créer un événement\n• Créer un projet\n• Ajouter une tâche à un projet\n• Affecter une tâche à un adhérent\n• Créer et ajouter une photo ou vidéo dans la galerie\n• Envoyer une notification\n• Envoyer un email aux adhérents\n• Créer et gérer une dépense\n• Gérer les types de dépenses\n\nPosez-moi une question plus précise en utilisant des mots-clés et je vous guiderai étape par étape !`
   };
 }
 
@@ -1921,6 +1977,7 @@ export const quickQuestions = [
   "Comment commenter ma tâche ?",
   "[ADMIN] Comment encaisser une cotisation ?",
   "[ADMIN] Comment créer la cotisation mensuelle ?",
+  "[ADMIN] Comment identifier les adhérents sans cotisation ?",
   "[ADMIN] Comment créer un événement ?",
   "[ADMIN] Comment créer un projet ?",
   "[ADMIN] Comment ajouter une tâche ?",

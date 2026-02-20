@@ -41,6 +41,7 @@ import {
   deleteRapportReunion,
   getRapportReunionById
 } from "@/actions/rapports-reunion";
+import { getAllReunionsMensuelles } from "@/actions/reunions-mensuelles";
 import { toast } from "sonner";
 import { isAuthorizationError } from "@/lib/utils";
 import {
@@ -128,7 +129,9 @@ export default function AdminRapportsReunionPage() {
     titre: "",
     dateReunion: "",
     contenu: "",
+    reunionMensuelleId: "",
   });
+  const [reunions, setReunions] = useState<any[]>([]);
 
   // Debounce pour la recherche
   useEffect(() => {
@@ -164,6 +167,18 @@ export default function AdminRapportsReunionPage() {
     loadRapports();
   }, [loadRapports]);
 
+  const loadReunions = useCallback(async () => {
+    try {
+      const res = await getAllReunionsMensuelles();
+      if (res.success && res.data) setReunions(res.data);
+    } catch {
+      setReunions([]);
+    }
+  }, []);
+  useEffect(() => {
+    loadReunions();
+  }, [loadReunions]);
+
   const handleCreate = async () => {
     if (!formData.titre.trim() || !formData.dateReunion || !formData.contenu.trim()) {
       toast.error("Veuillez remplir tous les champs");
@@ -176,12 +191,13 @@ export default function AdminRapportsReunionPage() {
       formDataToSend.append("titre", formData.titre);
       formDataToSend.append("dateReunion", formData.dateReunion);
       formDataToSend.append("contenu", formData.contenu);
+      if (formData.reunionMensuelleId) formDataToSend.append("reunionMensuelleId", formData.reunionMensuelleId);
 
       const result = await createRapportReunion(formDataToSend);
       if (result.success) {
         toast.success(result.message);
         setShowCreateDialog(false);
-        setFormData({ titre: "", dateReunion: "", contenu: "" });
+        setFormData({ titre: "", dateReunion: "", contenu: "", reunionMensuelleId: "" });
         loadRapports();
       } else {
         toast.error(result.error || "Erreur lors de la création");
@@ -207,6 +223,7 @@ export default function AdminRapportsReunionPage() {
       formDataToSend.append("titre", formData.titre);
       formDataToSend.append("dateReunion", formData.dateReunion);
       formDataToSend.append("contenu", formData.contenu);
+      if (formData.reunionMensuelleId) formDataToSend.append("reunionMensuelleId", formData.reunionMensuelleId);
 
       const result = await updateRapportReunion(formDataToSend);
       if (result.success) {
@@ -323,6 +340,7 @@ export default function AdminRapportsReunionPage() {
       titre: rapport.titre,
       dateReunion: format(new Date(rapport.dateReunion), "yyyy-MM-dd"),
       contenu: rapport.contenu,
+      reunionMensuelleId: rapport.reunionMensuelleId || "",
     });
     setShowEditDialog(true);
   };
@@ -644,6 +662,32 @@ export default function AdminRapportsReunionPage() {
               />
             </div>
             <div>
+              <Label>Réunion mensuelle associée</Label>
+              <Select
+                value={formData.reunionMensuelleId || "none"}
+                onValueChange={(v) => setFormData({ ...formData, reunionMensuelleId: v === "none" ? "" : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Aucune (lien optionnel)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucune</SelectItem>
+                  {reunions
+                    .filter((r) => r.dateReunion)
+                    .map((r) => {
+                      const moisLabel = ["Janv","Fév","Mars","Avr","Mai","Juin","Juil","Août","Sept","Oct","Nov","Déc"][r.mois - 1];
+                      return (
+                        <SelectItem key={r.id} value={r.id}>
+                          {moisLabel} {r.annee}
+                          {r.AdherentHote ? ` - ${r.AdherentHote.firstname} ${r.AdherentHote.lastname}` : ""}
+                        </SelectItem>
+                      );
+                    })}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground mt-1">Liez ce rapport à la réunion mensuelle concernée (optionnel).</p>
+            </div>
+            <div>
               <Label htmlFor="contenu">Contenu du rapport *</Label>
               <Textarea
                 id="contenu"
@@ -700,6 +744,31 @@ export default function AdminRapportsReunionPage() {
                 value={formData.dateReunion}
                 onChange={(e) => setFormData({ ...formData, dateReunion: e.target.value })}
               />
+            </div>
+            <div>
+              <Label>Réunion mensuelle associée</Label>
+              <Select
+                value={formData.reunionMensuelleId || "none"}
+                onValueChange={(v) => setFormData({ ...formData, reunionMensuelleId: v === "none" ? "" : v })}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Aucune (lien optionnel)" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucune</SelectItem>
+                  {reunions
+                    .filter((r) => r.dateReunion)
+                    .map((r) => {
+                      const moisLabel = ["Janv","Fév","Mars","Avr","Mai","Juin","Juil","Août","Sept","Oct","Nov","Déc"][r.mois - 1];
+                      return (
+                        <SelectItem key={r.id} value={r.id}>
+                          {moisLabel} {r.annee}
+                          {r.AdherentHote ? ` - ${r.AdherentHote.firstname} ${r.AdherentHote.lastname}` : ""}
+                        </SelectItem>
+                      );
+                    })}
+                </SelectContent>
+              </Select>
             </div>
             <div>
               <Label htmlFor="edit-contenu">Contenu du rapport *</Label>

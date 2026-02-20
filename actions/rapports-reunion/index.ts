@@ -12,6 +12,7 @@ const CreateRapportReunionSchema = z.object({
   titre: z.string().min(1, "Le titre est requis").max(255, "Le titre est trop long"),
   dateReunion: z.string().transform((str) => new Date(str)),
   contenu: z.string().min(1, "Le contenu est requis"),
+  reunionMensuelleId: z.string().optional(),
 });
 
 /**
@@ -22,6 +23,7 @@ const UpdateRapportReunionSchema = z.object({
   titre: z.string().min(1, "Le titre est requis").max(255, "Le titre est trop long"),
   dateReunion: z.string().transform((str) => new Date(str)),
   contenu: z.string().min(1, "Le contenu est requis"),
+  reunionMensuelleId: z.string().optional().nullable(),
 });
 
 /**
@@ -44,10 +46,12 @@ export async function createRapportReunion(formData: FormData) {
       return { success: false, error: "Droit de création de rapport de réunion requis." };
     }
 
+    const rawReunionId = formData.get("reunionMensuelleId");
     const rawData = {
       titre: formData.get("titre") as string,
       dateReunion: formData.get("dateReunion") as string,
       contenu: formData.get("contenu") as string,
+      reunionMensuelleId: rawReunionId && String(rawReunionId).trim() ? String(rawReunionId).trim() : undefined,
     };
 
     const validatedData = CreateRapportReunionSchema.parse(rawData);
@@ -58,6 +62,7 @@ export async function createRapportReunion(formData: FormData) {
         titre: validatedData.titre,
         dateReunion: validatedData.dateReunion,
         contenu: validatedData.contenu,
+        reunionMensuelleId: validatedData.reunionMensuelleId ?? null,
         createdBy: session.user.id,
       },
     });
@@ -99,11 +104,13 @@ export async function updateRapportReunion(formData: FormData) {
       return { success: false, error: "Droit de modification de rapport de réunion requis." };
     }
 
+    const rawReunionId = formData.get("reunionMensuelleId");
     const rawData = {
       id: formData.get("id") as string,
       titre: formData.get("titre") as string,
       dateReunion: formData.get("dateReunion") as string,
       contenu: formData.get("contenu") as string,
+      reunionMensuelleId: rawReunionId && String(rawReunionId).trim() ? String(rawReunionId).trim() : null,
     };
 
     const validatedData = UpdateRapportReunionSchema.parse(rawData);
@@ -124,6 +131,7 @@ export async function updateRapportReunion(formData: FormData) {
         titre: validatedData.titre,
         dateReunion: validatedData.dateReunion,
         contenu: validatedData.contenu,
+        reunionMensuelleId: validatedData.reunionMensuelleId ?? null,
         updatedBy: session.user.id,
       },
     });
@@ -215,6 +223,9 @@ export async function getAllRapportsReunion() {
         dateReunion: "desc",
       },
       include: {
+        ReunionMensuelle: {
+          select: { id: true, annee: true, mois: true, dateReunion: true },
+        },
         CreatedBy: {
           select: {
             id: true,
@@ -262,6 +273,9 @@ export async function getRapportReunionById(rapportId: string) {
     const rapport = await db.rapportReunion.findUnique({
       where: { id: rapportId },
       include: {
+        ReunionMensuelle: {
+          select: { id: true, annee: true, mois: true, dateReunion: true },
+        },
         CreatedBy: {
           select: {
             id: true,

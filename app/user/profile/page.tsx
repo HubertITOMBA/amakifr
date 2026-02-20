@@ -121,7 +121,7 @@ import {
 } from "@tanstack/react-table";
 
 // Types pour les sections du menu
-type MenuSection = 'profile' | 'statistiques' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'idees' | 'documents' | 'badges' | 'enfants' | 'passeport' | 'notifications' | 'settings' | 'rapports' | 'taches' | 'projets';
+type MenuSection = 'profile' | 'statistiques' | 'cotisations' | 'candidatures' | 'votes' | 'candidates' | 'idees' | 'documents' | 'badges' | 'enfants' | 'passeport' | 'notifications' | 'settings' | 'rapports' | 'reunions' | 'taches' | 'projets';
 
 // Type pour les dettes initiales
 interface DetteInitiale {
@@ -1394,6 +1394,8 @@ function UserProfilePageContent() {
             }
             setRapportsLoading(false);
             break;
+          case 'reunions':
+            break;
           case 'badges':
             setBadgesLoading(true);
             if (user.id) {
@@ -1778,6 +1780,14 @@ function UserProfilePageContent() {
       icon: FileText,
       description: 'Consulter les rapports de réunion',
       electoral: false
+    },
+    {
+      id: 'reunions' as MenuSection,
+      label: 'Réunions mensuelles',
+      icon: CalendarDays,
+      description: 'Calendrier et participation aux réunions',
+      electoral: false,
+      href: '/reunions-mensuelles'
     },
     {
       id: 'badges' as MenuSection,
@@ -5354,6 +5364,9 @@ function UserProfilePageContent() {
           </div>
         );
 
+      case 'reunions':
+        return null;
+
       case 'taches':
         // Vérifier si l'utilisateur a un profil adhérent
         if (effectiveLoading) {
@@ -5595,30 +5608,33 @@ function UserProfilePageContent() {
                   <nav className="space-y-1">
                     {menuItems.map((item) => {
                       const Icon = item.icon;
-                      const isActive = activeSection === item.id;
-                      
+                      const href = (item as { href?: string }).href;
+                      const isActive = !href && activeSection === item.id;
+                      const baseClass = "w-full flex items-center gap-3 px-4 py-3 text-left transition-colors " + (isActive ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-r-2 border-blue-600' : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800');
+                      if (href) {
+                        return (
+                          <Link key={item.id} href={href} className={baseClass}>
+                            <Icon className="h-5 w-5" />
+                            <div className="flex-1">
+                              <div className="font-medium">{item.label}</div>
+                              <div className="text-xs text-gray-500 dark:text-gray-400">{item.description}</div>
+                            </div>
+                            <ChevronRight className="h-4 w-4" />
+                          </Link>
+                        );
+                      }
                       return (
                         <button
                           key={item.id}
                           onClick={() => setActiveSection(item.id)}
-                          className={`w-full flex items-center gap-3 px-4 py-3 text-left transition-colors ${
-                            isActive
-                              ? 'bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300 border-r-2 border-blue-600'
-                              : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-800'
-                          }`}
+                          className={baseClass}
                         >
                           <Icon className="h-5 w-5" />
                           <div className="flex-1">
                             <div className="font-medium">{item.label}</div>
-                            <div className="text-xs text-gray-500 dark:text-gray-400">
-                              {item.description}
-                            </div>
+                            <div className="text-xs text-gray-500 dark:text-gray-400">{item.description}</div>
                           </div>
-                          {isActive ? (
-                            <ChevronDown className="h-4 w-4" />
-                          ) : (
-                            <ChevronRight className="h-4 w-4" />
-                          )}
+                          {isActive ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
                         </button>
                       );
                     })}
@@ -5633,17 +5649,22 @@ function UserProfilePageContent() {
                 <div className="flex gap-2 min-w-max">
                   {menuItems.map((item) => {
                     const Icon = item.icon;
-                    const isActive = activeSection === item.id;
-                    
+                    const href = (item as { href?: string }).href;
+                    const isActive = !href && activeSection === item.id;
+                    const btnClass = "flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium whitespace-nowrap transition-colors min-h-[44px] " + (isActive ? 'bg-blue-600 text-white shadow-md' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700');
+                    if (href) {
+                      return (
+                        <Link key={item.id} href={href} className={btnClass}>
+                          <Icon className="h-4 w-4" />
+                          <span>{item.label}</span>
+                        </Link>
+                      );
+                    }
                     return (
                       <button
                         key={item.id}
                         onClick={() => setActiveSection(item.id)}
-                        className={`flex items-center gap-2 px-4 py-3 rounded-lg text-sm font-medium whitespace-nowrap transition-colors min-h-[44px] ${
-                          isActive
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700'
-                        }`}
+                        className={btnClass}
                       >
                         <Icon className="h-4 w-4" />
                         <span>{item.label}</span>
