@@ -1,0 +1,81 @@
+# Proposition de `.cursorignore` (Next.js / Prisma / scripts)
+# Copiez/collez le contenu ci-dessous dans `.cursorignore`.
+#
+# Objectif : réduire l’indexation (RAM) en ignorant builds/caches/médias.
+# Note : je conserve `save/` ignoré (comme actuellement) pour limiter la charge.
+#        Si vous voulez que l’IA indexe aussi vos notes, supprimez la ligne `save/`.
+
+# Dépendances / builds Next
+node_modules/
+.next/
+out/
+dist/
+build/
+coverage/
+
+# Outils / caches
+.git/
+.cache/
+.target/
+.turbo/
+.vercel/
+.swc/
+.parcel-cache/
+
+# Dossiers temporaires
+tmp/
+temp/
+.tmp/
+
+# Vos notes / exports (actuellement ignorés)
+save/
+
+# Logs / PID
+*.log
+*.pid
+*.pid.lock
+
+# Archives / dumps
+*.zip
+*.tar
+*.tar.gz
+*.tgz
+*.gz
+*.7z
+*.sql.gz
+*.dump
+
+# Fichiers binaires lourds
+*.pdf
+*.psd
+*.ai
+
+# Médias
+*.mp4
+*.mov
+*.mkv
+*.avi
+*.webm
+*.mp3
+*.wav
+*.flac
+
+# Images (optionnel : à activer si vous avez beaucoup d’images)
+# *.png
+# *.jpg
+# *.jpeg
+# *.webp
+# *.gif
+
+# Uploads / ressources potentiellement volumineuses
+public/ressources/
+public/uploads/
+
+# Locks (optionnel : utile pour réduire l’indexation, rarement nécessaires à l’IA)
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# Secrets (ne jamais indexer)
+.env
+.env.*

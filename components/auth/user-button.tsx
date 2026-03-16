@@ -105,7 +105,7 @@ export const UserButton = () => {
 
               <DropdownMenuItem>
                 <Link href='/user/profile' className='w-full hover:bg-orange-300'>
-                  Mon Profil
+                  Mon espace adhérent
                 </Link>
               </DropdownMenuItem>
 

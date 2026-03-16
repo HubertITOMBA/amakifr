@@ -130,10 +130,7 @@ export async function POST(request: NextRequest) {
 
               await db.detteInitiale.update({
                 where: { id: dette.id },
-                data: {
-                  montantPaye: nouveauMontantPaye,
-                  montantRestant: nouveauMontantRestant.gt(0) ? nouveauMontantRestant : new Decimal(0),
-                },
+                data: { montantPaye: nouveauMontantPaye },
               });
             }
           }

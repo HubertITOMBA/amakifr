@@ -107,10 +107,7 @@ export async function GET(request: NextRequest) {
         const nouveauMontantRestant = restant.minus(montantEffectivementPaye);
         await db.detteInitiale.update({
           where: { id: dette.id },
-          data: {
-            montantPaye: nouveauMontantPaye,
-            montantRestant: nouveauMontantRestant.gt(0) ? nouveauMontantRestant : new Decimal(0),
-          },
+          data: { montantPaye: nouveauMontantPaye },
         });
       }
     }

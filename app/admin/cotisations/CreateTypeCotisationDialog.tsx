@@ -197,7 +197,12 @@ export function CreateTypeCotisationDialog({
                 <Select
                   value={formData.categorie}
                   onValueChange={(v: CategorieTypeCotisation) =>
-                    setFormData({ ...formData, categorie: v })
+                    setFormData({
+                      ...formData,
+                      categorie: v,
+                      // Assistance exige un bénéficiaire : cocher automatiquement "À bénéficiaire"
+                      aBeneficiaire: v === "Assistance",
+                    })
                   }
                 >
                   <SelectTrigger className={inputClass}>
@@ -238,7 +243,7 @@ export function CreateTypeCotisationDialog({
                 </div>
               </div>
 
-              {/* À bénéficiaire (assistance) */}
+              {/* À bénéficiaire (assistance) : obligatoire si catégorie Assistance */}
               <div className="space-y-1">
                 <label className={labelClass}>
                   <Users className="h-3 w-3" />
@@ -253,13 +258,19 @@ export function CreateTypeCotisationDialog({
                       onChange={(e) =>
                         setFormData({ ...formData, aBeneficiaire: e.target.checked })
                       }
-                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                      disabled={formData.categorie === "Assistance"}
+                      className="h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500 cursor-pointer disabled:opacity-70"
                     />
                     <Label
                       htmlFor="create-type-aBeneficiaire"
                       className="cursor-pointer text-sm font-medium text-slate-900 dark:text-slate-100"
                     >
                       Type assistance (un adhérent bénéficiaire ne paie pas)
+                      {formData.categorie === "Assistance" && (
+                        <span className="block text-xs text-amber-600 dark:text-amber-400 mt-0.5">
+                          Obligatoire pour la catégorie Assistance
+                        </span>
+                      )}
                     </Label>
                   </div>
                 </div>

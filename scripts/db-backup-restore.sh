@@ -1,13 +1,22 @@
 #!/bin/bash
 # Script de sauvegarde et restauration de la base de données PostgreSQL amakifr
+# - Sauvegarde complète ou tables au choix ; restauration globale ou par tables.
+# - Fichiers horodatés ; en production le répertoire par défaut est /sites/backup.
 # Gère les contraintes circulaires (comme messages.replyToId)
 
 set -e  # Arrêter en cas d'erreur
 
 # Configuration par défaut
+# En production : utiliser /sites/backup si le répertoire existe, sinon ./backups
 DB_USER="${DB_USER:-hubert}"
 DB_NAME="${DB_NAME:-amakifr}"
-BACKUP_DIR="${BACKUP_DIR:-./backups}"
+if [ -z "$BACKUP_DIR" ]; then
+    if [ -d /sites/backup ] && [ -w /sites/backup ] 2>/dev/null; then
+        BACKUP_DIR="/sites/backup"
+    else
+        BACKUP_DIR="./backups"
+    fi
+fi
 TIMESTAMP=$(date +%Y%m%d_%H%M%S)
 
 # Couleurs pour les messages
@@ -56,22 +65,26 @@ Options:
   -u, --user USER         Utilisateur PostgreSQL (défaut: hubert)
   -d, --database DB       Nom de la base de données (défaut: amakifr)
   -f, --file FILE         Fichier de sauvegarde à restaurer
-  -t, --type TYPE         Type de dump: complete, custom, data-only, non-empty (défaut: complete)
-  -T, --tables T1,T2,...   Restaurer uniquement ces tables (format custom uniquement)
-  -b, --backup-dir DIR    Répertoire de sauvegarde (défaut: ./backups)
+  -t, --type TYPE         Type de dump: complete, custom, data-only, non-empty, tables (défaut: complete)
+  -T, --tables T1,T2,...   Sauvegarder ou restaurer uniquement ces tables (backup -t tables ou restore)
+  -b, --backup-dir DIR    Répertoire de sauvegarde (défaut: ./backups ou /sites/backup en prod)
   -h, --help              Afficher cette aide
 
   Connexion: définir DATABASE_URL pour utiliser une URL (ex. production), sinon -u et -d.
 
 Types de dump:
-  complete    Dump complet (schéma + données), format SQL.
+  complete    Dump complet (schéma + données), format SQL. Fichiers horodatés.
   custom      Dump complet, format binaire (permet restauration par table).
   data-only   Données uniquement, format SQL.
   non-empty   Uniquement les tables non vides (schéma + données), format custom.
+  tables      Uniquement les tables listées avec -T (schéma + données), format custom.
 
 Exemples:
-  # Créer une sauvegarde complète
+  # Créer une sauvegarde complète (toutes les tables, fichier horodaté)
   $0 backup
+
+  # Sauvegarder uniquement certaines tables
+  $0 backup -t tables -T "adherent,users,paiements_cotisation"
 
   # Sauvegarder uniquement les tables non vides
   $0 backup -t non-empty
@@ -97,6 +110,7 @@ EOF
 # Fonction pour créer une sauvegarde
 backup_database() {
     local dump_type="${1:-complete}"
+    local tables_list="$2"
     
     # Créer le répertoire de sauvegarde s'il n'existe pas
     mkdir -p "$BACKUP_DIR"
@@ -161,9 +175,35 @@ backup_database() {
                 exit 1
             fi
             ;;
+        tables)
+            if [ -z "$tables_list" ]; then
+                echo -e "${RED}❌ Type 'tables' nécessite l'option -T table1,table2,...${NC}"
+                echo "Exemple : $0 backup -t tables -T \"adherent,users,paiements_cotisation\""
+                exit 1
+            fi
+            BACKUP_FILE="$BACKUP_DIR/amakifr_tables_${TIMESTAMP}.dump"
+            echo -e "${BLUE}📦 Sauvegarde des tables : $tables_list${NC}"
+            local dump_tables=()
+            IFS=',' read -ra TABARR <<< "$tables_list"
+            for t in "${TABARR[@]}"; do
+                t=$(echo "$t" | xargs)
+                [ -z "$t" ] && continue
+                dump_tables+=(-t "public.$t")
+            done
+            if [ ${#dump_tables[@]} -eq 0 ]; then
+                echo -e "${RED}❌ Aucune table valide dans -T${NC}"
+                exit 1
+            fi
+            if pg_dump_conn -F c "${dump_tables[@]}" -f "$BACKUP_FILE" 2>&1; then
+                echo -e "${GREEN}✅ Dump tables créé : $BACKUP_FILE${NC}"
+            else
+                echo -e "${RED}❌ Erreur lors du dump tables${NC}"
+                exit 1
+            fi
+            ;;
         *)
             echo -e "${RED}❌ Type de dump invalide : $dump_type${NC}"
-            echo "Types valides : complete, custom, data-only, non-empty"
+            echo "Types valides : complete, custom, data-only, non-empty, tables"
             exit 1
             ;;
     esac
@@ -302,6 +342,10 @@ list_backups() {
     ls -lh "$BACKUP_DIR"/amakifr_nonempty_*.dump 2>/dev/null | awk '{printf "  %s %s %s\n", $6, $7, $9}' || echo "  Aucun"
     
     echo ""
+    echo -e "${GREEN}Dumps tables au choix (custom):${NC}"
+    ls -lh "$BACKUP_DIR"/amakifr_tables_*.dump 2>/dev/null | awk '{printf "  %s %s %s\n", $6, $7, $9}' || echo "  Aucun"
+    
+    echo ""
     echo -e "${BLUE}💡 Restaurer : $0 restore -f <fichier>${NC}"
     echo -e "${BLUE}💡 Restaurer des tables choisies : $0 restore -f <fichier.dump> -T \"table1,table2\"${NC}"
     echo -e "${BLUE}💡 Lister les tables d'un dump : $0 list-tables -f <fichier.dump>${NC}"
@@ -376,6 +420,20 @@ clean_backups() {
         kept=$((kept + nonempty_count))
     fi
     
+    # Dumps tables au choix
+    local tables_count=$(ls -1 "$BACKUP_DIR"/amakifr_tables_*.dump 2>/dev/null | wc -l)
+    if [ "$tables_count" -gt 10 ]; then
+        local to_delete=$((tables_count - 10))
+        ls -t "$BACKUP_DIR"/amakifr_tables_*.dump 2>/dev/null | tail -n "$to_delete" | while read file; do
+            rm -f "$file"
+            deleted=$((deleted + 1))
+            echo -e "${YELLOW}  Supprimé : $(basename $file)${NC}"
+        done
+        kept=$((kept + 10))
+    else
+        kept=$((kept + tables_count))
+    fi
+    
     echo -e "${GREEN}✅ Nettoyage terminé : $kept sauvegarde(s) conservée(s), $deleted supprimée(s)${NC}"
 }
 
@@ -430,7 +488,7 @@ done
 # Exécuter la commande
 case "$COMMAND" in
     backup)
-        backup_database "$DUMP_TYPE"
+        backup_database "$DUMP_TYPE" "$RESTORE_TABLES"
         ;;
     restore)
         restore_database "$BACKUP_FILE" "$RESTORE_TABLES"

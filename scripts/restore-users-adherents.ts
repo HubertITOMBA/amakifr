@@ -287,7 +287,6 @@ async function main() {
       annee: (d.annee as number) ?? new Date().getFullYear(),
       montant: parseDecimal(d.montant),
       montantPaye: parseDecimal(d.montantPaye),
-      montantRestant: parseDecimal(d.montantRestant),
       description: (d.description as string) ?? null,
       createdAt: parseDate(d.createdAt) ?? new Date(),
       updatedAt: parseDate(d.updatedAt) ?? new Date(),

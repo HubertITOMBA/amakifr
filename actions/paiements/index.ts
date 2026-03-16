@@ -57,7 +57,6 @@ try {
         annee: validatedData.annee,
         montant: new Decimal(validatedData.montant),
         montantPaye: new Decimal(0),
-        montantRestant: new Decimal(validatedData.montant),
         description: validatedData.description,
         createdBy: session.user.id,
       },
@@ -213,10 +212,7 @@ export async function appliquerAvoirSurDettesInitiales(adherentId: string): Prom
         : new Decimal(0);
       await prisma.detteInitiale.update({
         where: { id: dette.id },
-        data: {
-          montantPaye: nouveauMontantPaye,
-          montantRestant: nouveauMontantRestant,
-        },
+        data: { montantPaye: nouveauMontantPaye },
       });
     }
   }
@@ -317,10 +313,7 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
 
         await prisma.detteInitiale.update({
           where: { id: validatedData.detteInitialeId },
-          data: {
-            montantPaye: nouveauMontantPaye,
-            montantRestant: nouveauMontantRestant.gt(0) ? nouveauMontantRestant : new Decimal(0),
-          },
+          data: { montantPaye: nouveauMontantPaye },
         });
 
         montantRestantAPayer = excédent;
@@ -671,10 +664,7 @@ export async function updatePaiement(data: z.infer<typeof UpdatePaiementSchema>)
       const montantRestant = montantTotal.minus(totalPaye).gt(0) ? montantTotal.minus(totalPaye) : new Decimal(0);
       await prisma.detteInitiale.update({
         where: { id: existing.detteInitialeId },
-        data: {
-          montantPaye: totalPaye,
-          montantRestant,
-        },
+        data: { montantPaye: totalPaye },
       });
     } else if (existing.assistanceId && existing.Assistance) {
       const paiements = await prisma.paiementCotisation.findMany({
@@ -1519,7 +1509,6 @@ export async function updateDetteInitiale(data: z.infer<typeof UpdateDetteInitia
         adherentId: validatedData.adherentId,
         annee: validatedData.annee,
         montant: new Decimal(validatedData.montant),
-        montantRestant: nouveauMontantRestant,
         description: validatedData.description,
       },
       include: {
@@ -1953,10 +1942,7 @@ export async function createPaiementGeneral(data: {
             const nouveauMontantRestant = montantRestantApresAvoirs.minus(montantAPayerDecimal);
             await prisma.detteInitiale.update({
               where: { id: dette.id },
-              data: {
-                montantPaye: nouveauMontantPaye,
-                montantRestant: nouveauMontantRestant.gt(0) ? nouveauMontantRestant : new Decimal(0),
-              },
+              data: { montantPaye: nouveauMontantPaye },
             });
           }
         } else if (dette.type === 'cotisationMensuelle') {

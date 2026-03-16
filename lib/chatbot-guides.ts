@@ -460,7 +460,7 @@ export const chatbotGuides: Guide[] = [
       '',
       '📆 Choisir la date (hôte) :',
       'Cliquez sur le mois dont vous êtes hôte',
-      'Dans le dialogue, section "Date de la réunion" : choisissez un samedi du mois (uniquement les samedis, et au moins 7 jours à l\'avance)',
+      'Dans le dialogue, section "Date de la réunion" : choisissez un samedi du mois (uniquement les samedis, et au moins 15 jours à l\'avance)',
       'Renseignez le type de lieu (Domicile, Restaurant, Autre), l\'adresse si besoin, et enregistrez',
       'Une fois l\'admin aura validé la réunion, la date sera confirmée et les autres pourront indiquer leur présence',
       '',
