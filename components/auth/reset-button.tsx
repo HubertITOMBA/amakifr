@@ -37,7 +37,11 @@ export const ResetButton = ({
                     <DialogTrigger asChild={true}>
                         {children}
                     </DialogTrigger>
-                    <DialogContent className="p-0 w-auto bg-transparent border-none max-w-md backdrop-blur-none">
+                    <DialogContent
+                        onOpenAutoFocus={(e) => e.preventDefault()}
+                        onCloseAutoFocus={(e) => e.preventDefault()}
+                        className="p-0 w-auto bg-transparent border-none max-w-md backdrop-blur-none"
+                    >
                         <DialogTitle className="sr-only">Réinitialisation du mot de passe</DialogTitle>
                         <div className="bg-transparent">
                             <ResetForm />

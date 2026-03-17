@@ -20,8 +20,8 @@ import { Button } from "@/components/ui/button";
 import { FormError } from '@/components/global/form-error';
 import { FormSuccess } from '@/components/global/form-success';
 import { reset } from "@/actions/auth/reset";
-import { LoginButton } from "@/components/auth/login-button";
 import { DialogClose } from "@/components/ui/dialog";
+import Link from "next/link";
 
 
 export const ResetForm = () => {
@@ -63,44 +63,25 @@ export const ResetForm = () => {
     const BackToLoginButton = () => {
         const pathname = usePathname();
         const router = useRouter();
-        const [shouldOpenLogin, setShouldOpenLogin] = useState(false);
-        const loginTriggerRef = React.useRef<HTMLButtonElement>(null);
         
         // Vérifier si on est sur la page standalone (pas dans un modal)
         const isStandalonePage = pathname === "/auth/reset";
         
-        const handleClick = () => {
-            if (isStandalonePage) {
-                // Si on est sur la page standalone, rediriger vers la page de connexion
-                router.push("/auth/sign-in");
-            } else {
-                // Si on est dans un modal, marquer qu'on doit ouvrir le modal de connexion après la fermeture
-                setShouldOpenLogin(true);
-            }
-        };
-        
-        // Ouvrir le modal de connexion après un court délai si nécessaire
-        React.useEffect(() => {
-            if (!isStandalonePage && shouldOpenLogin && loginTriggerRef.current) {
-                const timer = setTimeout(() => {
-                    loginTriggerRef.current?.click();
-                    setShouldOpenLogin(false);
-                }, 200);
-                return () => clearTimeout(timer);
-            }
-        }, [shouldOpenLogin, isStandalonePage]);
-        
+        const callbackUrl = encodeURIComponent(pathname || "/");
+        const href = `/auth/sign-in?callbackUrl=${callbackUrl}`;
+
         const button = (
-            <Button
-                variant="link"
-                size="sm"
-                type="button"
-                onClick={handleClick}
-                className="w-full text-gray-800 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100 font-normal"
-            >
-                Retour à la connexion
-            </Button>
-        );
+            <Link href={href} className="w-full">
+                <Button
+                    variant="link"
+                    size="sm"
+                    type="button"
+                    className="w-full text-gray-800 dark:text-gray-200 hover:text-gray-900 dark:hover:text-gray-100 font-normal"
+                >
+                    Retour à la connexion
+                </Button>
+            </Link>
+        )
         
         // Si on est dans un modal, utiliser DialogClose, sinon utiliser le bouton directement
         if (isStandalonePage) {
@@ -108,22 +89,9 @@ export const ResetForm = () => {
         }
         
         return (
-            <>
-                <DialogClose asChild>
-                    {button}
-                </DialogClose>
-                {shouldOpenLogin && (
-                    <div style={{ position: 'absolute', top: '-9999px', left: '-9999px' }}>
-                        <LoginButton mode="modal">
-                            <button 
-                                ref={loginTriggerRef}
-                                type="button" 
-                                style={{ display: 'none' }}
-                            />
-                        </LoginButton>
-                    </div>
-                )}
-            </>
+            <DialogClose asChild>
+                {button}
+            </DialogClose>
         );
     };
 
@@ -151,6 +119,7 @@ export const ResetForm = () => {
                                                  disabled={isPending}
                                                  placeholder=""
                                                 type="email"
+                                                autoFocus
                                             />
                                         </FormControl>
                                         <FormMessage />

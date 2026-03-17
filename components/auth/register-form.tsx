@@ -116,7 +116,7 @@ export const RegisterForm = () => {
                 headerLabel="Créez votre compte"
                 backButtonLabel="Vous avez déjà un compte ?"
                 backButtonComponent={
-                    <LoginButton mode="modal">
+                    <LoginButton mode="redirect">
                         <Button
                             variant="link"
                             size="sm"
@@ -165,6 +165,7 @@ export const RegisterForm = () => {
                                                 disabled={isPending}
                                                 placeholder="votre.boite@gmail.com"
                                                 type="email"
+                                                autoFocus
                                                 className="placeholder:text-gray-400 dark:placeholder:text-gray-500 text-gray-900 dark:text-gray-100"
                                             />
                                          </FormControl>

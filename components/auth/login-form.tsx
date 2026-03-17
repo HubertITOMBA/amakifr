@@ -15,6 +15,7 @@ import {
   FormMessage,
 } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { PasswordInput } from "@/components/ui/password-input"
 import { Button } from "@/components/ui/button"
 import { CardWrapper } from "@/components/auth/card-wrapper"
 import { FormError } from "@/components/global/form-error"
@@ -158,6 +159,7 @@ export default function LoginForm() {
                       placeholder=""
                       type="email"
                       autoComplete="email"
+                      autoFocus
                     />
                   </FormControl>
                   <FormMessage />
@@ -172,11 +174,10 @@ export default function LoginForm() {
                 <FormItem>
                   <FormLabel>Mot de passe</FormLabel>
                   <FormControl>
-                    <Input
+                    <PasswordInput
                       {...field}
                       disabled={isPending}
                       placeholder=""
-                      type="password"
                       autoComplete="current-password"
                     />
                   </FormControl>
