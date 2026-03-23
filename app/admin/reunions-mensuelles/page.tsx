@@ -40,9 +40,10 @@ import {
   deleteReunionMensuelle,
   validerMoisReunion,
   getReunionMensuelleById,
+  adminSetParticipationsReunion,
 } from "@/actions/reunions-mensuelles";
 import { getAdherentsMembres } from "@/actions/cotisations-du-mois";
-import { StatutReunionMensuelle, TypeLieuReunion } from "@prisma/client";
+import { StatutReunionMensuelle, TypeLieuReunion, StatutParticipationReunion } from "@prisma/client";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -130,6 +131,8 @@ export default function AdminReunionsMensuellesPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [anneeCartes, setAnneeCartes] = useState(new Date().getFullYear());
   const [participantsDialogReunion, setParticipantsDialogReunion] = useState<any | null>(null);
+  const [participantsEdits, setParticipantsEdits] = useState<Record<string, StatutParticipationReunion>>({});
+  const [participantsInitial, setParticipantsInitial] = useState<Record<string, StatutParticipationReunion>>({});
 
   const loadData = useCallback(async () => {
     try {
@@ -389,7 +392,7 @@ export default function AdminReunionsMensuellesPage() {
           return (
             <button
               type="button"
-              onClick={() => canViewList && setParticipantsDialogReunion(reunion)}
+              onClick={() => canViewList && openParticipantsDialog(reunion)}
               className={cn(
                 "flex items-center gap-2 text-xs text-left rounded px-1 py-0.5 -mx-1",
                 canViewList && "hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
@@ -426,7 +429,7 @@ export default function AdminReunionsMensuellesPage() {
                   Modifier
                 </DropdownMenuItem>
                 {reunion.statut === "DateConfirmee" && (
-                  <DropdownMenuItem onClick={() => setParticipantsDialogReunion(reunion)}>
+                  <DropdownMenuItem onClick={() => openParticipantsDialog(reunion)}>
                     <Users className="h-4 w-4 mr-2" />
                     Voir participants
                   </DropdownMenuItem>
@@ -499,6 +502,63 @@ export default function AdminReunionsMensuellesPage() {
       });
       setSelectedAdherent(null);
       setShowForm(true);
+    }
+  };
+
+  const openParticipantsDialog = (reunion: any) => {
+    const initial: Record<string, StatutParticipationReunion> = {};
+    adherents.forEach((a) => {
+      const part = reunion.Participations?.find((p: any) => p.adherentId === a.id);
+      initial[a.id] = (part?.statut ?? "NonRepondu") as StatutParticipationReunion;
+    });
+    setParticipantsInitial(initial);
+    setParticipantsEdits(initial);
+    setParticipantsDialogReunion(reunion);
+  };
+
+  const handleSaveParticipants = async () => {
+    if (!participantsDialogReunion) return;
+    setLoading(true);
+    try {
+      // Envoyer uniquement les changements pour ne pas écraser l'historique non modifié
+      const payloadParticipations = adherents
+        .map((a) => ({
+          adherentId: a.id,
+          statut: (participantsEdits[a.id] ?? "NonRepondu") as StatutParticipationReunion,
+          initialStatut: (participantsInitial[a.id] ?? "NonRepondu") as StatutParticipationReunion,
+        }))
+        .filter((p) => p.statut !== p.initialStatut)
+        .map(({ adherentId, statut }) => ({ adherentId, statut }));
+
+      if (payloadParticipations.length === 0) {
+        toast.info("Aucune modification détectée.");
+        setLoading(false);
+        return;
+      }
+
+      const result = await adminSetParticipationsReunion({
+        reunionId: participantsDialogReunion.id,
+        participations: payloadParticipations,
+      });
+
+      if (result.success) {
+        const presents = payloadParticipations.filter((p) => p.statut === "Present").length;
+        const absents = payloadParticipations.filter((p) => p.statut === "Absent").length;
+        const excuses = payloadParticipations.filter((p) => p.statut === "Excuse").length;
+        const nonRepondus = payloadParticipations.filter((p) => p.statut === "NonRepondu").length;
+
+        toast.success(
+          `Participants enregistrés - Présents: ${presents} | Absents: ${absents} | Excusés: ${excuses} | Non répondus: ${nonRepondus}`
+        );
+        setParticipantsDialogReunion(null);
+        await loadData();
+      } else {
+        toast.error(result.error || "Erreur lors de l'enregistrement des participants");
+      }
+    } catch (error) {
+      toast.error("Erreur lors de l'enregistrement des participants");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -914,6 +974,40 @@ export default function AdminReunionsMensuellesPage() {
               </DialogHeader>
               {participantsDialogReunion && (
                 <div className="overflow-auto flex-1 min-h-0">
+                  {(() => {
+                    const stats = adherents.reduce(
+                      (acc, a) => {
+                        const part = participantsDialogReunion.Participations?.find((p: any) => p.adherentId === a.id);
+                        const fallbackStatut = (part?.statut ?? "NonRepondu") as StatutParticipationReunion;
+                        const statut = (participantsEdits[a.id] ?? fallbackStatut) as StatutParticipationReunion;
+                        if (statut === "Present") acc.presents += 1;
+                        else if (statut === "Absent") acc.absents += 1;
+                        else if (statut === "Excuse") acc.excuses += 1;
+                        else acc.nonRepondus += 1;
+                        return acc;
+                      },
+                      { presents: 0, absents: 0, excuses: 0, nonRepondus: 0 }
+                    );
+
+                    return (
+                      <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
+                        <div className="flex flex-wrap items-center gap-2 text-xs">
+                          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-100">
+                            Présents: {stats.presents}
+                          </Badge>
+                          <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-100">
+                            Absents: {stats.absents}
+                          </Badge>
+                          <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900/60 dark:text-orange-100">
+                            Excusés: {stats.excuses}
+                          </Badge>
+                          <Badge variant="secondary" className="bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100">
+                            Non répondus: {stats.nonRepondus}
+                          </Badge>
+                        </div>
+                      </div>
+                    );
+                  })()}
                   <table className="w-full text-sm border-collapse">
                     <thead>
                       <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
@@ -925,12 +1019,31 @@ export default function AdminReunionsMensuellesPage() {
                       {adherents.map((a) => {
                         const part = participantsDialogReunion.Participations?.find((p: any) => p.adherentId === a.id);
                         const statut = part?.statut ?? "NonRepondu";
-                        const statutLabel = { Present: "Présent", Absent: "Absent", Excuse: "Excuse", NonRepondu: "Non répondu" }[statut] ?? statut;
-                        const statutClass = statut === "Present" ? "text-green-600 dark:text-green-400" : statut === "Absent" ? "text-red-600 dark:text-red-400" : statut === "Excuse" ? "text-orange-600 dark:text-orange-400" : "text-slate-500 dark:text-slate-400";
+                        const currentStatut = participantsEdits[a.id] ?? statut;
                         return (
                           <tr key={a.id} className="border-b border-slate-100 dark:border-slate-800">
                             <td className="px-3 py-2">{a.firstname} {a.lastname}</td>
-                            <td className={`px-3 py-2 font-medium ${statutClass}`}>{statutLabel}</td>
+                            <td className="px-3 py-2">
+                              <Select
+                                value={currentStatut}
+                                onValueChange={(v) =>
+                                  setParticipantsEdits((prev) => ({
+                                    ...prev,
+                                    [a.id]: v as StatutParticipationReunion,
+                                  }))
+                                }
+                              >
+                                <SelectTrigger className="h-8">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="Present">Présent</SelectItem>
+                                  <SelectItem value="Absent">Absent</SelectItem>
+                                  <SelectItem value="Excuse">Excusé</SelectItem>
+                                  <SelectItem value="NonRepondu">Non répondu</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </td>
                           </tr>
                         );
                       })}
@@ -939,6 +1052,9 @@ export default function AdminReunionsMensuellesPage() {
                 </div>
               )}
               <DialogFooter className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                <Button type="button" onClick={handleSaveParticipants} disabled={loading}>
+                  Enregistrer
+                </Button>
                 <Button type="button" variant="outline" onClick={() => setParticipantsDialogReunion(null)}>
                   Fermer
                 </Button>

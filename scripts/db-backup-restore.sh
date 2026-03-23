@@ -27,23 +27,35 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 # Connexion : utiliser DATABASE_URL si défini, sinon -U et -d
+sanitize_db_url() {
+    # Prisma utilise souvent ?schema=public ; les outils Postgres (psql/pg_dump/pg_restore) peuvent refuser ces params.
+    # On retire toute la querystring (?...)
+    echo "${DATABASE_URL%%\?*}"
+}
 psql_conn() {
     if [ -n "$DATABASE_URL" ]; then
-        psql "$DATABASE_URL" "$@"
+        local url
+        url="$(sanitize_db_url)"
+        psql "$url" "$@"
     else
         psql -U "$DB_USER" -d "$DB_NAME" "$@"
     fi
 }
 pg_dump_conn() {
     if [ -n "$DATABASE_URL" ]; then
-        pg_dump "$DATABASE_URL" "$@"
+        local url
+        url="$(sanitize_db_url)"
+        pg_dump "$url" "$@"
     else
         pg_dump -U "$DB_USER" -d "$DB_NAME" "$@"
     fi
 }
 pg_restore_conn() {
     if [ -n "$DATABASE_URL" ]; then
-        pg_restore "$DATABASE_URL" "$@"
+        # pg_restore n'accepte pas l'URL en argument positionnel : utiliser --dbname
+        local url
+        url="$(sanitize_db_url)"
+        pg_restore --dbname="$url" "$@"
     else
         pg_restore -U "$DB_USER" -d "$DB_NAME" "$@"
     fi
@@ -248,17 +260,41 @@ restore_database() {
     
     # Détecter le type de fichier
     if [[ "$backup_file" == *.dump ]] || [[ "$backup_file" == *.custom ]]; then
-        # Format custom (binaire) : restauration globale ou par table(s)
-        local restore_opts=(--clean --if-exists)
+        # Format custom (binaire) : par défaut on restaure les DONNÉES uniquement.
+        # La base cible a généralement déjà le schéma (migrations), et --clean provoquerait des erreurs de FK.
+        # Note: --disable-triggers nécessite souvent des droits élevés (sinon "trigger système").
+        local restore_opts=(--data-only --no-owner --no-privileges)
+
+        # Si on restaure un sous-ensemble de tables, on peut les vider avant injection
+        if [ -n "$tables_opt" ]; then
+            echo -e "${BLUE}🧹 Nettoyage des tables cibles (TRUNCATE) : $tables_opt${NC}"
+            local truncate_sql="TRUNCATE "
+            local first=1
+            local t
+            IFS=',' read -ra TABLIST <<< "$tables_opt"
+            for t in "${TABLIST[@]}"; do
+                t=$(echo "$t" | xargs)
+                [ -z "$t" ] && continue
+                if [ $first -eq 1 ]; then
+                    first=0
+                else
+                    truncate_sql+=", "
+                fi
+                truncate_sql+="public.\"$t\""
+            done
+            truncate_sql+=" RESTART IDENTITY CASCADE;"
+            # Si ça échoue (droits), on continue quand même pour laisser pg_restore tenter
+            psql_conn -v ON_ERROR_STOP=1 -c "$truncate_sql" 2>/dev/null || true
+        fi
+
         if [ -n "$tables_opt" ]; then
             local t
-            while IFS=',' read -ra TABLIST; do
-                for t in "${TABLIST[@]}"; do
-                    t=$(echo "$t" | xargs)
-                    [ -z "$t" ] && continue
-                    restore_opts+=(-t "$t")
-                done
-            done <<< "$tables_opt"
+            IFS=',' read -ra TABLIST <<< "$tables_opt"
+            for t in "${TABLIST[@]}"; do
+                t=$(echo "$t" | xargs)
+                [ -z "$t" ] && continue
+                restore_opts+=(-t "$t")
+            done
         fi
         restore_opts+=("$backup_file")
         echo -e "${BLUE}📥 Restauration d'un dump custom...${NC}"

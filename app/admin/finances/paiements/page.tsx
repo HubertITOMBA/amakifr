@@ -5,6 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
@@ -55,6 +56,7 @@ export default function AdminPaiementsPage() {
     datePaiement: new Date().toISOString().split("T")[0],
     moyenPaiement: "Especes" as "Especes" | "Cheque" | "Virement" | "CarteBancaire",
     reference: "",
+    note: "",
   });
   const [payJustificatifFile, setPayJustificatifFile] = useState<File | null>(null);
   const [payingId, setPayingId] = useState<string | null>(null);
@@ -64,8 +66,8 @@ export default function AdminPaiementsPage() {
   const [dettesInitialesAdherent, setDettesInitialesAdherent] = useState<{ id: string; annee: number; montant: number; montantPaye: number; montantRestant: number; description?: string | null }[]>([]);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [editPaiementOpen, setEditPaiementOpen] = useState(false);
-  const [editingPaiement, setEditingPaiement] = useState<{ id: string; montant: number; datePaiement: string; moyenPaiement: string; reference?: string | null; justificatifChemin?: string | null } | null>(null);
-  const [editPaiementForm, setEditPaiementForm] = useState({ montant: "", datePaiement: "", moyenPaiement: "Especes" as "Especes" | "Cheque" | "Virement" | "CarteBancaire", reference: "" });
+  const [editingPaiement, setEditingPaiement] = useState<{ id: string; montant: number; datePaiement: string; moyenPaiement: string; reference?: string | null; description?: string | null; justificatifChemin?: string | null } | null>(null);
+  const [editPaiementForm, setEditPaiementForm] = useState({ montant: "", datePaiement: "", moyenPaiement: "Especes" as "Especes" | "Cheque" | "Virement" | "CarteBancaire", reference: "", note: "" });
   const [editJustificatifFile, setEditJustificatifFile] = useState<File | null>(null);
   const [savingPaiement, setSavingPaiement] = useState(false);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
@@ -80,6 +82,7 @@ export default function AdminPaiementsPage() {
     datePaiement: new Date().toISOString().split("T")[0],
     moyenPaiement: "Especes" as "Especes" | "Cheque" | "Virement" | "CarteBancaire",
     reference: "",
+    note: "",
   });
   const [payObligationJustificatifFile, setPayObligationJustificatifFile] = useState<File | null>(null);
   const [payingObligationId, setPayingObligationId] = useState<string | null>(null);
@@ -380,6 +383,7 @@ export default function AdminPaiementsPage() {
       datePaiement: new Date().toISOString().split("T")[0],
       moyenPaiement: "Especes",
       reference: "",
+      note: "",
     });
     setPayJustificatifFile(null);
     setPayDialogOpen(true);
@@ -421,6 +425,7 @@ export default function AdminPaiementsPage() {
         datePaiement: payForm.datePaiement,
         moyenPaiement: payForm.moyenPaiement,
         reference: payForm.reference || undefined,
+        description: payForm.note?.trim() || undefined,
         cotisationMensuelleId: selectedCotisationForPay.id,
         justificatifChemin,
       });
@@ -456,6 +461,7 @@ export default function AdminPaiementsPage() {
       datePaiement: new Date().toISOString().split("T")[0],
       moyenPaiement: "Especes",
       reference: "",
+      note: "",
     });
     setPayObligationJustificatifFile(null);
     setPayObligationDialogOpen(true);
@@ -496,7 +502,10 @@ export default function AdminPaiementsPage() {
         moyenPaiement: payObligationForm.moyenPaiement,
         reference: payObligationForm.reference || undefined,
         obligationCotisationId: selectedObligationForPay.id,
-        description: selectedObligationForPay.description || getTypeObligationLabel(selectedObligationForPay.type),
+        description:
+          payObligationForm.note?.trim() ||
+          selectedObligationForPay.description ||
+          getTypeObligationLabel(selectedObligationForPay.type),
         justificatifChemin,
       });
       if (result.success) {
@@ -515,10 +524,10 @@ export default function AdminPaiementsPage() {
     }
   };
 
-  const openEditPaiement = (p: { id: string; montant: number; datePaiement: Date | string; moyenPaiement: string; reference?: string | null; justificatifChemin?: string | null }) => {
+  const openEditPaiement = (p: { id: string; montant: number; datePaiement: Date | string; moyenPaiement: string; reference?: string | null; description?: string | null; justificatifChemin?: string | null }) => {
     const date = typeof p.datePaiement === "string" ? p.datePaiement : format(new Date(p.datePaiement), "yyyy-MM-dd");
-    setEditingPaiement({ id: p.id, montant: p.montant, datePaiement: date, moyenPaiement: p.moyenPaiement, reference: p.reference ?? undefined, justificatifChemin: p.justificatifChemin ?? undefined });
-    setEditPaiementForm({ montant: String(p.montant), datePaiement: date, moyenPaiement: (p.moyenPaiement as "Especes" | "Cheque" | "Virement" | "CarteBancaire") || "Especes", reference: p.reference ?? "" });
+    setEditingPaiement({ id: p.id, montant: p.montant, datePaiement: date, moyenPaiement: p.moyenPaiement, reference: p.reference ?? undefined, description: p.description ?? undefined, justificatifChemin: p.justificatifChemin ?? undefined });
+    setEditPaiementForm({ montant: String(p.montant), datePaiement: date, moyenPaiement: (p.moyenPaiement as "Especes" | "Cheque" | "Virement" | "CarteBancaire") || "Especes", reference: p.reference ?? "", note: p.description ?? "" });
     setEditJustificatifFile(null);
     setEditPaiementOpen(true);
   };
@@ -557,6 +566,7 @@ export default function AdminPaiementsPage() {
         datePaiement: editPaiementForm.datePaiement,
         moyenPaiement: editPaiementForm.moyenPaiement,
         reference: editPaiementForm.reference || undefined,
+        description: editPaiementForm.note?.trim() || undefined,
         justificatifChemin: isVirement ? justificatifChemin : undefined,
       });
       if (res.success) {
@@ -902,6 +912,16 @@ export default function AdminPaiementsPage() {
                 className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
               />
             </div>
+            <div>
+              <Label className="text-sm text-gray-700 dark:text-gray-300">Commentaire / note</Label>
+              <Textarea
+                value={payForm.note}
+                onChange={(e) => setPayForm((p) => ({ ...p, note: e.target.value }))}
+                placeholder="Ajouter une note sur ce paiement..."
+                rows={3}
+                className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+              />
+            </div>
             {payForm.moyenPaiement === "Virement" && (
               <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-3 space-y-2">
                 <div className="flex items-center gap-2">
@@ -1013,6 +1033,16 @@ export default function AdminPaiementsPage() {
                   value={payObligationForm.reference}
                   onChange={(e) => setPayObligationForm((p) => ({ ...p, reference: e.target.value }))}
                   placeholder="N° chèque, virement..."
+                  className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
+                />
+              </div>
+              <div>
+                <Label className="text-sm text-gray-700 dark:text-gray-300">Commentaire / note</Label>
+                <Textarea
+                  value={payObligationForm.note}
+                  onChange={(e) => setPayObligationForm((p) => ({ ...p, note: e.target.value }))}
+                  placeholder="Ajouter une note sur ce paiement..."
+                  rows={3}
                   className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
                 />
               </div>
@@ -1128,12 +1158,19 @@ export default function AdminPaiementsPage() {
                     <p className="text-xs font-semibold uppercase tracking-wider text-emerald-800 dark:text-emerald-200">Paiements enregistrés</p>
                     <ul className="text-xs space-y-2">
                       {selectedCotisationForDetail.Paiements.map((p: any) => (
-                        <li key={p.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-emerald-100 dark:border-emerald-900/50 last:border-0">
-                          <span>{format(new Date(p.datePaiement), "dd/MM/yyyy", { locale: fr })} · {Number(p.montant).toFixed(2)} € · {p.moyenPaiement}</span>
-                          <Button variant="ghost" size="sm" className="h-7 text-emerald-700 dark:text-emerald-300 shrink-0" onClick={() => openEditPaiement(p)}>
-                            <Pencil className="h-3.5 w-3.5 mr-1" />
-                            Modifier
-                          </Button>
+                        <li key={p.id} className="py-1.5 border-b border-emerald-100 dark:border-emerald-900/50 last:border-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span>{format(new Date(p.datePaiement), "dd/MM/yyyy", { locale: fr })} · {Number(p.montant).toFixed(2)} € · {p.moyenPaiement}</span>
+                            <Button variant="ghost" size="sm" className="h-7 text-emerald-700 dark:text-emerald-300 shrink-0" onClick={() => openEditPaiement(p)}>
+                              <Pencil className="h-3.5 w-3.5 mr-1" />
+                              Modifier
+                            </Button>
+                          </div>
+                          {p.description?.trim() && (
+                            <p className="mt-1 text-[11px] text-emerald-900 dark:text-emerald-200">
+                              Note : {p.description}
+                            </p>
+                          )}
                         </li>
                       ))}
                     </ul>
@@ -1176,6 +1213,16 @@ export default function AdminPaiementsPage() {
                 <div>
                   <Label className="text-sm text-gray-700 dark:text-gray-300">Référence</Label>
                   <Input value={editPaiementForm.reference} onChange={(e) => setEditPaiementForm((f) => ({ ...f, reference: e.target.value }))} placeholder="N° chèque, virement..." className="mt-1 bg-gray-50 dark:bg-gray-800" />
+                </div>
+                <div>
+                  <Label className="text-sm text-gray-700 dark:text-gray-300">Commentaire / note</Label>
+                  <Textarea
+                    value={editPaiementForm.note}
+                    onChange={(e) => setEditPaiementForm((f) => ({ ...f, note: e.target.value }))}
+                    placeholder="Ajouter une note sur ce paiement..."
+                    rows={3}
+                    className="mt-1 bg-gray-50 dark:bg-gray-800"
+                  />
                 </div>
                 {editPaiementForm.moyenPaiement === "Virement" && (
                   <div className="space-y-2 rounded-lg border border-amber-200 dark:border-amber-800 bg-amber-50/50 dark:bg-amber-950/30 p-3">

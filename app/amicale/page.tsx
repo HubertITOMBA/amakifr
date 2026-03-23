@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { StatuAmaki } from "@/components/statuamaki";
 import { Conditions } from "@/components/conditions";
+import { AnniversairesBanner } from "@/components/amicale/anniversaires-banner";
 import { 
   Users, 
   Target, 
@@ -199,6 +200,8 @@ export default function AmicalePage() {
           </div>
         </div>
       </section>
+
+      <AnniversairesBanner />
 
       {/* Section Qui sommes-nous */}
       <section className="py-8 sm:py-12 md:py-16 bg-white dark:bg-slate-900">

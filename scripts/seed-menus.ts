@@ -58,6 +58,18 @@ async function seedMenus() {
         electoral: false,
         parent: null,
       },
+      {
+        libelle: "Anniversaires",
+        description: "Souhaiter les anniversaires des adhérents",
+        lien: "/anniversaires",
+        niveau: "NAVBAR" as const,
+        roles: ["ADMIN", "MEMBRE", "INVITE", "VISITEUR"],
+        icone: "Cake",
+        statut: true,
+        ordre: 9,
+        electoral: false,
+        parent: null,
+      },
       // Menu parent "Scrutin" pour regrouper les menus électoraux
       {
         libelle: "Scrutin",

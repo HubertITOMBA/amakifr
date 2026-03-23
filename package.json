@@ -62,7 +62,8 @@
     "db:backup:tables": "bash scripts/db-backup-restore.sh backup -t tables",
     "db:backup-list": "bash scripts/db-backup-restore.sh list",
     "db:backup-clean": "bash scripts/db-backup-restore.sh clean",
-    "db:restore": "bash scripts/db-backup-restore.sh restore"
+    "db:restore": "bash scripts/db-backup-restore.sh restore",
+    "db:add-anniversaires-menu-navbar": "tsx scripts/add-anniversaires-menu-navbar.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",

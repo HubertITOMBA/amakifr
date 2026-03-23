@@ -36,6 +36,17 @@ const ConfirmerParticipationSchema = z.object({
   commentaire: z.string().optional(),
 });
 
+const AdminSetParticipationsSchema = z.object({
+  reunionId: z.string().min(1, "ID de réunion requis"),
+  participations: z.array(
+    z.object({
+      adherentId: z.string().min(1, "ID adhérent requis"),
+      statut: z.enum(["Present", "Absent", "Excuse", "NonRepondu"]),
+      commentaire: z.string().optional(),
+    })
+  ),
+});
+
 /**
  * Créer une nouvelle réunion mensuelle (adhérent choisit le mois)
  */
@@ -709,6 +720,79 @@ export async function confirmerParticipationReunion(data: z.infer<typeof Confirm
     return { success: true, data: participation };
   } catch (error) {
     console.error("Erreur lors de la confirmation de participation:", error);
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    return { success: false, error: "Erreur interne du serveur" };
+  }
+}
+
+/**
+ * Enregistrer les participations d'une réunion (admin)
+ */
+export async function adminSetParticipationsReunion(data: z.infer<typeof AdminSetParticipationsSchema>) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateReunionMensuelle");
+    if (!hasAccess) {
+      return { success: false, error: "Réservé aux administrateurs" };
+    }
+
+    const validatedData = AdminSetParticipationsSchema.parse(data);
+
+    const reunion = await prisma.reunionMensuelle.findUnique({
+      where: { id: validatedData.reunionId },
+      select: { id: true },
+    });
+
+    if (!reunion) {
+      return { success: false, error: "Réunion non trouvée" };
+    }
+
+    if (validatedData.participations.length === 0) {
+      return { success: false, error: "Aucune participation à enregistrer" };
+    }
+
+    await prisma.$transaction(
+      validatedData.participations.map((p) =>
+        prisma.participationReunion.upsert({
+          where: {
+            reunionId_adherentId: {
+              reunionId: validatedData.reunionId,
+              adherentId: p.adherentId,
+            },
+          },
+          create: {
+            reunionId: validatedData.reunionId,
+            adherentId: p.adherentId,
+            statut: p.statut as StatutParticipationReunion,
+            commentaire: p.commentaire,
+          },
+          update: {
+            statut: p.statut as StatutParticipationReunion,
+            commentaire: p.commentaire,
+          },
+        })
+      )
+    );
+
+    await logModification(
+      `Participations enregistrées pour la réunion ${validatedData.reunionId}`,
+      "ParticipationReunion",
+      validatedData.reunionId
+    );
+
+    revalidatePath("/admin/reunions-mensuelles");
+    revalidatePath("/reunions-mensuelles");
+
+    return { success: true };
+  } catch (error) {
+    console.error("Erreur lors de l'enregistrement des participations (admin):", error);
     if (error instanceof z.ZodError) {
       return { success: false, error: error.errors[0].message };
     }
