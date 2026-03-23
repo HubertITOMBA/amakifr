@@ -75,9 +75,6 @@ export default async function AnniversairesPage() {
                           <Gift className="h-3.5 w-3.5 mr-1" />
                           {getSpotlightLabel(member.daysFromBirthday)}
                         </Badge>
-                        <span className="text-sm text-gray-600 dark:text-gray-300">
-                          {member.ageAtNextBirthday} ans
-                        </span>
                       </div>
                     </CardContent>
                   </Card>
