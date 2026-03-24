@@ -254,6 +254,7 @@ model User {
   emailsReceived                Email[]                      @relation("EmailRecipient") // Emails reçus
   emailsSent                    Email[]                      @relation("EmailCreatedBy") // Emails envoyés
   suppressionsEffectuees        SuppressionAdherent[]        @relation("SuppressionDeletedBy") // Suppressions d'adhérents effectuées
+  relancesAbsenteisme           RelanceAbsenteisme[]         @relation("RelanceAbsenteismeCreatedBy")
   dataDeletionRequests          DataDeletionRequest[]        @relation("DataDeletionRequestUser") // Demandes de suppression de données
   dataDeletionRequestsVerified  DataDeletionRequest[]        @relation("DataDeletionRequestVerifiedBy") // Demandes vérifiées
   dataDeletionRequestsApproved  DataDeletionRequest[]        @relation("DataDeletionRequestApprovedBy") // Demandes approuvées
@@ -374,6 +375,7 @@ model Adherent {
   commentairesTaches                CommentaireTache[] // Commentaires sur les tâches
   ReunionsMensuellesHote            ReunionMensuelle[]           @relation("ReunionMensuelleHote") // Réunions où l'adhérent est hôte
   ParticipationsReunion             ParticipationReunion[]       @relation("ParticipationReunionAdherent") // Participations aux réunions
+  RelancesAbsenteisme              RelanceAbsenteisme[]
   created_at                        DateTime?                    @db.Timestamp(0)
   updated_at                        DateTime?                    @db.Timestamp(0)
   userId                            String                       @unique
@@ -870,7 +872,8 @@ model DetteInitiale {
   annee          Int // Année de la dette (2024, 2025, etc.)
   montant        Decimal  @db.Decimal(10, 2) // Montant total de la dette pour l'année
   montantPaye    Decimal  @default(0) @db.Decimal(10, 2) // Montant déjà payé
-  montantRestant Decimal  @db.Decimal(10, 2) // Montant restant à payer
+  // Colonne générée en base: ("montant" - "montantPaye")
+  montantRestant Decimal  @default(dbgenerated()) @db.Decimal(10, 2) // Montant restant à payer
   description    String?  @db.Text
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
@@ -1052,6 +1055,7 @@ model Evenement {
   placesDisponibles     Int? // Nombre de places disponibles
   placesReservees       Int       @default(0) // Nombre de places réservées
   inscriptionRequis     Boolean   @default(false) // Si une inscription est requise
+  obligatoireParticipation Boolean @default(false) // Si true, l'absence compte dans l'absenteisme
   dateLimiteInscription DateTime? // Date limite pour s'inscrire
   contactEmail          String?   @db.VarChar(100)
   contactTelephone      String?   @db.VarChar(20)
@@ -1079,6 +1083,9 @@ model InscriptionEvenement {
   dateInscription DateTime @default(now())
   commentaires    String?  @db.Text
   nombrePersonnes Int      @default(1) // Nombre de personnes inscrites
+  participationStatut String @default("NonRenseigne") // Present, Absent, Excuse, NonRenseigne
+  justificatifFournit Boolean @default(false)
+  justificatifNote String? @db.Text
 
   // Informations du visiteur (pour les non-adhérents)
   visiteurNom       String? @db.VarChar(255)
@@ -1574,6 +1581,8 @@ model ParticipationReunion {
   reunionId   String
   adherentId  String
   statut      StatutParticipationReunion @default(NonRepondu)
+  justificatifFournit Boolean           @default(false) // Justificatif d'absence fourni
+  justificatifNote    String?           @db.Text // Détail du justificatif (optionnel)
   commentaire String?                    @db.Text // Message d'excuse ou commentaire
   createdAt   DateTime                   @default(now())
   updatedAt   DateTime                   @updatedAt
@@ -1587,6 +1596,27 @@ model ParticipationReunion {
   @@index([adherentId])
   @@index([statut])
   @@map("participations_reunion")
+}
+
+model RelanceAbsenteisme {
+  id                     String   @id @default(cuid())
+  adherentId             String
+  motif                  String   @db.VarChar(255) // Plus de 3 absences, 3 absences successives sans justificatif, etc.
+  totalAbsences          Int      @default(0)
+  absencesConsecutives   Int      @default(0)
+  contenu                String?  @db.Text
+  dateEnvoi              DateTime?
+  statut                 String   @default("EnAttente") // EnAttente, Envoyee, Repondu, Classee
+  createdBy              String?
+  createdAt              DateTime @default(now())
+  updatedAt              DateTime @updatedAt
+
+  Adherent   Adherent @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  CreatedBy  User?    @relation("RelanceAbsenteismeCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@index([adherentId])
+  @@index([createdAt])
+  @@map("relances_absenteisme")
 }
 
 // Modèles pour le système de réservations et gestion de ressources

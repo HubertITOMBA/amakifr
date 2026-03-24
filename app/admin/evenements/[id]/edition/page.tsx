@@ -81,6 +81,7 @@ export default function EditionEvenementPage() {
     prix: string;
     placesDisponibles: string;
     inscriptionRequis: boolean;
+    obligatoireParticipation: boolean;
     dateLimiteInscription: string;
     contactEmail: string;
     contactTelephone: string;
@@ -103,6 +104,7 @@ export default function EditionEvenementPage() {
     prix: "",
     placesDisponibles: "",
     inscriptionRequis: false,
+    obligatoireParticipation: false,
     dateLimiteInscription: "",
     contactEmail: "",
     contactTelephone: "",
@@ -176,6 +178,7 @@ export default function EditionEvenementPage() {
           prix: e.prix ? String(e.prix) : "",
           placesDisponibles: e.placesDisponibles ? String(e.placesDisponibles) : "",
           inscriptionRequis: e.inscriptionRequis || false,
+          obligatoireParticipation: e.obligatoireParticipation || false,
           dateLimiteInscription: e.dateLimiteInscription ? new Date(e.dateLimiteInscription).toISOString().slice(0, 16) : "",
           contactEmail: e.contactEmail || "",
           contactTelephone: e.contactTelephone || "",
@@ -229,6 +232,7 @@ export default function EditionEvenementPage() {
         prix: form.prix || "",
         placesDisponibles: form.placesDisponibles || "",
         dateFin: form.dateFin || "",
+        obligatoireParticipation: form.obligatoireParticipation,
         dateLimiteInscription: form.dateLimiteInscription || "",
         contactEmail: form.contactEmail || "",
         contactTelephone: form.contactTelephone || "",
@@ -588,6 +592,18 @@ export default function EditionEvenementPage() {
                     />
                     <Label htmlFor="inscriptionRequis" className="text-xs font-medium text-slate-900 dark:text-slate-100 cursor-pointer">
                       Inscription requise
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="obligatoireParticipation"
+                      checked={form.obligatoireParticipation}
+                      onChange={(e) => setForm({ ...form, obligatoireParticipation: e.target.checked })}
+                      className="rounded"
+                    />
+                    <Label htmlFor="obligatoireParticipation" className="text-xs font-medium text-slate-900 dark:text-slate-100 cursor-pointer">
+                      Participation obligatoire (absentéisme)
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">

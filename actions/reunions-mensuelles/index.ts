@@ -42,6 +42,8 @@ const AdminSetParticipationsSchema = z.object({
     z.object({
       adherentId: z.string().min(1, "ID adhérent requis"),
       statut: z.enum(["Present", "Absent", "Excuse", "NonRepondu"]),
+      justificatifFournit: z.boolean().optional(),
+      justificatifNote: z.string().optional(),
       commentaire: z.string().optional(),
     })
   ),
@@ -771,10 +773,14 @@ export async function adminSetParticipationsReunion(data: z.infer<typeof AdminSe
             reunionId: validatedData.reunionId,
             adherentId: p.adherentId,
             statut: p.statut as StatutParticipationReunion,
+            justificatifFournit: p.justificatifFournit ?? false,
+            justificatifNote: p.justificatifNote,
             commentaire: p.commentaire,
           },
           update: {
             statut: p.statut as StatutParticipationReunion,
+            justificatifFournit: p.justificatifFournit ?? false,
+            justificatifNote: p.justificatifNote,
             commentaire: p.commentaire,
           },
         })

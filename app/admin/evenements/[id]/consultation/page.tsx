@@ -5,7 +5,10 @@ import { Modal } from "@/components/Modal";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { useEffect, useState } from "react";
-import { getEvenementById } from "@/actions/evenements";
+import { getEvenementById, setEventParticipationStatus } from "@/actions/evenements";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const getStatusColor = (statut: string) => {
   switch (statut) {
@@ -38,6 +41,7 @@ export default function ConsultationEvenementPage() {
   const id = Array.isArray(params?.id) ? params.id[0] : (params?.id as string);
   const [evenement, setEvenement] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [savingInscriptionId, setSavingInscriptionId] = useState<string | null>(null);
 
   useEffect(() => {
     if (id) {
@@ -54,6 +58,25 @@ export default function ConsultationEvenementPage() {
       }
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSaveParticipation = async (inscriptionId: string, participationStatut: string, justificatifFournit: boolean) => {
+    try {
+      setSavingInscriptionId(inscriptionId);
+      const result = await setEventParticipationStatus({
+        inscriptionId,
+        participationStatut: participationStatut as "Present" | "Absent" | "Excuse" | "NonRenseigne",
+        justificatifFournit,
+      });
+      if (result.success) {
+        toast.success("Participation mise à jour");
+        await loadEvenement();
+      } else {
+        toast.error(result.error || "Échec de mise à jour");
+      }
+    } finally {
+      setSavingInscriptionId(null);
     }
   };
 
@@ -184,8 +207,49 @@ export default function ConsultationEvenementPage() {
               <Label>Inscriptions ({evenement.Inscriptions.length})</Label>
               <div className="text-sm mt-1 space-y-1">
                 {evenement.Inscriptions.map((insc: any, idx: number) => (
-                  <div key={idx}>
-                    {insc.Adherent?.civility} {insc.Adherent?.firstname} {insc.Adherent?.lastname}
+                  <div key={idx} className="border rounded-md p-2 space-y-2">
+                    <div className="font-medium">
+                      {insc.Adherent?.civility} {insc.Adherent?.firstname} {insc.Adherent?.lastname}
+                    </div>
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Select
+                        value={insc.participationStatut || "NonRenseigne"}
+                        onValueChange={(v) => {
+                          insc.participationStatut = v;
+                          setEvenement({ ...evenement });
+                        }}
+                      >
+                        <SelectTrigger className="w-[180px] h-8">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Present">Présent</SelectItem>
+                          <SelectItem value="Absent">Absent</SelectItem>
+                          <SelectItem value="Excuse">Excusé</SelectItem>
+                          <SelectItem value="NonRenseigne">Non renseigné</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <label className="inline-flex items-center gap-2 text-xs">
+                        <input
+                          type="checkbox"
+                          checked={Boolean(insc.justificatifFournit)}
+                          onChange={(e) => {
+                            insc.justificatifFournit = e.target.checked;
+                            setEvenement({ ...evenement });
+                          }}
+                        />
+                        Justificatif fourni
+                      </label>
+                      <Button
+                        size="sm"
+                        onClick={() =>
+                          handleSaveParticipation(insc.id, insc.participationStatut || "NonRenseigne", Boolean(insc.justificatifFournit))
+                        }
+                        disabled={savingInscriptionId === insc.id}
+                      >
+                        Enregistrer
+                      </Button>
+                    </div>
                   </div>
                 ))}
               </div>

@@ -67,6 +67,7 @@ import {
 } from "@/components/ui/popover";
 import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -132,8 +133,8 @@ export default function AdminReunionsMensuellesPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [anneeCartes, setAnneeCartes] = useState(new Date().getFullYear());
   const [participantsDialogReunion, setParticipantsDialogReunion] = useState<any | null>(null);
-  const [participantsEdits, setParticipantsEdits] = useState<Record<string, StatutParticipationReunion>>({});
-  const [participantsInitial, setParticipantsInitial] = useState<Record<string, StatutParticipationReunion>>({});
+  const [participantsEdits, setParticipantsEdits] = useState<Record<string, { statut: StatutParticipationReunion; justificatifFournit: boolean }>>({});
+  const [participantsInitial, setParticipantsInitial] = useState<Record<string, { statut: StatutParticipationReunion; justificatifFournit: boolean }>>({});
   const [participantsSort, setParticipantsSort] = useState<{ key: "adherent" | "statut"; direction: "asc" | "desc" }>({
     key: "adherent",
     direction: "asc",
@@ -511,10 +512,13 @@ export default function AdminReunionsMensuellesPage() {
   };
 
   const openParticipantsDialog = (reunion: any) => {
-    const initial: Record<string, StatutParticipationReunion> = {};
+    const initial: Record<string, { statut: StatutParticipationReunion; justificatifFournit: boolean }> = {};
     adherents.forEach((a) => {
       const part = reunion.Participations?.find((p: any) => p.adherentId === a.id);
-      initial[a.id] = (part?.statut ?? "NonRepondu") as StatutParticipationReunion;
+      initial[a.id] = {
+        statut: (part?.statut ?? "NonRepondu") as StatutParticipationReunion,
+        justificatifFournit: Boolean(part?.justificatifFournit),
+      };
     });
     setParticipantsInitial(initial);
     setParticipantsEdits(initial);
@@ -539,11 +543,13 @@ export default function AdminReunionsMensuellesPage() {
       const payloadParticipations = adherents
         .map((a) => ({
           adherentId: a.id,
-          statut: (participantsEdits[a.id] ?? "NonRepondu") as StatutParticipationReunion,
-          initialStatut: (participantsInitial[a.id] ?? "NonRepondu") as StatutParticipationReunion,
+          statut: (participantsEdits[a.id]?.statut ?? "NonRepondu") as StatutParticipationReunion,
+          justificatifFournit: Boolean(participantsEdits[a.id]?.justificatifFournit),
+          initialStatut: (participantsInitial[a.id]?.statut ?? "NonRepondu") as StatutParticipationReunion,
+          initialJustificatif: Boolean(participantsInitial[a.id]?.justificatifFournit),
         }))
-        .filter((p) => p.statut !== p.initialStatut)
-        .map(({ adherentId, statut }) => ({ adherentId, statut }));
+        .filter((p) => p.statut !== p.initialStatut || p.justificatifFournit !== p.initialJustificatif)
+        .map(({ adherentId, statut, justificatifFournit }) => ({ adherentId, statut, justificatifFournit }));
 
       if (payloadParticipations.length === 0) {
         toast.info("Aucune modification détectée.");
@@ -994,7 +1000,7 @@ export default function AdminReunionsMensuellesPage() {
                       (acc, a) => {
                         const part = participantsDialogReunion.Participations?.find((p: any) => p.adherentId === a.id);
                         const fallbackStatut = (part?.statut ?? "NonRepondu") as StatutParticipationReunion;
-                        const statut = (participantsEdits[a.id] ?? fallbackStatut) as StatutParticipationReunion;
+                        const statut = (participantsEdits[a.id]?.statut ?? fallbackStatut) as StatutParticipationReunion;
                         if (statut === "Present") acc.presents += 1;
                         else if (statut === "Absent") acc.absents += 1;
                         else if (statut === "Excuse") acc.excuses += 1;
@@ -1053,8 +1059,9 @@ export default function AdminReunionsMensuellesPage() {
                         .map((a) => {
                           const part = participantsDialogReunion.Participations?.find((p: any) => p.adherentId === a.id);
                           const statut = (part?.statut ?? "NonRepondu") as StatutParticipationReunion;
-                          const currentStatut = (participantsEdits[a.id] ?? statut) as StatutParticipationReunion;
-                          return { adherent: a, currentStatut };
+                          const currentStatut = (participantsEdits[a.id]?.statut ?? statut) as StatutParticipationReunion;
+                          const currentJustificatif = participantsEdits[a.id]?.justificatifFournit ?? Boolean(part?.justificatifFournit);
+                          return { adherent: a, currentStatut, currentJustificatif };
                         })
                         .sort((x, y) => {
                           if (participantsSort.key === "adherent") {
@@ -1072,30 +1079,52 @@ export default function AdminReunionsMensuellesPage() {
                           const cmp = statusOrder[x.currentStatut] - statusOrder[y.currentStatut];
                           return participantsSort.direction === "asc" ? cmp : -cmp;
                         })
-                        .map(({ adherent: a, currentStatut }) => {
+                        .map(({ adherent: a, currentStatut, currentJustificatif }) => {
                         return (
                           <tr key={a.id} className="border-b border-slate-100 dark:border-slate-800">
                             <td className="px-3 py-2">{a.firstname} {a.lastname}</td>
                             <td className="px-3 py-2">
-                              <Select
-                                value={currentStatut}
-                                onValueChange={(v) =>
-                                  setParticipantsEdits((prev) => ({
-                                    ...prev,
-                                    [a.id]: v as StatutParticipationReunion,
-                                  }))
-                                }
-                              >
-                                <SelectTrigger className="h-8">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="Present">Présent</SelectItem>
-                                  <SelectItem value="Absent">Absent</SelectItem>
-                                  <SelectItem value="Excuse">Excusé</SelectItem>
-                                  <SelectItem value="NonRepondu">Non répondu</SelectItem>
-                                </SelectContent>
-                              </Select>
+                              <div className="space-y-2">
+                                <Select
+                                  value={currentStatut}
+                                  onValueChange={(v) =>
+                                    setParticipantsEdits((prev) => ({
+                                      ...prev,
+                                      [a.id]: {
+                                        statut: v as StatutParticipationReunion,
+                                        justificatifFournit: prev[a.id]?.justificatifFournit ?? false,
+                                      },
+                                    }))
+                                  }
+                                >
+                                  <SelectTrigger className="h-8">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="Present">Présent</SelectItem>
+                                    <SelectItem value="Absent">Absent</SelectItem>
+                                    <SelectItem value="Excuse">Excusé</SelectItem>
+                                    <SelectItem value="NonRepondu">Non répondu</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                                {(currentStatut === "Absent" || currentStatut === "Excuse") && (
+                                  <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                    <Checkbox
+                                      checked={currentJustificatif}
+                                      onCheckedChange={(checked) =>
+                                        setParticipantsEdits((prev) => ({
+                                          ...prev,
+                                          [a.id]: {
+                                            statut: prev[a.id]?.statut ?? currentStatut,
+                                            justificatifFournit: checked === true,
+                                          },
+                                        }))
+                                      }
+                                    />
+                                    Justificatif fourni
+                                  </label>
+                                )}
+                              </div>
                             </td>
                           </tr>
                         );

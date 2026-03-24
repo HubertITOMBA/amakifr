@@ -63,6 +63,7 @@ export default function GestionEvenementsPage() {
     prix: "",
     placesDisponibles: "",
     inscriptionRequis: false,
+    obligatoireParticipation: false,
     dateLimiteInscription: "",
     contactEmail: "",
     contactTelephone: "",
@@ -112,6 +113,7 @@ export default function GestionEvenementsPage() {
         prix: form.prix || "",
         placesDisponibles: form.placesDisponibles || "",
         dateFin: form.dateFin || "",
+        obligatoireParticipation: form.obligatoireParticipation,
         dateLimiteInscription: form.dateLimiteInscription || "",
         contactEmail: form.contactEmail || "",
         contactTelephone: form.contactTelephone || "",
@@ -439,6 +441,18 @@ export default function GestionEvenementsPage() {
                     />
                     <Label htmlFor="inscriptionRequis" className="text-xs font-medium text-slate-900 dark:text-slate-100 cursor-pointer">
                       Inscription requise
+                    </Label>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="checkbox"
+                      id="obligatoireParticipation"
+                      checked={form.obligatoireParticipation}
+                      onChange={(e) => setForm({ ...form, obligatoireParticipation: e.target.checked })}
+                      className="rounded"
+                    />
+                    <Label htmlFor="obligatoireParticipation" className="text-xs font-medium text-slate-900 dark:text-slate-100 cursor-pointer">
+                      Participation obligatoire (absentéisme)
                     </Label>
                   </div>
                   <div className="flex items-center space-x-2">

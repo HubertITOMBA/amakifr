@@ -29,6 +29,7 @@ const EvenementSchema = z.object({
   prix: z.string().optional(),
   placesDisponibles: z.string().optional(),
   inscriptionRequis: z.boolean().default(false),
+  obligatoireParticipation: z.boolean().default(false),
   dateLimiteInscription: z.string().optional(),
   contactEmail: z.string().email().optional().or(z.literal("")),
   contactTelephone: z.string().optional(),
@@ -71,6 +72,7 @@ export interface EvenementData {
   placesDisponibles?: number;
   placesReservees: number;
   inscriptionRequis: boolean;
+  obligatoireParticipation: boolean;
   dateLimiteInscription?: Date;
   contactEmail?: string;
   contactTelephone?: string;
@@ -165,6 +167,7 @@ export async function createEvenement(data: z.infer<typeof EvenementSchema>) {
         prix,
         placesDisponibles,
         inscriptionRequis: validatedData.inscriptionRequis,
+        obligatoireParticipation: validatedData.obligatoireParticipation,
         dateLimiteInscription,
         contactEmail: validatedData.contactEmail || null,
         contactTelephone: validatedData.contactTelephone,
@@ -188,6 +191,7 @@ export async function createEvenement(data: z.infer<typeof EvenementSchema>) {
           statut: validatedData.statut,
           estPublic: validatedData.estPublic,
           inscriptionRequis: validatedData.inscriptionRequis,
+          obligatoireParticipation: validatedData.obligatoireParticipation,
         }
       );
     } catch (logError) {
@@ -281,6 +285,7 @@ export async function updateEvenement(id: string, data: z.infer<typeof Evenement
         prix,
         placesDisponibles,
         inscriptionRequis: validatedData.inscriptionRequis,
+        obligatoireParticipation: validatedData.obligatoireParticipation,
         dateLimiteInscription,
         contactEmail: validatedData.contactEmail || null,
         contactTelephone: validatedData.contactTelephone,
@@ -1113,6 +1118,54 @@ export async function addParticipantToEvent(
   } catch (error) {
     console.error("Erreur lors de l'ajout du participant:", error);
     return { success: false, error: "Erreur lors de l'ajout du participant" };
+  }
+}
+
+const SetEventParticipationSchema = z.object({
+  inscriptionId: z.string().min(1, "ID inscription requis"),
+  participationStatut: z.enum(["Present", "Absent", "Excuse", "NonRenseigne"]),
+  justificatifFournit: z.boolean().optional(),
+  justificatifNote: z.string().optional(),
+});
+
+/**
+ * Définir le statut de participation réel d'un inscrit à un événement (Admin)
+ */
+export async function setEventParticipationStatus(data: z.infer<typeof SetEventParticipationSchema>) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateEvenement");
+    if (!hasAccess) {
+      return { success: false, error: "Droit de modification requis." };
+    }
+
+    const validated = SetEventParticipationSchema.parse(data);
+
+    const inscription = await prisma.inscriptionEvenement.update({
+      where: { id: validated.inscriptionId },
+      data: {
+        participationStatut: validated.participationStatut,
+        justificatifFournit: validated.justificatifFournit ?? false,
+        justificatifNote: validated.justificatifNote,
+      },
+      include: { Evenement: { select: { id: true } } },
+    });
+
+    revalidatePath(`/admin/evenements/${inscription.Evenement.id}/consultation`);
+    revalidatePath("/admin/absenteisme");
+
+    return { success: true, data: inscription };
+  } catch (error) {
+    console.error("Erreur setEventParticipationStatus:", error);
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    return { success: false, error: "Erreur lors de la mise à jour de la participation" };
   }
 }
 
