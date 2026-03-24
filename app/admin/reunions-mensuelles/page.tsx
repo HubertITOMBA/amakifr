@@ -30,6 +30,7 @@ import {
   User,
   FileText,
   ArrowLeft,
+  ArrowUpDown,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
@@ -133,6 +134,10 @@ export default function AdminReunionsMensuellesPage() {
   const [participantsDialogReunion, setParticipantsDialogReunion] = useState<any | null>(null);
   const [participantsEdits, setParticipantsEdits] = useState<Record<string, StatutParticipationReunion>>({});
   const [participantsInitial, setParticipantsInitial] = useState<Record<string, StatutParticipationReunion>>({});
+  const [participantsSort, setParticipantsSort] = useState<{ key: "adherent" | "statut"; direction: "asc" | "desc" }>({
+    key: "adherent",
+    direction: "asc",
+  });
 
   const loadData = useCallback(async () => {
     try {
@@ -513,7 +518,17 @@ export default function AdminReunionsMensuellesPage() {
     });
     setParticipantsInitial(initial);
     setParticipantsEdits(initial);
+    setParticipantsSort({ key: "adherent", direction: "asc" });
     setParticipantsDialogReunion(reunion);
+  };
+
+  const toggleParticipantsSort = (key: "adherent" | "statut") => {
+    setParticipantsSort((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key, direction: "asc" };
+    });
   };
 
   const handleSaveParticipants = async () => {
@@ -1011,15 +1026,53 @@ export default function AdminReunionsMensuellesPage() {
                   <table className="w-full text-sm border-collapse">
                     <thead>
                       <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                        <th className="text-left px-3 py-2 font-medium text-slate-700 dark:text-slate-300">Adhérent</th>
-                        <th className="text-left px-3 py-2 font-medium text-slate-700 dark:text-slate-300">Statut</th>
+                        <th className="text-left px-3 py-2 font-medium text-slate-700 dark:text-slate-300">
+                          <button
+                            type="button"
+                            onClick={() => toggleParticipantsSort("adherent")}
+                            className="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                          >
+                            Adhérent
+                            <ArrowUpDown className="h-3.5 w-3.5" />
+                          </button>
+                        </th>
+                        <th className="text-left px-3 py-2 font-medium text-slate-700 dark:text-slate-300">
+                          <button
+                            type="button"
+                            onClick={() => toggleParticipantsSort("statut")}
+                            className="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                          >
+                            Statut
+                            <ArrowUpDown className="h-3.5 w-3.5" />
+                          </button>
+                        </th>
                       </tr>
                     </thead>
                     <tbody>
-                      {adherents.map((a) => {
-                        const part = participantsDialogReunion.Participations?.find((p: any) => p.adherentId === a.id);
-                        const statut = part?.statut ?? "NonRepondu";
-                        const currentStatut = participantsEdits[a.id] ?? statut;
+                      {adherents
+                        .map((a) => {
+                          const part = participantsDialogReunion.Participations?.find((p: any) => p.adherentId === a.id);
+                          const statut = (part?.statut ?? "NonRepondu") as StatutParticipationReunion;
+                          const currentStatut = (participantsEdits[a.id] ?? statut) as StatutParticipationReunion;
+                          return { adherent: a, currentStatut };
+                        })
+                        .sort((x, y) => {
+                          if (participantsSort.key === "adherent") {
+                            const aName = `${x.adherent.firstname ?? ""} ${x.adherent.lastname ?? ""}`.trim().toLowerCase();
+                            const bName = `${y.adherent.firstname ?? ""} ${y.adherent.lastname ?? ""}`.trim().toLowerCase();
+                            const cmp = aName.localeCompare(bName, "fr");
+                            return participantsSort.direction === "asc" ? cmp : -cmp;
+                          }
+                          const statusOrder: Record<StatutParticipationReunion, number> = {
+                            Present: 1,
+                            Excuse: 2,
+                            Absent: 3,
+                            NonRepondu: 4,
+                          };
+                          const cmp = statusOrder[x.currentStatut] - statusOrder[y.currentStatut];
+                          return participantsSort.direction === "asc" ? cmp : -cmp;
+                        })
+                        .map(({ adherent: a, currentStatut }) => {
                         return (
                           <tr key={a.id} className="border-b border-slate-100 dark:border-slate-800">
                             <td className="px-3 py-2">{a.firstname} {a.lastname}</td>

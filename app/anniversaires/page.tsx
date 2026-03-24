@@ -8,6 +8,9 @@ import { getAnniversairesData } from "@/lib/anniversaires";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
+export const dynamic = "force-dynamic";
+export const revalidate = 0;
+
 function getSpotlightLabel(daysFromBirthday: number) {
   if (daysFromBirthday === -1) return "Anniversaire demain";
   if (daysFromBirthday === 0) return "C'est aujourd'hui";
