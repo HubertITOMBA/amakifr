@@ -77,7 +77,7 @@ export function Modal ({
         return (
             <Dialog defaultOpen={true} open={true} onOpenChange={handleOpenChange}>
                 <DialogOverlay className="bg-black/50" />
-                <DialogContent className={`${contentClass} !pt-0`}>
+                <DialogContent className={`${contentClass} !pt-0`} showCloseButton={false}>
                     <div className="flex items-center justify-between px-4 !pt-0 pb-3 border-b bg-slate-50/80 dark:bg-slate-900/60 backdrop-blur rounded-t-lg">
                         {title ? (
                           <DialogTitle className="text-lg md:text-xl font-bold text-slate-900 dark:text-slate-100 truncate m-0 pt-3">
