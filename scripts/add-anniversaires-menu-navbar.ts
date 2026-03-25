@@ -19,7 +19,7 @@ async function main() {
       },
     });
 
-    const expectedRoles = ["ADMIN", "MEMBRE", "INVITE", "VISITEUR"];
+    const expectedRoles = ["ADMIN", "MEMBRE", "INVITE"];
 
     if (existing) {
       const rolesDifferents =

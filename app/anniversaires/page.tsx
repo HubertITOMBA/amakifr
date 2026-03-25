@@ -7,6 +7,8 @@ import { Cake, Gift, CalendarDays, Sparkles } from "lucide-react";
 import { getAnniversairesData } from "@/lib/anniversaires";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { auth } from "@/auth";
+import { redirect } from "next/navigation";
 
 export const dynamic = "force-dynamic";
 export const revalidate = 0;
@@ -22,6 +24,10 @@ function initials(firstname: string, lastname: string) {
 }
 
 export default async function AnniversairesPage() {
+  const session = await auth();
+  if (!session?.user?.id) {
+    redirect("/auth/sign-in");
+  }
   const { spotlight, prochains } = await getAnniversairesData(20);
 
   return (

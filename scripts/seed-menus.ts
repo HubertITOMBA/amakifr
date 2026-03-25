@@ -63,7 +63,7 @@ async function seedMenus() {
         description: "Souhaiter les anniversaires des adhérents",
         lien: "/anniversaires",
         niveau: "NAVBAR" as const,
-        roles: ["ADMIN", "MEMBRE", "INVITE", "VISITEUR"],
+        roles: ["ADMIN", "MEMBRE", "INVITE"],
         icone: "Cake",
         statut: true,
         ordre: 9,

@@ -64,7 +64,8 @@
     "db:backup-clean": "bash scripts/db-backup-restore.sh clean",
     "db:restore": "bash scripts/db-backup-restore.sh restore",
     "db:add-anniversaires-menu-navbar": "tsx scripts/add-anniversaires-menu-navbar.ts",
-    "db:add-absenteisme-menu-sidebar": "tsx scripts/add-absenteisme-menu-sidebar.ts"
+    "db:add-absenteisme-menu-sidebar": "tsx scripts/add-absenteisme-menu-sidebar.ts",
+    "db:restrict-anniversaires-to-auth": "tsx scripts/add-anniversaires-menu-navbar.ts"
   },
   "dependencies": {
     "@auth/prisma-adapter": "^2.8.0",
