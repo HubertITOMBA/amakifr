@@ -8,6 +8,7 @@ export const publicRoutes = [
     "/agenda",
     "/amicale",
     "/amicale/president-interview",
+    "/amicale/president-mastor-interview",
     "/contact",
     "/evenements",
     "/galerie",
@@ -32,7 +33,12 @@ export function isPublicRoute(pathname: string): boolean {
     }
     
     // API publique (interview président, etc.)
-    if (pathname === "/api/president-interview") {
+    if (pathname === "/api/president-interview" || pathname.startsWith("/api/president-interview/")) {
+        return true;
+    }
+
+    // API publique (interview président sortant)
+    if (pathname === "/api/president-mastor-interview" || pathname.startsWith("/api/president-mastor-interview/")) {
         return true;
     }
     

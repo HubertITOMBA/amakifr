@@ -407,11 +407,11 @@ export default function AmicalePage() {
               Notre Président
             </h2>
             <p className="text-sm sm:text-base md:text-lg text-gray-600 dark:text-gray-300 max-w-3xl mx-auto px-4">
-              Découvrez l&apos;interview de notre nouveau président, élu le 29 novembre 2025
+              Découvrez l&apos;interview de notre président actuel et de notre premier président
             </p>
           </div>
-          <div className="flex justify-center">
-            <Card className="p-4 sm:p-6 md:p-8 hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-purple-500 max-w-md w-full group">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 md:gap-8 max-w-5xl mx-auto">
+            <Card className="p-4 sm:p-6 md:p-8 hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-purple-500 w-full group">
               <Link href="/amicale/president-interview" className="block">
                 <div className="text-center">
                   <div className="flex justify-center mb-4">
@@ -432,6 +432,35 @@ export default function AmicalePage() {
                     Monsieur Simon Bavueza Tongi
                   </p>
                   <Button className="w-full bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-700 hover:to-pink-700 text-white">
+                    <BookOpen className="h-4 w-4 mr-2" />
+                    Lire l&apos;interview
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </div>
+              </Link>
+            </Card>
+
+            <Card className="p-4 sm:p-6 md:p-8 hover:shadow-xl transition-all duration-300 cursor-pointer border-2 hover:border-slate-500 w-full group">
+              <Link href="/amicale/president-mastor-interview" className="block">
+                <div className="text-center">
+                  <div className="flex justify-center mb-4">
+                    <div className="p-4 bg-gradient-to-br from-slate-700 to-slate-900 rounded-full group-hover:scale-110 transition-transform duration-300">
+                      <BookOpen className="h-8 w-8 sm:h-10 sm:w-10 text-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-lg sm:text-xl md:text-2xl font-semibold text-gray-900 dark:text-white mb-2 sm:mb-3">
+                    Interview du premier Président
+                  </h3>
+                  <div className="mb-4">
+                    <Badge className="bg-slate-100 text-slate-800 dark:bg-slate-900 dark:text-slate-200 border-slate-300">
+                      <Star className="h-3 w-3 mr-1" />
+                      Membre fondateur
+                    </Badge>
+                  </div>
+                  <p className="text-sm sm:text-base text-gray-600 dark:text-gray-300 mb-4 sm:mb-6">
+                    Monsieur Albert Bébé Lukombo (Mastor)
+                  </p>
+                  <Button className="w-full bg-gradient-to-r from-slate-700 to-slate-900 hover:from-slate-800 hover:to-black text-white">
                     <BookOpen className="h-4 w-4 mr-2" />
                     Lire l&apos;interview
                     <ArrowRight className="h-4 w-4 ml-2" />
