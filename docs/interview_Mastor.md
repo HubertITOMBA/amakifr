@@ -1,14 +1,8 @@
-/**
- * Contenu de repli pour l'interview du premier président (Mastor Bébé Lukombo).
- *
- * Ce fallback est utilisé si le fichier `docs/interview_Mastor.md` n'est pas présent
- * dans l'environnement (ex. production) ou n'est pas déployé.
- */
-export const PRESIDENT_MASTOR_INTERVIEW_MARKDOWN_FALLBACK = `
 Entretien avec le Président sortant d’Amaki France
 Un engagement au service de la communauté
 L’association AmaKi est née d’un moment douloureux : la disparition de notre collègue et ami, Samba Maziku. De cette épreuve est née une volonté forte — celle de se rassembler, de se soutenir et de construire une communauté solidaire.
 À la veille de l’élection d’un nouveau président, nous avons rencontré le président sortant pour revenir sur dix années d’engagement, de défis et de réalisations au service d’Amaki.
+
 
 Un parcours guidé par le sens du collectif
 
@@ -30,6 +24,7 @@ Comment Amaki a-t-elle évolué ?
 
 L’association s’est progressivement structurée et unifiée. Collèges, lycées, anciens élèves, diaspora, Amaki Kinshasa et LAC se sont réunis autour d’un projet commun, renforçant notre cohésion.
 
+
 Quels moments vous ont marqué ?
 
 Certains événements ont profondément marqué notre histoire, notamment le décès de notre collègue José Tiansende. Mais je retiens également les actions de solidarité : dons d’ordinateurs, soutien du diocèse de Kisantu, contributions aux infrastructures, et moments de convivialité favorisant l’intégration des nouveaux membres.
@@ -42,15 +37,18 @@ Parmi les actions majeures de ce mandat :
     • La structuration administrative de l’association 
 Mais au-delà des réalisations matérielles, la plus grande réussite reste la consolidation d’une véritable communauté unie.
 
+
 Des défis formateurs
 
 Quels obstacles avez-vous rencontrés ?
 
 Le manque de lieux de réunion et les contraintes financières ont constitué des défis importants. Ils nous ont poussés à nous adapter et à trouver des solutions durables.
 
+
 Quelles leçons retenez-vous ?
 
 La présidence exige patience, écoute et équilibre. Elle demande de savoir rassembler, décider avec discernement et agir dans l’intérêt collectif.
+
 
 Une aventure humaine
 
@@ -59,6 +57,7 @@ De quoi êtes-vous le plus fier ?
 De ma constance durant ces dix années, mais surtout de l’harmonie que nous avons su préserver au sein de l’association.
 Avez-vous connu des moments de doute ?
 Oui, notamment face à certaines difficultés organisationnelles. Mais chaque obstacle a été surmonté grâce à l’engagement collectif.
+
 
 Passer le relais
 
@@ -83,5 +82,4 @@ Un dernier conseil aux membres ?
 
 Restez unis, cultivez l’entraide et continuez à faire vivre l’esprit Amaki.
 Que Dieu  bénisse  toute la  famille Amaki  de loin ou de près
-`.trim();
 

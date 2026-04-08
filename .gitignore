@@ -41,6 +41,7 @@ PROMPTEUR.txt
 data/geonames/*
 *.md
 !docs/interview.md
+!docs/interview_Mastor.md
 .cursorrules
 
 # vercel
