@@ -354,6 +354,18 @@ export default function ReunionsMensuellesPage() {
     return d.getTime() < now.getTime();
   };
 
+  const getStatutBadgeForReunion = (reunion: any) => {
+    const badge = getStatutBadge(reunion?.statut);
+    if (reunion?.statut === "DateConfirmee" && isReunionPassee(reunion)) {
+      return {
+        label: "Réunion passée",
+        variant: "secondary" as const,
+        className: "bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100",
+      };
+    }
+    return { ...badge, className: "" };
+  };
+
   const reunionsParMois = useMemo(() => {
     const map = new Map<number, any>();
     reunions.forEach((r) => {
@@ -502,11 +514,7 @@ export default function ReunionsMensuellesPage() {
               <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4">
                 {moisOptions.map((mois) => {
                   const reunion = reunionsParMois.get(mois.value);
-                  const statutBadge = reunion ? getStatutBadge(reunion.statut) : null;
-                  const statutBadgeLabel =
-                    reunion && statutBadge
-                      ? (reunion.statut === "DateConfirmee" && isReunionPassee(reunion) ? "Réunion passée" : statutBadge.label)
-                      : null;
+                  const statutBadge = reunion ? getStatutBadgeForReunion(reunion) : null;
                   
                   return (
                     <Card
@@ -521,8 +529,8 @@ export default function ReunionsMensuellesPage() {
                           {reunion ? (
                             <>
                               {statutBadge && (
-                                <Badge variant={statutBadge.variant} className="text-xs">
-                                  {statutBadgeLabel}
+                                <Badge variant={statutBadge.variant} className={`text-xs ${statutBadge.className}`}>
+                                  {statutBadge.label}
                                 </Badge>
                               )}
                               {reunion.AdherentHote ? (

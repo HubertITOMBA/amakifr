@@ -320,12 +320,16 @@ export default function AdminReunionsMensuellesPage() {
     return d.getTime() < now.getTime();
   };
 
-  const getStatutBadgeLabelForReunion = (reunion: any) => {
+  const getStatutBadgeForReunion = (reunion: any) => {
     const badge = getStatutBadge(reunion?.statut);
     if (reunion?.statut === "DateConfirmee" && isReunionPassee(reunion)) {
-      return "Réunion passée";
+      return {
+        label: "Réunion passée",
+        variant: "secondary" as const,
+        className: "bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100",
+      };
     }
-    return badge.label;
+    return { ...badge, className: "" };
   };
 
   const getTypeLieuIcon = (type: string) => {
@@ -359,7 +363,8 @@ export default function AdminReunionsMensuellesPage() {
           const reunion = info.row.original;
           const statut = info.getValue();
           const badge = getStatutBadge(statut);
-          return <Badge variant={badge.variant}>{getStatutBadgeLabelForReunion(reunion)}</Badge>;
+          const computed = getStatutBadgeForReunion(reunion);
+          return <Badge variant={badge.variant} className={computed.className}>{computed.label}</Badge>;
         },
       }),
       columnHelper.accessor("AdherentHote", {
@@ -682,7 +687,7 @@ export default function AdminReunionsMensuellesPage() {
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-2 sm:gap-3">
               {moisOptions.map((mois) => {
                 const reunion = reunionsParMois.get(mois.value);
-                const badge = reunion ? getStatutBadge(reunion.statut) : null;
+                const badge = reunion ? getStatutBadgeForReunion(reunion) : null;
                 return (
                   <Card
                     key={mois.value}
@@ -702,8 +707,8 @@ export default function AdminReunionsMensuellesPage() {
                       {reunion ? (
                         <>
                           {badge && (
-                            <Badge variant={badge.variant} className="text-xs mt-1">
-                              {getStatutBadgeLabelForReunion(reunion)}
+                            <Badge variant={badge.variant} className={`text-xs mt-1 ${badge.className}`}>
+                              {badge.label}
                             </Badge>
                           )}
                           {reunion.AdherentHote && (
