@@ -331,6 +331,29 @@ export default function ReunionsMensuellesPage() {
     }
   };
 
+  const getParticipationSubmitLabel = (statut: StatutParticipationReunion) => {
+    switch (statut) {
+      case "Present":
+        return "Confirmer ma présence";
+      case "Absent":
+        return "Confirmer mon absence";
+      case "Excuse":
+        return "Envoyer mes excuses";
+      default:
+        return "Confirmer";
+    }
+  };
+
+  const isReunionPassee = (reunion: any) => {
+    if (!reunion?.dateReunion) return false;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const d = new Date(reunion.dateReunion);
+    if (Number.isNaN(d.getTime())) return false;
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() < now.getTime();
+  };
+
   const reunionsParMois = useMemo(() => {
     const map = new Map<number, any>();
     reunions.forEach((r) => {
@@ -370,6 +393,10 @@ export default function ReunionsMensuellesPage() {
       } else {
         // Adhérent : selon le statut
         if (reunionExistante.statut === "DateConfirmee") {
+          if (isReunionPassee(reunionExistante)) {
+            toast.info("Cette réunion est passée. Vous ne pouvez plus indiquer votre présence.");
+            return;
+          }
           openParticipationDialog(reunionExistante);
         } else if (reunionExistante.statut === "MoisValide") {
           // Mois validé : ouvrir le dialog avec calendrier pour choisir/modifier la date
@@ -476,6 +503,10 @@ export default function ReunionsMensuellesPage() {
                 {moisOptions.map((mois) => {
                   const reunion = reunionsParMois.get(mois.value);
                   const statutBadge = reunion ? getStatutBadge(reunion.statut) : null;
+                  const statutBadgeLabel =
+                    reunion && statutBadge
+                      ? (reunion.statut === "DateConfirmee" && isReunionPassee(reunion) ? "Réunion passée" : statutBadge.label)
+                      : null;
                   
                   return (
                     <Card
@@ -491,7 +522,7 @@ export default function ReunionsMensuellesPage() {
                             <>
                               {statutBadge && (
                                 <Badge variant={statutBadge.variant} className="text-xs">
-                                  {statutBadge.label}
+                                  {statutBadgeLabel}
                                 </Badge>
                               )}
                               {reunion.AdherentHote ? (
@@ -506,8 +537,11 @@ export default function ReunionsMensuellesPage() {
                                   {format(new Date(reunion.dateReunion), "d MMM", { locale: fr })}
                                 </p>
                               )}
-                              {reunion.statut === "DateConfirmee" && !isAdmin && (
+                              {reunion.statut === "DateConfirmee" && !isAdmin && !isReunionPassee(reunion) && (
                                 <p className="text-xs text-blue-600 dark:text-blue-400 mt-1 font-medium">Indiquer ma présence</p>
+                              )}
+                              {reunion.statut === "DateConfirmee" && !isAdmin && isReunionPassee(reunion) && (
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Présence clôturée</p>
                               )}
                             </>
                           ) : (
@@ -920,7 +954,7 @@ export default function ReunionsMensuellesPage() {
               Annuler
             </Button>
             <Button onClick={handleConfirmParticipation} disabled={loading}>
-              Confirmer ma présence
+              {getParticipationSubmitLabel(participationStatut)}
             </Button>
           </DialogFooter>
         </DialogContent>

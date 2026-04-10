@@ -310,6 +310,24 @@ export default function AdminReunionsMensuellesPage() {
     return badges[statut] || { label: statut, variant: "outline" };
   };
 
+  const isReunionPassee = (reunion: any) => {
+    if (!reunion?.dateReunion) return false;
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const d = new Date(reunion.dateReunion);
+    if (Number.isNaN(d.getTime())) return false;
+    d.setHours(0, 0, 0, 0);
+    return d.getTime() < now.getTime();
+  };
+
+  const getStatutBadgeLabelForReunion = (reunion: any) => {
+    const badge = getStatutBadge(reunion?.statut);
+    if (reunion?.statut === "DateConfirmee" && isReunionPassee(reunion)) {
+      return "Réunion passée";
+    }
+    return badge.label;
+  };
+
   const getTypeLieuIcon = (type: string) => {
     switch (type) {
       case "Domicile":
@@ -338,9 +356,10 @@ export default function AdminReunionsMensuellesPage() {
       columnHelper.accessor("statut", {
         header: "Statut",
         cell: (info) => {
+          const reunion = info.row.original;
           const statut = info.getValue();
           const badge = getStatutBadge(statut);
-          return <Badge variant={badge.variant}>{badge.label}</Badge>;
+          return <Badge variant={badge.variant}>{getStatutBadgeLabelForReunion(reunion)}</Badge>;
         },
       }),
       columnHelper.accessor("AdherentHote", {
@@ -684,7 +703,7 @@ export default function AdminReunionsMensuellesPage() {
                         <>
                           {badge && (
                             <Badge variant={badge.variant} className="text-xs mt-1">
-                              {badge.label}
+                              {getStatutBadgeLabelForReunion(reunion)}
                             </Badge>
                           )}
                           {reunion.AdherentHote && (
