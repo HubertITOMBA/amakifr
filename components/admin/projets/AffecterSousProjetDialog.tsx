@@ -161,8 +161,12 @@ export function AffecterSousProjetDialog({ sousProjet, open, onOpenChange, onSuc
   }, [onOpenChange]);
 
   return (
-    <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0">
+    <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
+      <DialogContent
+        className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0"
+        onOpenAutoFocus={(e) => e.preventDefault()}
+        onCloseAutoFocus={(e) => e.preventDefault()}
+      >
         <DialogHeader className="bg-gradient-to-r from-indigo-500/90 via-indigo-400/80 to-indigo-500/90 dark:from-indigo-700/50 dark:via-indigo-600/40 dark:to-indigo-700/50 text-white px-6 pt-6 pb-4 rounded-t-lg">
           <DialogTitle className="text-white text-lg font-bold flex items-center gap-2">
             <UserPlus className="h-5 w-5 text-white" />

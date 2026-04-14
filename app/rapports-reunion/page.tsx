@@ -19,6 +19,7 @@ import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { getRapportsReunionForAdherents, getRapportReunionById } from "@/actions/rapports-reunion";
 import { toast } from "sonner";
+import DOMPurify from "isomorphic-dompurify";
 
 export default function RapportsReunionPage() {
   const [rapports, setRapports] = useState<any[]>([]);
@@ -71,6 +72,7 @@ export default function RapportsReunionPage() {
       toast.error("Impossible d'ouvrir la fenêtre d'impression");
       return;
     }
+    const safeHtml = DOMPurify.sanitize(String(rapport.contenu || ""), { USE_PROFILES: { html: true } });
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -95,7 +97,7 @@ export default function RapportsReunionPage() {
             }
             .contenu {
               line-height: 1.6;
-              white-space: pre-wrap;
+              word-break: break-word;
             }
             @media print {
               body {
@@ -111,7 +113,7 @@ export default function RapportsReunionPage() {
             <p><strong>Créé le :</strong> ${format(new Date(rapport.createdAt), "dd MMMM yyyy à HH:mm", { locale: fr })}</p>
             ${rapport.CreatedBy ? `<p><strong>Créé par :</strong> ${rapport.CreatedBy.name || rapport.CreatedBy.email}</p>` : ''}
           </div>
-          <div class="contenu">${rapport.contenu}</div>
+          <div class="contenu">${safeHtml}</div>
         </body>
       </html>
     `);
@@ -252,9 +254,12 @@ export default function RapportsReunionPage() {
             </DialogDescription>
           </DialogHeader>
           <div className="mt-4">
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg whitespace-pre-wrap text-sm">
-              {selectedRapport?.contenu}
-            </div>
+            <div
+              className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg text-sm leading-relaxed text-slate-900 dark:text-slate-100"
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(String(selectedRapport?.contenu || ""), { USE_PROFILES: { html: true } }),
+              }}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowViewDialog(false)}>

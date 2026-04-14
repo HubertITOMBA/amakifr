@@ -234,6 +234,147 @@ function wrapEmailContent(content: string): string {
     </html>`;
 }
 
+/**
+ * Envoie un email à un adhérent lors de l'affectation à une tâche.
+ *
+ * @param params - Données de l'email
+ * @returns true si l'email a été envoyé avec succès, false sinon
+ */
+export async function sendTacheAffecteeEmail(params: {
+  to: string;
+  adherentNom: string;
+  projetTitre: string;
+  tacheTitre: string;
+}): Promise<boolean> {
+  const appUrl = cleanUrl(domain) || domain || "https://amakifr.fr";
+  const link = `${appUrl}/user/taches`;
+
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Nouvelle tâche affectée</h1>
+    <p style="margin: 10px 0; color: #666;">Bonjour ${params.adherentNom},</p>
+    <div style="background-color: #dcfce7; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #22c55e;">
+      <p style="margin: 0; color: #166534;">
+        Vous avez été affecté à la tâche <strong>"${params.tacheTitre}"</strong> du projet <strong>"${params.projetTitre}"</strong>.
+      </p>
+    </div>
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="${link}" target="_blank" rel="noopener noreferrer"
+        style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 15px;">
+        Voir mes tâches
+      </a>
+    </div>
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  return await sendEmail(
+    {
+      from: "noreply@amaki.fr",
+      to: params.to,
+      subject: `Nouvelle tâche : ${params.tacheTitre}`,
+      html: wrapEmailContent(content),
+    },
+    false
+  );
+}
+
+/**
+ * Envoie un email à un adhérent lors du retrait d'affectation à une tâche.
+ *
+ * @param params - Données de l'email
+ * @returns true si l'email a été envoyé avec succès, false sinon
+ */
+export async function sendTacheRetireeEmail(params: {
+  to: string;
+  adherentNom: string;
+  projetTitre: string;
+  tacheTitre: string;
+}): Promise<boolean> {
+  const appUrl = cleanUrl(domain) || domain || "https://amakifr.fr";
+  const link = `${appUrl}/user/taches`;
+
+  const content = `
+    <h1 style="color: #dc3545; margin-bottom: 20px; margin-top: 0;">Affectation retirée</h1>
+    <p style="margin: 10px 0; color: #666;">Bonjour ${params.adherentNom},</p>
+    <div style="background-color: #fee2e2; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ef4444;">
+      <p style="margin: 0; color: #991b1b;">
+        Vous avez été retiré de la tâche <strong>"${params.tacheTitre}"</strong> du projet <strong>"${params.projetTitre}"</strong>.
+      </p>
+    </div>
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="${link}" target="_blank" rel="noopener noreferrer"
+        style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 15px;">
+        Accéder à mes tâches
+      </a>
+    </div>
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  return await sendEmail(
+    {
+      from: "noreply@amaki.fr",
+      to: params.to,
+      subject: `Retrait de la tâche : ${params.tacheTitre}`,
+      html: wrapEmailContent(content),
+    },
+    false
+  );
+}
+
+/**
+ * Envoie un email à un adhérent lors d'un changement de responsable d'une tâche.
+ *
+ * @param params - Données de l'email
+ * @returns true si l'email a été envoyé avec succès, false sinon
+ */
+export async function sendChangementResponsableTacheEmail(params: {
+  to: string;
+  adherentNom: string;
+  projetTitre: string;
+  tacheTitre: string;
+  becameResponsible: boolean;
+}): Promise<boolean> {
+  const appUrl = cleanUrl(domain) || domain || "https://amakifr.fr";
+  const link = `${appUrl}/user/taches`;
+
+  const title = params.becameResponsible ? "Vous êtes maintenant responsable" : "Vous n'êtes plus responsable";
+  const accent = params.becameResponsible ? "#22c55e" : "#f59e0b";
+  const bg = params.becameResponsible ? "#dcfce7" : "#fef3c7";
+
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Changement de responsable</h1>
+    <p style="margin: 10px 0; color: #666;">Bonjour ${params.adherentNom},</p>
+    <div style="background-color: ${bg}; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid ${accent};">
+      <p style="margin: 0; color: #333;">
+        <strong>${title}</strong> de la tâche <strong>"${params.tacheTitre}"</strong> (projet <strong>"${params.projetTitre}"</strong>).
+      </p>
+    </div>
+    <div style="text-align: center; margin: 24px 0;">
+      <a href="${link}" target="_blank" rel="noopener noreferrer"
+        style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 15px;">
+        Voir la tâche
+      </a>
+    </div>
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  const subjectPrefix = params.becameResponsible ? "Responsable de tâche" : "Responsable retiré";
+  return await sendEmail(
+    {
+      from: "noreply@amaki.fr",
+      to: params.to,
+      subject: `${subjectPrefix} : ${params.tacheTitre}`,
+      html: wrapEmailContent(content),
+    },
+    false
+  );
+}
+
 export const sendTwoFactorTokenEmail = async(
     email: string,
     token: string

@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { StatutProjet, StatutSousProjet, TypeNotification } from "@prisma/client";
 import { logCreation, logModification, logDeletion } from "@/lib/activity-logger";
+import { sendChangementResponsableTacheEmail, sendTacheAffecteeEmail, sendTacheRetireeEmail } from "@/lib/mail";
 
 // Schémas de validation
 const CreateProjetSchema = z.object({
@@ -942,6 +943,115 @@ export async function affecterSousProjet(formData: FormData) {
       }
     });
 
+    // Envoi d'emails (non bloquant) aux adhérents concernés
+    let emailsAttempted = 0;
+    let emailsSent = 0;
+    try {
+      const emailTargetsByAdherentId = new Map<
+        string,
+        { email: string; nom: string; accepteCommunications: boolean }
+      >();
+
+      const allConcernedIds = Array.from(
+        new Set(
+          [
+            ...newlyAssignedAdherentIds,
+            ...removedAdherentIds,
+            previousResponsibleAdherentId,
+            nextResponsibleAdherentId,
+          ].filter(Boolean) as string[]
+        )
+      );
+
+      if (allConcernedIds.length > 0) {
+        const adherents = await db.adherent.findMany({
+          where: { id: { in: allConcernedIds } },
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            accepteCommunications: true,
+            User: {
+              select: {
+                email: true,
+              },
+            },
+          },
+        });
+
+        for (const a of adherents) {
+          const email = a.User?.email;
+          if (!email) continue;
+          emailTargetsByAdherentId.set(a.id, {
+            email,
+            nom: `${a.firstname} ${a.lastname}`,
+            accepteCommunications: !!a.accepteCommunications,
+          });
+        }
+      }
+
+      const projetTitre = sousProjet.Projet.titre;
+      const tacheTitre = sousProjet.titre;
+
+      for (const adherentId of newlyAssignedAdherentIds) {
+        const target = emailTargetsByAdherentId.get(adherentId);
+        if (!target?.email || !target.accepteCommunications) continue;
+        emailsAttempted += 1;
+        const ok = await sendTacheAffecteeEmail({
+          to: target.email,
+          adherentNom: target.nom,
+          projetTitre,
+          tacheTitre,
+        });
+        if (ok) emailsSent += 1;
+      }
+
+      for (const adherentId of removedAdherentIds) {
+        const target = emailTargetsByAdherentId.get(adherentId);
+        if (!target?.email || !target.accepteCommunications) continue;
+        emailsAttempted += 1;
+        const ok = await sendTacheRetireeEmail({
+          to: target.email,
+          adherentNom: target.nom,
+          projetTitre,
+          tacheTitre,
+        });
+        if (ok) emailsSent += 1;
+      }
+
+      if (previousResponsibleAdherentId && previousResponsibleAdherentId !== nextResponsibleAdherentId) {
+        const target = emailTargetsByAdherentId.get(previousResponsibleAdherentId);
+        if (target?.email && target.accepteCommunications) {
+          emailsAttempted += 1;
+          const ok = await sendChangementResponsableTacheEmail({
+            to: target.email,
+            adherentNom: target.nom,
+            projetTitre,
+            tacheTitre,
+            becameResponsible: false,
+          });
+          if (ok) emailsSent += 1;
+        }
+      }
+
+      if (nextResponsibleAdherentId && previousResponsibleAdherentId !== nextResponsibleAdherentId) {
+        const target = emailTargetsByAdherentId.get(nextResponsibleAdherentId);
+        if (target?.email && target.accepteCommunications) {
+          emailsAttempted += 1;
+          const ok = await sendChangementResponsableTacheEmail({
+            to: target.email,
+            adherentNom: target.nom,
+            projetTitre,
+            tacheTitre,
+            becameResponsible: true,
+          });
+          if (ok) emailsSent += 1;
+        }
+      }
+    } catch (emailError) {
+      console.error("Erreur lors de l'envoi des emails d'affectation:", emailError);
+    }
+
     // Logger l'activité
     try {
       await logModification(
@@ -967,9 +1077,14 @@ export async function affecterSousProjet(formData: FormData) {
     revalidatePath("/user/taches");
     return {
       success: true,
-      message: hadDuplicates
-        ? `${validatedData.adherentIds.length} adhérent(s) affecté(s) à la tâche avec succès (doublons ignorés)`
-        : `${validatedData.adherentIds.length} adhérent(s) affecté(s) à la tâche avec succès`,
+      message: [
+        hadDuplicates
+          ? `${validatedData.adherentIds.length} adhérent(s) affecté(s) à la tâche avec succès (doublons ignorés)`
+          : `${validatedData.adherentIds.length} adhérent(s) affecté(s) à la tâche avec succès`,
+        emailsAttempted > 0 ? `Emails envoyés : ${emailsSent}/${emailsAttempted}` : null,
+      ]
+        .filter(Boolean)
+        .join(" • "),
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -1016,6 +1131,12 @@ export async function retirerAffectation(affectationId: string) {
             firstname: true,
             lastname: true,
             userId: true,
+            accepteCommunications: true,
+            User: {
+              select: {
+                email: true,
+              },
+            },
           },
         },
       },
@@ -1047,6 +1168,25 @@ export async function retirerAffectation(affectationId: string) {
       }
     }
 
+    // Envoyer un email (non bloquant) à l'adhérent retiré
+    let emailsAttempted = 0;
+    let emailsSent = 0;
+    try {
+      const email = affectation.Adherent.User?.email;
+      if (email && affectation.Adherent.accepteCommunications) {
+        emailsAttempted += 1;
+        const ok = await sendTacheRetireeEmail({
+          to: email,
+          adherentNom: `${affectation.Adherent.firstname} ${affectation.Adherent.lastname}`,
+          projetTitre: affectation.SousProjet.Projet.titre,
+          tacheTitre: affectation.SousProjet.titre,
+        });
+        if (ok) emailsSent += 1;
+      }
+    } catch (emailError) {
+      console.error("Erreur lors de l'envoi de l'email de retrait:", emailError);
+    }
+
     // Logger l'activité
     try {
       await logModification(
@@ -1067,7 +1207,12 @@ export async function retirerAffectation(affectationId: string) {
     revalidatePath("/user/taches");
     return {
       success: true,
-      message: `Adhérent retiré de la tâche avec succès`,
+      message: [
+        "Adhérent retiré de la tâche avec succès",
+        emailsAttempted > 0 ? `Emails envoyés : ${emailsSent}/${emailsAttempted}` : null,
+      ]
+        .filter(Boolean)
+        .join(" • "),
     };
   } catch (error) {
     console.error("Erreur lors du retrait de l'affectation:", error);

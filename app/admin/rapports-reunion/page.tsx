@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import {
@@ -58,6 +57,8 @@ import {
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import DOMPurify from "isomorphic-dompurify";
+import { RichTextEditor } from "@/components/admin/rapports-reunion/RichTextEditor";
 
 const columnHelper = createColumnHelper<any>();
 
@@ -283,6 +284,7 @@ export default function AdminRapportsReunionPage() {
       toast.error("Impossible d'ouvrir la fenêtre d'impression");
       return;
     }
+    const safeHtml = DOMPurify.sanitize(String(rapport.contenu || ""), { USE_PROFILES: { html: true } });
 
     printWindow.document.write(`
       <!DOCTYPE html>
@@ -307,7 +309,7 @@ export default function AdminRapportsReunionPage() {
             }
             .contenu {
               line-height: 1.6;
-              white-space: pre-wrap;
+              word-break: break-word;
             }
             @media print {
               body {
@@ -323,7 +325,7 @@ export default function AdminRapportsReunionPage() {
             <p><strong>Créé le :</strong> ${format(new Date(rapport.createdAt), "dd MMMM yyyy à HH:mm", { locale: fr })}</p>
             ${rapport.CreatedBy ? `<p><strong>Créé par :</strong> ${rapport.CreatedBy.name || rapport.CreatedBy.email}</p>` : ''}
           </div>
-          <div class="contenu">${rapport.contenu}</div>
+          <div class="contenu">${safeHtml}</div>
         </body>
       </html>
     `);
@@ -636,9 +638,9 @@ export default function AdminRapportsReunionPage() {
       {/* Dialog de création */}
       <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Créer un nouveau rapport de réunion</DialogTitle>
-            <DialogDescription>
+          <DialogHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 text-white px-6 pt-6 pb-4 rounded-t-lg -mx-6 -mt-6">
+            <DialogTitle className="text-white">Créer un nouveau rapport de réunion</DialogTitle>
+            <DialogDescription className="text-blue-50 text-sm mt-2">
               Remplissez les informations du rapport de réunion mensuelle
             </DialogDescription>
           </DialogHeader>
@@ -689,13 +691,10 @@ export default function AdminRapportsReunionPage() {
             </div>
             <div>
               <Label htmlFor="contenu">Contenu du rapport *</Label>
-              <Textarea
-                id="contenu"
+              <RichTextEditor
                 value={formData.contenu}
-                onChange={(e) => setFormData({ ...formData, contenu: e.target.value })}
+                onChange={(html) => setFormData({ ...formData, contenu: html })}
                 placeholder="Rédigez le compte rendu de la réunion..."
-                rows={15}
-                className="font-mono text-sm"
               />
             </div>
           </div>
@@ -720,9 +719,9 @@ export default function AdminRapportsReunionPage() {
       {/* Dialog de modification */}
       <Dialog open={showEditDialog} onOpenChange={setShowEditDialog}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Modifier le rapport de réunion</DialogTitle>
-            <DialogDescription>
+          <DialogHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 text-white px-6 pt-6 pb-4 rounded-t-lg -mx-6 -mt-6">
+            <DialogTitle className="text-white">Modifier le rapport de réunion</DialogTitle>
+            <DialogDescription className="text-blue-50 text-sm mt-2">
               Modifiez les informations du rapport de réunion
             </DialogDescription>
           </DialogHeader>
@@ -772,13 +771,10 @@ export default function AdminRapportsReunionPage() {
             </div>
             <div>
               <Label htmlFor="edit-contenu">Contenu du rapport *</Label>
-              <Textarea
-                id="edit-contenu"
+              <RichTextEditor
                 value={formData.contenu}
-                onChange={(e) => setFormData({ ...formData, contenu: e.target.value })}
+                onChange={(html) => setFormData({ ...formData, contenu: html })}
                 placeholder="Rédigez le compte rendu de la réunion..."
-                rows={15}
-                className="font-mono text-sm"
               />
             </div>
           </div>
@@ -803,8 +799,8 @@ export default function AdminRapportsReunionPage() {
       {/* Dialog de visualisation */}
       <Dialog open={showViewDialog} onOpenChange={setShowViewDialog}>
         <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{selectedRapport?.titre}</DialogTitle>
+          <DialogHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 text-white px-6 pt-6 pb-4 rounded-t-lg -mx-6 -mt-6">
+            <DialogTitle className="text-white">{selectedRapport?.titre}</DialogTitle>
           </DialogHeader>
           <div className="space-y-1 mt-2 text-sm text-muted-foreground">
             <p><strong>Date de la réunion :</strong> {selectedRapport && format(new Date(selectedRapport.dateReunion), "dd MMMM yyyy", { locale: fr })}</p>
@@ -817,9 +813,12 @@ export default function AdminRapportsReunionPage() {
             )}
           </div>
           <div className="mt-4">
-            <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg whitespace-pre-wrap text-sm">
-              {selectedRapport?.contenu}
-            </div>
+            <div
+              className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg text-sm leading-relaxed text-slate-900 dark:text-slate-100"
+              dangerouslySetInnerHTML={{
+                __html: DOMPurify.sanitize(String(selectedRapport?.contenu || ""), { USE_PROFILES: { html: true } }),
+              }}
+            />
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowViewDialog(false)}>

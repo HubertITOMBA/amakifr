@@ -22,7 +22,8 @@ import Link from "next/link";
 import { Button } from "../ui/button";
 import { LoginButton } from "./login-button";
 import { ChangePasswordDialog } from "@/components/user/ChangePasswordDialog";
-import { Lock } from "lucide-react";
+import { Download, Lock } from "lucide-react";
+import { usePwaInstallPrompt } from "@/components/pwa/usePwaInstallPrompt";
 
 
 export const UserButton = () => {
@@ -30,6 +31,7 @@ export const UserButton = () => {
     const { forceUpdate } = useSessionUpdate();
     const { userProfile } = useUserProfile();
     const user = session?.user;
+    const { canInstall, isInstalled, isIOS, install } = usePwaInstallPrompt();
     
     // Récupérer l'image de l'utilisateur (priorité à userProfile, puis session)
     const userImage = userProfile?.image || user?.image;
@@ -125,6 +127,18 @@ export const UserButton = () => {
                   }
                 />
               </DropdownMenuItem>
+
+              {!isInstalled && (
+                <DropdownMenuItem
+                  onSelect={async () => {
+                    await install();
+                  }}
+                  className="hover:bg-orange-300"
+                >
+                  <Download className="h-4 w-4 mr-2" />
+                  Installer l'application
+                </DropdownMenuItem>
+              )}
 
               <DropdownMenuItem className="hover:bg-orange-300">
                 <LogoutButton>

@@ -13,7 +13,6 @@ import { ToastProvider } from "@/components/providers/toast-provider";
 import { Toaster } from "sonner";
 import SessionAutoSignout from "@/components/SessionAutoSignout";
 import { ReactToastifyProvider } from "@/components/providers/react-toastify-provider";
-import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import { ChatBotProvider } from "@/components/user/ChatBotProvider";
 import { BuildIdChecker } from "@/components/BuildIdChecker";
 import { ChunkErrorHandler } from "@/components/ChunkErrorHandler";
@@ -126,7 +125,6 @@ export default function RootLayout({
             <ReactToastifyProvider />
             {/* TODO: Réactiver la déconnexion automatique après le développement */}
             {/* <SessionAutoSignout /> */}
-            <InstallPrompt />
             <ChatBotProvider />
             <BuildIdChecker />
             <ChunkErrorHandler />
