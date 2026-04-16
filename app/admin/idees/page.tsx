@@ -165,7 +165,6 @@ export default function AdminIdeesPage() {
   const [showValiderDialog, setShowValiderDialog] = useState(false);
   const [showRejeterDialog, setShowRejeterDialog] = useState(false);
   const [showBloquerDialog, setShowBloquerDialog] = useState(false);
-  const [showSupprimerCommentaireDialog, setShowSupprimerCommentaireDialog] = useState(false);
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [selectedCommentaire, setSelectedCommentaire] = useState<any>(null);
   const [raisonRejet, setRaisonRejet] = useState("");
@@ -390,7 +389,6 @@ export default function AdminIdeesPage() {
       const result = await supprimerCommentaire(formData);
       if (result.success) {
         toast.success(result.message || "Commentaire supprimé avec succès");
-        setShowSupprimerCommentaireDialog(false);
         setSelectedCommentaire(null);
         setRaisonSuppression("");
         await loadIdees();
@@ -952,8 +950,7 @@ export default function AdminIdeesPage() {
                               size="sm"
                               onClick={() => {
                                 setSelectedCommentaire(commentaire);
-                                setShowSupprimerCommentaireDialog(true);
-                                setShowDetailsDialog(false);
+                                setRaisonSuppression("");
                               }}
                               className="text-red-600 hover:text-red-700 hover:bg-red-50"
                             >
@@ -969,6 +966,60 @@ export default function AdminIdeesPage() {
                 )}
               </div>
 
+              {/* Suppression inline (évite un 2e dialog) */}
+              {selectedCommentaire && !selectedCommentaire.supprime && (
+                <div className="rounded-lg border border-red-200 dark:border-red-800 bg-red-50/60 dark:bg-red-900/10 p-3 space-y-3">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <Label className="text-sm font-semibold text-red-700 dark:text-red-300">
+                        Supprimer le commentaire
+                      </Label>
+                      <p className="text-xs text-red-700/80 dark:text-red-200/80 mt-0.5">
+                        Indiquez la raison. L&apos;adhérent sera notifié par email.
+                      </p>
+                    </div>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedCommentaire(null);
+                        setRaisonSuppression("");
+                      }}
+                      className="border-red-300 text-red-700 hover:bg-red-100"
+                    >
+                      Annuler
+                    </Button>
+                  </div>
+
+                  <div className="bg-white dark:bg-gray-900 rounded-lg p-3 border border-red-100 dark:border-red-900">
+                    <p className="text-sm text-gray-700 dark:text-gray-300">
+                      {selectedCommentaire.contenu}
+                    </p>
+                  </div>
+
+                  <div>
+                    <Label htmlFor="raison-suppression">Raison de la suppression *</Label>
+                    <Textarea
+                      id="raison-suppression"
+                      value={raisonSuppression}
+                      onChange={(e) => setRaisonSuppression(e.target.value)}
+                      placeholder="Ex: Viole l'éthique de l'association, contient des propos diffamatoires..."
+                      rows={3}
+                    />
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      onClick={handleSupprimerCommentaire}
+                      disabled={actionLoading || !raisonSuppression.trim()}
+                      className="bg-red-600 hover:bg-red-700"
+                    >
+                      {actionLoading ? "Suppression..." : "Supprimer"}
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-2 justify-end pt-4 border-t">
                 <Button variant="outline" onClick={() => setShowDetailsDialog(false)}>
                   Fermer
@@ -978,52 +1029,6 @@ export default function AdminIdeesPage() {
                     Voir sur le site
                   </Button>
                 </Link>
-              </div>
-            </div>
-          )}
-        </DialogContent>
-      </Dialog>
-
-      {/* Dialog Supprimer Commentaire */}
-      <Dialog open={showSupprimerCommentaireDialog} onOpenChange={setShowSupprimerCommentaireDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Supprimer le commentaire</DialogTitle>
-            <DialogDescription>
-              Indiquez la raison de la suppression. L'adhérent sera notifié par email.
-            </DialogDescription>
-          </DialogHeader>
-          {selectedCommentaire && (
-            <div className="space-y-4">
-              <div className="bg-gray-50 dark:bg-gray-800 rounded-lg p-3">
-                <p className="text-sm text-gray-700 dark:text-gray-300">
-                  {selectedCommentaire.contenu}
-                </p>
-              </div>
-              <div>
-                <Label htmlFor="raison-suppression">Raison de la suppression *</Label>
-                <Textarea
-                  id="raison-suppression"
-                  value={raisonSuppression}
-                  onChange={(e) => setRaisonSuppression(e.target.value)}
-                  placeholder="Ex: Viole l'éthique de l'association, contient des propos diffamatoires..."
-                  rows={4}
-                />
-              </div>
-              <div className="flex gap-2 justify-end">
-                <Button variant="outline" onClick={() => {
-                  setShowSupprimerCommentaireDialog(false);
-                  setRaisonSuppression("");
-                }}>
-                  Annuler
-                </Button>
-                <Button
-                  onClick={handleSupprimerCommentaire}
-                  disabled={actionLoading || !raisonSuppression.trim()}
-                  className="bg-red-600 hover:bg-red-700"
-                >
-                  {actionLoading ? "Suppression..." : "Supprimer"}
-                </Button>
               </div>
             </div>
           )}

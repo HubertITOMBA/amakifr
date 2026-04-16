@@ -45,6 +45,7 @@ export function AffecterSousProjetDialog({ sousProjet, open, onOpenChange, onSuc
   const [searchTerm, setSearchTerm] = useState("");
   const [responsable, setResponsable] = useState(false);
   const initializedKeyRef = useRef<string | null>(null);
+  const allowCloseRef = useRef(false);
 
   const loadAdherents = useCallback(async () => {
     try {
@@ -139,8 +140,10 @@ export function AffecterSousProjetDialog({ sousProjet, open, onOpenChange, onSuc
 
       if (result.success) {
         toast.success(result.message);
-        // Fermer le dialog d'abord
+        // Fermer le dialog d'abord (fermeture explicite uniquement)
+        allowCloseRef.current = true;
         onOpenChange(false);
+        allowCloseRef.current = false;
         // Attendre un peu avant d'appeler onSuccess pour éviter les conflits
         setTimeout(() => {
           onSuccess?.();
@@ -157,6 +160,11 @@ export function AffecterSousProjetDialog({ sousProjet, open, onOpenChange, onSuc
   };
 
   const handleOpenChange = useCallback((newOpen: boolean) => {
+    // Empêcher la fermeture automatique (clic overlay, focus, etc.)
+    // La fermeture est autorisée uniquement via nos boutons (Annuler / succès).
+    if (!newOpen && !allowCloseRef.current) {
+      return;
+    }
     onOpenChange(newOpen);
   }, [onOpenChange]);
 
@@ -164,8 +172,12 @@ export function AffecterSousProjetDialog({ sousProjet, open, onOpenChange, onSuc
     <Dialog open={open} onOpenChange={handleOpenChange} modal={false}>
       <DialogContent
         className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0"
+        showCloseButton={false}
         onOpenAutoFocus={(e) => e.preventDefault()}
         onCloseAutoFocus={(e) => e.preventDefault()}
+        onInteractOutside={(e) => e.preventDefault()}
+        onPointerDownOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <DialogHeader className="bg-gradient-to-r from-indigo-500/90 via-indigo-400/80 to-indigo-500/90 dark:from-indigo-700/50 dark:via-indigo-600/40 dark:to-indigo-700/50 text-white px-6 pt-6 pb-4 rounded-t-lg">
           <DialogTitle className="text-white text-lg font-bold flex items-center gap-2">
@@ -254,7 +266,11 @@ export function AffecterSousProjetDialog({ sousProjet, open, onOpenChange, onSuc
             <Button
               type="button"
               variant="outline"
-              onClick={() => onOpenChange(false)}
+              onClick={() => {
+                allowCloseRef.current = true;
+                onOpenChange(false);
+                allowCloseRef.current = false;
+              }}
               disabled={loading}
               className="w-full sm:w-auto border-gray-300 dark:border-gray-600"
             >

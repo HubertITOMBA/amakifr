@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AdherentSearchDialog } from "@/components/admin/AdherentSearchDialog";
+import { InlineAdherentSearchPanel } from "@/components/admin/InlineAdherentSearchPanel";
 import { Badge } from "@/components/ui/badge";
 import { 
   HandHeart, 
@@ -766,13 +766,15 @@ export default function AdminAssistancesPage() {
                           {selectedAdherent.email}
                         </p>
                       )}
-                      <AdherentSearchDialog
+                      <InlineAdherentSearchPanel
                         open={adherentSearchOpen}
                         onOpenChange={setAdherentSearchOpen}
                         onSelect={(adherent) => {
                           setSelectedAdherent(adherent);
                           setFormData((prev) => ({ ...prev, adherentId: adherent.id }));
                         }}
+                        title="Rechercher un adhérent"
+                        description="Tapez le nom, prénom ou email de l'adhérent"
                       />
                     </div>
                     <div className="rounded-lg border border-purple-200 dark:border-purple-800 bg-purple-50/50 dark:bg-purple-900/20 p-3">
@@ -1084,13 +1086,15 @@ export default function AdminAssistancesPage() {
                     </Button>
                   )}
                 </div>
-                <AdherentSearchDialog
+                <InlineAdherentSearchPanel
                   open={editAdherentSearchOpen}
                   onOpenChange={setEditAdherentSearchOpen}
                   onSelect={(adherent) => {
                     setEditSelectedAdherent({ id: adherent.id, firstname: adherent.firstname, lastname: adherent.lastname, email: adherent.email });
                     setEditFormData((p) => ({ ...p, adherentId: adherent.id }));
                   }}
+                  title="Rechercher un adhérent"
+                  description="Tapez le nom, prénom ou email de l'adhérent"
                 />
               </div>
               <div className="rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/50 p-3">

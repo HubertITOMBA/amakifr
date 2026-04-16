@@ -43,7 +43,7 @@ import { StatutReunionMensuelle, TypeLieuReunion, StatutParticipationReunion } f
 import Link from "next/link";
 import { useCurrentUser } from "@/hooks/use-current-user";
 import { isAdminRole } from "@/lib/utils";
-import { AdherentSearchDialog } from "@/components/admin/AdherentSearchDialog";
+import { InlineAdherentSearchPanel } from "@/components/admin/InlineAdherentSearchPanel";
 import { getAdherentsMembres } from "@/actions/cotisations-du-mois";
 
 const moisOptions = [
@@ -880,7 +880,7 @@ export default function ReunionsMensuellesPage() {
 
       {/* Dialog : Recherche adhérent hôte (admin) */}
       {isAdmin && (
-        <AdherentSearchDialog
+        <InlineAdherentSearchPanel
           open={adherentSearchOpen}
           onOpenChange={setAdherentSearchOpen}
           onSelect={(adherent) => {

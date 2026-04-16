@@ -474,83 +474,101 @@ export function PaiementCotisationsDialog({
             <p className="text-xs text-gray-500 dark:text-gray-400">
               {filteredData.length} cotisation(s) · Mois par défaut : mois en cours
             </p>
-          </div>
-        </DialogContent>
-      </Dialog>
 
-      <Dialog open={payFormOpen} onOpenChange={setPayFormOpen}>
-        <DialogContent className="max-w-sm bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700">
-          <DialogHeader>
-            <DialogTitle className="text-base text-gray-900 dark:text-gray-100">
-              Enregistrer le paiement
-            </DialogTitle>
-            <DialogDescription className="text-sm text-gray-500 dark:text-gray-400">
-              {selectedRow && (
-                <> {selectedRow.Adherent?.firstname} {selectedRow.Adherent?.lastname} · {selectedRow.TypeCotisation?.nom} · Reste {selectedRow.montantRestant.toFixed(2)} €</>
-              )}
-            </DialogDescription>
-          </DialogHeader>
-          <div className="space-y-3 pt-2">
-            <div>
-              <Label className="text-sm text-gray-700 dark:text-gray-300">Montant (€) *</Label>
-              <Input
-                type="text"
-                inputMode="decimal"
-                value={payForm.montant}
-                onChange={(e) => setPayForm((p) => ({ ...p, montant: e.target.value }))}
-                placeholder="0,00"
-                className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-              />
-            </div>
-            <div>
-              <Label className="text-sm text-gray-700 dark:text-gray-300">Date</Label>
-              <Input
-                type="date"
-                value={payForm.datePaiement}
-                onChange={(e) => setPayForm((p) => ({ ...p, datePaiement: e.target.value }))}
-                className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-              />
-            </div>
-            <div>
-              <Label className="text-sm text-gray-700 dark:text-gray-300">Moyen</Label>
-              <Select
-                value={payForm.moyenPaiement}
-                onValueChange={(v: "Especes" | "Cheque" | "Virement" | "CarteBancaire") =>
-                  setPayForm((p) => ({ ...p, moyenPaiement: v }))
-                }
-              >
-                <SelectTrigger className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="Especes">Espèces</SelectItem>
-                  <SelectItem value="Cheque">Chèque</SelectItem>
-                  <SelectItem value="Virement">Virement</SelectItem>
-                  <SelectItem value="CarteBancaire">Carte bancaire</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-            <div>
-              <Label className="text-sm text-gray-700 dark:text-gray-300">Référence</Label>
-              <Input
-                value={payForm.reference}
-                onChange={(e) => setPayForm((p) => ({ ...p, reference: e.target.value }))}
-                placeholder="N° chèque, virement..."
-                className="mt-1 bg-gray-50 dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100"
-              />
-            </div>
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => setPayFormOpen(false)} className="text-gray-700 dark:text-gray-300">
-                Annuler
-              </Button>
-              <Button
-                onClick={handleSubmitPay}
-                disabled={payingId !== null}
-                className="bg-emerald-600 hover:bg-emerald-700 text-white"
-              >
-                {payingId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enregistrer"}
-              </Button>
-            </div>
+            {/* Formulaire inline (évite Dialog imbriqué) */}
+            {payFormOpen && selectedRow && (
+              <div className="mt-3 rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/60 dark:bg-emerald-900/10 p-3 sm:p-4">
+                <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-2">
+                  <div>
+                    <div className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
+                      Enregistrer le paiement
+                    </div>
+                    <div className="text-xs text-emerald-800/80 dark:text-emerald-200/80 mt-0.5">
+                      {selectedRow.Adherent?.firstname} {selectedRow.Adherent?.lastname} ·{" "}
+                      {selectedRow.TypeCotisation?.nom} · Reste{" "}
+                      {selectedRow.montantRestant.toFixed(2)} €
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setPayFormOpen(false);
+                      setSelectedRow(null);
+                    }}
+                    className="border-emerald-300 dark:border-emerald-700 text-emerald-900 dark:text-emerald-100 hover:bg-emerald-100/60 dark:hover:bg-emerald-900/20"
+                  >
+                    Annuler
+                  </Button>
+                </div>
+
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <Label className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">
+                      Montant (€) *
+                    </Label>
+                    <Input
+                      type="text"
+                      inputMode="decimal"
+                      value={payForm.montant}
+                      onChange={(e) => setPayForm((p) => ({ ...p, montant: e.target.value }))}
+                      placeholder="0,00"
+                      className="mt-1 bg-white dark:bg-gray-900 border-emerald-200 dark:border-emerald-800 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">Date</Label>
+                    <Input
+                      type="date"
+                      value={payForm.datePaiement}
+                      onChange={(e) => setPayForm((p) => ({ ...p, datePaiement: e.target.value }))}
+                      className="mt-1 bg-white dark:bg-gray-900 border-emerald-200 dark:border-emerald-800 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">Moyen</Label>
+                    <Select
+                      value={payForm.moyenPaiement}
+                      onValueChange={(v: "Especes" | "Cheque" | "Virement" | "CarteBancaire") =>
+                        setPayForm((p) => ({ ...p, moyenPaiement: v }))
+                      }
+                    >
+                      <SelectTrigger className="mt-1 bg-white dark:bg-gray-900 border-emerald-200 dark:border-emerald-800 text-gray-900 dark:text-gray-100">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Especes">Espèces</SelectItem>
+                        <SelectItem value="Cheque">Chèque</SelectItem>
+                        <SelectItem value="Virement">Virement</SelectItem>
+                        <SelectItem value="CarteBancaire">Carte bancaire</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs font-semibold text-emerald-900 dark:text-emerald-100">Référence</Label>
+                    <Input
+                      value={payForm.reference}
+                      onChange={(e) => setPayForm((p) => ({ ...p, reference: e.target.value }))}
+                      placeholder="N° chèque, virement..."
+                      className="mt-1 bg-white dark:bg-gray-900 border-emerald-200 dark:border-emerald-800 text-gray-900 dark:text-gray-100"
+                    />
+                  </div>
+                </div>
+
+                <div className="mt-3 flex justify-end">
+                  <Button
+                    onClick={handleSubmitPay}
+                    disabled={payingId !== null}
+                    className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                  >
+                    {payingId ? <Loader2 className="h-4 w-4 animate-spin" /> : "Enregistrer"}
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </DialogContent>
       </Dialog>

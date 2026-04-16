@@ -33,7 +33,7 @@ import {
   HandHeart,
   MoreHorizontal
 } from "lucide-react";
-import { AdherentSearchDialog } from "@/components/admin/AdherentSearchDialog";
+import { InlineAdherentSearchPanel } from "@/components/admin/InlineAdherentSearchPanel";
 import { toast } from "react-toastify";
 import Link from "next/link";
 import { 
@@ -1117,7 +1117,7 @@ export default function AdminCotisationsDuMois() {
                         type="button"
                         variant="outline"
                         size="sm"
-                        onClick={() => setAdherentSearchOpen(true)}
+                        onClick={() => setAdherentSearchOpen((v) => !v)}
                         title="Rechercher un adhérent"
                       >
                         <User className="h-4 w-4 mr-2" />
@@ -1140,6 +1140,17 @@ export default function AdminCotisationsDuMois() {
                     <p className="text-xs text-muted-foreground">
                       Les cotisations ne concernent que les adhérents MEMBRE. L&apos;adhérent bénéficiaire ne paiera pas cette cotisation d&apos;assistance.
                     </p>
+
+                    <InlineAdherentSearchPanel
+                      open={adherentSearchOpen}
+                      onOpenChange={setAdherentSearchOpen}
+                      title="Sélectionner l'adhérent bénéficiaire"
+                      description="Recherchez l'adhérent qui bénéficiera de cette assistance (il ne paiera pas cette cotisation)"
+                      onSelect={(adherent) => {
+                        setSelectedAdherent(adherent);
+                        setFormData({ ...formData, adherentBeneficiaireId: adherent.id });
+                      }}
+                    />
                   </div>
                 );
               }
@@ -1460,18 +1471,6 @@ export default function AdminCotisationsDuMois() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Dialog de recherche d'adhérent */}
-      <AdherentSearchDialog
-        open={adherentSearchOpen}
-        onOpenChange={setAdherentSearchOpen}
-        onSelect={(adherent) => {
-          setSelectedAdherent(adherent);
-          setFormData({ ...formData, adherentBeneficiaireId: adherent.id });
-        }}
-        title="Sélectionner l'adhérent bénéficiaire"
-        description="Recherchez l'adhérent qui bénéficiera de cette assistance (il ne paiera pas cette cotisation)"
-      />
 
       {/* Informations importantes */}
       <Card className="mx-auto max-w-[96rem] w-full border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-900/20 mt-6">

@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { AdherentSearchDialog } from "@/components/admin/AdherentSearchDialog";
+import { InlineAdherentSearchPanel } from "@/components/admin/InlineAdherentSearchPanel";
 import { Badge } from "@/components/ui/badge";
 import {
   Receipt,
@@ -688,7 +688,7 @@ export default function AdminHistoriquePaiementsPage() {
                             {selectedAdherent.email}
                           </p>
                         )}
-                        <AdherentSearchDialog
+                        <InlineAdherentSearchPanel
                           open={adherentSearchOpen}
                           onOpenChange={setAdherentSearchOpen}
                           onSelect={(adherent) => {
@@ -701,6 +701,8 @@ export default function AdminHistoriquePaiementsPage() {
                               assistanceId: "",
                             });
                           }}
+                          title="Rechercher un adhérent"
+                          description="Tapez le nom, prénom ou email de l'adhérent"
                         />
                       </div>
 

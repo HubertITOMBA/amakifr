@@ -79,7 +79,7 @@ import {
   ColumnFiltersState,
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/admin/DataTable";
-import { AdherentSearchDialog } from "@/components/admin/AdherentSearchDialog";
+import { InlineAdherentSearchPanel } from "@/components/admin/InlineAdherentSearchPanel";
 
 const columnHelper = createColumnHelper<any>();
 
@@ -1168,8 +1168,8 @@ export default function AdminReunionsMensuellesPage() {
             </DialogContent>
           </Dialog>
 
-          {/* Dialog : Recherche d'adhérent */}
-          <AdherentSearchDialog
+          {/* Recherche d'adhérent inline (évite Dialog imbriqué) */}
+          <InlineAdherentSearchPanel
             open={adherentSearchOpen}
             onOpenChange={setAdherentSearchOpen}
             onSelect={(adherent) => {
@@ -1179,7 +1179,7 @@ export default function AdminReunionsMensuellesPage() {
             title="Sélectionner l'adhérent hôte"
             description="Choisissez l'adhérent qui accueillera la réunion"
           />
-          <AdherentSearchDialog
+          <InlineAdherentSearchPanel
             open={adherentSearchEditOpen}
             onOpenChange={setAdherentSearchEditOpen}
             onSelect={(adherent) => {

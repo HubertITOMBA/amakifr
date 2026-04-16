@@ -20,9 +20,8 @@ import { fr } from "date-fns/locale";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { CreateSousProjetDialog } from "./CreateSousProjetDialog";
 import { EditSousProjetDialog } from "./EditSousProjetDialog";
-import { AffecterSousProjetDialog } from "./AffecterSousProjetDialog";
-import { getAllAdherentsForSelect } from "@/actions/user";
 import Link from "next/link";
+import { InlineAffectationPanel } from "./InlineAffectationPanel";
 
 interface ViewProjetDialogProps {
   projetId: string;
@@ -116,18 +115,23 @@ export function ViewProjetDialog({ projetId, open, onOpenChange }: ViewProjetDia
     }
   };
 
-  const handleAffecterDialogClose = useCallback((open: boolean) => {
-    if (!open) {
-      setAffecterDialogOpen(null);
-    }
+  const closeAffecterPanel = useCallback(() => {
+    setAffecterDialogOpen(null);
   }, []);
 
   if (!open) return null;
 
   return (
     <>
-      <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0">
+      <Dialog open={open} onOpenChange={onOpenChange} modal={false}>
+        <DialogContent
+          className="sm:max-w-4xl max-h-[90vh] overflow-y-auto p-0"
+          onInteractOutside={(e) => e.preventDefault()}
+          onPointerDownOutside={(e) => e.preventDefault()}
+          onEscapeKeyDown={(e) => {
+            if (affecterDialogOpen) e.preventDefault();
+          }}
+        >
           <DialogHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 dark:from-blue-700/50 dark:via-blue-600/40 dark:to-blue-700/50 text-white px-6 pt-6 pb-4 rounded-t-lg">
             <div className="flex items-center justify-between">
               <div>
@@ -279,7 +283,11 @@ export function ViewProjetDialog({ projetId, open, onOpenChange }: ViewProjetDia
                                   variant="outline"
                                   size="sm"
                                   className="h-6 text-xs"
-                                  onClick={() => setAffecterDialogOpen(sousProjet)}
+                                  onClick={() => {
+                                    setAffecterDialogOpen((prev: any) =>
+                                      prev?.id === sousProjet.id ? null : sousProjet
+                                    );
+                                  }}
                                 >
                                   <UserPlus className="h-3 w-3 mr-1" />
                                   Affecter
@@ -356,6 +364,18 @@ export function ViewProjetDialog({ projetId, open, onOpenChange }: ViewProjetDia
                               </div>
                             )}
                           </CardContent>
+
+                          {/* Panneau inline d'affectation (évite les dialogs imbriqués) */}
+                          {affecterDialogOpen?.id === sousProjet.id && (
+                            <div className="px-6 pb-4">
+                              <InlineAffectationPanel
+                                sousProjet={sousProjet}
+                                open={true}
+                                onClose={closeAffecterPanel}
+                                onSuccess={loadProjet}
+                              />
+                            </div>
+                          )}
                         </Card>
                       ))}
                     </div>
@@ -403,16 +423,6 @@ export function ViewProjetDialog({ projetId, open, onOpenChange }: ViewProjetDia
           onOpenChange={(open) => {
             if (!open) setEditSousProjetOpen(null);
           }}
-          onSuccess={loadProjet}
-        />
-      )}
-
-      {affecterDialogOpen && (
-        <AffecterSousProjetDialog
-          key={affecterDialogOpen.id}
-          sousProjet={affecterDialogOpen}
-          open={!!affecterDialogOpen}
-          onOpenChange={handleAffecterDialogClose}
           onSuccess={loadProjet}
         />
       )}
