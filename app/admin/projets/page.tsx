@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, FolderKanban, Plus, Search, Eye, Edit, Trash2, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight, Users, Calendar, FileText } from "lucide-react";
+import { Loader2, FolderKanban, Plus, Search, Eye, Edit, Trash2, ChevronsLeft, ChevronsRight, ChevronLeft, ChevronRight, Users, Calendar, FileText, ListChecks } from "lucide-react";
 import { toast } from "react-toastify";
 import { getAllProjets, deleteProjet } from "@/actions/projets";
 import { format } from "date-fns";
@@ -282,6 +282,17 @@ export default function AdminProjetsPage() {
         return (
           <div className="flex items-center gap-1 sm:gap-2">
             <Button
+              asChild
+              variant="outline"
+              size="sm"
+              className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
+              title="Voir les affectations par tâche"
+            >
+              <Link href={`/admin/projets/${projet.id}/taches`} prefetch={false}>
+                <ListChecks className="h-3 w-3 sm:h-4 sm:w-4" />
+              </Link>
+            </Button>
+            <Button
               variant="outline"
               size="sm"
               className="h-7 w-7 sm:h-8 sm:w-8 p-0 border-blue-300 hover:bg-blue-50"
@@ -358,8 +369,8 @@ export default function AdminProjetsPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:to-slate-800">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Card className="mx-auto max-w-7xl shadow-lg border-blue-200 dark:border-gray-700 !pt-0">
+      <div className="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Card className="mx-auto max-w-screen-2xl shadow-lg border-blue-200 dark:border-gray-700 !pt-0">
           <CardHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 dark:from-blue-700/50 dark:via-blue-600/40 dark:to-blue-700/50 text-white !pt-0 rounded-t-lg">
             <div className="flex items-center justify-between pt-4 sm:pt-6 pb-4 sm:pb-6">
               <CardTitle className="flex items-center gap-2">
@@ -446,12 +457,12 @@ export default function AdminProjetsPage() {
                 <DataTable table={table} emptyMessage="Aucun projet trouvé" />
                 
                 {/* Pagination - Masquée sur mobile */}
-                <div className="hidden md:flex bg-white dark:bg-gray-800 mt-5 flex-col sm:flex-row items-center justify-between py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4">
-                  <div className="ml-5 flex-1 text-sm text-muted-foreground dark:text-gray-400">
+                <div className="hidden md:flex bg-white dark:bg-gray-800 mt-5 flex-row flex-nowrap items-center justify-between px-5 py-5 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4">
+                  <div className="min-w-0 flex-1 text-sm text-muted-foreground dark:text-gray-400 truncate">
                     {table.getFilteredRowModel().rows.length} projet(s) au total
                   </div>
 
-                  <div className="flex items-center space-x-6 lg:space-x-8">
+                  <div className="flex items-center whitespace-nowrap space-x-6 lg:space-x-8">
                     <div className="flex items-center space-x-2">
                       <p className="text-sm font-medium text-gray-700 dark:text-gray-300">Lignes par page</p>
                       <Select
