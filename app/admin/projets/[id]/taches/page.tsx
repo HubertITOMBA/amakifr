@@ -39,19 +39,56 @@ type Projet = {
 function statutBadgeClass(statut: string) {
   switch (statut) {
     case "APlanifier":
-      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700";
+      return "bg-white/80 text-slate-800 border-slate-400 shadow-sm font-semibold dark:bg-slate-950/40 dark:text-slate-100 dark:border-slate-600";
     case "EnAttente":
-      return "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-200 border-orange-200 dark:border-orange-800";
+      return "bg-white/80 text-orange-900 border-orange-500 shadow-sm font-semibold dark:bg-slate-950/40 dark:text-orange-100 dark:border-orange-700";
     case "EnCours":
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-200 border-blue-200 dark:border-blue-800";
+      return "bg-white/80 text-blue-900 border-blue-500 shadow-sm font-semibold dark:bg-slate-950/40 dark:text-blue-100 dark:border-blue-700";
     case "EnPause":
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-200 border-yellow-200 dark:border-yellow-800";
+      return "bg-white/80 text-yellow-950 border-yellow-500 shadow-sm font-semibold dark:bg-slate-950/40 dark:text-yellow-100 dark:border-yellow-700";
     case "Terminee":
-      return "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-200 border-green-200 dark:border-green-800";
+      return "bg-white/80 text-green-900 border-green-500 shadow-sm font-semibold dark:bg-slate-950/40 dark:text-green-100 dark:border-green-700";
     case "Annulee":
-      return "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-200 border-red-200 dark:border-red-800";
+      return "bg-white/80 text-red-900 border-red-500 shadow-sm font-semibold dark:bg-slate-950/40 dark:text-red-100 dark:border-red-700";
     default:
-      return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200 border-slate-200 dark:border-slate-700";
+      return "bg-white/80 text-slate-800 border-slate-400 shadow-sm font-semibold dark:bg-slate-950/40 dark:text-slate-100 dark:border-slate-600";
+  }
+}
+
+function tacheCardClass(statut: string) {
+  switch (statut) {
+    case "APlanifier":
+      return "border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70 hover:border-slate-400 dark:hover:border-slate-600 shadow-sm hover:shadow-md";
+    case "EnAttente":
+      return "border-orange-400 dark:border-orange-800 bg-orange-100 dark:bg-orange-950/35 hover:border-orange-500 dark:hover:border-orange-700 shadow-sm hover:shadow-md";
+    case "EnCours":
+      return "border-blue-400 dark:border-blue-800 bg-blue-100 dark:bg-blue-950/35 hover:border-blue-500 dark:hover:border-blue-700 shadow-sm hover:shadow-md";
+    case "EnPause":
+      return "border-yellow-400 dark:border-yellow-800 bg-yellow-100 dark:bg-yellow-950/35 hover:border-yellow-500 dark:hover:border-yellow-700 shadow-sm hover:shadow-md";
+    case "Terminee":
+      return "border-green-400 dark:border-green-800 bg-green-100 dark:bg-green-950/35 hover:border-green-500 dark:hover:border-green-700 shadow-sm hover:shadow-md";
+    case "Annulee":
+      return "border-red-400 dark:border-red-800 bg-red-100 dark:bg-red-950/35 hover:border-red-500 dark:hover:border-red-700 shadow-sm hover:shadow-md";
+    default:
+      return "border-slate-300 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/70 hover:border-slate-400 dark:hover:border-slate-600 shadow-sm hover:shadow-md";
+  }
+}
+
+function tacheAccentClass(statut: string) {
+  switch (statut) {
+    case "EnAttente":
+      return "bg-orange-500";
+    case "EnCours":
+      return "bg-blue-500";
+    case "EnPause":
+      return "bg-yellow-500";
+    case "Terminee":
+      return "bg-green-500";
+    case "Annulee":
+      return "bg-red-500";
+    case "APlanifier":
+    default:
+      return "bg-slate-400";
   }
 }
 
@@ -154,9 +191,10 @@ export default function AdminProjetTachesPage() {
                   return (
                     <Card
                       key={tache.id}
-                      className="border-2 border-slate-200 dark:border-slate-800 hover:border-blue-300 dark:hover:border-blue-700 transition-colors"
+                      className={`relative overflow-hidden border-2 transition-all ${tacheCardClass(tache.statut)}`}
                     >
-                      <CardHeader className="pb-3">
+                      <div className={`absolute left-0 top-0 h-full w-1.5 ${tacheAccentClass(tache.statut)}`} />
+                      <CardHeader className="pt-4 pb-3">
                         <div className="flex items-start justify-between gap-3">
                           <CardTitle className="text-base leading-tight">
                             {tache.titre}
@@ -179,8 +217,8 @@ export default function AdminProjetTachesPage() {
                         ) : (
                           <div className="space-y-2">
                             {responsables.length > 0 && (
-                              <div className="rounded-md border border-amber-200 dark:border-amber-900 bg-amber-50 dark:bg-amber-950/30 p-3">
-                                <div className="flex items-center gap-2 text-xs font-semibold text-amber-800 dark:text-amber-200">
+                              <div className="rounded-md border border-amber-300 dark:border-amber-800 bg-white/75 dark:bg-slate-950/40 p-3 shadow-sm backdrop-blur-sm">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-amber-900 dark:text-amber-100">
                                   <Users className="h-4 w-4" />
                                   Responsable(s)
                                 </div>
@@ -195,8 +233,8 @@ export default function AdminProjetTachesPage() {
                             )}
 
                             {autres.length > 0 && (
-                              <div className="rounded-md border border-blue-200 dark:border-blue-900 bg-blue-50 dark:bg-blue-950/20 p-3">
-                                <div className="flex items-center gap-2 text-xs font-semibold text-blue-800 dark:text-blue-200">
+                              <div className="rounded-md border border-blue-300 dark:border-blue-800 bg-white/75 dark:bg-slate-950/40 p-3 shadow-sm backdrop-blur-sm">
+                                <div className="flex items-center gap-2 text-xs font-semibold text-blue-900 dark:text-blue-100">
                                   <Users className="h-4 w-4" />
                                   Affecté(s)
                                 </div>
