@@ -1538,15 +1538,17 @@ export const sendAccountDeletionEmail = async(
 
 /**
  * Envoie un email à un adhérent dont le mot de passe a été réinitialisé par un administrateur
- * 
+ *
  * @param email - L'adresse email de l'adhérent
  * @param fullName - Le nom complet de l'adhérent
  * @param temporaryPassword - Le mot de passe temporaire généré
+ * @param adminCopyEmail - Si renseigné et différent de l'email du destinataire, copie cachée (BCC) pour l'admin ayant effectué l'action
  */
 export const sendPasswordResetByAdminEmail = async(
   email: string,
   fullName: string,
-  temporaryPassword: string
+  temporaryPassword: string,
+  adminCopyEmail?: string | null
 ) => {
   const content = `
     <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Réinitialisation de votre mot de passe AMAKI</h1>
@@ -1614,9 +1616,16 @@ export const sendPasswordResetByAdminEmail = async(
     </p>
   `;
 
+  const adminBcc =
+    adminCopyEmail?.trim() &&
+    adminCopyEmail.trim().toLowerCase() !== email.trim().toLowerCase()
+      ? adminCopyEmail.trim()
+      : undefined;
+
   await sendEmail({
     from: 'noreply@amaki.fr',
     to: email,
+    ...(adminBcc ? { bcc: adminBcc } : {}),
     subject: `🔐 Réinitialisation de votre mot de passe AMAKI`,
     html: wrapEmailContent(content),
   });

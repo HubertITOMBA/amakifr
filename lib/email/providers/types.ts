@@ -7,6 +7,8 @@ export type EmailProvider = 'resend' | 'smtp';
 export interface EmailOptions {
   from: string;
   to: string | string[];
+  /** Destinataires en copie cachée (non visibles pour les autres destinataires) */
+  bcc?: string | string[];
   subject: string;
   html: string;
   attachments?: Array<{

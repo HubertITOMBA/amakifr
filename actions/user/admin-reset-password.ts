@@ -105,7 +105,8 @@ export async function adminResetUserPassword(userId: string) {
       await sendPasswordResetByAdminEmail(
         user.email,
         fullName,
-        temporaryPassword
+        temporaryPassword,
+        session.user.email ?? undefined
       );
     } catch (emailError) {
       console.error("Erreur lors de l'envoi de l'email:", emailError);

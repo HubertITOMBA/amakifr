@@ -17,9 +17,14 @@ export class ResendProvider implements EmailProviderInterface {
 
   async send(options: EmailOptions): Promise<{ success: boolean; error?: any }> {
     try {
+      const bcc = options.bcc
+        ? (Array.isArray(options.bcc) ? options.bcc : [options.bcc]).filter(Boolean)
+        : undefined;
+
       const { error } = await this.resend.emails.send({
         from: options.from,
         to: Array.isArray(options.to) ? options.to : [options.to],
+        ...(bcc?.length ? { bcc } : {}),
         subject: options.subject,
         html: options.html,
         attachments: options.attachments?.map(att => ({

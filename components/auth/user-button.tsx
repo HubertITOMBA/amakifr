@@ -22,7 +22,7 @@ import Link from "next/link";
 import { Button } from "../ui/button";
 import { LoginButton } from "./login-button";
 import { ChangePasswordDialog } from "@/components/user/ChangePasswordDialog";
-import { Download, Lock } from "lucide-react";
+import { Download, Lock, Shield } from "lucide-react";
 import { usePwaInstallPrompt } from "@/components/pwa/usePwaInstallPrompt";
 
 
@@ -32,6 +32,13 @@ export const UserButton = () => {
     const { userProfile } = useUserProfile();
     const user = session?.user;
     const { canInstall, isInstalled, isIOS, install } = usePwaInstallPrompt();
+
+    const normalizedRole = user?.role?.toString().trim().toUpperCase();
+    const canSeeAdministration =
+        normalizedRole === "ADMIN" ||
+        normalizedRole === "PRESID" ||
+        normalizedRole === "VICEPR" ||
+        normalizedRole === "SECRET";
     
     // Récupérer l'image de l'utilisateur (priorité à userProfile, puis session)
     const userImage = userProfile?.image || user?.image;
@@ -110,6 +117,15 @@ export const UserButton = () => {
                   Mon espace adhérent
                 </Link>
               </DropdownMenuItem>
+
+              {canSeeAdministration && (
+                <DropdownMenuItem>
+                  <Link href='/admin' className='w-full flex items-center hover:bg-orange-300'>
+                    <Shield className="h-4 w-4 mr-2" />
+                    Administration
+                  </Link>
+                </DropdownMenuItem>
+              )}
 
               <DropdownMenuItem>
                 <Link href='/user/documents' className='w-full hover:bg-orange-300'>

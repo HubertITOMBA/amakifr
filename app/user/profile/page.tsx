@@ -88,7 +88,7 @@ import { getIdeesByUser, getAllIdees, createIdee, updateIdee, deleteIdee, create
 import { getDocuments, deleteDocument } from "@/actions/documents";
 import { getRapportsReunionForAdherents, getRapportReunionById } from "@/actions/rapports-reunion";
 import { getUserBadges } from "@/actions/badges";
-import { getSimulationVersementAssistance, getTypesAssistancePourSimulation } from "@/actions/paiements";
+import { getSimulationVersementAssistance, getSimulationVersementAssistanceForUser, getTypesAssistancePourSimulation } from "@/actions/paiements";
 import { StatutIdee, TypeDocument } from "@prisma/client";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -1011,13 +1011,17 @@ function UserProfilePageContent() {
     if (!simulationDialogOpen || !selectedTypeId) return;
     setLoadingSimulation(true);
     setSimulationVersement(null);
-    getSimulationVersementAssistance(selectedTypeId)
+    const promise = isViewAsMode && viewAsUserId
+      ? getSimulationVersementAssistanceForUser(viewAsUserId, selectedTypeId)
+      : getSimulationVersementAssistance(selectedTypeId);
+
+    promise
       .then((result) => {
         if (result.success && result.data) setSimulationVersement(result.data);
       })
       .catch(() => {})
       .finally(() => setLoadingSimulation(false));
-  }, [simulationDialogOpen, selectedTypeId]);
+  }, [simulationDialogOpen, selectedTypeId, isViewAsMode, viewAsUserId]);
 
   const [candidatures, setCandidatures] = useState<any[]>([]);
   const [votes, setVotes] = useState<any[]>([]);

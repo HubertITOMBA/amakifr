@@ -26,10 +26,15 @@ export class SMTPProvider implements EmailProviderInterface {
     try {
       const recipients = Array.isArray(options.to) ? options.to : [options.to];
       
+      const bccList = options.bcc
+        ? (Array.isArray(options.bcc) ? options.bcc : [options.bcc]).filter(Boolean)
+        : undefined;
+
       for (const recipient of recipients) {
         await this.transporter.sendMail({
           from: options.from || this.defaultFrom,
           to: recipient,
+          ...(bccList?.length ? { bcc: bccList } : {}),
           subject: options.subject,
           html: options.html,
           attachments: options.attachments?.map(att => ({
