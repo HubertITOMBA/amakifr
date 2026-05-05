@@ -65,7 +65,8 @@ export function addSecurityHeaders(
   headers.set('X-Content-Type-Options', 'nosniff');
   
   // Protection contre le clickjacking
-  headers.set('X-Frame-Options', 'DENY');
+  // On autorise l'iframe uniquement depuis la même origine (utile pour les dialogs admin qui embarquent des pages internes)
+  headers.set('X-Frame-Options', 'SAMEORIGIN');
   
   // Protection XSS (legacy mais toujours utile)
   headers.set('X-XSS-Protection', '1; mode=block');
@@ -90,7 +91,8 @@ export function addSecurityHeaders(
       "object-src 'none'",
       "base-uri 'self'",
       "form-action 'self'",
-      "frame-ancestors 'none'",
+      // Autoriser l'embarquement uniquement depuis la même origine
+      "frame-ancestors 'self'",
       // Ne forcer HTTPS que si le serveur supporte réellement HTTPS
       ...(useHttps ? ["upgrade-insecure-requests"] : []),
     ].join('; ');

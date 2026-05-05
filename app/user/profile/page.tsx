@@ -89,6 +89,7 @@ import { getDocuments, deleteDocument } from "@/actions/documents";
 import { getRapportsReunionForAdherents, getRapportReunionById } from "@/actions/rapports-reunion";
 import { getUserBadges } from "@/actions/badges";
 import { getSimulationVersementAssistance, getSimulationVersementAssistanceForUser, getTypesAssistancePourSimulation } from "@/actions/paiements";
+import { CotisationsSection } from "@/components/user/CotisationsSection";
 import { StatutIdee, TypeDocument } from "@prisma/client";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -946,13 +947,14 @@ function UserProfilePageContent() {
   const displayUser = isAdminViewAs && viewAsProfile ? viewAsProfile : user;
   const isViewAsMode = isAdminViewAs && viewAsProfile;
   const effectiveLoading = isAdminViewAs ? viewAsLoading : profileLoading;
+  const isEmbed = searchParams.get("embed") === "1";
 
   // Initialiser activeSection depuis les paramètres d'URL ou par défaut 'profile'
   const sectionFromUrl = searchParams.get('section') as MenuSection | null;
   const [activeSection, setActiveSection] = useState<MenuSection>(
     (sectionFromUrl && ['profile', 'statistiques', 'cotisations', 'candidatures', 'votes', 'candidates', 'idees', 'documents', 'badges', 'enfants', 'passeport', 'notifications', 'settings', 'rapports', 'taches'].includes(sectionFromUrl))
       ? sectionFromUrl
-      : 'profile'
+      : (isEmbed ? 'cotisations' : 'profile')
   );
 
   // Mettre à jour activeSection si le paramètre d'URL change
@@ -961,6 +963,12 @@ function UserProfilePageContent() {
       setActiveSection(sectionFromUrl);
     }
   }, [sectionFromUrl]);
+
+  useEffect(() => {
+    if (isEmbed && activeSection !== "cotisations") {
+      setActiveSection("cotisations");
+    }
+  }, [isEmbed, activeSection]);
 
   const prevActiveSectionRef = useRef<MenuSection | null>(null);
   // Rafraîchir les données cotisations à l'ouverture de la section pour voir les créations récentes (ex. février)
@@ -2280,430 +2288,12 @@ function UserProfilePageContent() {
 
       case 'cotisations':
         return (
-          <div className="space-y-3">
-            <div className="flex justify-between items-center mb-2">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Mes Cotisations</h2>
-                <p className="text-sm text-gray-600 dark:text-gray-300">Historique des cotisations et obligations</p>
-              </div>
-            </div>
-
-            {/* Afficher les avoirs disponibles */}
-            {avoirs.length > 0 && (
-              <Card className="border-green-200 dark:border-green-800 bg-white dark:bg-gray-900 !py-0">
-                <CardHeader className="bg-gradient-to-r from-green-500 to-green-600 dark:from-green-600 dark:to-green-700 text-white pb-3 pt-3 px-6 gap-0">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <CheckCircle2 className="h-4 w-4" />
-                    Mes Avoirs (Crédits Disponibles)
-                  </CardTitle>
-                  <CardDescription className="text-green-100 dark:text-green-200 mt-1 text-xs">
-                    Crédits disponibles à utiliser pour vos prochains paiements
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-3 pb-4 px-6">
-                  <div className="space-y-2">
-                    {avoirs.map((avoir: any) => (
-                      <div key={avoir.id} className="p-3 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-800">
-                        <div className="flex justify-between items-center">
-                          <div>
-                            <p className="text-sm font-semibold text-green-900 dark:text-green-100">
-                              {avoir.description || "Avoir disponible"}
-                            </p>
-                            <p className="text-xs text-green-700 dark:text-green-300 mt-1">
-                              Créé le {format(new Date(avoir.createdAt), "dd MMMM yyyy", { locale: fr })}
-                            </p>
-                          </div>
-                          <div className="text-right">
-                            <p className="text-lg font-bold text-green-600 dark:text-green-400">
-                              {avoir.montantRestant.toFixed(2).replace('.', ',')} €
-                            </p>
-                            {avoir.montantUtilise > 0 && (
-                              <p className="text-xs text-green-600 dark:text-green-400 mt-1">
-                                Utilisé: {avoir.montantUtilise.toFixed(2).replace('.', ',')} €
-                              </p>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                    <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                      <div className="flex items-start gap-2">
-                        <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                        <div>
-                          <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-0.5">
-                            Comment utiliser vos avoirs ?
-                          </p>
-                          <p className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
-                            Vos avoirs sont automatiquement appliqués lors de vos prochains paiements. 
-                            Ils réduiront le montant à payer pour vos cotisations et dettes.
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Afficher les dettes initiales en premier sous forme de table */}
-            {dettesInitiales.length > 0 && (
-              <Card className="border-red-200 dark:border-red-800 bg-white dark:bg-gray-900 !py-0">
-                <CardHeader className="bg-gradient-to-r from-red-500 to-red-600 dark:from-red-600 dark:to-red-700 text-white pb-3 pt-3 px-6 gap-0">
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <AlertCircle className="h-4 w-4" />
-                    Dettes Initiales
-                  </CardTitle>
-                  <CardDescription className="text-red-100 dark:text-red-200 mt-1 text-xs">
-                    Dettes de l'adhérent envers l'association (2024, 2025, etc.)
-                  </CardDescription>
-                </CardHeader>
-                <CardContent className="pt-3 pb-4 px-6">
-                  <DettesInitialesTable dettes={dettesInitiales} />
-                  <div className="mt-3 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
-                    <div className="flex items-start gap-2">
-                      <Info className="h-4 w-4 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-                      <div>
-                        <p className="text-xs font-semibold text-blue-900 dark:text-blue-100 mb-0.5">
-                          Information importante
-                        </p>
-                        <p className="text-xs text-blue-800 dark:text-blue-200 leading-relaxed">
-                          Ces dettes initiales représentent votre dette envers l'association pour les années précédentes (2024, 2025, etc.). 
-                          Vous pouvez effectuer des paiements partiels ou complets pour régulariser votre situation. 
-                          L'application a été mise en place le 1er janvier, ces dettes correspondent donc aux années antérieures.
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Frais d'adhésion et autres obligations à payer (virement / carte) */}
-            {(() => {
-              const obligationsAPayer = (obligationsCotisation || []).filter(
-                (ob: any) => Number(ob.montantRestant ?? 0) > 0
-              );
-              if (obligationsAPayer.length === 0) return null;
-              const adherentId = (effectiveProfile?.adherent as any)?.id;
-              return (
-                <Card className="border-amber-200 dark:border-amber-800 bg-white dark:bg-gray-900 !py-0">
-                  <CardHeader className="bg-gradient-to-r from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-700 text-white pb-3 pt-3 px-6 gap-0">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <CreditCard className="h-4 w-4" />
-                      Frais d&apos;adhésion et obligations à payer
-                    </CardTitle>
-                    <CardDescription className="text-amber-100 dark:text-amber-200 mt-1 text-xs">
-                      Payez par virement ou carte bancaire
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-3 pb-4 px-6">
-                    <div className="overflow-x-auto">
-                      <Table>
-                        <TableHeader>
-                          <TableRow className="bg-amber-50 dark:bg-amber-900/20">
-                            <TableHead className="font-semibold text-xs text-left">Description</TableHead>
-                            <TableHead className="font-semibold text-xs text-center">Montant attendu</TableHead>
-                            <TableHead className="font-semibold text-xs text-center">Restant</TableHead>
-                            <TableHead className="font-semibold text-xs text-center w-[100px]">Action</TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {obligationsAPayer.map((ob: any) => {
-                            const restant = Number(ob.montantRestant ?? 0);
-                            const label = ob.description?.trim() || getTypeCotisationLabel(ob.type ?? "");
-                            return (
-                              <TableRow key={ob.id} className="hover:bg-amber-50 dark:hover:bg-amber-900/20">
-                                <TableCell className="text-xs text-gray-700 dark:text-gray-300 text-left">
-                                  {label}
-                                </TableCell>
-                                <TableCell className="text-xs text-gray-700 dark:text-gray-300 text-center">
-                                  {Number(ob.montantAttendu ?? 0).toFixed(2).replace(".", ",")} €
-                                </TableCell>
-                                <TableCell className="text-xs font-medium text-amber-700 dark:text-amber-300 text-center">
-                                  {restant.toFixed(2).replace(".", ",")} €
-                                </TableCell>
-                                <TableCell className="text-center">
-                                  {!isViewAsMode && adherentId ? (
-                                    <Button
-                                      size="sm"
-                                      className="bg-blue-600 hover:bg-blue-700 text-white h-7 text-xs px-2"
-                                      onClick={() =>
-                                        router.push(
-                                          `/paiement?adherentId=${adherentId}&montant=${restant}&type=obligation&id=${ob.id}`
-                                        )
-                                      }
-                                    >
-                                      <Euro className="h-3 w-3 mr-1" />
-                                      Payer
-                                    </Button>
-                                  ) : (
-                                    <span className="text-xs text-gray-500">—</span>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })()}
-
-            {/* Sélecteur : Un mois / Une année / Toutes */}
-            <div className="flex flex-wrap items-center gap-2 mb-2">
-              <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Afficher :</span>
-              <Select
-                value={cotisationsVue}
-                onValueChange={(v: 'mois' | 'annee' | 'toutes') => setCotisationsVue(v)}
-              >
-                <SelectTrigger className="w-[160px] h-8 text-sm">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="mois">Un mois</SelectItem>
-                  <SelectItem value="annee">Une année</SelectItem>
-                  <SelectItem value="toutes">Toutes les cotisations</SelectItem>
-                </SelectContent>
-              </Select>
-              {cotisationsVue === 'mois' && (
-                <>
-                  <Popover open={calendarCotisationsOpen} onOpenChange={setCalendarCotisationsOpen}>
-                    <PopoverTrigger asChild>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 w-[180px] justify-start text-left font-normal bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-600 text-gray-900 dark:text-gray-100 hover:bg-gray-50 dark:hover:bg-gray-800"
-                      >
-                        <CalendarDays className="mr-2 h-4 w-4" />
-                        {format(new Date(selectedCotisationsAnnee, selectedCotisationsMois - 1, 1), "MMMM yyyy", { locale: fr }).replace(/^\w/, (c) => c.toUpperCase())}
-                      </Button>
-                    </PopoverTrigger>
-                    <PopoverContent className="w-auto p-0 bg-white dark:bg-gray-900 border-gray-200 dark:border-gray-700" align="start">
-                      <CalendarUI
-                        mode="single"
-                        selected={new Date(selectedCotisationsAnnee, selectedCotisationsMois - 1, 1)}
-                        onSelect={(date) => {
-                          if (date) {
-                            setSelectedCotisationsAnnee(date.getFullYear());
-                            setSelectedCotisationsMois(date.getMonth() + 1);
-                            setCalendarCotisationsOpen(false);
-                          }
-                        }}
-                        defaultMonth={new Date(selectedCotisationsAnnee, selectedCotisationsMois - 1, 1)}
-                        locale={fr}
-                      />
-                    </PopoverContent>
-                  </Popover>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs text-blue-600 dark:text-blue-400"
-                    onClick={() => {
-                      const n = new Date();
-                      setSelectedCotisationsMois(n.getMonth() + 1);
-                      setSelectedCotisationsAnnee(n.getFullYear());
-                    }}
-                  >
-                    Mois en cours
-                  </Button>
-                </>
-              )}
-              {cotisationsVue === 'annee' && (
-                <>
-                  <Select
-                    value={String(selectedCotisationsAnnee)}
-                    onValueChange={(v) => setSelectedCotisationsAnnee(Number(v))}
-                  >
-                    <SelectTrigger className="w-[90px] h-8 text-sm">
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {(() => {
-                        const currentYear = new Date().getFullYear();
-                        const years = [];
-                        for (let y = currentYear - 2; y <= currentYear + 1; y++) years.push(y);
-                        return years.map((y) => (
-                          <SelectItem key={y} value={String(y)}>
-                            {y}
-                          </SelectItem>
-                        ));
-                      })()}
-                    </SelectContent>
-                  </Select>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-8 text-xs text-blue-600 dark:text-blue-400"
-                    onClick={() => setSelectedCotisationsAnnee(new Date().getFullYear())}
-                  >
-                    Année en cours
-                  </Button>
-                </>
-              )}
-            </div>
-
-            <Dialog open={simulationDialogOpen} onOpenChange={setSimulationDialogOpen}>
-              <DialogContent className="max-w-md">
-                <DialogHeader className="bg-gradient-to-r from-purple-500 to-purple-600 dark:from-purple-600 dark:to-purple-700 -m-6 mb-4 p-6 rounded-t-lg">
-                  <DialogTitle className="flex items-center gap-2 text-white">
-                    <HandHeart className="h-5 w-5 text-purple-100" />
-                    Simulation de versement assistance
-                  </DialogTitle>
-                  <DialogDescription className="text-purple-100 dark:text-purple-200 mt-2">
-                    Choisissez un type d&apos;assistance pour voir une estimation de ce que vous recevriez si vous étiez bénéficiaire (déductions dettes et cotisations).
-                  </DialogDescription>
-                </DialogHeader>
-                <div className="space-y-4 pt-2">
-                  <div className="space-y-2">
-                    <Label className="text-sm font-semibold text-purple-700 dark:text-purple-300">Type d&apos;assistance</Label>
-                    <Select value={selectedTypeId} onValueChange={setSelectedTypeId} disabled={typesAssistanceList.length === 0}>
-                      <SelectTrigger className="border-purple-300 dark:border-purple-700 focus:ring-purple-500">
-                        <SelectValue placeholder={typesAssistanceList.length === 0 ? "Chargement..." : "Sélectionnez un type"} />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {typesAssistanceList.map((t) => (
-                          <SelectItem key={t.id} value={t.id} className="focus:bg-purple-50 dark:focus:bg-purple-950">
-                            <span className="font-medium">{t.nom}</span> <span className="text-purple-600 dark:text-purple-400 ml-1">({t.montant.toFixed(2)} €)</span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  {loadingSimulation ? (
-                    <div className="flex justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-purple-600" />
-                    </div>
-                  ) : simulationVersement ? (
-                    <div className="space-y-3 text-sm">
-                      <div className="rounded-lg border-2 border-purple-200 dark:border-purple-800 bg-gradient-to-br from-purple-50 to-purple-100/50 dark:from-purple-950/30 dark:to-purple-900/20 p-4 space-y-3 shadow-sm">
-                        {simulationVersement.typeAssistanceNom && (
-                          <div className="pb-2 border-b border-purple-200 dark:border-purple-800">
-                            <p className="text-xs font-semibold text-purple-700 dark:text-purple-300 uppercase tracking-wide">{simulationVersement.typeAssistanceNom}</p>
-                          </div>
-                        )}
-                        <div className="flex justify-between items-center py-1.5 px-2 rounded-md bg-blue-50 dark:bg-blue-950/30">
-                          <span className="text-muted-foreground font-medium">Montant fixe assistance</span>
-                          <span className="font-bold text-blue-700 dark:text-blue-300 text-base">{simulationVersement.montantFixe.toFixed(2)} €</span>
-                        </div>
-                        <div className="flex justify-between items-center py-1.5 px-2 rounded-md bg-red-50 dark:bg-red-950/20">
-                          <span className="text-muted-foreground">Dettes initiales à déduire</span>
-                          <span className="font-semibold text-red-600 dark:text-red-400">− {simulationVersement.totalDettes.toFixed(2)} €</span>
-                        </div>
-                        <div className="flex justify-between items-center py-1.5 px-2 rounded-md bg-orange-50 dark:bg-orange-950/20">
-                          <span className="text-muted-foreground">Cotisations non payées à déduire</span>
-                          <span className="font-semibold text-orange-600 dark:text-orange-400">− {simulationVersement.totalCotisationsNonPayees.toFixed(2)} €</span>
-                        </div>
-                        {simulationVersement.totalAvoirs > 0 && (
-                          <div className="flex justify-between items-center py-1.5 px-2 rounded-md bg-emerald-50 dark:bg-emerald-950/30">
-                            <span className="text-muted-foreground">Avoirs disponibles</span>
-                            <span className="font-semibold text-emerald-600 dark:text-emerald-400">+ {simulationVersement.totalAvoirs.toFixed(2)} €</span>
-                          </div>
-                        )}
-                        <div className={`border-t-2 pt-3 mt-2 flex justify-between items-center font-bold text-lg px-2 py-2 rounded-md ${simulationVersement.montantAVerser > 0 ? "bg-green-50 dark:bg-green-950/30 border-green-300 dark:border-green-800" : "bg-gray-100 dark:bg-gray-800 border-gray-300 dark:border-gray-700"}`}>
-                          <span className={simulationVersement.montantAVerser > 0 ? "text-green-800 dark:text-green-200" : "text-gray-600 dark:text-gray-400"}>Montant à verser</span>
-                          <span className={simulationVersement.montantAVerser > 0 ? "text-green-700 dark:text-green-300 text-xl" : "text-gray-500 dark:text-gray-500 text-xl"}>
-                            {simulationVersement.montantAVerser.toFixed(2)} €
-                          </span>
-                        </div>
-                      </div>
-                      {simulationVersement.montantAVerser <= 0 ? (
-                        <div className="rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800 p-3">
-                          <p className="text-xs text-amber-700 dark:text-amber-300 font-medium">
-                            ⚠️ Le montant fixe est entièrement absorbé par vos dettes et cotisations non payées.
-                          </p>
-                        </div>
-                      ) : (
-                        <div className="rounded-lg bg-blue-50 dark:bg-blue-950/30 border border-blue-200 dark:border-blue-800 p-3">
-                          <p className="text-xs text-blue-700 dark:text-blue-300">
-                            ℹ️ Cette simulation est indicative. Le montant réel dépendra de votre situation au moment de la demande.
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  ) : selectedTypeId ? (
-                    <div className="rounded-lg bg-red-50 dark:bg-red-950/30 border border-red-200 dark:border-red-800 p-3">
-                      <p className="text-sm text-red-700 dark:text-red-300">Impossible de charger la simulation.</p>
-                    </div>
-                  ) : null}
-                </div>
-              </DialogContent>
-            </Dialog>
-
-            {/* Carte cotisations selon le mode */}
-            {(() => {
-              let title = '';
-              let description = '';
-              if (cotisationsVue === 'mois') {
-                const nomMois = new Date(selectedCotisationsAnnee, selectedCotisationsMois - 1, 1)
-                  .toLocaleDateString('fr-FR', { month: 'long' });
-                const nomMoisCap = nomMois.charAt(0).toUpperCase() + nomMois.slice(1);
-                title = `Cotisations du mois de ${nomMoisCap} ${selectedCotisationsAnnee}`;
-                description = 'Cotisations mensuelles + assistances du mois';
-              } else if (cotisationsVue === 'annee') {
-                title = `Cotisations de l'année ${selectedCotisationsAnnee}`;
-                description = 'Toutes les cotisations mensuelles et assistances de l\'année';
-              } else {
-                title = 'Toutes mes cotisations';
-                description = 'Toutes vos cotisations mensuelles et assistances';
-              }
-              return (
-                <Card className="border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 !py-0">
-                  <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white pb-3 pt-3 px-6 gap-0">
-                    <CardTitle className="flex items-center gap-2 text-base">
-                      <Receipt className="h-4 w-4" />
-                      {title}
-                    </CardTitle>
-                    <CardDescription className="text-blue-100 dark:text-blue-200 mt-1 text-xs">
-                      {description}
-                    </CardDescription>
-                  </CardHeader>
-                  <CardContent className="pt-3 pb-4 px-6">
-                    <CotisationsMoisTable cotisations={cotisationsMoisAffichage} vueCotisations={cotisationsVue} />
-                  </CardContent>
-                </Card>
-              );
-            })()}
-
-            {/* Historique des cotisations par mois : page dédiée (lien) */}
-            <Card className="border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-900 !py-0">
-              <CardHeader className="bg-gradient-to-r from-indigo-500 to-indigo-600 dark:from-indigo-600 dark:to-indigo-700 text-white pb-3 pt-3 px-6 gap-0">
-                <CardTitle className="flex items-center gap-2 text-base">
-                  <History className="h-4 w-4" />
-                  Historique des Cotisations par Mois
-                </CardTitle>
-                <CardDescription className="text-indigo-100 dark:text-indigo-200 mt-1 text-xs">
-                  Consultez l&apos;historique détaillé et imprimez en PDF si besoin
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="pt-3 pb-4 px-6">
-                <div className="flex flex-wrap items-center gap-2">
-                  <Link
-                    href={
-                      isViewAsMode && viewAsUserId
-                        ? `/user/profile/historique-cotisations?viewAs=${viewAsUserId}`
-                        : "/user/profile/historique-cotisations"
-                    }
-                  >
-                    <Button variant="outline" className="border-indigo-300 dark:border-indigo-700">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Voir l&apos;historique
-                    </Button>
-                  </Link>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-purple-300 dark:border-purple-700 text-purple-700 dark:text-purple-300 hover:bg-purple-50 dark:hover:bg-purple-950/30"
-                    onClick={() => setSimulationDialogOpen(true)}
-                  >
-                    <HandHeart className="h-4 w-4 mr-2" />
-                    Simulation versement assistance
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <CotisationsSection
+            profile={effectiveProfile as any}
+            embed={isEmbed}
+            viewAsUserId={isViewAsMode ? (viewAsUserId ?? undefined) : undefined}
+            readOnly={isViewAsMode}
+          />
         );
 
       case 'candidatures':
@@ -5500,10 +5090,10 @@ function UserProfilePageContent() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
-      <DynamicNavbar />
+      {!isEmbed && <DynamicNavbar />}
 
       {/* Bannière "Vue comme l'adhérent" (admin) */}
-      {isViewAsMode && (
+      {!isEmbed && isViewAsMode && (
         <div className="sticky top-0 z-30 flex items-center justify-between gap-4 bg-amber-500 text-amber-950 px-4 py-2 shadow-md">
           <span className="text-sm font-medium">
             Vous consultez le profil de <strong>{displayUser?.name || (effectiveProfile?.adherent as any)?.firstname + " " + (effectiveProfile?.adherent as any)?.lastname || "cet adhérent"}</strong> en tant qu&apos;administrateur (lecture seule).
@@ -5520,6 +5110,7 @@ function UserProfilePageContent() {
       )}
 
       {/* Hero Section */}
+      {!isEmbed && (
       <section className="relative py-3 sm:py-4 md:py-5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white">
         <div className="absolute inset-0 bg-black/20" />
         <div className="relative max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -5593,8 +5184,16 @@ function UserProfilePageContent() {
           </div>
         </div>
       </section>
+      )}
 
       {/* Contenu principal avec menu latéral */}
+      {isEmbed ? (
+        <section className="py-4 sm:py-6">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            {renderSectionContent()}
+          </div>
+        </section>
+      ) : (
       <section className="py-8 sm:py-16">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 sm:gap-8">
@@ -5686,8 +5285,9 @@ function UserProfilePageContent() {
           </div>
         </div>
       </section>
+      )}
 
-      <Footer />
+      {!isEmbed && <Footer />}
     </div>
   );
 }

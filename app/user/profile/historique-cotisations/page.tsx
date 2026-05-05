@@ -44,6 +44,8 @@ export default function HistoriqueCotisationsPage() {
     return qs ? `/user/profile?${qs}` : "/user/profile?section=cotisations";
   }, [searchParams]);
 
+  const isEmbed = searchParams?.get("embed") === "1";
+
   useEffect(() => {
     if (!isViewAsMode || !viewAsUserId) {
       setViewAsProfile(null);
@@ -142,7 +144,7 @@ export default function HistoriqueCotisationsPage() {
         }
       `}</style>
 
-      <DynamicNavbar />
+      {!isEmbed && <DynamicNavbar />}
 
       <section className="py-8 sm:py-12">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -243,7 +245,7 @@ export default function HistoriqueCotisationsPage() {
         </div>
       </section>
 
-      <Footer />
+      {!isEmbed && <Footer />}
     </div>
   );
 }

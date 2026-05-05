@@ -6,6 +6,13 @@ import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import {
@@ -23,7 +30,6 @@ import {
   Users, 
   Search, 
   Edit,
-  Eye,
   Shield,
   UserCheck,
   UserX,
@@ -40,7 +46,8 @@ import {
   KeyRound,
   Trash2,
   Download,
-  UserCircle
+  UserCircle,
+  Receipt
 } from "lucide-react";
 import { UserRole, UserStatus } from "@prisma/client";
 import { 
@@ -70,6 +77,8 @@ import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 import { SendEmailModal } from "@/components/admin/SendEmailModal";
 import { useActivityLogger } from "@/hooks/use-activity-logger";
+import { getUserDataForAdminView } from "@/actions/user";
+import { CotisationsSection } from "@/components/user/CotisationsSection";
 
 type UserData = {
   id: string;
@@ -113,87 +122,79 @@ type UserData = {
 
 const columnHelper = createColumnHelper<UserData>();
 
-const getRoleColor = (role: UserRole) => {
-  switch (role) {
-    case UserRole.ADMIN:
-      return "bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200";
-    case UserRole.MEMBRE:
-      return "bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200";
-    case UserRole.INVITE:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
-    case UserRole.PRESID:
-      return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
-    case UserRole.VICEPR:
-      return "bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200";
-    case UserRole.SECRET:
-      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-    case UserRole.VICESE:
-      return "bg-teal-100 text-teal-800 dark:bg-teal-900 dark:text-teal-200";
-    case UserRole.COMCPT:
-      return "bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200";
-    case UserRole.TRESOR:
-      return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
-    case UserRole.VTRESO:
-      return "bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200";
-    default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
-  }
-};
+function UserCotisationsDialog({
+  userId,
+  fullName,
+  open,
+  onOpenChange,
+}: {
+  userId: string;
+  fullName: string;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
+  const [loadingUser, setLoadingUser] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
-const getRoleLabel = (role: UserRole) => {
-  switch (role) {
-    case UserRole.ADMIN:
-      return "ADMIN";
-    case UserRole.MEMBRE:
-      return "MEMBRE";
-    case UserRole.INVITE:
-      return "Invité";
-    case UserRole.PRESID:
-      return "Président";
-    case UserRole.VICEPR:
-      return "Vice-Président";
-    case UserRole.SECRET:
-      return "Secrétaire";
-    case UserRole.VICESE:
-      return "Vice-Secrétaire";
-    case UserRole.COMCPT:
-      return "Comptable/Trésorier";
-    case UserRole.TRESOR:
-      return "Trésorier";
-    case UserRole.VTRESO:
-      return "Vice-Trésorier";
-    default:
-      return role;
-  }
-};
+  useEffect(() => {
+    if (!open) return;
+    let cancelled = false;
+    setLoadingUser(true);
+    setUserProfile(null);
+    getUserDataForAdminView(userId)
+      .then((res) => {
+        if (cancelled) return;
+        if (res.success && res.user) setUserProfile(res.user);
+        else setUserProfile(null);
+      })
+      .finally(() => {
+        if (!cancelled) setLoadingUser(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [open, userId]);
 
-const getStatusColor = (status: UserStatus) => {
-  switch (status) {
-    case UserStatus.Actif:
-      return "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200";
-    case UserStatus.Inactif:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
-    default:
-      return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
-  }
-};
-
-const getStatusLabel = (status: UserStatus) => {
-  switch (status) {
-    case UserStatus.Actif:
-      return "Actif";
-    case UserStatus.Inactif:
-      return "Inactif";
-    default:
-      return status;
-  }
-};
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-6xl p-0 overflow-hidden">
+        <DialogHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white p-6">
+          <DialogTitle className="flex items-center gap-2 text-lg">
+            <Receipt className="h-5 w-5" />
+            Cotisations — {fullName}
+          </DialogTitle>
+          <DialogDescription className="text-blue-100">
+            Vue des dettes initiales, cotisations du mois, et historique.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="h-[80vh] bg-white dark:bg-gray-900 overflow-y-auto">
+          {loadingUser ? (
+            <div className="flex flex-col items-center justify-center gap-3 py-12">
+              <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+              <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300">Chargement des cotisations...</p>
+            </div>
+          ) : userProfile ? (
+            <div className="p-4 sm:p-6">
+              <CotisationsSection profile={userProfile} embed={true} viewAsUserId={userId} readOnly={true} />
+            </div>
+          ) : (
+            <div className="flex flex-col items-center justify-center gap-2 py-12 text-gray-600 dark:text-gray-300">
+              <p className="text-sm font-medium">Impossible de charger le profil.</p>
+              <p className="text-xs">Vérifiez les droits d&apos;accès ou réessayez.</p>
+            </div>
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
 
 export default function AdminUsersPage() {
   const { data: session, status: sessionStatus } = useSession();
   const router = useRouter();
   const [users, setUsers] = useState<UserData[]>([]);
   const [loading, setLoading] = useState(true);
+  const [cotisationsDialogUser, setCotisationsDialogUser] = useState<{ userId: string; fullName: string } | null>(null);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
@@ -672,6 +673,9 @@ export default function AdminUsersPage() {
         const user = row.original;
         const role = user.role;
         const status = user.status;
+        const fullName = user.adherent
+          ? `${user.adherent.firstname || ""} ${user.adherent.lastname || ""}`.trim()
+          : user.name || "Utilisateur";
         
         // Déterminer le prochain statut pour le toggle
         const getNextStatus = (currentStatus: UserStatus): UserStatus => {
@@ -695,11 +699,15 @@ export default function AdminUsersPage() {
               <DropdownMenuContent align="end" className="w-56">
                 <DropdownMenuLabel>Actions</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href={`/user/profile?viewAs=${user.id}`} className="flex items-center gap-2 cursor-pointer">
-                    <UserCircle className="h-4 w-4" />
-                    <span>Voir le profil comme l&apos;adhérent</span>
-                  </Link>
+                <DropdownMenuItem
+                  className="flex items-center gap-2 cursor-pointer"
+                  onSelect={(e) => {
+                    e.preventDefault();
+                    setCotisationsDialogUser({ userId: user.id, fullName });
+                  }}
+                >
+                  <Receipt className="h-4 w-4" />
+                  <span>Cotisations</span>
                 </DropdownMenuItem>
                 {isAdminOnly && (
                   <DropdownMenuItem asChild>
@@ -1401,6 +1409,16 @@ export default function AdminUsersPage() {
 
   return (
     <div className="space-y-4 sm:space-y-6 p-4 sm:p-6">
+      {cotisationsDialogUser && (
+        <UserCotisationsDialog
+          userId={cotisationsDialogUser.userId}
+          fullName={cotisationsDialogUser.fullName}
+          open={true}
+          onOpenChange={(open) => {
+            if (!open) setCotisationsDialogUser(null);
+          }}
+        />
+      )}
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
