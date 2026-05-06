@@ -29,6 +29,29 @@ const CreateMenuSchema = z.object({
 const UpdateMenuSchema = CreateMenuSchema.partial();
 
 /**
+ * Normalise un lien de menu.
+ *
+ * Règles:
+ * - `"#"` et `"/#"` deviennent `"#"` (menu dossier / sans navigation)
+ * - Si le lien ne commence pas par `/` et n'est pas une URL (`http(s)://`) ni `#`,
+ *   on préfixe par `/` (ex: `admin/menus` -> `/admin/menus`)
+ * - Supprime les espaces de début/fin
+ *
+ * @param lien - Lien brut saisi
+ * @returns Lien normalisé
+ */
+function normalizeMenuLink(lien: string): string {
+  const trimmed = (lien ?? "").trim();
+  if (!trimmed) return "";
+
+  if (trimmed === "/#" || trimmed === "#") return "#";
+  if (trimmed.startsWith("http://") || trimmed.startsWith("https://")) return trimmed;
+  if (trimmed.startsWith("#")) return "#";
+  if (trimmed.startsWith("/")) return trimmed;
+  return `/${trimmed}`;
+}
+
+/**
  * Récupère tous les menus actifs pour un niveau donné
  * 
  * @param niveau - Le niveau du menu (NAVBAR ou SIDEBAR)
@@ -194,6 +217,10 @@ export async function createMenu(formData: FormData) {
     };
 
     const validatedData = CreateMenuSchema.parse(rawData);
+    const normalizedLink = normalizeMenuLink(validatedData.lien);
+    if (!normalizedLink) {
+      return { success: false, error: "Le lien est requis" };
+    }
 
     // Vérifier les doublons
     const existing = await db.menu.findFirst({
@@ -213,6 +240,7 @@ export async function createMenu(formData: FormData) {
     const newMenu = await db.menu.create({
       data: {
         ...validatedData,
+        lien: normalizedLink,
         createdBy: session.user.id,
       },
     });
@@ -268,10 +296,18 @@ export async function updateMenu(id: string, formData: FormData) {
     if (formData.has("electoral")) rawData.electoral = formData.get("electoral") === "true";
 
     const validatedData = UpdateMenuSchema.parse(rawData);
+    const normalizedUpdate: Record<string, unknown> = { ...validatedData };
+    if (typeof validatedData.lien === "string") {
+      const normalizedLink = normalizeMenuLink(validatedData.lien);
+      if (!normalizedLink) {
+        return { success: false, error: "Le lien est requis" };
+      }
+      normalizedUpdate.lien = normalizedLink;
+    }
 
     const updated = await db.menu.update({
       where: { id },
-      data: validatedData,
+      data: normalizedUpdate,
     });
 
     revalidatePath("/admin/menus");

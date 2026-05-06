@@ -768,6 +768,7 @@ export function CotisationsSection({
                   </TableHeader>
                   <TableBody>
                     {cotisationsMoisAffichage.map((c) => {
+                      const montant = Number(c.montant ?? 0);
                       const restant = Number(c.montantRestant ?? 0);
                       const estDynamique = c.isCotisationMensuelle === false && !c.cotisationMensuelleId;
                       const estPaye = restant <= 0;
@@ -779,7 +780,7 @@ export function CotisationsSection({
                             </span>
                           </TableCell>
                           <TableCell className="text-xs font-bold text-gray-900 dark:text-white text-center whitespace-nowrap">
-                            {restant.toFixed(2).replace(".", ",")} €
+                            {montant.toFixed(2).replace(".", ",")} €
                           </TableCell>
                           {showPaymentActions && (
                             <TableCell className="text-center">

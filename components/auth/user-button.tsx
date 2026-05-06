@@ -1,7 +1,5 @@
 "use client"
 import { useEffect } from "react";
-import { FaUser } from "react-icons/fa"
-import { ExitIcon } from "@radix-ui/react-icons";
 import { 
     DropdownMenu,
     DropdownMenuContent,
@@ -19,10 +17,9 @@ import { useSessionUpdate } from "@/hooks/use-session-update";
 import { useUserProfile } from "@/hooks/use-user-profile";
 import { LogoutButton } from '@/components/auth/logout-button';
 import Link from "next/link";
-import { Button } from "../ui/button";
 import { LoginButton } from "./login-button";
 import { ChangePasswordDialog } from "@/components/user/ChangePasswordDialog";
-import { Download, Lock, Shield } from "lucide-react";
+import { Download, FileText, Lock, LogIn, LogOut, Shield, User } from "lucide-react";
 import { usePwaInstallPrompt } from "@/components/pwa/usePwaInstallPrompt";
 
 
@@ -113,7 +110,8 @@ export const UserButton = () => {
               </DropdownMenuLabel>
 
               <DropdownMenuItem>
-                <Link href='/user/profile' className='w-full hover:bg-orange-300'>
+                <Link href='/user/profile' className='w-full flex items-center hover:bg-orange-300'>
+                  <User className="h-4 w-4 mr-2" />
                   Mon espace adhérent
                 </Link>
               </DropdownMenuItem>
@@ -128,7 +126,8 @@ export const UserButton = () => {
               )}
 
               <DropdownMenuItem>
-                <Link href='/user/documents' className='w-full hover:bg-orange-300'>
+                <Link href='/user/documents' className='w-full flex items-center hover:bg-orange-300'>
+                  <FileText className="h-4 w-4 mr-2" />
                   Mes Documents
                 </Link>
               </DropdownMenuItem>
@@ -158,7 +157,10 @@ export const UserButton = () => {
 
               <DropdownMenuItem className="hover:bg-orange-300">
                 <LogoutButton>
-                  Déconnexion
+                  <span className="flex items-center">
+                    <LogOut className="h-4 w-4 mr-2" />
+                    Déconnexion
+                  </span>
                 </LogoutButton>    
               </DropdownMenuItem>
             </>
@@ -178,7 +180,8 @@ export const UserButton = () => {
 
               <DropdownMenuItem className="hover:bg-orange-300" onSelect={(e) => e.preventDefault()}>
                 <LoginButton mode="modal">
-                  <button type="button" className="w-full text-left">
+                  <button type="button" className="w-full text-left flex items-center">
+                    <LogIn className="h-4 w-4 mr-2" />
                     Connexion
                   </button>
                 </LoginButton>    

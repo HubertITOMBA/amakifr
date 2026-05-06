@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,7 @@ import {
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { ArrowLeft, Save, Menu as MenuIcon } from "lucide-react";
-import { createMenu } from "@/actions/menus";
+import { createMenu, getAllMenus } from "@/actions/menus";
 import { toast } from "react-toastify";
 import Link from "next/link";
 
@@ -35,6 +35,10 @@ const MENU_ROLES = [
 export default function CreateMenuPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(false);
+  const [loadingParents, setLoadingParents] = useState(true);
+  const [parentMenus, setParentMenus] = useState<
+    { id: string; libelle: string; niveau: "NAVBAR" | "SIDEBAR" }[]
+  >([]);
   const [formData, setFormData] = useState({
     libelle: "",
     description: "",
@@ -44,8 +48,41 @@ export default function CreateMenuPage() {
     icone: "",
     statut: true,
     ordre: 0,
+    parent: null as string | null,
     electoral: false,
+    isFolder: false,
   });
+
+  useEffect(() => {
+    const loadParents = async () => {
+      try {
+        setLoadingParents(true);
+        const res = await getAllMenus();
+        if (res.success && res.data) {
+          const simplified = (res.data as any[])
+            .map((m) => ({
+              id: String(m.id),
+              libelle: String(m.libelle),
+              niveau: m.niveau as "NAVBAR" | "SIDEBAR",
+            }))
+            .sort((a, b) => a.libelle.localeCompare(b.libelle, "fr"));
+          setParentMenus(simplified);
+        } else {
+          setParentMenus([]);
+        }
+      } catch {
+        setParentMenus([]);
+      } finally {
+        setLoadingParents(false);
+      }
+    };
+
+    loadParents();
+  }, []);
+
+  const availableParentMenus = useMemo(() => {
+    return parentMenus.filter((m) => m.niveau === formData.niveau);
+  }, [parentMenus, formData.niveau]);
 
   const handleRoleToggle = (role: string) => {
     setFormData((prev) => ({
@@ -64,12 +101,13 @@ export default function CreateMenuPage() {
       const formDataToSend = new FormData();
       formDataToSend.append("libelle", formData.libelle);
       formDataToSend.append("description", formData.description);
-      formDataToSend.append("lien", formData.lien);
+      formDataToSend.append("lien", formData.isFolder ? "#" : formData.lien);
       formDataToSend.append("niveau", formData.niveau);
       formDataToSend.append("roles", JSON.stringify(formData.roles));
       formDataToSend.append("icone", formData.icone);
       formDataToSend.append("statut", String(formData.statut));
       formDataToSend.append("ordre", String(formData.ordre));
+      formDataToSend.append("parent", formData.parent || "");
       formDataToSend.append("electoral", String(formData.electoral));
 
       const result = await createMenu(formDataToSend);
@@ -90,11 +128,11 @@ export default function CreateMenuPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-6">
-      <Card className="mx-auto max-w-4xl shadow-lg border-blue-200 dark:border-slate-700 !py-0">
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white !p-0">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-6">
+      <Card className="mx-auto max-w-4xl shadow-lg border-blue-200 dark:border-slate-700 py-0!">
+        <CardHeader className="bg-linear-to-r from-blue-500 to-blue-600 text-white p-0!">
           <div className="flex items-center justify-between px-6 py-4">
-            <CardTitle className="flex items-center gap-2 !p-0">
+            <CardTitle className="flex items-center gap-2 p-0!">
               <MenuIcon className="h-6 w-6" />
               Créer un nouveau menu
             </CardTitle>
@@ -139,18 +177,76 @@ export default function CreateMenuPage() {
             {/* Lien */}
             <div className="space-y-2">
               <Label htmlFor="lien" className="text-sm font-semibold">
-                Lien <span className="text-red-500">*</span>
+                Lien {!formData.isFolder && <span className="text-red-500">*</span>}
               </Label>
               <Input
                 id="lien"
-                value={formData.lien}
+                value={formData.isFolder ? "#" : formData.lien}
                 onChange={(e) =>
                   setFormData({ ...formData, lien: e.target.value })
                 }
-                placeholder="Ex: /evenements"
-                required
+                placeholder={formData.isFolder ? "Désactivé (menu dossier)" : "Ex: /evenements"}
+                required={!formData.isFolder}
+                disabled={formData.isFolder}
                 maxLength={255}
               />
+            </div>
+
+            {/* Options - Dossier */}
+            <div className="space-y-3">
+              <div className="flex items-start space-x-2">
+                <Checkbox
+                  id="isFolder"
+                  checked={formData.isFolder}
+                  onCheckedChange={(checked) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      isFolder: !!checked,
+                      lien: !!checked ? "#" : prev.lien,
+                    }))
+                  }
+                />
+                <div className="space-y-0.5">
+                  <label htmlFor="isFolder" className="text-sm font-medium cursor-pointer">
+                    Menu dossier (sans lien)
+                  </label>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    Quand activé, le lien est forcé à <code className="text-xs bg-gray-100 dark:bg-gray-800 px-1 py-0.5 rounded">#</code> et un clic sert à déplier/replier le groupe.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Parent */}
+            <div className="space-y-2">
+              <Label htmlFor="parent" className="text-sm font-semibold">
+                Menu parent
+              </Label>
+              <Select
+                value={formData.parent ?? "none"}
+                onValueChange={(value) =>
+                  setFormData((prev) => ({
+                    ...prev,
+                    parent: value === "none" ? null : value,
+                  }))
+                }
+                disabled={loadingParents}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder={loadingParents ? "Chargement..." : "Aucun (menu racine)"} />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">Aucun (menu racine)</SelectItem>
+                  {availableParentMenus.map((m) => (
+                    <SelectItem key={m.id} value={m.id}>
+                      {m.libelle}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 dark:text-gray-400">
+                Seuls les menus du même niveau ({formData.niveau}) sont proposés comme parents.
+              </p>
             </div>
 
             {/* Niveau */}
@@ -161,7 +257,11 @@ export default function CreateMenuPage() {
               <Select
                 value={formData.niveau}
                 onValueChange={(value: "NAVBAR" | "SIDEBAR") =>
-                  setFormData({ ...formData, niveau: value })
+                  setFormData((prev) => ({
+                    ...prev,
+                    niveau: value,
+                    parent: null,
+                  }))
                 }
               >
                 <SelectTrigger>
