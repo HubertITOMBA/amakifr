@@ -1,3 +1,8 @@
+const path = require("path");
+
+const appRoot = __dirname;
+const logsDirDev = path.join(appRoot, "logs");
+
 /**
  * Configuration PM2 pour les applications AMAKI France et HITOMBACOM
  * 
@@ -22,6 +27,38 @@
 
 module.exports = {
   apps: [
+    /**
+     * Instance locale pour tester la maintenance (build + start sur 9052).
+     *   npm run build
+     *   pm2 start ecosystem.config.js --only amakifr-dev
+     *   bash scripts/maintenance-on.sh
+     *   pm2 restart amakifr-dev --update-env
+     */
+    {
+      name: "amakifr-dev",
+      script: "npx",
+      args: ["next", "start", "-H", "0.0.0.0", "-p", "9052"],
+      cwd: appRoot,
+      interpreter: "none",
+      instances: 1,
+      exec_mode: "fork",
+      env: {
+        NODE_ENV: "production",
+        PORT: "9052",
+        HOSTNAME: "0.0.0.0",
+        NEXT_PUBLIC_APP_URL: "http://localhost:9052",
+        MAINTENANCE_MODE: "false",
+        MAINTENANCE_BYPASS_IPS: "",
+      },
+      autorestart: true,
+      watch: false,
+      max_memory_restart: "1G",
+      error_file: path.join(logsDirDev, "pm2-dev-error.log"),
+      out_file: path.join(logsDirDev, "pm2-dev-out.log"),
+      log_file: path.join(logsDirDev, "pm2-dev-combined.log"),
+      time: true,
+      merge_logs: true,
+    },
     {
       name: 'amakifr',
       script: 'npm',

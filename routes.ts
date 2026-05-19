@@ -5,6 +5,7 @@
  */
 export const publicRoutes = [
     "/",
+    "/maintenance",
     "/agenda",
     "/amicale",
     "/amicale/president-interview",
@@ -44,6 +45,10 @@ export function isPublicRoute(pathname: string): boolean {
     
     // Routes dynamiques publiques
     if (pathname.startsWith("/evenements/")) {
+        return true;
+    }
+
+    if (pathname === "/maintenance" || pathname === "/maintenance.html") {
         return true;
     }
     

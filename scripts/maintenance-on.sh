@@ -1,132 +1,118 @@
 #!/bin/bash
 
 ###############################################################################
-# Script d'activation du mode maintenance
-# 
-# Ce script active le mode maintenance en créant un fichier flag que nginx
-# détecte pour rediriger tous les utilisateurs vers la page de maintenance.
+# Activation du mode maintenance — AMAKI France (amakifr)
 #
-# Usage: ./scripts/maintenance-on.sh
-# Ou depuis la racine: bash scripts/maintenance-on.sh
+# - Crée maintenance.flag (détecté par nginx)
+# - Vérifie public/maintenance.html
+# - Active MAINTENANCE_MODE dans .env.local (fallback Next.js sans nginx)
+#
+# Usage dev  : bash scripts/maintenance-on.sh
+# Usage prod : AMAKI_SITE_ROOT=/sites/amakifr bash scripts/maintenance-on.sh
 ###############################################################################
 
-set -e  # Arrêter le script en cas d'erreur
+set -e
 
-# Couleurs pour l'affichage
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-# Configuration
-MAINTENANCE_FLAG="/sites/amakifr/maintenance.flag"
-MAINTENANCE_HTML="/sites/amakifr/.next/server/app/maintenance.html"
-PUBLIC_MAINTENANCE_HTML="./public/maintenance.html"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SITE_ROOT="${AMAKI_SITE_ROOT:-$PROJECT_ROOT}"
+
+MAINTENANCE_FLAG="${SITE_ROOT}/maintenance.flag"
+PUBLIC_HTML="${PROJECT_ROOT}/public/maintenance.html"
+ENV_FILE="${PROJECT_ROOT}/.env.local"
+# Copie optionnelle pour nginx prod historique (.next/server/app)
+NEXT_HTML_LEGACY="${SITE_ROOT}/.next/server/app/maintenance.html"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}🔧  ACTIVATION DU MODE MAINTENANCE - AMAKI FRANCE${NC}"
+echo -e "${BLUE}🔧  ACTIVATION DU MODE MAINTENANCE — AMAKI FRANCE${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${CYAN}   Projet : ${PROJECT_ROOT}${NC}"
+echo -e "${CYAN}   Site   : ${SITE_ROOT}${NC}"
 echo ""
 
-# Vérifier si on est dans le bon répertoire
-if [ ! -f "package.json" ]; then
-    echo -e "${RED}❌ Erreur: Ce script doit être exécuté depuis la racine du projet.${NC}"
-    exit 1
+if [ ! -f "${PROJECT_ROOT}/package.json" ]; then
+  echo -e "${RED}❌ Exécutez ce script depuis la racine du projet.${NC}"
+  exit 1
 fi
 
-# Vérifier si le fichier HTML de maintenance existe
-if [ ! -f "$PUBLIC_MAINTENANCE_HTML" ]; then
-    echo -e "${RED}❌ Erreur: Le fichier de maintenance n'existe pas: $PUBLIC_MAINTENANCE_HTML${NC}"
-    exit 1
+if [ ! -f "$PUBLIC_HTML" ]; then
+  echo -e "${RED}❌ Fichier introuvable : $PUBLIC_HTML${NC}"
+  exit 1
 fi
 
-# Demander confirmation
-echo -e "${YELLOW}⚠️  Cette action va activer le mode maintenance.${NC}"
-echo -e "${YELLOW}   Tous les utilisateurs verront la page de maintenance.${NC}"
+echo -e "${YELLOW}⚠️  Les visiteurs verront la page de maintenance.${NC}"
+read -p "Continuer ? (o/n) : " -n 1 -r
 echo ""
-read -p "Voulez-vous continuer ? (o/n) : " -n 1 -r
-echo ""
-
 if [[ ! $REPLY =~ ^[OoYy]$ ]]; then
-    echo -e "${BLUE}ℹ️  Opération annulée.${NC}"
-    exit 0
+  echo -e "${BLUE}ℹ️  Annulé.${NC}"
+  exit 0
 fi
 
 echo ""
-echo -e "${GREEN}📝 Étape 1/3: Création du fichier flag...${NC}"
-
-# Créer le fichier flag
-if sudo touch "$MAINTENANCE_FLAG"; then
-    echo -e "${GREEN}   ✅ Fichier flag créé: $MAINTENANCE_FLAG${NC}"
+echo -e "${GREEN}📝 Étape 1/4 : Fichier flag nginx...${NC}"
+if [ "$SITE_ROOT" = "$PROJECT_ROOT" ]; then
+  echo "Maintenance activée le $(date)" > "$MAINTENANCE_FLAG"
+  chmod 644 "$MAINTENANCE_FLAG"
 else
-    echo -e "${RED}   ❌ Erreur lors de la création du fichier flag${NC}"
-    exit 1
+  echo "Maintenance activée le $(date)" | sudo tee "$MAINTENANCE_FLAG" > /dev/null
+  sudo chmod 644 "$MAINTENANCE_FLAG"
+fi
+echo -e "${GREEN}   ✅ $MAINTENANCE_FLAG${NC}"
+
+echo ""
+echo -e "${GREEN}📄 Étape 2/4 : Page maintenance (public/maintenance.html)...${NC}"
+echo -e "${GREEN}   ✅ $PUBLIC_HTML${NC}"
+
+if [ -d "$(dirname "$NEXT_HTML_LEGACY")" ]; then
+  if [ "$SITE_ROOT" = "$PROJECT_ROOT" ]; then
+    cp "$PUBLIC_HTML" "$NEXT_HTML_LEGACY"
+    chmod 644 "$NEXT_HTML_LEGACY"
+  else
+    sudo cp "$PUBLIC_HTML" "$NEXT_HTML_LEGACY"
+    sudo chmod 644 "$NEXT_HTML_LEGACY"
+  fi
+  echo -e "${GREEN}   ✅ Copie legacy nginx : $NEXT_HTML_LEGACY${NC}"
 fi
 
-# Ajouter la date et l'heure dans le fichier flag
-if sudo bash -c "echo 'Maintenance activée le $(date)' > $MAINTENANCE_FLAG"; then
-    echo -e "${GREEN}   ✅ Horodatage ajouté au fichier flag${NC}"
+echo ""
+echo -e "${GREEN}⚙️  Étape 3/4 : Variable MAINTENANCE_MODE (.env.local)...${NC}"
+touch "$ENV_FILE"
+if grep -q '^MAINTENANCE_MODE=' "$ENV_FILE" 2>/dev/null; then
+  sed -i 's/^MAINTENANCE_MODE=.*/MAINTENANCE_MODE=true/' "$ENV_FILE"
 else
-    echo -e "${YELLOW}   ⚠️  Impossible d'ajouter l'horodatage (non critique)${NC}"
+  echo "MAINTENANCE_MODE=true" >> "$ENV_FILE"
 fi
-
-echo ""
-echo -e "${GREEN}📄 Étape 2/3: Copie de la page de maintenance...${NC}"
-
-# S'assurer que le répertoire de destination existe
-DEST_DIR=$(dirname "$MAINTENANCE_HTML")
-if [ ! -d "$DEST_DIR" ]; then
-    echo -e "${YELLOW}   ℹ️  Création du répertoire: $DEST_DIR${NC}"
-    sudo mkdir -p "$DEST_DIR"
-fi
-
-# Copier le fichier HTML de maintenance
-if sudo cp "$PUBLIC_MAINTENANCE_HTML" "$MAINTENANCE_HTML"; then
-    echo -e "${GREEN}   ✅ Page de maintenance copiée vers: $MAINTENANCE_HTML${NC}"
-    sudo chmod 644 "$MAINTENANCE_HTML"
-    echo -e "${GREEN}   ✅ Permissions définies (644)${NC}"
+if grep -q '^MAINTENANCE_BYPASS_IPS=' "$ENV_FILE" 2>/dev/null; then
+  sed -i 's/^MAINTENANCE_BYPASS_IPS=.*/MAINTENANCE_BYPASS_IPS=/' "$ENV_FILE"
 else
-    echo -e "${RED}   ❌ Erreur lors de la copie de la page de maintenance${NC}"
-    # Nettoyer le fichier flag en cas d'erreur
-    sudo rm -f "$MAINTENANCE_FLAG"
-    exit 1
+  echo "MAINTENANCE_BYPASS_IPS=" >> "$ENV_FILE"
 fi
+echo -e "${GREEN}   ✅ MAINTENANCE_MODE=true (BYPASS_IPS vidé pour test local)${NC}"
 
 echo ""
-echo -e "${GREEN}🔄 Étape 3/3: Rechargement de la configuration nginx...${NC}"
-
-# Vérifier la configuration nginx avant de recharger
-if sudo nginx -t > /dev/null 2>&1; then
-    echo -e "${GREEN}   ✅ Configuration nginx valide${NC}"
-    
-    # Recharger nginx
-    if sudo systemctl reload nginx; then
-        echo -e "${GREEN}   ✅ Nginx rechargé avec succès${NC}"
-    else
-        echo -e "${RED}   ❌ Erreur lors du rechargement de nginx${NC}"
-        echo -e "${YELLOW}   ℹ️  Essayez manuellement: sudo systemctl reload nginx${NC}"
-    fi
+echo -e "${GREEN}🔄 Étape 4/4 : Rechargement nginx (si disponible)...${NC}"
+if command -v nginx >/dev/null 2>&1 && sudo nginx -t >/dev/null 2>&1; then
+  if sudo systemctl reload nginx 2>/dev/null; then
+    echo -e "${GREEN}   ✅ Nginx rechargé${NC}"
+  else
+    echo -e "${YELLOW}   ⚠️  Rechargez nginx : sudo systemctl reload nginx${NC}"
+  fi
 else
-    echo -e "${RED}   ❌ Configuration nginx invalide${NC}"
-    echo -e "${YELLOW}   ℹ️  Vérifiez avec: sudo nginx -t${NC}"
-    echo -e "${YELLOW}   ℹ️  Le mode maintenance est actif mais nginx n'a pas été rechargé${NC}"
+  echo -e "${YELLOW}   ℹ️  Nginx non configuré — test via Next.js uniquement (MAINTENANCE_MODE)${NC}"
 fi
 
 echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}✅  MODE MAINTENANCE ACTIVÉ !${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-echo -e "${GREEN}📌 Statut:${NC}"
-echo -e "   • Fichier flag: ${GREEN}$MAINTENANCE_FLAG${NC}"
-echo -e "   • Page HTML: ${GREEN}$MAINTENANCE_HTML${NC}"
-echo -e "   • Date d'activation: ${BLUE}$(date '+%d/%m/%Y à %H:%M:%S')${NC}"
-echo ""
-echo -e "${YELLOW}💡 Tous les utilisateurs voient maintenant la page de maintenance.${NC}"
-echo -e "${YELLOW}   La page se rafraîchit automatiquement toutes les 30 secondes.${NC}"
-echo ""
-echo -e "${BLUE}ℹ️  Pour désactiver le mode maintenance:${NC}"
-echo -e "   ${GREEN}bash scripts/maintenance-off.sh${NC}"
+echo -e "${GREEN}✅ MODE MAINTENANCE ACTIVÉ${NC}"
+echo -e "${YELLOW}💡 Redémarrez Next.js / PM2 (obligatoire pour MAINTENANCE_MODE) :${NC}"
+echo -e "   ${GREEN}pm2 restart amakifr-dev --update-env${NC}  ou  ${GREEN}npm run build && pm2 restart amakifr --update-env${NC}"
+echo -e "${BLUE}ℹ️  Test direct : http://localhost:9052/maintenance${NC}"
+echo -e "${BLUE}ℹ️  Désactivation : bash scripts/maintenance-off.sh${NC}"
 echo ""

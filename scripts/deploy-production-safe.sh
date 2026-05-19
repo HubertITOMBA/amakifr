@@ -95,17 +95,29 @@ step "3/9 — Dépendances (npm ci)"
 npm ci
 
 # ─── SAUVEGARDE (critique) ───────────────────────────────────────────────────
+find_latest_backup() {
+  local dir="${1:-./backups}"
+  # Ne pas faire échouer le script (pipefail + glob vide)
+  ls -t "$dir"/amakifr_custom_*.dump 2>/dev/null | head -1 || true
+}
+
 step "4/9 — Sauvegarde complète de la base (OBLIGATOIRE)"
 export DATABASE_URL
-if bash scripts/db-backup-restore.sh backup -t custom; then
-  BACKUP_FILE=$(ls -t "${BACKUP_DIR:-./backups}"/amakifr_backup_*.dump 2>/dev/null | head -1)
-  if [ -z "$BACKUP_FILE" ] && [ -d /sites/backup ]; then
-    BACKUP_FILE=$(ls -t /sites/backup/amakifr_backup_*.dump 2>/dev/null | head -1)
-  fi
-  echo -e "${GREEN}✅ Sauvegarde créée${NC}"
-  [ -n "$BACKUP_FILE" ] && echo -e "${CYAN}   Fichier: $BACKUP_FILE${NC}"
+if [ "${SKIP_BACKUP:-0}" = "1" ]; then
+  warn "Sauvegarde ignorée (SKIP_BACKUP=1) — reprise de déploiement"
+  BACKUP_FILE=$(find_latest_backup "${BACKUP_DIR:-./backups}")
+  [ -z "$BACKUP_FILE" ] && [ -d /sites/backup ] && BACKUP_FILE=$(find_latest_backup /sites/backup)
 else
-  fail "Échec de la sauvegarde — déploiement interrompu pour protéger vos données."
+  if bash scripts/db-backup-restore.sh backup -t custom; then
+    BACKUP_FILE=$(find_latest_backup "${BACKUP_DIR:-./backups}")
+    if [ -z "$BACKUP_FILE" ] && [ -d /sites/backup ]; then
+      BACKUP_FILE=$(find_latest_backup /sites/backup)
+    fi
+    echo -e "${GREEN}✅ Sauvegarde créée${NC}"
+    [ -n "$BACKUP_FILE" ] && echo -e "${CYAN}   Fichier: $BACKUP_FILE${NC}" || warn "Fichier de sauvegarde introuvable dans ./backups (vérifiez manuellement)"
+  else
+    fail "Échec de la sauvegarde — déploiement interrompu pour protéger vos données."
+  fi
 fi
 
 # ─── Prisma generate (client à jour avant migrations) ────────────────────────

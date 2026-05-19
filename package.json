@@ -4,6 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 9052",
+    "maintenance:on": "bash scripts/maintenance-on.sh",
+    "maintenance:off": "bash scripts/maintenance-off.sh",
     "build": "node scripts/generate-build-id.js && next build",
     "start": "next start -H 0.0.0.0 -p 9060",
     "lint": "next lint",
@@ -57,6 +59,7 @@
     "deploy:check": "tsx scripts/verify-production-ready.ts",
     "deploy:preflight": "bash scripts/preflight-production.sh",
     "deploy:production-safe": "bash scripts/deploy-production-safe.sh",
+    "deploy:production-safe-continue": "bash scripts/deploy-production-safe-continue.sh",
     "deploy:migrate": "prisma migrate deploy",
     "deploy:generate": "prisma generate",
     "db:backup": "bash scripts/db-backup-restore.sh backup",

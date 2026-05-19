@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
 import { addSecurityHeaders } from "@/lib/security-headers";
 import { checkRateLimit, getRateLimitIdentifier, rateLimitPresets } from "@/lib/rate-limit";
+import {
+  isMaintenanceEnabled,
+  isBypassedIp,
+  isExemptMaintenancePath,
+  maintenanceRewrite,
+} from "@/lib/maintenance";
 import { auth } from "@/auth"; // Importer directement depuis auth.ts pour utiliser la même instance
 
 import { 
@@ -12,6 +18,14 @@ import {
 
 export default auth(async (req: NextRequest) => {
     const { nextUrl } = req;
+
+    // Mode maintenance (MAINTENANCE_MODE dans .env / .env.local) — avant auth
+    if (isMaintenanceEnabled()) {
+        const { pathname } = nextUrl;
+        if (!isExemptMaintenancePath(pathname) && !isBypassedIp(req)) {
+            return maintenanceRewrite(req);
+        }
+    }
     const isApiAuthRoute = nextUrl.pathname.startsWith(apiAuthPrefix);
     
     // Ne pas interférer avec les routes API d'authentification

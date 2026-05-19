@@ -1,104 +1,68 @@
 #!/bin/bash
 
 ###############################################################################
-# Script de désactivation du mode maintenance
-# 
-# Ce script désactive le mode maintenance en supprimant le fichier flag.
-# Les utilisateurs pourront alors accéder normalement à l'application.
+# Désactivation du mode maintenance — AMAKI France (amakifr)
 #
-# Usage: ./scripts/maintenance-off.sh
-# Ou depuis la racine: bash scripts/maintenance-off.sh
+# Usage : bash scripts/maintenance-off.sh
+# Prod  : AMAKI_SITE_ROOT=/sites/amakifr bash scripts/maintenance-off.sh
 ###############################################################################
 
-set -e  # Arrêter le script en cas d'erreur
+set -e
 
-# Couleurs pour l'affichage
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+NC='\033[0m'
 
-# Configuration
-MAINTENANCE_FLAG="/sites/amakifr/maintenance.flag"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+SITE_ROOT="${AMAKI_SITE_ROOT:-$PROJECT_ROOT}"
+
+MAINTENANCE_FLAG="${SITE_ROOT}/maintenance.flag"
+ENV_FILE="${PROJECT_ROOT}/.env.local"
 
 echo ""
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${BLUE}✅  DÉSACTIVATION DU MODE MAINTENANCE - AMAKI FRANCE${NC}"
+echo -e "${BLUE}✅  DÉSACTIVATION DU MODE MAINTENANCE — AMAKI FRANCE${NC}"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
 echo ""
 
-# Vérifier si le fichier flag existe
-if [ ! -f "$MAINTENANCE_FLAG" ]; then
-    echo -e "${YELLOW}⚠️  Le mode maintenance n'est pas activé.${NC}"
-    echo -e "${BLUE}ℹ️  Fichier flag non trouvé: $MAINTENANCE_FLAG${NC}"
-    echo ""
-    exit 0
+if [ ! -f "$MAINTENANCE_FLAG" ] && ! grep -q '^MAINTENANCE_MODE=true' "$ENV_FILE" 2>/dev/null; then
+  echo -e "${YELLOW}⚠️  Le mode maintenance ne semble pas actif.${NC}"
+  exit 0
 fi
 
-# Afficher les informations du fichier flag
-echo -e "${BLUE}📋 Informations du mode maintenance:${NC}"
-if [ -r "$MAINTENANCE_FLAG" ]; then
-    CONTENT=$(sudo cat "$MAINTENANCE_FLAG" 2>/dev/null || echo "Contenu non disponible")
-    echo -e "${YELLOW}   $CONTENT${NC}"
-else
-    echo -e "${YELLOW}   Fichier détecté mais contenu non lisible${NC}"
-fi
-
+read -p "Désactiver le mode maintenance ? (o/n) : " -n 1 -r
 echo ""
-
-# Demander confirmation
-read -p "Voulez-vous désactiver le mode maintenance ? (o/n) : " -n 1 -r
-echo ""
-echo ""
-
 if [[ ! $REPLY =~ ^[OoYy]$ ]]; then
-    echo -e "${BLUE}ℹ️  Opération annulée.${NC}"
-    exit 0
-fi
-
-echo -e "${GREEN}🗑️  Suppression du fichier flag...${NC}"
-
-# Supprimer le fichier flag
-if sudo rm -f "$MAINTENANCE_FLAG"; then
-    echo -e "${GREEN}   ✅ Fichier flag supprimé: $MAINTENANCE_FLAG${NC}"
-else
-    echo -e "${RED}   ❌ Erreur lors de la suppression du fichier flag${NC}"
-    exit 1
+  exit 0
 fi
 
 echo ""
-echo -e "${GREEN}🔄 Rechargement de la configuration nginx...${NC}"
+if [ -f "$MAINTENANCE_FLAG" ]; then
+  if [ "$SITE_ROOT" = "$PROJECT_ROOT" ]; then
+    rm -f "$MAINTENANCE_FLAG"
+  else
+    sudo rm -f "$MAINTENANCE_FLAG"
+  fi
+  echo -e "${GREEN}   ✅ Flag supprimé${NC}"
+fi
 
-# Vérifier la configuration nginx avant de recharger
-if sudo nginx -t > /dev/null 2>&1; then
-    echo -e "${GREEN}   ✅ Configuration nginx valide${NC}"
-    
-    # Recharger nginx
-    if sudo systemctl reload nginx; then
-        echo -e "${GREEN}   ✅ Nginx rechargé avec succès${NC}"
-    else
-        echo -e "${RED}   ❌ Erreur lors du rechargement de nginx${NC}"
-        echo -e "${YELLOW}   ℹ️  Essayez manuellement: sudo systemctl reload nginx${NC}"
-    fi
-else
-    echo -e "${RED}   ❌ Configuration nginx invalide${NC}"
-    echo -e "${YELLOW}   ℹ️  Vérifiez avec: sudo nginx -t${NC}"
+if [ -f "$ENV_FILE" ]; then
+  if grep -q '^MAINTENANCE_MODE=' "$ENV_FILE" 2>/dev/null; then
+    sed -i 's/^MAINTENANCE_MODE=.*/MAINTENANCE_MODE=false/' "$ENV_FILE"
+  else
+    echo "MAINTENANCE_MODE=false" >> "$ENV_FILE"
+  fi
+  echo -e "${GREEN}   ✅ MAINTENANCE_MODE=false dans .env.local${NC}"
+fi
+
+if command -v nginx >/dev/null 2>&1 && sudo nginx -t >/dev/null 2>&1; then
+  sudo systemctl reload nginx 2>/dev/null && echo -e "${GREEN}   ✅ Nginx rechargé${NC}" || true
 fi
 
 echo ""
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo -e "${GREEN}✅  MODE MAINTENANCE DÉSACTIVÉ !${NC}"
-echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
-echo ""
-echo -e "${GREEN}📌 Statut:${NC}"
-echo -e "   • Mode maintenance: ${RED}Désactivé${NC}"
-echo -e "   • Date de désactivation: ${BLUE}$(date '+%d/%m/%Y à %H:%M:%S')${NC}"
-echo ""
-echo -e "${GREEN}🎉 L'application est maintenant accessible par tous les utilisateurs !${NC}"
-echo ""
-echo -e "${BLUE}💡 Vérifications recommandées:${NC}"
-echo -e "   1. Tester l'accès à l'application: ${GREEN}https://votre-domaine.fr${NC}"
-echo -e "   2. Vérifier les logs nginx: ${GREEN}sudo tail -f /var/log/nginx/error.log${NC}"
-echo -e "   3. Vérifier les logs de l'app: ${GREEN}pm2 logs amaki${NC}"
+echo -e "${GREEN}✅ MODE MAINTENANCE DÉSACTIVÉ${NC}"
+echo -e "${YELLOW}💡 Redémarrez l'application : pm2 restart amakifr-dev --update-env${NC}"
 echo ""
