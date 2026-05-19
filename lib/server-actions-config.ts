@@ -1066,6 +1066,16 @@ export const SERVER_ACTIONS_CONFIG: ServerActionConfig[] = [
     route: "/admin/reservations",
     category: "Réservations",
   },
+  // ========== CONNEXIONS ADHÉRENTS ==========
+  {
+    action: "getAdherentConnexionsList",
+    label: "Lister les connexions adhérents",
+    description: "Suivi des connexions au portail et badges de fidélité (hors administrateurs)",
+    resource: "connexions-adherents",
+    defaultType: "READ",
+    route: "/admin/connexions-adherents",
+    category: "Adhérents",
+  },
 ];
 
 /**

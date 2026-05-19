@@ -55,6 +55,8 @@
     "db:nettoyer-cotisations-beneficiaires": "tsx scripts/nettoyer-cotisations-beneficiaires.ts",
     "db:insert-test-adherents": "tsx scripts/insert-test-adherents.ts",
     "deploy:check": "tsx scripts/verify-production-ready.ts",
+    "deploy:preflight": "bash scripts/preflight-production.sh",
+    "deploy:production-safe": "bash scripts/deploy-production-safe.sh",
     "deploy:migrate": "prisma migrate deploy",
     "deploy:generate": "prisma generate",
     "db:backup": "bash scripts/db-backup-restore.sh backup",
@@ -65,6 +67,8 @@
     "db:restore": "bash scripts/db-backup-restore.sh restore",
     "db:add-anniversaires-menu-navbar": "tsx scripts/add-anniversaires-menu-navbar.ts",
     "db:add-absenteisme-menu-sidebar": "tsx scripts/add-absenteisme-menu-sidebar.ts",
+    "db:add-connexions-adherents-menu": "tsx scripts/add-connexions-adherents-menu.ts",
+    "db:seed-connexion-badges": "tsx scripts/create-connexion-badges.ts",
     "db:restrict-anniversaires-to-auth": "tsx scripts/add-anniversaires-menu-navbar.ts"
   },
   "dependencies": {

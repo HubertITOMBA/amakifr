@@ -74,7 +74,10 @@ export const {
 			if (user.id) {
 				await db.user.update({
 					where: { id: user.id },
-					data: { lastLogin: new Date() },
+					data: {
+						lastLogin: new Date(),
+						loginCount: { increment: 1 },
+					},
 				});
 				// Logger la connexion pour tous les utilisateurs (credentials + OAuth)
 				try {
@@ -94,6 +97,13 @@ export const {
 					}
 				} catch (logErr) {
 					console.warn("[auth] Erreur lors du logging de la connexion:", logErr);
+				}
+				// Attribution automatique des badges de connexion
+				try {
+					const { verifierBadgesAutomatiques } = await import("@/actions/badges");
+					await verifierBadgesAutomatiques(user.id);
+				} catch (badgeErr) {
+					console.warn("[auth] Erreur lors de la vérification des badges de connexion:", badgeErr);
 				}
 			}
 		},

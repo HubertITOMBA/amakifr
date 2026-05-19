@@ -274,9 +274,10 @@ model User {
   activities                    UserActivity[]               @relation("UserActivities") // Activités de l'utilisateur
   projetsCrees                  Projet[]                     @relation("ProjetCreatedBy") // Projets créés
 
-  lastLogin DateTime? @updatedAt
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
+  lastLogin  DateTime? @updatedAt
+  loginCount Int       @default(0) // Nombre de connexions au portail
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
 
   remember_token        String?                @db.VarChar(100)
   isTwoFactorEnabled    Boolean                @default(false)

@@ -24,37 +24,48 @@ async function createAdminUser() {
       },
     });
 
-    if (existingAdmin) {
-      console.log('⚠️  L\'utilisateur admin existe déjà. Suppression de l\'ancien utilisateur...');
-      
-      // Supprimer l'ancien utilisateur (les adhérents, adresses et téléphones seront supprimés en cascade)
-      await prisma.user.delete({
-        where: { id: existingAdmin.id },
-      });
-      
-      console.log('   ✅ Ancien utilisateur admin supprimé\n');
-    }
-
-    // Hasher le mot de passe
-    const hashedPassword = await bcrypt.hash('password', 12);
-
-    // Date de vérification email (maintenant)
+    const hashedPassword = await bcrypt.hash('Admin12345!', 12);
     const emailVerifiedDate = new Date();
 
-    // Créer l'utilisateur admin d'abord (sans adhérent pour pouvoir l'utiliser comme createdBy)
-    console.log('👤 Création de l\'utilisateur admin...');
-    const newAdmin = await prisma.user.create({
-      data: {
-        email: 'admin@amaki.fr',
-        name: 'ADMIN',
-        password: hashedPassword,
-        role: UserRole.ADMIN,
-        status: UserStatus.Actif,
-        emailVerified: emailVerifiedDate,
-      },
-    });
+    let newAdmin = existingAdmin;
 
-    console.log(`   ✅ Utilisateur admin créé (ID: ${newAdmin.id})\n`);
+    if (existingAdmin) {
+      console.log('⚠️  L\'utilisateur admin existe déjà — mise à jour (sans suppression)...');
+      newAdmin = await prisma.user.update({
+        where: { id: existingAdmin.id },
+        data: {
+          name: 'ADMIN',
+          password: hashedPassword,
+          role: UserRole.ADMIN,
+          status: UserStatus.Actif,
+          emailVerified: emailVerifiedDate,
+        },
+        include: {
+          adherent: {
+            include: { Adresse: true, Telephones: true },
+          },
+        },
+      });
+      console.log(`   ✅ Utilisateur admin mis à jour (ID: ${newAdmin.id})\n`);
+    } else {
+      console.log('👤 Création de l\'utilisateur admin...');
+      newAdmin = await prisma.user.create({
+        data: {
+          email: 'admin@amaki.fr',
+          name: 'ADMIN',
+          password: hashedPassword,
+          role: UserRole.ADMIN,
+          status: UserStatus.Actif,
+          emailVerified: emailVerifiedDate,
+        },
+        include: {
+          adherent: {
+            include: { Adresse: true, Telephones: true },
+          },
+        },
+      });
+      console.log(`   ✅ Utilisateur admin créé (ID: ${newAdmin.id})\n`);
+    }
 
     // Récupérer ou créer le poste "MEMBRE" par défaut
     let posteMembre = await prisma.posteTemplate.findUnique({
@@ -78,54 +89,95 @@ async function createAdminUser() {
       console.log(`   ✅ Poste "MEMBRE" créé (ID: ${posteMembre.id})\n`);
     }
 
-    // Créer l'adhérent avec le poste
-    console.log('👥 Création de l\'adhérent...');
-    const newAdherent = await prisma.adherent.create({
-      data: {
-        userId: newAdmin.id,
-        civility: Civilities.Monsieur,
-        firstname: 'Hubert',
-        lastname: 'Itomba',
-        posteTemplateId: posteMembre.id,
-        typeAdhesion: TypeAdhesion.AdhesionAnnuelle,
-      },
-    });
+    let adherentId: string;
 
-    const adherentId = newAdherent.id;
-    console.log(`   ✅ Adhérent créé (ID: ${adherentId})\n`);
+    if (newAdmin.adherent) {
+      console.log('👥 Mise à jour de l\'adhérent existant...');
+      const updated = await prisma.adherent.update({
+        where: { id: newAdmin.adherent.id },
+        data: {
+          civility: Civilities.Monsieur,
+          firstname: 'Hubert',
+          lastname: 'Itomba',
+          posteTemplateId: posteMembre.id,
+          typeAdhesion: TypeAdhesion.AdhesionAnnuelle,
+        },
+      });
+      adherentId = updated.id;
+      console.log(`   ✅ Adhérent mis à jour (ID: ${adherentId})\n`);
+    } else {
+      console.log('👥 Création de l\'adhérent...');
+      const newAdherent = await prisma.adherent.create({
+        data: {
+          userId: newAdmin.id,
+          civility: Civilities.Monsieur,
+          firstname: 'Hubert',
+          lastname: 'Itomba',
+          posteTemplateId: posteMembre.id,
+          typeAdhesion: TypeAdhesion.AdhesionAnnuelle,
+        },
+      });
+      adherentId = newAdherent.id;
+      console.log(`   ✅ Adhérent créé (ID: ${adherentId})\n`);
+    }
 
-    // Créer l'adresse
-    console.log('📍 Création de l\'adresse...');
-    await prisma.adresse.create({
-      data: {
-        adherentId,
-        streetnum: '37',
-        street1: "Rue de l'abbé Ruellan",
-        street2: '',
-        codepost: '95300',
-        city: 'Argenteuil',
-        country: 'France',
-      },
-    });
-    console.log('   ✅ Adresse créée\n');
+    const existingAdresse = newAdmin.adherent?.Adresse?.[0];
+    console.log(existingAdresse ? '📍 Mise à jour de l\'adresse...' : '📍 Création de l\'adresse...');
+    if (existingAdresse) {
+      await prisma.adresse.update({
+        where: { id: existingAdresse.id },
+        data: {
+          streetnum: '37',
+          street1: "Rue de l'abbé Ruellan",
+          street2: '',
+          codepost: '95300',
+          city: 'Argenteuil',
+          country: 'France',
+        },
+      });
+    } else {
+      await prisma.adresse.create({
+        data: {
+          adherentId,
+          streetnum: '37',
+          street1: "Rue de l'abbé Ruellan",
+          street2: '',
+          codepost: '95300',
+          city: 'Argenteuil',
+          country: 'France',
+        },
+      });
+    }
+    console.log('   ✅ Adresse enregistrée\n');
 
-    // Créer le téléphone
-    console.log('📞 Création du téléphone...');
-    await prisma.telephone.create({
-      data: {
-        adherentId,
-        numero: '+33607034364',
-        type: TypeTelephone.Mobile,
-        estPrincipal: true,
-      },
-    });
-    console.log('   ✅ Téléphone créé\n');
+    const existingTel = newAdmin.adherent?.Telephones?.[0];
+    console.log(existingTel ? '📞 Mise à jour du téléphone...' : '📞 Création du téléphone...');
+    if (existingTel) {
+      await prisma.telephone.update({
+        where: { id: existingTel.id },
+        data: {
+          numero: '+33607034364',
+          type: TypeTelephone.Mobile,
+          estPrincipal: true,
+        },
+      });
+    } else {
+      await prisma.telephone.create({
+        data: {
+          adherentId,
+          numero: '+33607034364',
+          type: TypeTelephone.Mobile,
+          estPrincipal: true,
+        },
+      });
+    }
+    console.log('   ✅ Téléphone enregistré\n');
 
     console.log('=====================================');
     console.log('✅ Utilisateur admin créé avec succès !');
     console.log('=====================================');
     console.log(`📧 Email: admin@amaki.fr`);
-    console.log(`🔐 Mot de passe: password`);
+    console.log(`🔐 Mot de passe: Admin12345!`);
     console.log(`👑 Rôle: Admin`);
     console.log(`👤 Nom: Hubert Itomba`);
     console.log(`📍 Adresse: 37 Rue de l'abbé Ruellan, 95300 Argenteuil, France`);

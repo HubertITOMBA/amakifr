@@ -478,6 +478,16 @@ async function evaluerConditionBadge(userId: string, condition: any): Promise<bo
       );
       return anneesFidelite >= 3;
 
+    case "nombre_connexions": {
+      const userConnexions = await prisma.user.findUnique({
+        where: { id: userId },
+        select: { loginCount: true },
+      });
+      const count = userConnexions?.loginCount ?? 0;
+      const seuil = typeof valeur === "number" ? valeur : parseInt(String(valeur ?? 1), 10);
+      return count >= (Number.isNaN(seuil) ? 1 : seuil);
+    }
+
     default:
       return false;
   }
