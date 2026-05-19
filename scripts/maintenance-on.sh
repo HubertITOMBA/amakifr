@@ -26,7 +26,11 @@ SITE_ROOT="${AMAKI_SITE_ROOT:-$PROJECT_ROOT}"
 
 MAINTENANCE_FLAG="${SITE_ROOT}/maintenance.flag"
 PUBLIC_HTML="${PROJECT_ROOT}/public/maintenance.html"
-ENV_FILE="${PROJECT_ROOT}/.env.local"
+# En production PM2 lit surtout .env ; en dev .env.local
+ENV_FILES=()
+[ -f "${PROJECT_ROOT}/.env" ] && ENV_FILES+=("${PROJECT_ROOT}/.env")
+[ -f "${PROJECT_ROOT}/.env.local" ] && ENV_FILES+=("${PROJECT_ROOT}/.env.local")
+[ ${#ENV_FILES[@]} -eq 0 ] && ENV_FILES+=("${PROJECT_ROOT}/.env.local")
 # Copie optionnelle pour nginx prod historique (.next/server/app)
 NEXT_HTML_LEGACY="${SITE_ROOT}/.next/server/app/maintenance.html"
 
@@ -83,19 +87,21 @@ if [ -d "$(dirname "$NEXT_HTML_LEGACY")" ]; then
 fi
 
 echo ""
-echo -e "${GREEN}⚙️  Étape 3/4 : Variable MAINTENANCE_MODE (.env.local)...${NC}"
-touch "$ENV_FILE"
-if grep -q '^MAINTENANCE_MODE=' "$ENV_FILE" 2>/dev/null; then
-  sed -i 's/^MAINTENANCE_MODE=.*/MAINTENANCE_MODE=true/' "$ENV_FILE"
-else
-  echo "MAINTENANCE_MODE=true" >> "$ENV_FILE"
-fi
-if grep -q '^MAINTENANCE_BYPASS_IPS=' "$ENV_FILE" 2>/dev/null; then
-  sed -i 's/^MAINTENANCE_BYPASS_IPS=.*/MAINTENANCE_BYPASS_IPS=/' "$ENV_FILE"
-else
-  echo "MAINTENANCE_BYPASS_IPS=" >> "$ENV_FILE"
-fi
-echo -e "${GREEN}   ✅ MAINTENANCE_MODE=true (BYPASS_IPS vidé pour test local)${NC}"
+echo -e "${GREEN}⚙️  Étape 3/4 : Variable MAINTENANCE_MODE (.env / .env.local)...${NC}"
+for ENV_FILE in "${ENV_FILES[@]}"; do
+  touch "$ENV_FILE"
+  if grep -q '^MAINTENANCE_MODE=' "$ENV_FILE" 2>/dev/null; then
+    sed -i 's/^MAINTENANCE_MODE=.*/MAINTENANCE_MODE=true/' "$ENV_FILE"
+  else
+    echo "MAINTENANCE_MODE=true" >> "$ENV_FILE"
+  fi
+  if grep -q '^MAINTENANCE_BYPASS_IPS=' "$ENV_FILE" 2>/dev/null; then
+    sed -i 's/^MAINTENANCE_BYPASS_IPS=.*/MAINTENANCE_BYPASS_IPS=/' "$ENV_FILE"
+  else
+    echo "MAINTENANCE_BYPASS_IPS=" >> "$ENV_FILE"
+  fi
+  echo -e "${GREEN}   ✅ MAINTENANCE_MODE=true dans $(basename "$ENV_FILE")${NC}"
+done
 
 echo ""
 echo -e "${GREEN}🔄 Étape 4/4 : Rechargement nginx (si disponible)...${NC}"
@@ -112,7 +118,7 @@ fi
 echo ""
 echo -e "${GREEN}✅ MODE MAINTENANCE ACTIVÉ${NC}"
 echo -e "${YELLOW}💡 Redémarrez Next.js / PM2 (obligatoire pour MAINTENANCE_MODE) :${NC}"
-echo -e "   ${GREEN}pm2 restart amakifr-dev --update-env${NC}  ou  ${GREEN}npm run build && pm2 restart amakifr --update-env${NC}"
+echo -e "   ${GREEN}pm2 restart amaki --update-env${NC}  (prod)  ou  ${GREEN}pm2 restart amakifr-dev --update-env${NC}  (dev)"
 echo -e "${BLUE}ℹ️  Test direct : http://localhost:9052/maintenance${NC}"
 echo -e "${BLUE}ℹ️  Désactivation : bash scripts/maintenance-off.sh${NC}"
 echo ""
