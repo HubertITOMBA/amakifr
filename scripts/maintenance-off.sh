@@ -71,5 +71,5 @@ fi
 
 echo ""
 echo -e "${GREEN}✅ MODE MAINTENANCE DÉSACTIVÉ${NC}"
-echo -e "${YELLOW}💡 Redémarrez l'application : pm2 restart amaki --update-env${NC}"
+echo -e "${YELLOW}💡 Redémarrez l'application : pm2 restart amakifr --update-env${NC}"
 echo ""

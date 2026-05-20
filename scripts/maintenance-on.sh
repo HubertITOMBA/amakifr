@@ -118,7 +118,7 @@ fi
 echo ""
 echo -e "${GREEN}✅ MODE MAINTENANCE ACTIVÉ${NC}"
 echo -e "${YELLOW}💡 Redémarrez Next.js / PM2 (obligatoire pour MAINTENANCE_MODE) :${NC}"
-echo -e "   ${GREEN}pm2 restart amaki --update-env${NC}  (prod)  ou  ${GREEN}pm2 restart amakifr-dev --update-env${NC}  (dev)"
+echo -e "   ${GREEN}pm2 restart amakifr --update-env${NC}  (prod)  ou  ${GREEN}pm2 restart amakifr-dev --update-env${NC}  (dev)"
 echo -e "${BLUE}ℹ️  Test direct : http://localhost:9052/maintenance${NC}"
 echo -e "${BLUE}ℹ️  Désactivation : bash scripts/maintenance-off.sh${NC}"
 echo ""

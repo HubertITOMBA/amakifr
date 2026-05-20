@@ -137,6 +137,90 @@ export const chatbotGuides: Guide[] = [
     ]
   },
   {
+    keywords: [
+      'trouver', 'retrouver', 'chercher', 'rechercher', 'recherche',
+      'info', 'information', 'rapidement', 'où', 'ou',
+      'menu', 'navigation', 'filtre', 'filtres', 'tri',
+      'barre de recherche', 'loupe'
+    ],
+    title: 'Quelle est la meilleure façon de trouver une info rapidement dans l\'appli',
+    steps: [
+      '🔎 1) Utilisez les recherches et filtres dans les listes :',
+      '  • Sur la plupart des pages de liste, vous avez une recherche (barre) + des filtres (statut, période, etc.)',
+      '  • Commencez par taper un mot-clé (nom, titre, email, montant…) puis affinez avec les filtres',
+      '',
+      '🧭 2) Passez par "Mon Profil" pour tout ce qui vous concerne :',
+      '  • Cotisations, obligations, historique, documents, passeport, notifications, votes, événements, idées…',
+      '',
+      '💬 3) Utilisez la messagerie pour retrouver une discussion :',
+      '  • Dans /chat, la barre de recherche permet de retrouver un participant ou un titre de conversation',
+      '',
+      '🖥️ 4) Astuce navigateur :',
+      '  • Sur ordinateur, Ctrl+F (ou Cmd+F sur Mac) permet de chercher un mot sur la page affichée',
+      '',
+      '💡 Conseil : Si vous ne trouvez pas, dites-moi ce que vous cherchez (ex: "document", "événement", "cotisation") et je vous oriente vers la bonne page'
+    ],
+    actions: [
+      { label: 'Mon profil', action: 'open_profile', href: '/user/profile' },
+      { label: 'Ouvrir la messagerie', action: 'open_chat', href: '/chat' }
+    ]
+  },
+  {
+    keywords: [
+      'email', 'mail', 'mails', 'e-mails',
+      'lire mail', 'lire mes mails', 'envoyer mail', 'envoyer un mail',
+      'messagerie email', 'boite mail', 'boîte mail',
+      'téléphone', 'telephone', 'mobile', 'smartphone', 'iphone', 'android'
+    ],
+    title: 'Est-il possible d\'envoyer et lire ses mails depuis le téléphone via l\'application',
+    steps: [
+      '📧 Aujourd\'hui, l\'application AMAKI n\'est pas une boîte mail complète (comme Gmail/Outlook) : vous ne lisez pas tous vos emails "personnels" directement dans l\'application.',
+      '',
+      '✅ Ce que vous pouvez faire avec l\'application :',
+      '  • Recevoir des notifications et messages internes (messagerie /chat)',
+      '  • Recevoir des emails automatiques liés à l\'association (ex: confirmation d\'inscription, confirmation d\'événement, confirmations de paiement, etc.) dans votre boîte mail habituelle',
+      '',
+      '📱 Pour lire / envoyer vos emails sur téléphone :',
+      '  • Utilisez l\'application email de votre téléphone (Gmail, Outlook, Mail iOS, etc.)',
+      '',
+      '💬 Alternative dans AMAKI :',
+      '  • Pour échanger avec l\'association ou d\'autres adhérents, privilégiez la messagerie interne (plus rapide et centralisée)'
+    ],
+    actions: [
+      { label: 'Ouvrir la messagerie', action: 'open_chat', href: '/chat' },
+      { label: 'Page de contact', action: 'open_contact', href: '/contact' }
+    ]
+  },
+  {
+    keywords: [
+      'adresse email', 'adresse mail', 'mon email', 'mon mail',
+      'vérifier email', 'verifier email', 'vérifier mon email', 'verifier mon email',
+      'modifier email', 'changer email', 'mettre à jour email', 'mettre a jour email'
+    ],
+    title: 'Comment vérifier l\'adresse email affichée et la modifier si besoin',
+    steps: [
+      '👤 Vérifier votre adresse email :',
+      'Allez dans "Mon Profil" puis ouvrez la section "Paramètres" (ou la page de modification du profil)',
+      'Votre adresse email y est affichée dans vos informations de compte',
+      '',
+      '✏️ Modifier votre adresse email :',
+      'Cliquez sur "Modifier" / "Éditer" votre profil',
+      'Mettez à jour le champ "Email" (si modifiable)',
+      'Cliquez sur "Enregistrer"',
+      '',
+      '📩 Après modification :',
+      'Surveillez votre boîte mail : certains changements peuvent déclencher un email de confirmation selon la configuration',
+      '',
+      '⚠️ Si vous ne pouvez pas modifier l\'email :',
+      'Contactez l\'association via la page "Contact" en précisant l\'ancien email + le nouveau email souhaité'
+    ],
+    actions: [
+      { label: 'Mon profil', action: 'open_profile', href: '/user/profile' },
+      { label: 'Modifier mon profil', action: 'open_edit', href: '/user/update' },
+      { label: 'Contacter l\'association', action: 'open_contact', href: '/contact' }
+    ]
+  },
+  {
     keywords: ['passeport', 'imprimer passeport', 'télécharger passeport', 'pdf passeport', 'mon passeport', 'imprimer mon passeport', 'télécharger mon passeport'],
     title: 'Comment imprimer mon passeport',
     steps: [
@@ -1963,6 +2047,7 @@ export const quickQuestions = [
   "Comment modifier mon mot de passe ?",
   "Comment modifier ma photo ?",
   "Comment voir mes documents ?",
+  "Quelle est la meilleure façon de trouver une info rapidement ?",
   "Comment voir mes obligations ?",
   "Comment simuler un versement assistance ?",
   "Comment voir et imprimer mon historique des cotisations ?",
@@ -1972,6 +2057,8 @@ export const quickQuestions = [
   "Comment consulter les rapports ?",
   "Comment ajouter une idée ?",
   "Comment modifier mon profil ?",
+  "Comment vérifier et modifier mon adresse email ?",
+  "Puis-je lire et envoyer mes mails depuis l'application ?",
   "Comment utiliser la messagerie ?",
   "Comment voir mes notifications ?",
   "Comment commenter ma tâche ?",
