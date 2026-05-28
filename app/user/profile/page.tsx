@@ -3019,6 +3019,26 @@ function UserProfilePageContent() {
         );
 
       case 'rapports':
+        const stripHtmlForPreview = (html: string) => {
+          if (!html) return "";
+          const withoutTags = html.replace(/<[^>]*>/g, " ");
+          return withoutTags
+            .replace(/&nbsp;/g, " ")
+            .replace(/&amp;/g, "&")
+            .replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&#39;/g, "'")
+            .replace(/&quot;/g, '"')
+            .replace(/\s+/g, " ")
+            .trim();
+        };
+
+        const getRapportExcerpt = (html: string, maxLength = 200) => {
+          const text = stripHtmlForPreview(html);
+          if (text.length <= maxLength) return text;
+          return `${text.slice(0, maxLength).trim()}…`;
+        };
+
         const handleViewRapport = async (rapport: any) => {
           try {
             const result = await getRapportReunionById(rapport.id);
@@ -3148,7 +3168,7 @@ function UserProfilePageContent() {
                             )}
                           </div>
                           <p className="text-gray-700 dark:text-gray-300 line-clamp-2">
-                            {rapport.contenu.substring(0, 200)}...
+                            {getRapportExcerpt(rapport.contenu, 200)}
                           </p>
                         </div>
                         <div className="flex items-center gap-2 ml-4">
@@ -3190,8 +3210,11 @@ function UserProfilePageContent() {
                   )}
                 </div>
                 <div className="mt-4">
-                  <div className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg whitespace-pre-wrap text-sm">
-                    {selectedRapport?.contenu}
+                  <div
+                    className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg text-sm leading-relaxed prose prose-sm max-w-none dark:prose-invert prose-a:text-blue-600 dark:prose-a:text-blue-400"
+                    dangerouslySetInnerHTML={{ __html: selectedRapport?.contenu || "" }}
+                  >
+                    {/* contenu injecté via dangerouslySetInnerHTML */}
                   </div>
                 </div>
                 <DialogFooter>
