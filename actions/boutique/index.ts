@@ -245,6 +245,13 @@ export async function createMerchProduct(data: z.infer<typeof ProductSchema>) {
       return { success: false, error: error.errors[0]?.message || "Données invalides" };
     }
     console.error("createMerchProduct:", error);
+    const message = error instanceof Error ? error.message : "";
+    if (message.includes("merch_products") || message.includes("does not exist")) {
+      return {
+        success: false,
+        error: "Tables boutique absentes : exécutez « npx prisma migrate deploy » sur le serveur.",
+      };
+    }
     return { success: false, error: "Erreur lors de la création du produit" };
   }
 }

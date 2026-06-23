@@ -93,6 +93,10 @@ export default function AdminBoutiquePage() {
   const [ordre, setOrdre] = useState(0);
   const [variants, setVariants] = useState<MerchVariantInput[]>([emptyVariant()]);
   const [images, setImages] = useState<any[]>([]);
+  const [pendingImages, setPendingImages] = useState<File[]>([]);
+  const [pendingPreviews, setPendingPreviews] = useState<string[]>([]);
+
+  const productId = editing?.id as string | undefined;
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
@@ -119,6 +123,17 @@ export default function AdminBoutiquePage() {
     return () => clearTimeout(t);
   }, [searchTerm]);
 
+  const handleDialogOpenChange = (open: boolean) => {
+    setDialogOpen(open);
+    if (!open) resetPendingImages();
+  };
+
+  const resetPendingImages = () => {
+    pendingPreviews.forEach((url) => URL.revokeObjectURL(url));
+    setPendingImages([]);
+    setPendingPreviews([]);
+  };
+
   const openCreate = () => {
     setEditing(null);
     setTitre("");
@@ -127,10 +142,12 @@ export default function AdminBoutiquePage() {
     setOrdre(0);
     setVariants([emptyVariant()]);
     setImages([]);
+    resetPendingImages();
     setDialogOpen(true);
   };
 
   const openEdit = (product: any) => {
+    resetPendingImages();
     setEditing(product);
     setTitre(product.titre);
     setDescription(product.description || "");
@@ -152,31 +169,94 @@ export default function AdminBoutiquePage() {
     setDialogOpen(true);
   };
 
+  const validateForm = () => {
+    if (!titre.trim()) {
+      toast.error("Le titre est obligatoire");
+      return false;
+    }
+    const validVariants = variants.filter((v) => v.taille.trim() && v.couleur.trim());
+    if (validVariants.length === 0) {
+      toast.error("Ajoutez au moins une variante avec taille et couleur");
+      return false;
+    }
+    if (validVariants.some((v) => Number.isNaN(v.prix) || v.prix < 0)) {
+      toast.error("Le prix doit être un nombre positif ou nul");
+      return false;
+    }
+    return true;
+  };
+
+  const uploadImagesForProduct = async (targetProductId: string, files: File[], existingCount: number) => {
+    let uploaded = 0;
+    for (let i = 0; i < files.length; i++) {
+      const fd = new FormData();
+      fd.append("productId", targetProductId);
+      fd.append("file", files[i]);
+      fd.append("estPrincipale", existingCount === 0 && i === 0 ? "true" : "false");
+      const res = await uploadMerchProductImage(fd);
+      if (res.success) uploaded += 1;
+      else toast.error(res.error || `Erreur upload image ${i + 1}`);
+    }
+    return uploaded;
+  };
+
+  const refreshProductInDialog = async (targetProductId: string) => {
+    const refreshed = await getAllMerchProducts();
+    const updated = refreshed.data?.find((p: any) => p.id === targetProductId);
+    if (updated) {
+      setEditing(updated);
+      setImages(updated.images || []);
+    }
+    await loadProducts();
+  };
+
   const handleSave = async () => {
+    if (!validateForm()) return;
+
     setSaving(true);
     const payload = {
-      titre,
+      titre: titre.trim(),
       description: description || null,
       actif,
       ordre,
       variants: variants.filter((v) => v.taille.trim() && v.couleur.trim()),
     };
-    const res = editing
-      ? await updateMerchProduct({ id: editing.id, ...payload })
-      : await createMerchProduct(payload);
 
-    if (res.success) {
-      toast.success(res.message);
-      if (!editing && res.data) setEditing(res.data);
-      await loadProducts();
-      if (res.data) {
-        setEditing(res.data);
-        setImages(res.data.images || []);
+    try {
+      const res = editing?.id
+        ? await updateMerchProduct({ id: editing.id, ...payload })
+        : await createMerchProduct(payload);
+
+      if (!res.success || !res.data?.id) {
+        toast.error(res.error || "Erreur lors de l'enregistrement");
+        return;
       }
-    } else {
-      toast.error(res.error || "Erreur");
+
+      const savedId = res.data.id as string;
+      setEditing(res.data);
+      setImages(res.data.images || []);
+
+      let uploadCount = 0;
+      if (pendingImages.length > 0) {
+        uploadCount = await uploadImagesForProduct(
+          savedId,
+          pendingImages,
+          (res.data.images || []).length
+        );
+        resetPendingImages();
+        await refreshProductInDialog(savedId);
+      } else {
+        await loadProducts();
+      }
+
+      toast.success(
+        uploadCount > 0
+          ? `${res.message} — ${uploadCount} image(s) ajoutée(s).`
+          : res.message
+      );
+    } finally {
+      setSaving(false);
     }
-    setSaving(false);
   };
 
   const handleDelete = async (id: string) => {
@@ -189,25 +269,38 @@ export default function AdminBoutiquePage() {
   };
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    if (!editing?.id || !e.target.files?.[0]) return;
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!productId) {
+      const previewUrl = URL.createObjectURL(file);
+      setPendingImages((prev) => [...prev, file]);
+      setPendingPreviews((prev) => [...prev, previewUrl]);
+      e.target.value = "";
+      return;
+    }
+
     setUploading(true);
     const fd = new FormData();
-    fd.append("productId", editing.id);
-    fd.append("file", e.target.files[0]);
+    fd.append("productId", productId);
+    fd.append("file", file);
     fd.append("estPrincipale", images.length === 0 ? "true" : "false");
     const res = await uploadMerchProductImage(fd);
     if (res.success) {
       toast.success(res.message);
-      await loadProducts();
-      const refreshed = await getAllMerchProducts();
-      const updated = refreshed.data?.find((p: any) => p.id === editing.id);
-      if (updated) {
-        setEditing(updated);
-        setImages(updated.images || []);
-      }
+      await refreshProductInDialog(productId);
     } else toast.error(res.error || "Erreur upload");
     setUploading(false);
     e.target.value = "";
+  };
+
+  const removePendingImage = (index: number) => {
+    setPendingImages((prev) => prev.filter((_, i) => i !== index));
+    setPendingPreviews((prev) => {
+      const url = prev[index];
+      if (url) URL.revokeObjectURL(url);
+      return prev.filter((_, i) => i !== index);
+    });
   };
 
   const handleDeleteImage = async (imageId: string) => {
@@ -399,7 +492,7 @@ export default function AdminBoutiquePage() {
         </CardContent>
       </Card>
 
-      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+      <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>{editing ? "Modifier le produit" : "Nouveau produit dérivé"}</DialogTitle>
@@ -457,37 +550,59 @@ export default function AdminBoutiquePage() {
               </div>
             </div>
 
-            {editing && (
-              <div>
-                <Label>Images</Label>
-                <div className="flex flex-wrap gap-2 mt-2">
-                  {images.map((img) => (
-                    <div key={img.id} className="relative h-20 w-20 rounded border overflow-hidden group">
-                      <Image src={img.chemin} alt="" fill className="object-cover" />
-                      <button
-                        type="button"
-                        className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center"
-                        onClick={() => handleDeleteImage(img.id)}
-                      >
-                        <Trash2 className="h-4 w-4 text-white" />
-                      </button>
-                    </div>
-                  ))}
-                  <label className="h-20 w-20 border-2 border-dashed rounded flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50">
-                    {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5 text-slate-400" />}
-                    <input type="file" accept="image/*" className="hidden" onChange={handleImageUpload} disabled={uploading} />
-                  </label>
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">Dossier : public/produits-derives/</p>
+            <div>
+              <Label>Images du produit</Label>
+              {!productId && (
+                <p className="text-xs text-blue-700 dark:text-blue-300 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-800 rounded-md px-2 py-1.5 mt-1 mb-2">
+                  Vous pouvez sélectionner les images maintenant. Elles seront envoyées automatiquement lors de l&apos;enregistrement.
+                </p>
+              )}
+              <div className="flex flex-wrap gap-2 mt-2">
+                {images.map((img) => (
+                  <div key={img.id} className="relative h-20 w-20 rounded border overflow-hidden group">
+                    <Image src={img.chemin} alt="" fill className="object-cover" unoptimized />
+                    <button
+                      type="button"
+                      className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center"
+                      onClick={() => handleDeleteImage(img.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-white" />
+                    </button>
+                  </div>
+                ))}
+                {pendingPreviews.map((preview, idx) => (
+                  <div key={`pending-${idx}`} className="relative h-20 w-20 rounded border overflow-hidden group border-dashed border-blue-300">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img src={preview} alt="" className="h-full w-full object-cover" />
+                    <button
+                      type="button"
+                      className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center"
+                      onClick={() => removePendingImage(idx)}
+                    >
+                      <Trash2 className="h-4 w-4 text-white" />
+                    </button>
+                  </div>
+                ))}
+                <label className="h-20 w-20 border-2 border-dashed rounded flex flex-col items-center justify-center cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
+                  {uploading ? <Loader2 className="h-5 w-5 animate-spin" /> : <ImagePlus className="h-5 w-5 text-slate-400" />}
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleImageUpload}
+                    disabled={uploading || saving}
+                  />
+                </label>
               </div>
-            )}
+              <p className="text-xs text-muted-foreground mt-1">Dossier : public/produits-derives/</p>
+            </div>
           </div>
 
           <DialogFooter>
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Fermer</Button>
-            <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700">
+            <Button onClick={handleSave} disabled={saving || uploading} className="bg-blue-600 hover:bg-blue-700">
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Package className="h-4 w-4 mr-2" />}
-              Enregistrer
+              {productId ? "Enregistrer" : "Créer le produit"}
             </Button>
           </DialogFooter>
         </DialogContent>
