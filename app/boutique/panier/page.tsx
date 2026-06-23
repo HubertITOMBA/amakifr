@@ -121,7 +121,7 @@ export default function BoutiquePanierPage() {
                   <CardContent className="p-4 flex gap-3">
                     <div className="relative h-16 w-16 rounded bg-slate-100 shrink-0 overflow-hidden">
                       {item.imageCover ? (
-                        <Image src={item.imageCover} alt="" fill className="object-cover" />
+                        <Image src={item.imageCover} alt="" fill className="object-cover" unoptimized={item.imageCover?.startsWith("/")} />
                       ) : (
                         <ShoppingBag className="h-6 w-6 m-auto text-slate-300" />
                       )}

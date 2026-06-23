@@ -11,8 +11,13 @@ import { slugifyMerchTitle, generateMerchOrderNumber } from "@/lib/boutique";
 import { normalizePhoneE164 } from "@/lib/phone";
 import { MerchOrderStatus } from "@prisma/client";
 
-const UPLOAD_DIR = join(process.cwd(), "public", "produits-derives");
-const PUBLIC_PREFIX = "/produits-derives";
+const UPLOAD_DIR = join(process.cwd(), "public", "ressources", "produits-derives");
+const PUBLIC_PREFIX = "/ressources/produits-derives";
+
+function resolveMerchImageDiskPath(chemin: string) {
+  const relative = chemin.replace(/^\//, "");
+  return join(process.cwd(), "public", relative);
+}
 
 const VariantSchema = z.object({
   id: z.string().optional(),
@@ -337,7 +342,7 @@ export async function deleteMerchProduct(id: string) {
     await db.merchProduct.delete({ where: { id } });
 
     for (const img of product.images) {
-      const filePath = join(process.cwd(), "public", img.chemin.replace(/^\//, ""));
+      const filePath = resolveMerchImageDiskPath(img.chemin);
       if (existsSync(filePath)) {
         await unlink(filePath).catch(() => undefined);
       }
@@ -452,7 +457,7 @@ export async function deleteMerchProductImage(imageId: string) {
 
     await db.merchProductImage.delete({ where: { id: imageId } });
 
-    const filePath = join(process.cwd(), "public", image.chemin.replace(/^\//, ""));
+    const filePath = resolveMerchImageDiskPath(image.chemin);
     if (existsSync(filePath)) {
       await unlink(filePath).catch(() => undefined);
     }

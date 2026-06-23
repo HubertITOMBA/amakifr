@@ -187,13 +187,17 @@ const nextConfig: NextConfig = {
   },
 
   // Rewrite pour servir les fichiers statiques uploadés via l'API
-  // En production, les fichiers dans /public/ressources/* ne sont pas servis automatiquement
-  // Cette configuration redirige /ressources/* vers /api/ressources/* qui sert les fichiers
+  // En production, les fichiers dans /public/ressources/* et /public/produits-derives/*
+  // ne sont pas toujours servis directement — redirection vers les routes API dédiées
   async rewrites() {
     return [
       {
         source: '/ressources/:path*',
         destination: '/api/ressources/:path*',
+      },
+      {
+        source: '/produits-derives/:path*',
+        destination: '/api/produits-derives/:path*',
       },
     ];
   },

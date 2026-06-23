@@ -66,7 +66,7 @@ export default function BoutiquePage() {
                 <Card className="overflow-hidden hover:shadow-xl transition-all border-blue-200 h-full">
                   <div className="relative aspect-square bg-slate-100">
                     {product.imageCover ? (
-                      <Image src={product.imageCover} alt={product.titre} fill className="object-cover" />
+                      <Image src={product.imageCover} alt={product.titre} fill className="object-cover" unoptimized={product.imageCover?.startsWith("/")} />
                     ) : (
                       <div className="flex items-center justify-center h-full">
                         <ShoppingBag className="h-12 w-12 text-slate-300" />

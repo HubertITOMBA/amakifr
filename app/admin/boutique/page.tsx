@@ -321,7 +321,7 @@ export default function AdminBoutiquePage() {
         cell: ({ row }) => (
           <div className="relative h-12 w-12 rounded-md overflow-hidden bg-slate-100">
             {row.original.imageCover ? (
-              <Image src={row.original.imageCover} alt="" fill className="object-cover" />
+              <Image src={row.original.imageCover} alt="" fill className="object-cover" unoptimized={row.original.imageCover?.startsWith("/")} />
             ) : (
               <div className="flex items-center justify-center h-full">
                 <ShoppingBag className="h-5 w-5 text-slate-400" />
@@ -560,7 +560,7 @@ export default function AdminBoutiquePage() {
               <div className="flex flex-wrap gap-2 mt-2">
                 {images.map((img) => (
                   <div key={img.id} className="relative h-20 w-20 rounded border overflow-hidden group">
-                    <Image src={img.chemin} alt="" fill className="object-cover" unoptimized />
+                    <Image src={img.chemin} alt="" fill className="object-cover" unoptimized={img.chemin?.startsWith("/")} />
                     <button
                       type="button"
                       className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 flex items-center justify-center"
@@ -594,7 +594,7 @@ export default function AdminBoutiquePage() {
                   />
                 </label>
               </div>
-              <p className="text-xs text-muted-foreground mt-1">Dossier : public/produits-derives/</p>
+              <p className="text-xs text-muted-foreground mt-1">Dossier : public/ressources/produits-derives/</p>
             </div>
           </div>
 

@@ -142,6 +142,7 @@ export function MerchSection() {
                             fill
                             className="object-cover group-hover:scale-105 transition-transform duration-300"
                             sizes="(max-width: 768px) 100vw, 33vw"
+                            unoptimized={product.imageCover.startsWith("/")}
                           />
                         ) : (
                           <div className="flex items-center justify-center h-full text-slate-400">

@@ -149,7 +149,7 @@ export default function BoutiqueProductPage() {
           <div>
             <div className="relative aspect-square rounded-xl overflow-hidden bg-slate-100 border border-blue-200">
               {selectedImage ? (
-                <Image src={selectedImage} alt={product.titre} fill className="object-cover" priority />
+                <Image src={selectedImage} alt={product.titre} fill className="object-cover" priority unoptimized={selectedImage.startsWith("/")} />
               ) : (
                 <div className="flex items-center justify-center h-full">
                   <ShoppingBag className="h-16 w-16 text-slate-300" />
@@ -167,7 +167,7 @@ export default function BoutiqueProductPage() {
                       selectedImage === img.chemin ? "border-blue-600" : "border-transparent"
                     }`}
                   >
-                    <Image src={img.chemin} alt="" fill className="object-cover" />
+                    <Image src={img.chemin} alt="" fill className="object-cover" unoptimized={img.chemin?.startsWith("/")} />
                   </button>
                 ))}
               </div>
