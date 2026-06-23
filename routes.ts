@@ -21,6 +21,7 @@ export const publicRoutes = [
     "/candidats",
     "/extrat",
     "/inscription",
+    "/boutique",
 ];
 
 /**
@@ -49,6 +50,10 @@ export function isPublicRoute(pathname: string): boolean {
     }
 
     if (pathname === "/maintenance" || pathname === "/maintenance.html") {
+        return true;
+    }
+
+    if (pathname.startsWith("/boutique")) {
         return true;
     }
     

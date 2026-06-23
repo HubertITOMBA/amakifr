@@ -5,6 +5,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Footer } from "@/components/home/Footer";
+import { formatPhoneInternational, normalizePhoneE164 } from "@/lib/phone";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -2192,7 +2193,12 @@ function UserProfilePageContent() {
                           <Phone className="h-5 w-5 text-gray-500" />
                           <div>
                             <p className="text-sm text-gray-500">Numéro</p>
-                            <p className="font-medium text-lg">{telephone.numero}</p>
+                            <a
+                              className="font-medium text-lg text-blue-700 hover:text-blue-800 dark:text-blue-300 dark:hover:text-blue-200 underline-offset-2 hover:underline"
+                              href={`tel:${normalizePhoneE164(telephone.numero) || telephone.numero}`}
+                            >
+                              {formatPhoneInternational(telephone.numero)}
+                            </a>
                           </div>
                         </div>
                         

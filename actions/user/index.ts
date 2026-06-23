@@ -11,6 +11,7 @@ import { existsSync, mkdirSync } from "fs";
 import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { ChangePasswordSchema } from "@/schemas";
+import { normalizePhoneE164 } from "@/lib/phone";
 // import { toast } from "react-toastify"; // Supprimé car non utilisé
 
 // Types pour les données
@@ -1173,10 +1174,11 @@ export async function updateUserData(
       // Créer les nouveaux téléphones
       for (const telData of telephonesData) {
         if (telData.numero && telData.numero.trim()) { // Seulement si le numéro n'est pas vide
+          const normalized = normalizePhoneE164(telData.numero) || telData.numero.trim();
           await prisma.telephone.create({
             data: {
               adherentId: adherent.id,
-              numero: telData.numero,
+              numero: normalized,
               type: telData.type as TypeTelephone,
               estPrincipal: telData.estPrincipal,
               description: telData.description || null

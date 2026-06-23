@@ -71,6 +71,7 @@
     "db:add-anniversaires-menu-navbar": "tsx scripts/add-anniversaires-menu-navbar.ts",
     "db:add-absenteisme-menu-sidebar": "tsx scripts/add-absenteisme-menu-sidebar.ts",
     "db:add-connexions-adherents-menu": "tsx scripts/add-connexions-adherents-menu.ts",
+    "db:add-boutique-menu": "tsx scripts/add-boutique-menu.ts",
     "db:seed-connexion-badges": "tsx scripts/create-connexion-badges.ts",
     "db:restrict-anniversaires-to-auth": "tsx scripts/add-anniversaires-menu-navbar.ts"
   },
@@ -125,6 +126,7 @@
     "ioredis": "^5.4.1",
     "isomorphic-dompurify": "^2.33.0",
     "jspdf": "^3.0.3",
+    "libphonenumber-js": "^1.13.4",
     "lucide-react": "^0.485.0",
     "mammoth": "^1.11.0",
     "next": "^15.5.7",

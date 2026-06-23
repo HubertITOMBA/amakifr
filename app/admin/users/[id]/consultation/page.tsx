@@ -14,6 +14,7 @@ import { adminGeneratePasseport } from "@/actions/passeport";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
+import { formatPhoneInternational } from "@/lib/phone";
 
 const getRoleColor = (role: UserRole) => {
   switch (role) {
@@ -361,7 +362,9 @@ export default function ConsultationUserPage() {
                           <Phone className="h-3 w-3 text-blue-600 dark:text-blue-400 flex-shrink-0" />
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
-                              <span className="text-xs font-medium text-gray-900 dark:text-white truncate">{tel.numero}</span>
+                              <span className="text-xs font-medium text-gray-900 dark:text-white truncate">
+                                {formatPhoneInternational(tel.numero)}
+                              </span>
                               {tel.estPrincipal && (
                                 <Badge variant="outline" className="text-[9px] border-blue-300 text-blue-700 dark:text-blue-300 px-1 py-0">Principal</Badge>
                               )}

@@ -7,6 +7,7 @@ import { AboutSection } from "@/components/home/AboutSection";
 import { ValuesSection } from "@/components/home/ValuesSection";
 import { EventsSection } from "@/components/home/EventsSection";
 import { TestimonialsSection } from "@/components/home/TestimonialsSection";
+import { MerchSection } from "@/components/boutique/MerchSection";
 import { NewsletterSection } from "@/components/home/NewsletterSection";
 import { Footer } from "@/components/home/Footer";
 import { SessionDebug } from "@/components/debug/session-debug";
@@ -141,6 +142,9 @@ export default function Home() {
         
         {/* Testimonials Section */}
         <TestimonialsSection />
+
+        {/* Produits dérivés */}
+        <MerchSection />
         
         {/* Newsletter Section */}
         <NewsletterSection />

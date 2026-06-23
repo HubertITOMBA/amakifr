@@ -273,6 +273,8 @@ model User {
   permissionsCreated            Permission[]                 @relation("PermissionCreatedBy") // Permissions créées
   activities                    UserActivity[]               @relation("UserActivities") // Activités de l'utilisateur
   projetsCrees                  Projet[]                     @relation("ProjetCreatedBy") // Projets créés
+  merchProductsCrees            MerchProduct[]               @relation("MerchProductCreatedBy")
+  merchOrders                   MerchOrder[]                 @relation("MerchOrderUser")
 
   lastLogin  DateTime? @updatedAt
   loginCount Int       @default(0) // Nombre de connexions au portail
@@ -2131,4 +2133,115 @@ model Permission {
   @@index([enabled])
   @@index([route])
   @@map("permissions")
+}
+
+enum MerchOrderStatus {
+  EnAttente
+  Confirmee
+  Expediee
+  Annulee
+}
+
+// Boutique — produits dérivés AMAKI
+model MerchProduct {
+  id          String   @id @default(cuid())
+  titre       String   @db.VarChar(255)
+  slug        String   @unique @db.VarChar(255)
+  description String?  @db.Text
+  actif       Boolean  @default(true)
+  ordre       Int      @default(0)
+  imageCover  String?  @db.VarChar(500)
+  createdBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  CreatedBy User?               @relation("MerchProductCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
+  images    MerchProductImage[]
+  variants  MerchProductVariant[]
+
+  @@index([actif])
+  @@index([ordre])
+  @@map("merch_products")
+}
+
+model MerchProductImage {
+  id            String   @id @default(cuid())
+  productId     String
+  chemin        String   @db.VarChar(500)
+  nomFichier    String?  @db.VarChar(255)
+  ordre         Int      @default(0)
+  estPrincipale Boolean  @default(false)
+  createdAt     DateTime @default(now())
+
+  Product MerchProduct @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@map("merch_product_images")
+}
+
+model MerchProductVariant {
+  id        String   @id @default(cuid())
+  productId String
+  taille    String   @db.VarChar(50)
+  couleur   String   @db.VarChar(50)
+  prix      Decimal  @db.Decimal(10, 2)
+  stock     Int      @default(0)
+  actif     Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Product    MerchProduct     @relation(fields: [productId], references: [id], onDelete: Cascade)
+  orderItems MerchOrderItem[]
+
+  @@unique([productId, taille, couleur])
+  @@index([productId])
+  @@map("merch_product_variants")
+}
+
+model MerchOrder {
+  id                     String           @id @default(cuid())
+  numeroCommande         String           @unique @db.VarChar(50)
+  userId                 String?
+  email                  String           @db.VarChar(255)
+  nom                    String           @db.VarChar(255)
+  telephone              String?          @db.VarChar(30)
+  adresseLivraison        String           @db.Text
+  ville                  String?          @db.VarChar(100)
+  codePostal             String?          @db.VarChar(20)
+  pays                   String?          @db.VarChar(100)
+  statut                 MerchOrderStatus @default(EnAttente)
+  montantTotal           Decimal          @db.Decimal(10, 2)
+  notes                  String?          @db.Text
+  confirmationEmailSubject String?        @db.VarChar(255)
+  confirmationEmailBody    String?        @db.Text
+  confirmationEmailSentAt  DateTime?
+  confirmationEmailError   String?        @db.Text
+  createdAt              DateTime         @default(now())
+  updatedAt              DateTime         @updatedAt
+
+  User  User?            @relation("MerchOrderUser", fields: [userId], references: [id], onDelete: SetNull)
+  items MerchOrderItem[]
+
+  @@index([userId])
+  @@index([statut])
+  @@index([createdAt])
+  @@map("merch_orders")
+}
+
+model MerchOrderItem {
+  id           String  @id @default(cuid())
+  orderId      String
+  variantId    String
+  productTitre String  @db.VarChar(255)
+  taille       String  @db.VarChar(50)
+  couleur      String  @db.VarChar(50)
+  prixUnitaire Decimal @db.Decimal(10, 2)
+  quantite     Int
+  sousTotal    Decimal @db.Decimal(10, 2)
+
+  Order   MerchOrder          @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  Variant MerchProductVariant @relation(fields: [variantId], references: [id], onDelete: Restrict)
+
+  @@index([orderId])
+  @@map("merch_order_items")
 }

@@ -14,6 +14,7 @@ import { Toaster } from "sonner";
 import SessionAutoSignout from "@/components/SessionAutoSignout";
 import { ReactToastifyProvider } from "@/components/providers/react-toastify-provider";
 import { ChatBotProvider } from "@/components/user/ChatBotProvider";
+import { MerchCartProvider } from "@/components/boutique/MerchCartProvider";
 import { BuildIdChecker } from "@/components/BuildIdChecker";
 import { ChunkErrorHandler } from "@/components/ChunkErrorHandler";
 
@@ -119,7 +120,9 @@ export default function RootLayout({
             {/* 
             <Hero /> */}
             
-            {children}
+            <MerchCartProvider>
+              {children}
+            </MerchCartProvider>
             <ToastProvider />
             <Toaster richColors position="top-right" />
             <ReactToastifyProvider />

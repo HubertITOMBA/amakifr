@@ -6,6 +6,7 @@ import { NewsletterSection } from "@/components/home/NewsletterSection";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatPhoneInternational, normalizePhoneE164 } from "@/lib/phone";
 import { 
   Mail, 
   Phone, 
@@ -22,6 +23,11 @@ import {
 } from "lucide-react";
 
 export default function ContactPage() {
+  const contactPhones = [
+    { label: "Contact association", raw: "+33 6 51 99 82 44" },
+    { label: "Admin / Webmaster", raw: "+33 7 51 06 62 64" },
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
       <DynamicNavbar />
@@ -99,12 +105,22 @@ export default function ContactPage() {
               </div>
               <div className="space-y-3 text-gray-600 dark:text-gray-300">
                 <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">+33 6 51 99 82 44</p>
-                  <p className="text-sm">Contact association</p>
+                  <a
+                    className="font-semibold text-gray-900 dark:text-white hover:underline underline-offset-2"
+                    href={`tel:${normalizePhoneE164(contactPhones[0].raw) || contactPhones[0].raw}`}
+                  >
+                    {formatPhoneInternational(contactPhones[0].raw)}
+                  </a>
+                  <p className="text-sm">{contactPhones[0].label}</p>
                 </div>
                 <div>
-                  <p className="font-semibold text-gray-900 dark:text-white">+33 7 51 06 62 64</p>
-                  <p className="text-sm">Admin / Webmaster</p>
+                  <a
+                    className="font-semibold text-gray-900 dark:text-white hover:underline underline-offset-2"
+                    href={`tel:${normalizePhoneE164(contactPhones[1].raw) || contactPhones[1].raw}`}
+                  >
+                    {formatPhoneInternational(contactPhones[1].raw)}
+                  </a>
+                  <p className="text-sm">{contactPhones[1].label}</p>
                 </div>
               </div>
             </Card>

@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { motion } from "framer-motion";
 import { QRCodeShare } from "@/components/shared/QRCodeShare";
+import { formatPhoneInternational, normalizePhoneE164 } from "@/lib/phone";
 
 // Composant pour mettre en évidence une lettre dans le texte
 function HighlightedText({ text, highlightIndex }: { text: string; highlightIndex: number }) {
@@ -74,6 +75,11 @@ export function Footer() {
     { name: "Twitter", icon: Twitter, href: "#", color: "hover:bg-sky-500" },
     { name: "LinkedIn", icon: Linkedin, href: "#", color: "hover:bg-blue-700" },
     { name: "Instagram", icon: Instagram, href: "#", color: "hover:bg-pink-600" }
+  ];
+
+  const contactPhones = [
+    { label: "Contact association", raw: "+33 6 51 99 82 44" },
+    { label: "Admin / Webmaster", raw: "+33 7 51 06 62 64" },
   ];
 
   const stats = [
@@ -275,8 +281,13 @@ export function Footer() {
                       <Phone className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <p className="text-white font-medium">+33 6 51 99 82 44</p>
-                      <p className="text-sm text-gray-400">Contact association</p>
+                      <a
+                        className="text-white font-medium hover:underline underline-offset-2"
+                        href={`tel:${normalizePhoneE164(contactPhones[0].raw) || contactPhones[0].raw}`}
+                      >
+                        {formatPhoneInternational(contactPhones[0].raw)}
+                      </a>
+                      <p className="text-sm text-gray-400">{contactPhones[0].label}</p>
                     </div>
                   </div>
                   
@@ -285,8 +296,13 @@ export function Footer() {
                       <Phone className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <p className="text-white font-medium">+33 7 51 06 62 64</p>
-                      <p className="text-sm text-gray-400">Admin / Webmaster</p>
+                      <a
+                        className="text-white font-medium hover:underline underline-offset-2"
+                        href={`tel:${normalizePhoneE164(contactPhones[1].raw) || contactPhones[1].raw}`}
+                      >
+                        {formatPhoneInternational(contactPhones[1].raw)}
+                      </a>
+                      <p className="text-sm text-gray-400">{contactPhones[1].label}</p>
                     </div>
                   </div>
                   

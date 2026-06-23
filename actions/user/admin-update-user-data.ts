@@ -5,6 +5,7 @@ import prisma from "@/lib/prisma";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { TypeTelephone } from "@prisma/client";
+import { normalizePhoneE164 } from "@/lib/phone";
 
 const AdminUpdateUserDataSchema = z.object({
   userId: z.string().min(1),
@@ -144,10 +145,11 @@ export async function adminUpdateUserData(data: z.infer<typeof AdminUpdateUserDa
       await prisma.telephone.deleteMany({ where: { adherentId: target.adherent.id } });
       for (const tel of validated.telephonesData) {
         if (!tel.numero?.trim()) continue;
+        const normalized = normalizePhoneE164(tel.numero) || tel.numero.trim();
         await prisma.telephone.create({
           data: {
             adherentId: target.adherent.id,
-            numero: tel.numero,
+            numero: normalized,
             type: tel.type as TypeTelephone,
             estPrincipal: tel.estPrincipal,
             description: tel.description ?? null,
