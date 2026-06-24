@@ -9,7 +9,7 @@ import { join } from "path";
 import { existsSync, mkdirSync } from "fs";
 import { slugifyMerchTitle, generateMerchOrderNumber } from "@/lib/boutique";
 import { normalizePhoneE164 } from "@/lib/phone";
-import { MerchOrderStatus } from "@prisma/client";
+import { MerchOrderStatus, MerchPaymentStatus } from "@prisma/client";
 
 const UPLOAD_DIR = join(process.cwd(), "public", "ressources", "produits-derives");
 const PUBLIC_PREFIX = "/ressources/produits-derives";
@@ -58,6 +58,48 @@ const CreateOrderSchema = z.object({
   pays: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
 });
+
+const UpdateOrderAdminSchema = z.object({
+  orderId: z.string().min(1, "Commande requise"),
+  statut: z.nativeEnum(MerchOrderStatus),
+  statutPaiement: z.nativeEnum(MerchPaymentStatus),
+  referenceSuivi: z.string().max(100).optional().nullable(),
+  notesAdmin: z.string().optional().nullable(),
+});
+
+function mapOrder(order: any) {
+  return {
+    ...order,
+    montantTotal: Number(order.montantTotal),
+    items:
+      order.items?.map((i: any) => {
+        const product = i.Variant?.Product;
+        const imageCover =
+          product?.imageCover || product?.images?.[0]?.chemin || null;
+        const { Variant: _variant, ...rest } = i;
+        return {
+          ...rest,
+          prixUnitaire: Number(i.prixUnitaire),
+          sousTotal: Number(i.sousTotal),
+          imageCover,
+        };
+      }) ?? [],
+  };
+}
+
+const orderItemsInclude = {
+  include: {
+    Variant: {
+      include: {
+        Product: {
+          include: {
+            images: { orderBy: { ordre: "asc" as const }, take: 1 },
+          },
+        },
+      },
+    },
+  },
+};
 
 async function requireAdmin() {
   const session = await auth();
@@ -506,7 +548,7 @@ export async function getAllMerchOrders() {
 
     const orders = await db.merchOrder.findMany({
       include: {
-        items: true,
+        items: orderItemsInclude,
         User: { select: { id: true, name: true, email: true } },
       },
       orderBy: { createdAt: "desc" },
@@ -514,19 +556,101 @@ export async function getAllMerchOrders() {
 
     return {
       success: true,
-      data: orders.map((o) => ({
-        ...o,
-        montantTotal: Number(o.montantTotal),
-        items: o.items.map((i) => ({
-          ...i,
-          prixUnitaire: Number(i.prixUnitaire),
-          sousTotal: Number(i.sousTotal),
-        })),
-      })),
+      data: orders.map((o) => mapOrder(o)),
     };
   } catch (error) {
     console.error("getAllMerchOrders:", error);
     return { success: false, error: "Erreur lors du chargement des commandes" };
+  }
+}
+
+/**
+ * Détail d'une commande boutique (admin)
+ */
+export async function getMerchOrderById(orderId: string) {
+  try {
+    const admin = await requireAdmin();
+    if (!admin.ok) return { success: false, error: admin.error };
+
+    const order = await db.merchOrder.findUnique({
+      where: { id: orderId },
+      include: {
+        items: orderItemsInclude,
+        User: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    if (!order) return { success: false, error: "Commande introuvable" };
+
+    return { success: true, data: mapOrder(order) };
+  } catch (error) {
+    console.error("getMerchOrderById:", error);
+    return { success: false, error: "Erreur lors du chargement de la commande" };
+  }
+}
+
+/**
+ * Met à jour le suivi admin d'une commande (statut, paiement, livraison, clôture)
+ */
+export async function updateMerchOrderAdmin(data: z.infer<typeof UpdateOrderAdminSchema>) {
+  try {
+    const admin = await requireAdmin();
+    if (!admin.ok) return { success: false, error: admin.error };
+
+    const validated = UpdateOrderAdminSchema.parse(data);
+    const existing = await db.merchOrder.findUnique({ where: { id: validated.orderId } });
+    if (!existing) return { success: false, error: "Commande introuvable" };
+
+    const now = new Date();
+    const updateData: {
+      statut: MerchOrderStatus;
+      statutPaiement: MerchPaymentStatus;
+      referenceSuivi: string | null;
+      notesAdmin: string | null;
+      dateExpedition?: Date | null;
+      dateCloture?: Date | null;
+    } = {
+      statut: validated.statut,
+      statutPaiement: validated.statutPaiement,
+      referenceSuivi: validated.referenceSuivi?.trim() || null,
+      notesAdmin: validated.notesAdmin?.trim() || null,
+    };
+
+    if (validated.statut === MerchOrderStatus.Expediee && !existing.dateExpedition) {
+      updateData.dateExpedition = now;
+    }
+    if (
+      (validated.statut === MerchOrderStatus.Livree || validated.statut === MerchOrderStatus.Annulee) &&
+      !existing.dateCloture
+    ) {
+      updateData.dateCloture = now;
+    }
+    if (validated.statut === MerchOrderStatus.EnAttente || validated.statut === MerchOrderStatus.Confirmee) {
+      updateData.dateCloture = null;
+    }
+
+    const order = await db.merchOrder.update({
+      where: { id: validated.orderId },
+      data: updateData,
+      include: {
+        items: orderItemsInclude,
+        User: { select: { id: true, name: true, email: true } },
+      },
+    });
+
+    revalidatePath("/admin/boutique");
+
+    return {
+      success: true,
+      message: "Commande mise à jour",
+      data: mapOrder(order),
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0]?.message || "Données invalides" };
+    }
+    console.error("updateMerchOrderAdmin:", error);
+    return { success: false, error: "Erreur lors de la mise à jour de la commande" };
   }
 }
 

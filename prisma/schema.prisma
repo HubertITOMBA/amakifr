@@ -2139,7 +2139,14 @@ enum MerchOrderStatus {
   EnAttente
   Confirmee
   Expediee
+  Livree
   Annulee
+}
+
+enum MerchPaymentStatus {
+  EnAttente
+  Recu
+  Rembourse
 }
 
 // Boutique — produits dérivés AMAKI
@@ -2209,9 +2216,14 @@ model MerchOrder {
   ville                  String?          @db.VarChar(100)
   codePostal             String?          @db.VarChar(20)
   pays                   String?          @db.VarChar(100)
-  statut                 MerchOrderStatus @default(EnAttente)
-  montantTotal           Decimal          @db.Decimal(10, 2)
-  notes                  String?          @db.Text
+  statut                 MerchOrderStatus   @default(EnAttente)
+  statutPaiement         MerchPaymentStatus @default(EnAttente) @map("statut_paiement")
+  montantTotal           Decimal            @db.Decimal(10, 2)
+  notes                  String?            @db.Text
+  notesAdmin             String?            @db.Text @map("notes_admin")
+  referenceSuivi         String?            @db.VarChar(100) @map("reference_suivi")
+  dateExpedition         DateTime?          @map("date_expedition")
+  dateCloture            DateTime?          @map("date_cloture")
   confirmationEmailSubject String?        @db.VarChar(255)
   confirmationEmailBody    String?        @db.Text
   confirmationEmailSentAt  DateTime?
