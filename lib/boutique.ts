@@ -58,6 +58,25 @@ export function formatMerchPrice(value: number | string): string {
   }).format(num);
 }
 
+/**
+ * URL de base de l'application pour les liens boutique (emails, suivi commande)
+ */
+export function getMerchAppBaseUrl(): string {
+  let url = (process.env.NEXT_PUBLIC_APP_URL || "https://amaki.fr").trim();
+  url = url.replace(/^["']|["']$/g, "").replace(/;+$/, "").replace(/\/$/, "");
+  if (url.startsWith("http://") && process.env.NODE_ENV === "production") {
+    url = url.replace("http://", "https://");
+  }
+  return url;
+}
+
+/**
+ * Construit l'URL publique de suivi d'une commande
+ */
+export function buildMerchOrderTrackingUrl(suiviToken: string): string {
+  return `${getMerchAppBaseUrl()}/boutique/suivi/${suiviToken}`;
+}
+
 /** Libellés français des statuts de commande */
 export const MERCH_ORDER_STATUS_LABELS: Record<string, string> = {
   EnAttente: "En attente",

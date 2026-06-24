@@ -7,9 +7,10 @@ import { revalidatePath } from "next/cache";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { existsSync, mkdirSync } from "fs";
-import { slugifyMerchTitle, generateMerchOrderNumber } from "@/lib/boutique";
+import { slugifyMerchTitle, generateMerchOrderNumber, getMerchAppBaseUrl } from "@/lib/boutique";
 import { normalizePhoneE164 } from "@/lib/phone";
 import { MerchOrderStatus, MerchPaymentStatus } from "@prisma/client";
+import { randomBytes } from "crypto";
 
 const UPLOAD_DIR = join(process.cwd(), "public", "ressources", "produits-derives");
 const PUBLIC_PREFIX = "/ressources/produits-derives";
@@ -717,6 +718,8 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
       ? normalizePhoneE164(validated.telephone) || validated.telephone.trim()
       : null;
 
+    const suiviToken = randomBytes(32).toString("hex");
+
     const order = await db.$transaction(async (tx) => {
       for (const item of validated.items) {
         const updated = await tx.merchProductVariant.updateMany({
@@ -743,6 +746,7 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
           codePostal: validated.codePostal || null,
           pays: validated.pays || "France",
           montantTotal,
+          suiviToken,
           notes: validated.notes || null,
           statut: MerchOrderStatus.EnAttente,
           items: {
@@ -761,6 +765,31 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
       });
     });
 
+    const trackingUrl = buildMerchOrderTrackingUrl(suiviToken);
+
+    let emailSent = false;
+    let emailError: string | null = null;
+    try {
+      const { sendMerchOrderConfirmationEmail } = await import("@/lib/mail");
+      const emailResult = await sendMerchOrderConfirmationEmail({
+        to: validated.email,
+        nom: validated.nom,
+        numeroCommande,
+        montantTotal,
+        lineItems,
+        adresseLivraison: validated.adresseLivraison,
+        ville: validated.ville,
+        codePostal: validated.codePostal,
+        pays: validated.pays || "France",
+        trackingUrl,
+        notes: validated.notes,
+      });
+      emailSent = emailResult.sent;
+      emailError = emailResult.error || null;
+    } catch (err) {
+      emailError = err instanceof Error ? err.message : "Erreur d'envoi email";
+    }
+
     const subject = `Confirmation de commande ${numeroCommande} — AMAKI France`;
     const linesHtml = lineItems
       .map(
@@ -770,35 +799,10 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
       .join("");
     const bodyHtml = `
       <p>Bonjour ${validated.nom},</p>
-      <p>Nous avons bien reçu votre commande de produits dérivés AMAKI.</p>
-      <p><strong>Numéro de commande :</strong> ${numeroCommande}</p>
-      <p><strong>Total :</strong> ${montantTotal.toFixed(2)} €</p>
-      <p><strong>Livraison :</strong><br/>
-      ${validated.adresseLivraison}<br/>
-      ${validated.codePostal || ""} ${validated.ville || ""}<br/>
-      ${validated.pays || "France"}
-      </p>
-      <p><strong>Détail :</strong></p>
+      <p>Commande ${numeroCommande} — Total ${montantTotal.toFixed(2)} €</p>
+      <p><a href="${trackingUrl}">Suivre ma commande</a></p>
       <ul>${linesHtml}</ul>
-      <p>Le bureau de l'association vous contactera pour la suite (paiement / livraison).</p>
-      <p>Merci pour votre soutien à AMAKI France.</p>
     `;
-
-    let emailSent = false;
-    let emailError: string | null = null;
-    try {
-      const { sendEmail } = await import("@/lib/mail");
-      emailSent = await sendEmail(
-        {
-          to: validated.email,
-          subject,
-          html: bodyHtml,
-        },
-        false
-      );
-    } catch (err) {
-      emailError = err instanceof Error ? err.message : "Erreur d'envoi email";
-    }
 
     await db.merchOrder.update({
       where: { id: order.id },
@@ -810,13 +814,17 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
       },
     });
 
-    if (session?.user?.id) {
+    const historizeUserId =
+      session?.user?.id ||
+      (await db.user.findFirst({ where: { email: validated.email }, select: { id: true } }))?.id;
+
+    if (historizeUserId) {
       const adminUser = await db.user.findFirst({ where: { role: "ADMIN" } });
       await db.email
         .create({
           data: {
-            userId: session.user.id,
-            createdBy: adminUser?.id || session.user.id,
+            userId: historizeUserId,
+            createdBy: adminUser?.id || historizeUserId,
             subject,
             body: bodyHtml,
             recipientEmail: validated.email,
@@ -825,6 +833,14 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
           },
         })
         .catch((e) => console.error("Historisation email commande:", e));
+    }
+
+    if (!emailSent) {
+      console.error("[createMerchOrder] Échec envoi email confirmation:", {
+        to: validated.email,
+        numeroCommande,
+        error: emailError,
+      });
     }
 
     revalidatePath("/admin/boutique");
@@ -840,6 +856,8 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
         numeroCommande,
         montantTotal,
         emailSent,
+        suiviToken,
+        trackingUrl,
       },
     };
   } catch (error) {
@@ -851,6 +869,54 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
     }
     console.error("createMerchOrder:", error);
     return { success: false, error: "Erreur lors de la création de la commande" };
+  }
+}
+
+/**
+ * Suivi public d'une commande via son jeton (lien email)
+ */
+export async function getPublicMerchOrderByToken(token: string) {
+  try {
+    const trimmed = token?.trim();
+    if (!trimmed || trimmed.length < 16) {
+      return { success: false, error: "Lien de suivi invalide" };
+    }
+
+    const order = await db.merchOrder.findFirst({
+      where: { suiviToken: trimmed },
+      include: { items: orderItemsInclude },
+    });
+
+    if (!order) {
+      return { success: false, error: "Commande introuvable" };
+    }
+
+    const mapped = mapOrder(order);
+
+    return {
+      success: true,
+      data: {
+        numeroCommande: mapped.numeroCommande,
+        nom: mapped.nom,
+        email: mapped.email,
+        statut: mapped.statut,
+        statutPaiement: mapped.statutPaiement,
+        montantTotal: mapped.montantTotal,
+        adresseLivraison: mapped.adresseLivraison,
+        ville: mapped.ville,
+        codePostal: mapped.codePostal,
+        pays: mapped.pays,
+        referenceSuivi: mapped.referenceSuivi,
+        dateExpedition: mapped.dateExpedition,
+        dateCloture: mapped.dateCloture,
+        createdAt: mapped.createdAt,
+        updatedAt: mapped.updatedAt,
+        items: mapped.items,
+      },
+    };
+  } catch (error) {
+    console.error("getPublicMerchOrderByToken:", error);
+    return { success: false, error: "Erreur lors du chargement de la commande" };
   }
 }
 

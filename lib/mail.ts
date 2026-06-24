@@ -1780,3 +1780,105 @@ export const sendAdminPasswordResetEmail = async(
     throw error; // Re-lancer l'erreur pour qu'elle soit catchée dans la Server Action
   }
 }
+
+export interface MerchOrderConfirmationLineItem {
+  productTitre: string;
+  taille: string;
+  couleur: string;
+  quantite: number;
+  sousTotal: number;
+}
+
+/**
+ * Envoie l'email de confirmation de commande boutique (produits dérivés)
+ *
+ * @param params - Données de la commande et lien de suivi
+ * @returns Indique si l'email a été envoyé et l'erreur éventuelle
+ */
+export async function sendMerchOrderConfirmationEmail(params: {
+  to: string;
+  nom: string;
+  numeroCommande: string;
+  montantTotal: number;
+  lineItems: MerchOrderConfirmationLineItem[];
+  adresseLivraison: string;
+  ville?: string | null;
+  codePostal?: string | null;
+  pays?: string;
+  trackingUrl: string;
+  notes?: string | null;
+}): Promise<{ sent: boolean; error?: string }> {
+  const linesHtml = params.lineItems
+    .map(
+      (li) =>
+        `<li style="margin: 8px 0; color: #444;"><strong>${li.productTitre}</strong> — ${li.taille} / ${li.couleur} × ${li.quantite} = ${li.sousTotal.toFixed(2)} €</li>`
+    )
+    .join("");
+
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Confirmation de commande</h1>
+    <p style="margin: 10px 0; color: #666;">Bonjour ${params.nom},</p>
+    <p style="margin: 10px 0; color: #666;">Nous avons bien reçu votre commande de produits dérivés AMAKI France. Merci pour votre soutien !</p>
+
+    <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin: 20px 0; border-left: 4px solid #4a90e2;">
+      <p style="margin: 0 0 8px; color: #333;"><strong>Numéro de commande :</strong> ${params.numeroCommande}</p>
+      <p style="margin: 0; color: #333;"><strong>Total :</strong> ${params.montantTotal.toFixed(2)} €</p>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 8px;">Adresse de livraison</h3>
+      <p style="margin: 8px 0; color: #666; white-space: pre-line;">${params.adresseLivraison}</p>
+      <p style="margin: 0; color: #666;">${[params.codePostal, params.ville].filter(Boolean).join(" ")}${params.pays ? ` — ${params.pays}` : ""}</p>
+    </div>
+
+    <div style="margin-bottom: 20px;">
+      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 8px;">Détail de la commande</h3>
+      <ul style="padding-left: 18px; margin: 10px 0;">${linesHtml}</ul>
+    </div>
+
+    ${
+      params.notes
+        ? `<div style="background-color: #fff8e6; padding: 12px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #f59e0b;">
+      <p style="margin: 0; color: #92400e;"><strong>Votre note :</strong> ${params.notes}</p>
+    </div>`
+        : ""
+    }
+
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="${params.trackingUrl}" target="_blank" rel="noopener noreferrer"
+        style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">
+        Suivre ma commande
+      </a>
+    </div>
+
+    <p style="margin: 10px 0; color: #666; font-size: 14px;">
+      Le bureau de l'association vous contactera pour la suite (paiement et livraison).
+    </p>
+    <p style="margin: 10px 0; color: #666; font-size: 14px;">
+      Pour toute question : <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>
+    </p>
+
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email a été envoyé automatiquement. Merci de ne pas y répondre directement.
+    </p>
+  `;
+
+  const sent = await sendEmail(
+    {
+      from: "noreply@amaki.fr",
+      to: params.to,
+      subject: `Confirmation de commande ${params.numeroCommande} — AMAKI France`,
+      html: wrapEmailContent(content),
+    },
+    false
+  );
+
+  if (!sent) {
+    return {
+      sent: false,
+      error: "Échec de l'envoi via le service email (vérifiez la configuration SMTP/Resend)",
+    };
+  }
+
+  return { sent: true };
+}

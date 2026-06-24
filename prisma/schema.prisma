@@ -2219,6 +2219,7 @@ model MerchOrder {
   statut                 MerchOrderStatus   @default(EnAttente)
   statutPaiement         MerchPaymentStatus @default(EnAttente) @map("statut_paiement")
   montantTotal           Decimal            @db.Decimal(10, 2)
+  suiviToken             String             @unique @db.VarChar(64) @map("suivi_token")
   notes                  String?            @db.Text
   notesAdmin             String?            @db.Text @map("notes_admin")
   referenceSuivi         String?            @db.VarChar(100) @map("reference_suivi")

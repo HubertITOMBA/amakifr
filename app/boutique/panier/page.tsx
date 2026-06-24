@@ -22,7 +22,11 @@ import { formatMerchPrice } from "@/lib/boutique";
 export default function BoutiquePanierPage() {
   const { items, total, updateQuantity, removeItem, clearCart } = useMerchCart();
   const [submitting, setSubmitting] = useState(false);
-  const [orderDone, setOrderDone] = useState<string | null>(null);
+  const [orderDone, setOrderDone] = useState<{
+    numeroCommande: string;
+    emailSent: boolean;
+    suiviToken?: string;
+  } | null>(null);
 
   const [email, setEmail] = useState("");
   const [nom, setNom] = useState("");
@@ -69,8 +73,19 @@ export default function BoutiquePanierPage() {
     setSubmitting(false);
 
     if (res.success && res.data) {
-      toast.success(res.message);
-      setOrderDone(res.data.numeroCommande);
+      if (res.data.emailSent) {
+        toast.success(res.message);
+      } else {
+        toast.warning(
+          res.message ||
+            "Commande enregistrée, mais l'email de confirmation n'a pas pu être envoyé. Conservez votre lien de suivi."
+        );
+      }
+      setOrderDone({
+        numeroCommande: res.data.numeroCommande,
+        emailSent: res.data.emailSent,
+        suiviToken: res.data.suiviToken,
+      });
       clearCart();
     } else {
       toast.error(res.error || "Erreur lors de la commande");
@@ -85,12 +100,25 @@ export default function BoutiquePanierPage() {
           <CheckCircle2 className="h-16 w-16 text-green-600 mx-auto mb-4" />
           <h1 className="text-2xl font-bold mb-2">Commande enregistrée</h1>
           <p className="text-muted-foreground mb-4">
-            Numéro : <strong>{orderDone}</strong>
+            Numéro : <strong>{orderDone.numeroCommande}</strong>
           </p>
-          <p className="text-sm text-muted-foreground mb-6">
-            Un email de confirmation vous a été envoyé si votre adresse est valide.
-          </p>
-          <Link href="/boutique"><Button>Retour à la boutique</Button></Link>
+          {orderDone.emailSent ? (
+            <p className="text-sm text-muted-foreground mb-4">
+              Un email de confirmation avec le lien de suivi vous a été envoyé.
+            </p>
+          ) : (
+            <p className="text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-md px-3 py-2 mb-4">
+              L&apos;email de confirmation n&apos;a pas pu être envoyé. Utilisez le lien ci-dessous pour suivre votre commande.
+            </p>
+          )}
+          {orderDone.suiviToken && (
+            <Link href={`/boutique/suivi/${orderDone.suiviToken}`} className="block mb-6">
+              <Button className="w-full bg-blue-600 hover:bg-blue-700">
+                Suivre ma commande
+              </Button>
+            </Link>
+          )}
+          <Link href="/boutique"><Button variant="outline">Retour à la boutique</Button></Link>
         </div>
         <Footer />
       </div>
