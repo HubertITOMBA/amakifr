@@ -867,6 +867,15 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
     if (error instanceof Error && error.message === "STOCK_INSUFFISANT") {
       return { success: false, error: "Stock insuffisant pour un article du panier" };
     }
+    // Prisma: colonne manquante (base pas migrée)
+    if ((error as any)?.code === "P2022") {
+      const meta = (error as any)?.meta as { modelName?: string; column?: string } | undefined;
+      const column = meta?.column || "une colonne requise";
+      return {
+        success: false,
+        error: `La base de données n'est pas à jour (colonne manquante : ${column}). Exécutez « npx prisma migrate deploy » sur le serveur puis relancez l'application.`,
+      };
+    }
     console.error("createMerchOrder:", error);
     return { success: false, error: "Erreur lors de la création de la commande" };
   }
