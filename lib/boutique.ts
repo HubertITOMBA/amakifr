@@ -120,3 +120,80 @@ export function getMerchPaymentStatusBadgeClass(statut: string): string {
       return "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-200";
   }
 }
+
+/** Seuil d'alerte stock par défaut (unités) */
+export const MERCH_DEFAULT_STOCK_ALERT_THRESHOLD = 5;
+
+/** Niveaux de stock pour l'administration */
+export type MerchStockLevel = "ok" | "faible" | "rupture";
+
+/**
+ * Détermine le niveau de stock d'une variante par rapport au seuil d'alerte
+ *
+ * @param stock - Quantité en stock
+ * @param seuilAlerte - Seuil en dessous duquel le stock est considéré comme faible
+ */
+export function getMerchStockLevel(
+  stock: number,
+  seuilAlerte: number = MERCH_DEFAULT_STOCK_ALERT_THRESHOLD
+): MerchStockLevel {
+  if (stock <= 0) return "rupture";
+  if (stock <= seuilAlerte) return "faible";
+  return "ok";
+}
+
+/** Libellés français des niveaux de stock */
+export const MERCH_STOCK_LEVEL_LABELS: Record<MerchStockLevel, string> = {
+  ok: "Stock OK",
+  faible: "Stock bas",
+  rupture: "Rupture",
+};
+
+/** Classes Tailwind pour les badges de niveau de stock */
+export function getMerchStockLevelBadgeClass(level: MerchStockLevel): string {
+  switch (level) {
+    case "rupture":
+      return "bg-red-100 text-red-800 dark:bg-red-900/40 dark:text-red-200 border-red-200";
+    case "faible":
+      return "bg-amber-100 text-amber-800 dark:bg-amber-900/40 dark:text-amber-200 border-amber-200";
+    default:
+      return "bg-green-100 text-green-800 dark:bg-green-900/40 dark:text-green-200 border-green-200";
+  }
+}
+
+/**
+ * Calcule le niveau de stock global d'un produit (pire cas parmi les variantes actives)
+ */
+export function getMerchProductStockLevel(
+  variants: Array<{ stock: number; actif?: boolean }>,
+  seuilAlerte: number = MERCH_DEFAULT_STOCK_ALERT_THRESHOLD
+): MerchStockLevel {
+  const actives = variants.filter((v) => v.actif !== false);
+  if (actives.length === 0) return "rupture";
+  const levels = actives.map((v) => getMerchStockLevel(v.stock, seuilAlerte));
+  if (levels.includes("rupture")) return "rupture";
+  if (levels.includes("faible")) return "faible";
+  return "ok";
+}
+
+/** Libellés français des types de mouvement de stock */
+export const MERCH_STOCK_MOVEMENT_LABELS: Record<string, string> = {
+  Commande: "Commande",
+  AjustementManuel: "Ajustement manuel",
+  Reapprovisionnement: "Réapprovisionnement",
+};
+
+/**
+ * Indique si une alerte email doit être envoyée suite à un changement de stock
+ */
+export function getMerchStockAlertType(
+  stockAvant: number,
+  stockApres: number,
+  seuilAlerte: number
+): MerchStockLevel | null {
+  const niveauAvant = getMerchStockLevel(stockAvant, seuilAlerte);
+  const niveauApres = getMerchStockLevel(stockApres, seuilAlerte);
+  if (niveauAvant === niveauApres) return null;
+  if (niveauApres === "rupture" || niveauApres === "faible") return niveauApres;
+  return null;
+}

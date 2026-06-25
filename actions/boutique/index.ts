@@ -7,9 +7,9 @@ import { revalidatePath } from "next/cache";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { existsSync, mkdirSync } from "fs";
-import { slugifyMerchTitle, generateMerchOrderNumber, buildMerchOrderTrackingUrl } from "@/lib/boutique";
+import { slugifyMerchTitle, generateMerchOrderNumber, buildMerchOrderTrackingUrl, getMerchStockLevel, getMerchStockAlertType, getMerchAppBaseUrl, type MerchStockLevel } from "@/lib/boutique";
 import { normalizePhoneE164 } from "@/lib/phone";
-import { MerchOrderStatus, MerchPaymentStatus } from "@prisma/client";
+import { MerchOrderStatus, MerchPaymentStatus, MerchStockMovementType, Prisma } from "@prisma/client";
 import { randomBytes } from "crypto";
 
 const UPLOAD_DIR = join(process.cwd(), "public", "ressources", "produits-derives");
@@ -34,6 +34,7 @@ const ProductSchema = z.object({
   description: z.string().optional().nullable(),
   actif: z.boolean().default(true),
   ordre: z.number().int().default(0),
+  seuilAlerteStock: z.number().int().min(0, "Le seuil doit être positif ou nul").default(5),
   variants: z.array(VariantSchema).min(1, "Au moins une variante est requise"),
 });
 
@@ -66,6 +67,11 @@ const UpdateOrderAdminSchema = z.object({
   statutPaiement: z.nativeEnum(MerchPaymentStatus),
   referenceSuivi: z.string().max(100).optional().nullable(),
   notesAdmin: z.string().optional().nullable(),
+});
+
+const UpdateVariantStockSchema = z.object({
+  variantId: z.string().min(1, "Variante requise"),
+  stock: z.number().int().min(0, "Le stock doit être positif ou nul"),
 });
 
 function mapOrder(order: any) {
@@ -112,6 +118,57 @@ async function requireAdmin() {
     return { ok: false as const, error: "Accès administrateur requis" };
   }
   return { ok: true as const, userId: session.user.id };
+}
+
+interface MerchStockAlertItem {
+  productTitre: string;
+  taille: string;
+  couleur: string;
+  stockApres: number;
+  seuilAlerte: number;
+  alertType: MerchStockLevel;
+}
+
+async function recordMerchStockMovement(
+  tx: Prisma.TransactionClient,
+  data: {
+    variantId: string;
+    productId: string;
+    type: MerchStockMovementType;
+    quantite: number;
+    stockAvant: number;
+    stockApres: number;
+    orderId?: string | null;
+    motif?: string | null;
+    createdBy?: string | null;
+  }
+) {
+  return tx.merchStockMovement.create({ data });
+}
+
+/**
+ * Envoie un email d'alerte stock aux administrateurs actifs
+ */
+async function notifyMerchStockAlerts(items: MerchStockAlertItem[]) {
+  if (items.length === 0) return;
+
+  try {
+    const admins = await db.user.findMany({
+      where: { role: "ADMIN", email: { not: null }, status: "Actif" },
+      select: { email: true },
+    });
+    const emails = [...new Set(admins.map((a) => a.email).filter((e): e is string => !!e))];
+    if (emails.length === 0) return;
+
+    const { sendMerchStockAlertEmail } = await import("@/lib/mail");
+    const adminUrl = `${getMerchAppBaseUrl()}/admin/boutique`;
+
+    for (const email of emails) {
+      await sendMerchStockAlertEmail({ to: email, items, adminUrl });
+    }
+  } catch (error) {
+    console.error("[notifyMerchStockAlerts] Erreur envoi alertes stock:", error);
+  }
 }
 
 async function ensureUniqueSlug(base: string, excludeId?: string) {
@@ -161,6 +218,279 @@ export async function getAllMerchProducts() {
   } catch (error) {
     console.error("getAllMerchProducts:", error);
     return { success: false, error: "Erreur lors du chargement des produits" };
+  }
+}
+
+export interface MerchStockLine {
+  variantId: string;
+  productId: string;
+  productTitre: string;
+  productActif: boolean;
+  variantActif: boolean;
+  taille: string;
+  couleur: string;
+  stock: number;
+  seuilAlerte: number;
+  niveau: MerchStockLevel;
+}
+
+/**
+ * Vue d'ensemble du stock boutique (variantes actives des produits actifs)
+ *
+ * @returns Résumé des alertes et lignes détaillées par variante
+ */
+export async function getMerchStockOverview() {
+  try {
+    const admin = await requireAdmin();
+    if (!admin.ok) return { success: false, error: admin.error };
+
+    const products = await db.merchProduct.findMany({
+      where: { actif: true },
+      include: {
+        variants: {
+          where: { actif: true },
+          orderBy: [{ taille: "asc" }, { couleur: "asc" }],
+        },
+      },
+      orderBy: [{ ordre: "asc" }, { titre: "asc" }],
+    });
+
+    const lines: MerchStockLine[] = products.flatMap((product) =>
+      product.variants.map((variant) => {
+        const seuilAlerte = product.seuilAlerteStock ?? 5;
+        return {
+          variantId: variant.id,
+          productId: product.id,
+          productTitre: product.titre,
+          productActif: product.actif,
+          variantActif: variant.actif,
+          taille: variant.taille,
+          couleur: variant.couleur,
+          stock: variant.stock,
+          seuilAlerte,
+          niveau: getMerchStockLevel(variant.stock, seuilAlerte),
+        };
+      })
+    );
+
+    const summary = {
+      total: lines.length,
+      rupture: lines.filter((l) => l.niveau === "rupture").length,
+      faible: lines.filter((l) => l.niveau === "faible").length,
+      ok: lines.filter((l) => l.niveau === "ok").length,
+    };
+
+    return { success: true, data: { summary, lines } };
+  } catch (error) {
+    console.error("getMerchStockOverview:", error);
+    return { success: false, error: "Erreur lors du chargement du stock" };
+  }
+}
+
+/**
+ * Met à jour le stock d'une variante (réapprovisionnement rapide)
+ *
+ * @param data - Identifiant variante et nouvelle quantité en stock
+ */
+export async function updateMerchVariantStock(data: z.infer<typeof UpdateVariantStockSchema>) {
+  try {
+    const admin = await requireAdmin();
+    if (!admin.ok) return { success: false, error: admin.error };
+
+    const validated = UpdateVariantStockSchema.parse(data);
+    const variant = await db.merchProductVariant.findUnique({
+      where: { id: validated.variantId },
+      include: { Product: true },
+    });
+    if (!variant) return { success: false, error: "Variante introuvable" };
+
+    const stockAvant = variant.stock;
+    const stockApres = validated.stock;
+    const quantite = stockApres - stockAvant;
+    const movementType =
+      quantite > 0
+        ? MerchStockMovementType.Reapprovisionnement
+        : MerchStockMovementType.AjustementManuel;
+
+    await db.$transaction(async (tx) => {
+      await tx.merchProductVariant.update({
+        where: { id: validated.variantId },
+        data: { stock: validated.stock },
+      });
+
+      if (quantite !== 0) {
+        await recordMerchStockMovement(tx, {
+          variantId: variant.id,
+          productId: variant.productId,
+          type: movementType,
+          quantite,
+          stockAvant,
+          stockApres,
+          motif: "Mise à jour depuis l'onglet Stock",
+          createdBy: admin.userId,
+        });
+      }
+    });
+
+    revalidatePath("/admin/boutique");
+    revalidatePath("/boutique");
+    revalidatePath(`/boutique/${variant.Product.slug}`);
+    revalidatePath("/");
+
+    const seuil = variant.Product.seuilAlerteStock ?? 5;
+    const niveau = getMerchStockLevel(validated.stock, seuil);
+    const alertType = getMerchStockAlertType(stockAvant, stockApres, seuil);
+    if (alertType) {
+      await notifyMerchStockAlerts([
+        {
+          productTitre: variant.Product.titre,
+          taille: variant.taille,
+          couleur: variant.couleur,
+          stockApres,
+          seuilAlerte: seuil,
+          alertType,
+        },
+      ]);
+    }
+
+    return {
+      success: true,
+      message: `Stock mis à jour : ${validated.stock} unité(s)`,
+      data: { stock: validated.stock, niveau },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0]?.message || "Données invalides" };
+    }
+    console.error("updateMerchVariantStock:", error);
+    return { success: false, error: "Erreur lors de la mise à jour du stock" };
+  }
+}
+
+export interface MerchStockMovementRow {
+  id: string;
+  variantId: string;
+  productId: string;
+  productTitre: string;
+  taille: string;
+  couleur: string;
+  type: MerchStockMovementType;
+  quantite: number;
+  stockAvant: number;
+  stockApres: number;
+  orderId: string | null;
+  numeroCommande: string | null;
+  motif: string | null;
+  createdByName: string | null;
+  createdAt: Date;
+}
+
+/**
+ * Historique des mouvements de stock (admin)
+ *
+ * @param limit - Nombre maximum de lignes (défaut 100)
+ */
+export async function getMerchStockMovements(limit = 100) {
+  try {
+    const admin = await requireAdmin();
+    if (!admin.ok) return { success: false, error: admin.error };
+
+    const movements = await db.merchStockMovement.findMany({
+      take: Math.min(Math.max(limit, 1), 500),
+      orderBy: { createdAt: "desc" },
+      include: {
+        Product: { select: { titre: true } },
+        Variant: { select: { taille: true, couleur: true } },
+        Order: { select: { numeroCommande: true } },
+        CreatedBy: { select: { name: true, email: true } },
+      },
+    });
+
+    const data: MerchStockMovementRow[] = movements.map((m) => ({
+      id: m.id,
+      variantId: m.variantId,
+      productId: m.productId,
+      productTitre: m.Product.titre,
+      taille: m.Variant.taille,
+      couleur: m.Variant.couleur,
+      type: m.type,
+      quantite: m.quantite,
+      stockAvant: m.stockAvant,
+      stockApres: m.stockApres,
+      orderId: m.orderId,
+      numeroCommande: m.Order?.numeroCommande ?? null,
+      motif: m.motif,
+      createdByName: m.CreatedBy?.name || m.CreatedBy?.email || null,
+      createdAt: m.createdAt,
+    }));
+
+    return { success: true, data };
+  } catch (error) {
+    console.error("getMerchStockMovements:", error);
+    return { success: false, error: "Erreur lors du chargement de l'historique" };
+  }
+}
+
+/**
+ * Exporte l'historique des mouvements de stock au format CSV
+ */
+export async function exportMerchStockMovementsCsv() {
+  try {
+    const admin = await requireAdmin();
+    if (!admin.ok) return { success: false, error: admin.error };
+
+    const res = await getMerchStockMovements(500);
+    if (!res.success || !res.data) {
+      return { success: false, error: res.error || "Aucune donnée à exporter" };
+    }
+
+    const { MERCH_STOCK_MOVEMENT_LABELS } = await import("@/lib/boutique");
+    const header = [
+      "Date",
+      "Produit",
+      "Taille",
+      "Couleur",
+      "Type",
+      "Quantité",
+      "Stock avant",
+      "Stock après",
+      "Commande",
+      "Motif",
+      "Par",
+    ];
+
+    const escapeCsv = (value: string | number | null | undefined) => {
+      const str = value == null ? "" : String(value);
+      if (str.includes('"') || str.includes(";") || str.includes("\n")) {
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      return str;
+    };
+
+    const rows = res.data.map((m) => [
+      new Intl.DateTimeFormat("fr-FR", {
+        dateStyle: "short",
+        timeStyle: "medium",
+      }).format(new Date(m.createdAt)),
+      m.productTitre,
+      m.taille,
+      m.couleur,
+      MERCH_STOCK_MOVEMENT_LABELS[m.type] || m.type,
+      m.quantite,
+      m.stockAvant,
+      m.stockApres,
+      m.numeroCommande || "",
+      m.motif || "",
+      m.createdByName || "",
+    ]);
+
+    const csv = [header, ...rows].map((row) => row.map(escapeCsv).join(";")).join("\n");
+    const filename = `mouvements-stock-boutique-${new Date().toISOString().slice(0, 10)}.csv`;
+
+    return { success: true, data: { csv, filename } };
+  } catch (error) {
+    console.error("exportMerchStockMovementsCsv:", error);
+    return { success: false, error: "Erreur lors de l'export CSV" };
   }
 }
 
@@ -265,6 +595,7 @@ export async function createMerchProduct(data: z.infer<typeof ProductSchema>) {
         description: validated.description || null,
         actif: validated.actif,
         ordre: validated.ordre,
+        seuilAlerteStock: validated.seuilAlerteStock,
         createdBy: admin.userId,
         variants: {
           create: validated.variants.map((v) => ({
@@ -331,6 +662,7 @@ export async function updateMerchProduct(data: z.infer<typeof UpdateProductSchem
           description: validated.description || null,
           actif: validated.actif,
           ordre: validated.ordre,
+          seuilAlerteStock: validated.seuilAlerteStock,
           variants: {
             create: validated.variants.map((v) => ({
               taille: v.taille.trim(),
@@ -720,21 +1052,41 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
 
     const suiviToken = randomBytes(32).toString("hex");
 
+    const stockAlerts: MerchStockAlertItem[] = [];
+
     const order = await db.$transaction(async (tx) => {
       for (const item of validated.items) {
-        const updated = await tx.merchProductVariant.updateMany({
-          where: {
-            id: item.variantId,
-            stock: { gte: item.quantite },
-          },
-          data: { stock: { decrement: item.quantite } },
+        const variant = await tx.merchProductVariant.findUnique({
+          where: { id: item.variantId },
+          include: { Product: true },
         });
-        if (updated.count === 0) {
+        if (!variant || variant.stock < item.quantite) {
           throw new Error("STOCK_INSUFFISANT");
+        }
+
+        const stockAvant = variant.stock;
+        const stockApres = stockAvant - item.quantite;
+
+        await tx.merchProductVariant.update({
+          where: { id: item.variantId },
+          data: { stock: stockApres },
+        });
+
+        const seuil = variant.Product.seuilAlerteStock ?? 5;
+        const alertType = getMerchStockAlertType(stockAvant, stockApres, seuil);
+        if (alertType) {
+          stockAlerts.push({
+            productTitre: variant.Product.titre,
+            taille: variant.taille,
+            couleur: variant.couleur,
+            stockApres,
+            seuilAlerte: seuil,
+            alertType,
+          });
         }
       }
 
-      return tx.merchOrder.create({
+      const created = await tx.merchOrder.create({
         data: {
           numeroCommande,
           userId: session?.user?.id || null,
@@ -763,7 +1115,29 @@ export async function createMerchOrder(data: z.infer<typeof CreateOrderSchema>) 
         },
         include: { items: true },
       });
+
+      for (const item of validated.items) {
+        const variant = variantMap.get(item.variantId)!;
+        const stockAvant = variant.stock;
+        const stockApres = stockAvant - item.quantite;
+        await recordMerchStockMovement(tx, {
+          variantId: item.variantId,
+          productId: variant.productId,
+          type: MerchStockMovementType.Commande,
+          quantite: -item.quantite,
+          stockAvant,
+          stockApres,
+          orderId: created.id,
+          motif: `Commande ${numeroCommande}`,
+        });
+      }
+
+      return created;
     });
+
+    if (stockAlerts.length > 0) {
+      await notifyMerchStockAlerts(stockAlerts);
+    }
 
     const trackingUrl = buildMerchOrderTrackingUrl(suiviToken);
 

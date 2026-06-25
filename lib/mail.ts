@@ -1882,3 +1882,86 @@ export async function sendMerchOrderConfirmationEmail(params: {
 
   return { sent: true };
 }
+
+export interface MerchStockAlertEmailItem {
+  productTitre: string;
+  taille: string;
+  couleur: string;
+  stockApres: number;
+  seuilAlerte: number;
+  alertType: "ok" | "faible" | "rupture";
+}
+
+/**
+ * Envoie une alerte stock boutique aux administrateurs
+ *
+ * @param params - Destinataire, liste des variantes en alerte et lien admin
+ */
+export async function sendMerchStockAlertEmail(params: {
+  to: string;
+  items: MerchStockAlertEmailItem[];
+  adminUrl: string;
+}): Promise<{ sent: boolean; error?: string }> {
+  const ruptures = params.items.filter((i) => i.alertType === "rupture");
+  const faibles = params.items.filter((i) => i.alertType === "faible");
+  const isRupture = ruptures.length > 0;
+
+  const linesHtml = params.items
+    .map((item) => {
+      const label =
+        item.alertType === "rupture"
+          ? '<span style="color:#dc2626;font-weight:bold;">Rupture</span>'
+          : '<span style="color:#d97706;font-weight:bold;">Stock bas</span>';
+      return `<li style="margin: 8px 0; color: #444;">
+        <strong>${item.productTitre}</strong> — ${item.taille} / ${item.couleur}<br/>
+        Stock restant : <strong>${item.stockApres}</strong> (seuil : ${item.seuilAlerte}) — ${label}
+      </li>`;
+    })
+    .join("");
+
+  const title = isRupture
+    ? "Alerte rupture de stock — Boutique AMAKI"
+    : "Alerte stock bas — Boutique AMAKI";
+
+  const intro = isRupture
+    ? `${ruptures.length} variante(s) sont en rupture de stock${faibles.length > 0 ? ` et ${faibles.length} en stock bas` : ""}.`
+    : `${faibles.length} variante(s) sont passées sous le seuil d'alerte.`;
+
+  const content = `
+    <h1 style="color: ${isRupture ? "#dc2626" : "#d97706"}; margin-bottom: 20px; margin-top: 0;">${title}</h1>
+    <p style="margin: 10px 0; color: #666;">${intro}</p>
+    <p style="margin: 10px 0; color: #666;">Pensez à réapprovisionner les articles concernés depuis l'administration boutique.</p>
+
+    <div style="margin: 20px 0;">
+      <h3 style="color: #333; border-bottom: 2px solid #4a90e2; padding-bottom: 8px;">Variantes concernées</h3>
+      <ul style="padding-left: 18px; margin: 10px 0;">${linesHtml}</ul>
+    </div>
+
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="${params.adminUrl}" target="_blank" rel="noopener noreferrer"
+        style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">
+        Gérer le stock
+      </a>
+    </div>
+
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Alerte automatique — Boutique produits dérivés AMAKI France.
+    </p>
+  `;
+
+  const sent = await sendEmail(
+    {
+      from: "noreply@amaki.fr",
+      to: params.to,
+      subject: `${isRupture ? "Rupture" : "Stock bas"} — ${params.items.length} variante(s) boutique AMAKI`,
+      html: wrapEmailContent(content),
+    },
+    false
+  );
+
+  if (!sent) {
+    return { sent: false, error: "Échec de l'envoi de l'alerte stock" };
+  }
+
+  return { sent: true };
+}

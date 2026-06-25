@@ -42,6 +42,10 @@ import {
   Filter,
   Eye,
   ClipboardList,
+  AlertTriangle,
+  Boxes,
+  Download,
+  History,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -64,6 +68,12 @@ import {
   uploadMerchProductImage,
   deleteMerchProductImage,
   getAllMerchOrders,
+  getMerchStockOverview,
+  updateMerchVariantStock,
+  getMerchStockMovements,
+  exportMerchStockMovementsCsv,
+  type MerchStockLine,
+  type MerchStockMovementRow,
 } from "@/actions/boutique";
 import {
   formatMerchPrice,
@@ -72,6 +82,12 @@ import {
   MERCH_PAYMENT_STATUS_LABELS,
   getMerchOrderStatusBadgeClass,
   getMerchPaymentStatusBadgeClass,
+  getMerchStockLevel,
+  getMerchProductStockLevel,
+  MERCH_STOCK_LEVEL_LABELS,
+  getMerchStockLevelBadgeClass,
+  MERCH_DEFAULT_STOCK_ALERT_THRESHOLD,
+  MERCH_STOCK_MOVEMENT_LABELS,
 } from "@/lib/boutique";
 import { MerchOrderDetailDialog, type MerchOrderDetail } from "@/components/boutique/MerchOrderDetailDialog";
 import { format } from "date-fns";
@@ -118,18 +134,48 @@ export default function AdminBoutiquePage() {
   const [description, setDescription] = useState("");
   const [actif, setActif] = useState(true);
   const [ordre, setOrdre] = useState(0);
+  const [seuilAlerteStock, setSeuilAlerteStock] = useState(MERCH_DEFAULT_STOCK_ALERT_THRESHOLD);
   const [variants, setVariants] = useState<MerchVariantInput[]>([emptyVariant()]);
   const [images, setImages] = useState<any[]>([]);
   const [pendingImages, setPendingImages] = useState<File[]>([]);
   const [pendingPreviews, setPendingPreviews] = useState<string[]>([]);
+
+  const [stockLines, setStockLines] = useState<MerchStockLine[]>([]);
+  const [stockSummary, setStockSummary] = useState({ total: 0, rupture: 0, faible: 0, ok: 0 });
+  const [stockLoading, setStockLoading] = useState(false);
+  const [stockFilter, setStockFilter] = useState<string>("all");
+  const [stockSearch, setStockSearch] = useState("");
+  const [savingStockId, setSavingStockId] = useState<string | null>(null);
+  const [stockEdits, setStockEdits] = useState<Record<string, number>>({});
+  const [activeTab, setActiveTab] = useState("produits");
+  const [stockMovements, setStockMovements] = useState<MerchStockMovementRow[]>([]);
+  const [movementsLoading, setMovementsLoading] = useState(false);
+  const [exportingCsv, setExportingCsv] = useState(false);
 
   const productId = editing?.id as string | undefined;
 
   const loadProducts = useCallback(async () => {
     setLoading(true);
     const res = await getAllMerchProducts();
-    if (res.success && res.data) setProducts(res.data);
-    else toast.error(res.error || "Erreur de chargement");
+    if (res.success && res.data) {
+      setProducts(res.data);
+      let rupture = 0;
+      let faible = 0;
+      let ok = 0;
+      let total = 0;
+      for (const product of res.data.filter((p: any) => p.actif)) {
+        const seuil = product.seuilAlerteStock ?? MERCH_DEFAULT_STOCK_ALERT_THRESHOLD;
+        for (const variant of product.variants || []) {
+          if (variant.actif === false) continue;
+          total += 1;
+          const niveau = getMerchStockLevel(variant.stock, seuil);
+          if (niveau === "rupture") rupture += 1;
+          else if (niveau === "faible") faible += 1;
+          else ok += 1;
+        }
+      }
+      setStockSummary({ total, rupture, faible, ok });
+    } else toast.error(res.error || "Erreur de chargement");
     setLoading(false);
   }, []);
 
@@ -139,6 +185,31 @@ export default function AdminBoutiquePage() {
     if (res.success && res.data) setOrders(res.data);
     else toast.error(res.error || "Erreur de chargement des commandes");
     setOrdersLoading(false);
+  }, []);
+
+  const loadStock = useCallback(async () => {
+    setStockLoading(true);
+    const res = await getMerchStockOverview();
+    if (res.success && res.data) {
+      setStockLines(res.data.lines);
+      setStockSummary(res.data.summary);
+      const edits: Record<string, number> = {};
+      res.data.lines.forEach((line) => {
+        edits[line.variantId] = line.stock;
+      });
+      setStockEdits(edits);
+    } else {
+      toast.error(res.error || "Erreur de chargement du stock");
+    }
+    setStockLoading(false);
+  }, []);
+
+  const loadMovements = useCallback(async () => {
+    setMovementsLoading(true);
+    const res = await getMerchStockMovements(100);
+    if (res.success && res.data) setStockMovements(res.data);
+    else toast.error(res.error || "Erreur de chargement de l'historique");
+    setMovementsLoading(false);
   }, []);
 
   useEffect(() => {
@@ -187,6 +258,29 @@ export default function AdminBoutiquePage() {
     });
   }, [products, globalFilter, statusFilter]);
 
+  const stockAlertCount = useMemo(() => {
+    return stockSummary.rupture + stockSummary.faible;
+  }, [stockSummary.rupture, stockSummary.faible]);
+
+  const filteredStockLines = useMemo(() => {
+    const q = stockSearch.trim().toLowerCase();
+    return stockLines.filter((line) => {
+      if (stockFilter !== "all" && line.niveau !== stockFilter) return false;
+      if (!q) return true;
+      const text = [line.productTitre, line.taille, line.couleur].join(" ").toLowerCase();
+      return text.includes(q);
+    });
+  }, [stockLines, stockFilter, stockSearch]);
+
+  const handleTabChange = (value: string) => {
+    setActiveTab(value);
+    if (value === "commandes") loadOrders();
+    if (value === "stock") {
+      loadStock();
+      loadMovements();
+    }
+  };
+
   const handleDialogOpenChange = (open: boolean) => {
     setDialogOpen(open);
     if (!open) resetPendingImages();
@@ -204,6 +298,7 @@ export default function AdminBoutiquePage() {
     setDescription("");
     setActif(true);
     setOrdre(0);
+    setSeuilAlerteStock(MERCH_DEFAULT_STOCK_ALERT_THRESHOLD);
     setVariants([emptyVariant()]);
     setImages([]);
     resetPendingImages();
@@ -217,6 +312,7 @@ export default function AdminBoutiquePage() {
     setDescription(product.description || "");
     setActif(product.actif);
     setOrdre(product.ordre || 0);
+    setSeuilAlerteStock(product.seuilAlerteStock ?? MERCH_DEFAULT_STOCK_ALERT_THRESHOLD);
     setVariants(
       product.variants?.length
         ? product.variants.map((v: any) => ({
@@ -283,6 +379,7 @@ export default function AdminBoutiquePage() {
       description: description || null,
       actif,
       ordre,
+      seuilAlerteStock,
       variants: variants.filter((v) => v.taille.trim() && v.couleur.trim()),
     };
 
@@ -312,6 +409,8 @@ export default function AdminBoutiquePage() {
       } else {
         await loadProducts();
       }
+
+      if (stockLines.length > 0) await loadStock();
 
       toast.success(
         uploadCount > 0
@@ -376,6 +475,43 @@ export default function AdminBoutiquePage() {
     } else toast.error(res.error || "Erreur");
   };
 
+  const handleSaveVariantStock = async (variantId: string) => {
+    const stock = stockEdits[variantId];
+    if (stock === undefined || stock < 0) {
+      toast.error("Quantité invalide");
+      return;
+    }
+    setSavingStockId(variantId);
+    const res = await updateMerchVariantStock({ variantId, stock });
+    if (res.success) {
+      toast.success(res.message || "Stock mis à jour");
+      await loadStock();
+      await loadMovements();
+      await loadProducts();
+    } else {
+      toast.error(res.error || "Erreur lors de la mise à jour");
+    }
+    setSavingStockId(null);
+  };
+
+  const handleExportStockCsv = async () => {
+    setExportingCsv(true);
+    const res = await exportMerchStockMovementsCsv();
+    if (res.success && res.data) {
+      const blob = new Blob(["\uFEFF" + res.data.csv], { type: "text/csv;charset=utf-8;" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = res.data.filename;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success("Export CSV téléchargé");
+    } else {
+      toast.error(res.error || "Erreur lors de l'export");
+    }
+    setExportingCsv(false);
+  };
+
   const columns = useMemo(
     () => [
       columnHelper.accessor("imageCover", {
@@ -425,14 +561,23 @@ export default function AdminBoutiquePage() {
       }),
       columnHelper.display({
         id: "stock",
-        header: "Stock total",
-        size: 100,
-        minSize: 80,
-        maxSize: 120,
+        header: "Stock",
+        size: 130,
+        minSize: 110,
+        maxSize: 160,
         cell: ({ row }) => {
-          const stock =
+          const seuil = row.original.seuilAlerteStock ?? MERCH_DEFAULT_STOCK_ALERT_THRESHOLD;
+          const totalStock =
             row.original.variants?.reduce((s: number, v: any) => s + (v.stock || 0), 0) || 0;
-          return <span className="text-sm">{stock}</span>;
+          const niveau = getMerchProductStockLevel(row.original.variants || [], seuil);
+          return (
+            <div className="flex flex-col gap-1">
+              <span className="text-sm font-medium">{totalStock}</span>
+              <Badge className={`text-[10px] w-fit border ${getMerchStockLevelBadgeClass(niveau)}`}>
+                {MERCH_STOCK_LEVEL_LABELS[niveau]}
+              </Badge>
+            </div>
+          );
         },
       }),
       columnHelper.accessor("actif", {
@@ -541,13 +686,57 @@ export default function AdminBoutiquePage() {
           </p>
         </CardHeader>
         <CardContent className="pt-6 px-4 sm:px-6">
-          <Tabs defaultValue="produits" onValueChange={(v) => v === "commandes" && loadOrders()}>
+          <Tabs value={activeTab} onValueChange={handleTabChange}>
             <TabsList className="mb-6 h-11">
               <TabsTrigger value="produits" className="text-sm sm:text-base px-4">Produits</TabsTrigger>
+              <TabsTrigger value="stock" className="text-sm sm:text-base px-4 gap-2">
+                <Boxes className="h-4 w-4 hidden sm:inline" />
+                Stock
+                {stockAlertCount > 0 && (
+                  <Badge className="bg-amber-500 text-white text-xs px-1.5 py-0 min-w-[1.25rem]">
+                    {stockAlertCount}
+                  </Badge>
+                )}
+              </TabsTrigger>
               <TabsTrigger value="commandes" className="text-sm sm:text-base px-4">Commandes</TabsTrigger>
             </TabsList>
 
             <TabsContent value="produits" className="space-y-4">
+              {(stockSummary.rupture > 0 || stockSummary.faible > 0) && (
+                <div
+                  className={`rounded-xl border p-4 flex flex-col sm:flex-row sm:items-center gap-3 ${
+                    stockSummary.rupture > 0
+                      ? "border-red-200 bg-red-50 dark:border-red-800 dark:bg-red-950/30"
+                      : "border-amber-200 bg-amber-50 dark:border-amber-800 dark:bg-amber-950/30"
+                  }`}
+                >
+                  <AlertTriangle
+                    className={`h-5 w-5 shrink-0 ${
+                      stockSummary.rupture > 0 ? "text-red-600" : "text-amber-600"
+                    }`}
+                  />
+                  <div className="flex-1 text-sm">
+                    {stockSummary.rupture > 0 && (
+                      <p className="font-semibold text-red-800 dark:text-red-200">
+                        {stockSummary.rupture} variante{stockSummary.rupture > 1 ? "s" : ""} en rupture de stock
+                      </p>
+                    )}
+                    {stockSummary.faible > 0 && (
+                      <p className={stockSummary.rupture > 0 ? "text-red-700 dark:text-red-300 mt-1" : "font-semibold text-amber-800 dark:text-amber-200"}>
+                        {stockSummary.faible} variante{stockSummary.faible > 1 ? "s" : ""} sous le seuil d&apos;alerte
+                      </p>
+                    )}
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0 border-blue-300 hover:bg-blue-50"
+                    onClick={() => handleTabChange("stock")}
+                  >
+                    Voir le stock
+                  </Button>
+                </div>
+              )}
               <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-4 space-y-3">
                 <div className="flex items-center gap-2 text-sm font-semibold text-blue-800 dark:text-blue-200">
                   <Filter className="h-4 w-4" />
@@ -754,6 +943,233 @@ export default function AdminBoutiquePage() {
               )}
             </TabsContent>
 
+            <TabsContent value="stock" className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 text-center">
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{stockSummary.total}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Variantes actives</p>
+                </div>
+                <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-4 text-center">
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-300">{stockSummary.ok}</p>
+                  <p className="text-xs text-green-700 dark:text-green-400 mt-1">Stock OK</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 text-center">
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{stockSummary.faible}</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">Stock bas</p>
+                </div>
+                <div className="rounded-xl border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/30 p-4 text-center">
+                  <p className="text-2xl font-bold text-red-700 dark:text-red-300">{stockSummary.rupture}</p>
+                  <p className="text-xs text-red-700 dark:text-red-400 mt-1">Ruptures</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-4 space-y-3">
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="relative flex-1">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
+                    <Input
+                      placeholder="Rechercher produit, taille ou couleur..."
+                      value={stockSearch}
+                      onChange={(e) => setStockSearch(e.target.value)}
+                      className="pl-10 bg-white dark:bg-slate-900"
+                    />
+                  </div>
+                  <Select value={stockFilter} onValueChange={setStockFilter}>
+                    <SelectTrigger className="w-full sm:w-52 bg-white dark:bg-slate-900">
+                      <SelectValue placeholder="Niveau de stock" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Tous les niveaux</SelectItem>
+                      <SelectItem value="rupture">Rupture uniquement</SelectItem>
+                      <SelectItem value="faible">Stock bas uniquement</SelectItem>
+                      <SelectItem value="ok">Stock OK uniquement</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {filteredStockLines.length} variante{filteredStockLines.length > 1 ? "s" : ""} affichée{filteredStockLines.length > 1 ? "s" : ""}
+                  {stockLines.length > 0 && filteredStockLines.length !== stockLines.length && ` sur ${stockLines.length}`}
+                </p>
+              </div>
+
+              {stockLoading ? (
+                <div className="flex justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+                </div>
+              ) : filteredStockLines.length === 0 ? (
+                <div className="text-center py-12 text-muted-foreground border border-dashed rounded-xl">
+                  {stockLines.length === 0
+                    ? "Aucune variante active. Ouvrez l'onglet pour charger les données."
+                    : "Aucune variante ne correspond aux filtres."}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                  <div className="hidden md:grid grid-cols-[1fr_80px_80px_80px_100px_120px] gap-2 px-4 py-2 bg-slate-100 dark:bg-slate-800 text-xs font-bold uppercase text-slate-600 dark:text-slate-300">
+                    <span>Produit / variante</span>
+                    <span className="text-center">Stock</span>
+                    <span className="text-center">Seuil</span>
+                    <span className="text-center">Niveau</span>
+                    <span className="text-center">Réappro.</span>
+                    <span className="text-center">Action</span>
+                  </div>
+                  <div className="divide-y divide-slate-200 dark:divide-slate-700">
+                    {filteredStockLines.map((line) => (
+                      <div
+                        key={line.variantId}
+                        className="p-3 md:grid md:grid-cols-[1fr_80px_80px_80px_100px_120px] md:gap-2 md:items-center hover:bg-slate-50 dark:hover:bg-slate-800/50"
+                      >
+                        <div className="min-w-0 mb-2 md:mb-0">
+                          <p className="font-medium text-sm truncate">{line.productTitre}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {line.taille} — {line.couleur}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between md:justify-center gap-2 mb-2 md:mb-0">
+                          <span className="text-xs text-muted-foreground md:hidden">Stock actuel</span>
+                          <span className="text-sm font-mono font-semibold">{line.stock}</span>
+                        </div>
+                        <div className="flex items-center justify-between md:justify-center gap-2 mb-2 md:mb-0">
+                          <span className="text-xs text-muted-foreground md:hidden">Seuil alerte</span>
+                          <span className="text-sm">{line.seuilAlerte}</span>
+                        </div>
+                        <div className="flex items-center justify-between md:justify-center gap-2 mb-2 md:mb-0">
+                          <span className="text-xs text-muted-foreground md:hidden">Niveau</span>
+                          <Badge className={`text-[10px] border ${getMerchStockLevelBadgeClass(line.niveau)}`}>
+                            {MERCH_STOCK_LEVEL_LABELS[line.niveau]}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center gap-2 mb-2 md:mb-0 md:justify-center">
+                          <Input
+                            type="number"
+                            min={0}
+                            className="h-8 w-20 text-sm"
+                            value={stockEdits[line.variantId] ?? line.stock}
+                            onChange={(e) =>
+                              setStockEdits((prev) => ({
+                                ...prev,
+                                [line.variantId]: parseInt(e.target.value, 10) || 0,
+                              }))
+                            }
+                          />
+                        </div>
+                        <div className="flex gap-2 md:justify-center">
+                          <Button
+                            size="sm"
+                            className="h-8 bg-blue-600 hover:bg-blue-700"
+                            disabled={
+                              savingStockId === line.variantId ||
+                              stockEdits[line.variantId] === line.stock
+                            }
+                            onClick={() => handleSaveVariantStock(line.variantId)}
+                          >
+                            {savingStockId === line.variantId ? (
+                              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                            ) : (
+                              "Enregistrer"
+                            )}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-8 border-blue-300"
+                            onClick={() => {
+                              const product = products.find((p) => p.id === line.productId);
+                              if (product) openEdit(product);
+                            }}
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 overflow-hidden">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 py-3 bg-slate-100 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center gap-2">
+                    <History className="h-4 w-4 text-blue-600" />
+                    <h3 className="font-semibold text-sm sm:text-base">Historique des mouvements</h3>
+                    <Badge variant="outline" className="text-xs">
+                      {stockMovements.length} entrée{stockMovements.length > 1 ? "s" : ""}
+                    </Badge>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-blue-300 hover:bg-blue-50"
+                    disabled={exportingCsv || movementsLoading}
+                    onClick={handleExportStockCsv}
+                  >
+                    {exportingCsv ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Download className="h-4 w-4 mr-2" />
+                    )}
+                    Exporter CSV
+                  </Button>
+                </div>
+
+                {movementsLoading ? (
+                  <div className="flex justify-center py-10">
+                    <Loader2 className="h-7 w-7 animate-spin text-blue-600" />
+                  </div>
+                ) : stockMovements.length === 0 ? (
+                  <p className="text-center py-10 text-muted-foreground text-sm">
+                    Aucun mouvement enregistré pour le moment.
+                  </p>
+                ) : (
+                  <div className="divide-y divide-slate-200 dark:divide-slate-700 max-h-[420px] overflow-y-auto">
+                    {stockMovements.map((movement) => (
+                      <div
+                        key={movement.id}
+                        className="p-3 sm:grid sm:grid-cols-[140px_1fr_80px_80px_80px] sm:gap-3 sm:items-center hover:bg-slate-50 dark:hover:bg-slate-800/50 text-sm"
+                      >
+                        <p className="text-xs text-muted-foreground mb-1 sm:mb-0">
+                          {format(new Date(movement.createdAt), "dd/MM/yyyy HH:mm", { locale: fr })}
+                        </p>
+                        <div className="min-w-0 mb-2 sm:mb-0">
+                          <p className="font-medium truncate">{movement.productTitre}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {movement.taille} — {movement.couleur}
+                            {movement.numeroCommande && (
+                              <span className="ml-1">· {movement.numeroCommande}</span>
+                            )}
+                          </p>
+                          {movement.motif && (
+                            <p className="text-xs text-slate-500 mt-0.5 truncate">{movement.motif}</p>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-center gap-2 mb-1 sm:mb-0">
+                          <span className="text-xs text-muted-foreground sm:hidden">Type</span>
+                          <Badge variant="outline" className="text-[10px]">
+                            {MERCH_STOCK_MOVEMENT_LABELS[movement.type] || movement.type}
+                          </Badge>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-center gap-2 mb-1 sm:mb-0">
+                          <span className="text-xs text-muted-foreground sm:hidden">Variation</span>
+                          <span
+                            className={`font-mono font-semibold ${
+                              movement.quantite < 0 ? "text-red-600" : movement.quantite > 0 ? "text-green-600" : ""
+                            }`}
+                          >
+                            {movement.quantite > 0 ? `+${movement.quantite}` : movement.quantite}
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between sm:justify-center gap-2">
+                          <span className="text-xs text-muted-foreground sm:hidden">Stock</span>
+                          <span className="font-mono text-xs">
+                            {movement.stockAvant} → {movement.stockApres}
+                          </span>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </TabsContent>
+
             <TabsContent value="commandes" className="space-y-4">
               <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2 text-sm font-semibold text-blue-800 dark:text-blue-200">
@@ -872,10 +1288,23 @@ export default function AdminBoutiquePage() {
                 <Label>Ordre d&apos;affichage</Label>
                 <Input type="number" value={ordre} onChange={(e) => setOrdre(Number(e.target.value))} className="mt-1" />
               </div>
-              <div className="flex items-center gap-2 pt-6">
-                <Switch checked={actif} onCheckedChange={setActif} />
-                <Label>Produit actif</Label>
+              <div>
+                <Label>Seuil d&apos;alerte stock</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  value={seuilAlerteStock}
+                  onChange={(e) => setSeuilAlerteStock(parseInt(e.target.value, 10) || 0)}
+                  className="mt-1"
+                />
+                <p className="text-xs text-muted-foreground mt-1">
+                  Alerte si une variante passe à {seuilAlerteStock} unité{seuilAlerteStock > 1 ? "s" : ""} ou moins
+                </p>
               </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Switch checked={actif} onCheckedChange={setActif} />
+              <Label>Produit actif</Label>
             </div>
 
             <div>

@@ -512,6 +512,54 @@ export async function getDashboardAlerts() {
       });
     }
 
+    // Stock boutique — ruptures et stocks bas
+    if ("merchProduct" in db) {
+      try {
+        const products = await db.merchProduct.findMany({
+          where: { actif: true },
+          select: {
+            seuilAlerteStock: true,
+            variants: {
+              where: { actif: true },
+              select: { stock: true },
+            },
+          },
+        });
+
+        let rupture = 0;
+        let faible = 0;
+        for (const product of products) {
+          const seuil = product.seuilAlerteStock ?? 5;
+          for (const variant of product.variants) {
+            if (variant.stock <= 0) rupture += 1;
+            else if (variant.stock <= seuil) faible += 1;
+          }
+        }
+
+        if (rupture > 0) {
+          alerts.push({
+            id: "merch-stock-rupture",
+            type: "error",
+            title: "Rupture de stock boutique",
+            message: `${rupture} variante(s) en rupture de stock`,
+            count: rupture,
+            link: "/admin/boutique",
+          });
+        } else if (faible > 0) {
+          alerts.push({
+            id: "merch-stock-faible",
+            type: "warning",
+            title: "Stock bas — produits dérivés",
+            message: `${faible} variante(s) sous le seuil d'alerte`,
+            count: faible,
+            link: "/admin/boutique",
+          });
+        }
+      } catch (error) {
+        // Ignorer si les tables boutique n'existent pas encore
+      }
+    }
+
     return {
       success: true,
       alerts,
