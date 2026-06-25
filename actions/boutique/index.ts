@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 import { writeFile, unlink } from "fs/promises";
 import { join } from "path";
 import { existsSync, mkdirSync } from "fs";
-import { slugifyMerchTitle, generateMerchOrderNumber, getMerchAppBaseUrl } from "@/lib/boutique";
+import { slugifyMerchTitle, generateMerchOrderNumber, buildMerchOrderTrackingUrl } from "@/lib/boutique";
 import { normalizePhoneE164 } from "@/lib/phone";
 import { MerchOrderStatus, MerchPaymentStatus } from "@prisma/client";
 import { randomBytes } from "crypto";
