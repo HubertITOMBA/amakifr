@@ -1,18 +1,9 @@
 // Fonctions helper pour générer les en-têtes et pieds de page des PDFs
-import { readFileSync } from "fs";
-import { join } from "path";
+import { readBrandLogoBase64 } from "@/lib/brand-logo-server";
 
 // Fonction pour encoder l'image logo en base64 pour les PDFs
 export function getLogoBase64ForPDF(): string {
-  try {
-    const logoPath = join(process.cwd(), 'public', 'amakifav.jpeg');
-    const logoBuffer = readFileSync(logoPath);
-    const base64String = logoBuffer.toString('base64');
-    return base64String;
-  } catch (error) {
-    console.error("Erreur lors du chargement du logo pour PDF:", error);
-    return '';
-  }
+  return readBrandLogoBase64();
 }
 
 export type AddPDFHeaderOptions = {

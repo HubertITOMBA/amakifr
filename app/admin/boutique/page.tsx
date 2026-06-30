@@ -12,6 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
+  DialogDescription,
   DialogFooter,
   DialogHeader,
   DialogTitle,
@@ -1293,12 +1294,26 @@ export default function AdminBoutiquePage() {
       </Card>
 
       <Dialog open={dialogOpen} onOpenChange={handleDialogOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>{editing ? "Modifier le produit" : "Nouveau produit dérivé"}</DialogTitle>
-          </DialogHeader>
+        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden p-0 gap-0 border-slate-200 dark:border-slate-700 flex flex-col">
+          <div className="bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white p-6 rounded-t-lg shrink-0">
+            <div className="flex items-center gap-3">
+              <div className="h-12 w-12 rounded-full bg-white/20 flex items-center justify-center shrink-0">
+                {editing ? <Pencil className="h-6 w-6 text-white" /> : <Plus className="h-6 w-6 text-white" />}
+              </div>
+              <div className="min-w-0">
+                <DialogTitle className="text-2xl font-bold text-white mb-1">
+                  {editing ? "Modifier le produit" : "Nouveau produit dérivé"}
+                </DialogTitle>
+                <DialogDescription className="text-blue-100 text-sm">
+                  {editing
+                    ? "Mettre à jour les informations, variantes et images du produit"
+                    : "Créer un produit dérivé avec ses variantes et images"}
+                </DialogDescription>
+              </div>
+            </div>
+          </div>
 
-          <div className="space-y-4">
+          <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-gradient-to-br from-gray-50 to-white dark:from-gray-900 dark:to-gray-800 min-h-0">
             <div>
               <Label>Titre *</Label>
               <Input value={titre} onChange={(e) => setTitre(e.target.value)} className="mt-1" />
@@ -1332,20 +1347,53 @@ export default function AdminBoutiquePage() {
             </div>
 
             <div>
-              <div className="flex justify-between items-center mb-2">
-                <Label>Variantes (taille / couleur / prix / stock) *</Label>
-                <Button type="button" variant="outline" size="sm" onClick={() => setVariants([...variants, emptyVariant()])}>
-                  <Plus className="h-3 w-3 mr-1" /> Ajouter
-                </Button>
-              </div>
-              <div className="space-y-2">
+              <Label className="mb-2 block">Variantes (taille / couleur / prix / stock) *</Label>
+              <div className="space-y-3">
                 {variants.map((v, idx) => (
-                  <div key={idx} className="grid grid-cols-2 sm:grid-cols-5 gap-2 p-2 border rounded-md">
-                    <Input placeholder="Taille" value={v.taille} onChange={(e) => {
-                      const n = [...variants]; n[idx].taille = e.target.value; setVariants(n);
-                    }} />
-                    <div className="space-y-1">
-                      <div className="flex flex-wrap items-center gap-1.5">
+                  <div key={idx} className="space-y-3 p-3 border border-slate-200 dark:border-slate-700 rounded-md bg-slate-50/50 dark:bg-slate-900/30">
+                    {/* Ligne 1 : taille à gauche, action à droite */}
+                    <div className="flex items-end gap-2">
+                      <div className="flex-1 min-w-0">
+                        <Label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Taille</Label>
+                        <Input
+                          placeholder="Ex: M, L, XL"
+                          value={v.taille}
+                          onChange={(e) => {
+                            const n = [...variants];
+                            n[idx].taille = e.target.value;
+                            setVariants(n);
+                          }}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div className="shrink-0">
+                        {idx === variants.length - 1 ? (
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="border-blue-300 hover:bg-blue-50"
+                            onClick={() => setVariants([...variants, emptyVariant()])}
+                          >
+                            <Plus className="h-3 w-3 mr-1" /> Ajouter
+                          </Button>
+                        ) : variants.length > 1 ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setVariants(variants.filter((_, i) => i !== idx))}
+                          >
+                            <Trash2 className="h-4 w-4 text-red-500" />
+                          </Button>
+                        ) : null}
+                      </div>
+                    </div>
+
+                    {/* Ligne 2 : couleur seule */}
+                    <div>
+                      <Label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Couleur</Label>
+                      <div className="flex flex-wrap items-center gap-1.5 mt-1 mb-2">
                         {MERCH_VARIANT_COLOR_PRESETS.map((c) => {
                           const selected =
                             (v.couleur || "").trim().toLowerCase() === c.label.toLowerCase();
@@ -1371,7 +1419,7 @@ export default function AdminBoutiquePage() {
                       </div>
                       <div className="flex items-center gap-2">
                         <div
-                          className="h-7 w-7 rounded-md border border-slate-300 bg-slate-100 shrink-0"
+                          className="h-8 w-8 rounded-md border border-slate-300 bg-slate-100 shrink-0"
                           style={{
                             backgroundColor: getMerchColorHexFromLabel(v.couleur) || "#f1f5f9",
                           }}
@@ -1388,17 +1436,38 @@ export default function AdminBoutiquePage() {
                         />
                       </div>
                     </div>
-                    <Input type="number" placeholder="Prix €" value={v.prix} onChange={(e) => {
-                      const n = [...variants]; n[idx].prix = parseFloat(e.target.value) || 0; setVariants(n);
-                    }} />
-                    <Input type="number" placeholder="Stock" value={v.stock} onChange={(e) => {
-                      const n = [...variants]; n[idx].stock = parseInt(e.target.value, 10) || 0; setVariants(n);
-                    }} />
-                    {variants.length > 1 && (
-                      <Button type="button" variant="ghost" size="sm" onClick={() => setVariants(variants.filter((_, i) => i !== idx))}>
-                        <Trash2 className="h-4 w-4 text-red-500" />
-                      </Button>
-                    )}
+
+                    {/* Ligne 3 : prix à gauche, stock à droite */}
+                    <div className="grid grid-cols-2 gap-3">
+                      <div>
+                        <Label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Prix (€)</Label>
+                        <Input
+                          type="number"
+                          placeholder="0.00"
+                          value={v.prix}
+                          onChange={(e) => {
+                            const n = [...variants];
+                            n[idx].prix = parseFloat(e.target.value) || 0;
+                            setVariants(n);
+                          }}
+                          className="mt-1"
+                        />
+                      </div>
+                      <div>
+                        <Label className="text-[10px] font-semibold text-slate-600 uppercase tracking-wide">Stock</Label>
+                        <Input
+                          type="number"
+                          placeholder="0"
+                          value={v.stock}
+                          onChange={(e) => {
+                            const n = [...variants];
+                            n[idx].stock = parseInt(e.target.value, 10) || 0;
+                            setVariants(n);
+                          }}
+                          className="mt-1"
+                        />
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
@@ -1452,7 +1521,7 @@ export default function AdminBoutiquePage() {
             </div>
           </div>
 
-          <DialogFooter>
+          <DialogFooter className="px-6 pb-6 pt-2 shrink-0 border-t border-slate-200 dark:border-slate-700 bg-white dark:bg-gray-900">
             <Button variant="outline" onClick={() => setDialogOpen(false)}>Fermer</Button>
             <Button onClick={handleSave} disabled={saving || uploading} className="bg-blue-600 hover:bg-blue-700">
               {saving ? <Loader2 className="h-4 w-4 animate-spin mr-2" /> : <Package className="h-4 w-4 mr-2" />}

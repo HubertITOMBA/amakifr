@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import Logo from "@/public/logow1.webp";
+import Logo from "@/public/images/amakifr.jpeg";
 import { UserButton } from "../auth/user-button";
 import { ThemeToggle } from "../ThemeToggle";
 import { NotificationCenter } from "../notifications/NotificationCenter";
@@ -220,8 +220,8 @@ export function DynamicNavbar() {
         <div className="flex items-center h-16 gap-2">
           {/* Logo - Largeur fixe */}
           <div className="shrink-0">
-            <Link href="/" className="flex flex-col items-center justify-center gap-0 w-14 h-14 p-1 rounded-lg backdrop-blur-3xl bg-gradient-to-br from-blue-500/70 to-purple-600/70 dark:from-blue-600/60 dark:to-purple-700/60 shadow-2xl hover:shadow-blue-500/50 transition-shadow duration-300">
-              <Image src={Logo} alt="Logo" className="w-12 h-12" />
+            <Link href="/" className="flex flex-col items-center justify-center gap-0 w-14 h-14 p-1 shadow-2xl hover:shadow-blue-500/50 transition-shadow duration-300">
+              <Image src={Logo} alt="Logo AMAKI France" className="w-12 h-12 object-contain" />
             </Link>
           </div>
 

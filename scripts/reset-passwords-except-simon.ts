@@ -1,8 +1,7 @@
 import { PrismaClient } from '@prisma/client';
 import bcrypt from 'bcryptjs';
-import { readFileSync } from 'fs';
-import { join } from 'path';
 import { getEmailProvider } from '../lib/email/providers';
+import { readBrandLogoDataUrl } from '../lib/brand-logo-server';
 
 const prisma = new PrismaClient();
 const domain = process.env.NEXT_PUBLIC_APP_URL || 'https://amaki.fr';
@@ -27,15 +26,7 @@ function generatePassword(length: number = 12): string {
 
 // Fonction pour encoder l'image logo en base64
 function getLogoBase64(): string {
-  try {
-    const logoPath = join(process.cwd(), 'public', 'amakifav.jpeg');
-    const logoBuffer = readFileSync(logoPath);
-    const base64String = logoBuffer.toString('base64');
-    return `data:image/jpeg;base64,${base64String}`;
-  } catch (error) {
-    console.error("Erreur lors du chargement du logo:", error);
-    return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
-  }
+  return readBrandLogoDataUrl() || 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
 }
 
 // Fonction helper pour générer l'en-tête avec logo

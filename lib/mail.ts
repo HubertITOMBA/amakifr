@@ -1,7 +1,7 @@
-import { readFileSync, existsSync } from "fs"
-import { join } from "path"
 import { getEmailProvider } from "./email/providers"
 import type { EmailOptions } from "./email/providers/types"
+import { BRAND_LOGO_PUBLIC_URL } from "@/lib/brand-logo"
+import { readBrandLogoDataUrl, resolveBrandLogoPath } from "@/lib/brand-logo-server"
 
 const domain = process.env.NEXT_PUBLIC_APP_URL
 
@@ -108,59 +108,23 @@ export async function sendEmail(options: EmailOptions, throwOnError: boolean = t
 // Fonction pour obtenir le data URL du logo en base64
 // Utilise base64 intégré plutôt qu'une URL externe pour garantir l'affichage dans tous les clients email
 function getLogoBase64(): string {
-  // Obtenir le répertoire de travail actuel
-  const cwd = process.cwd();
-  
-  // Liste des chemins possibles pour le logo (ordre de priorité)
-  const possiblePaths = [
-    // Chemins standards
-    join(cwd, 'public', 'amakifav.jpeg'),
-    join(cwd, 'public', 'images', 'amakifav.jpeg'),
-    // Chemins relatifs depuis lib/mail.ts
-    join(__dirname, '..', '..', 'public', 'amakifav.jpeg'),
-    join(__dirname, '..', '..', 'public', 'images', 'amakifav.jpeg'),
-    // Chemins pour Next.js standalone en production
-    join(cwd, '.next', 'standalone', 'public', 'amakifav.jpeg'),
-    join(cwd, '.next', 'standalone', 'public', 'images', 'amakifav.jpeg'),
-    // Chemin absolu si cwd est différent
-    '/sites/amakifr/public/amakifav.jpeg',
-    '/sites/amakifr/public/images/amakifav.jpeg',
-  ];
-
-  console.log(`[Email] Recherche du logo dans: ${cwd}`);
-  console.log(`[Email] __dirname: ${__dirname}`);
-
-  // Essayer chaque chemin jusqu'à trouver le fichier
-  for (const logoPath of possiblePaths) {
-    try {
-      if (existsSync(logoPath)) {
-        const logoBuffer = readFileSync(logoPath);
-        const base64String = logoBuffer.toString('base64');
-        console.log(`[Email] ✅ Logo chargé en base64 depuis: ${logoPath}`);
-        console.log(`[Email] Taille du logo: ${logoBuffer.length} bytes, base64: ${base64String.length} caractères`);
-        return `data:image/jpeg;base64,${base64String}`;
-      } else {
-        console.log(`[Email] ⚠️  Logo non trouvé à: ${logoPath}`);
-      }
-    } catch (error: any) {
-      console.warn(`[Email] ❌ Erreur lors du chargement depuis ${logoPath}:`, error.message);
-      continue;
-    }
+  const dataUrl = readBrandLogoDataUrl();
+  if (dataUrl) {
+    const logoPath = resolveBrandLogoPath();
+    console.log(`[Email] ✅ Logo chargé en base64 depuis: ${logoPath}`);
+    return dataUrl;
   }
 
-  // Si aucun fichier n'a été trouvé, essayer d'utiliser une URL publique en dernier recours
   const appUrl = cleanUrl(domain) || domain;
   if (appUrl) {
-    const publicLogoUrl = `${appUrl}/amakifav.jpeg`;
+    const publicLogoUrl = `${appUrl}${BRAND_LOGO_PUBLIC_URL}`;
     console.warn(`[Email] ⚠️  Logo non trouvé localement, utilisation de l'URL publique: ${publicLogoUrl}`);
     console.warn(`[Email] ⚠️  Note: Certains clients email peuvent bloquer les images externes`);
     return publicLogoUrl;
   }
 
-  // En dernier recours, utiliser une image de fallback
   console.error("[Email] ❌ Aucun logo trouvé, utilisation d'une image de fallback");
-  // Image de fallback transparente 1x1 pixel
-  return 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
+  return "data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7";
 }
 
 // Fonction helper pour générer l'en-tête avec logo

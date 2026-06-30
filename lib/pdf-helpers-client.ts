@@ -1,11 +1,12 @@
 // Fonctions helper pour générer les en-têtes et pieds de page des PDFs (Version Client)
 // Cette version est utilisée dans les composants client qui ne peuvent pas utiliser fs
 
+import { BRAND_LOGO_PUBLIC_URL } from "@/lib/brand-logo";
+
 // Fonction pour charger le logo depuis l'URL publique (version client)
 async function getLogoBase64ForPDFClient(): Promise<string> {
   try {
-    // Charger le logo depuis l'URL publique
-    const response = await fetch('/amakifav.jpeg');
+    const response = await fetch(BRAND_LOGO_PUBLIC_URL);
     const blob = await response.blob();
     
     return new Promise((resolve, reject) => {

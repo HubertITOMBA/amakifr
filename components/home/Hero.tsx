@@ -1,6 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
-import HeroImage from "@/public/images/amakifav.jpeg";
+import HeroImage from "@/public/images/amakifr.jpeg";
 import { ANNEE_CREATION } from "@/lib/constants/association";
 import { RegisterButton } from "../auth/register-button";
 import { LoginButton } from "../auth/login-button";

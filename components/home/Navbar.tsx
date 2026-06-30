@@ -2,8 +2,7 @@
 
 import Image from "next/image";
 import Link from "next/link";
-import Logo from "@/public/logow1.webp";
-import HeroImage from "@/public/hero.png";
+import Logo from "@/public/images/amakifr.jpeg";
 import { buttonVariants } from "@/components/ui/button";
 import { UserButton } from "../auth/user-button";
 import { ThemeToggle } from "../ThemeToggle";
@@ -55,7 +54,7 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           {/* Logo */}
           <Link href="/" className="flex flex-col items-center justify-center gap-0 mr-8 lg:mr-12 -space-y-1">
-            <Image src={Logo} alt="Logo" className="size-8" />
+            <Image src={Logo} alt="Logo AMAKI France" className="size-8 object-contain" />
           </Link>
 
           {/* Navigation Desktop */}

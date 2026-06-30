@@ -1,19 +1,11 @@
 // Fonctions helper pour générer le passeport adhérent PDF (Version Serveur)
 // Cette version est utilisée dans les Server Actions
 
-import { readFile } from "fs/promises";
-import { join } from "path";
+import { readBrandLogoBase64 } from "@/lib/brand-logo-server";
 
 // Fonction pour charger le logo depuis le système de fichiers (version serveur)
 async function getLogoBase64ForPDFServer(): Promise<string> {
-  try {
-    const logoPath = join(process.cwd(), "public", "amakifav.jpeg");
-    const logoBuffer = await readFile(logoPath);
-    return logoBuffer.toString("base64");
-  } catch (error) {
-    console.error("Erreur lors du chargement du logo pour PDF:", error);
-    return "";
-  }
+  return readBrandLogoBase64();
 }
 
 // Fonction pour générer un numéro de passeport unique

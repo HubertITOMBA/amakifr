@@ -1,6 +1,7 @@
 "use client";
 
 import Image from "next/image";
+import { BRAND_LOGO_PUBLIC_URL } from "@/lib/brand-logo";
 
 interface HeaderProps {
     labelBox: string;
@@ -13,7 +14,7 @@ export const Header = ({ labelBox, label }: HeaderProps) => {
             {/* Logo */}
             <div className="flex items-center justify-center mb-2">
                 <Image 
-                    src="/amakifav.jpeg" 
+                    src={BRAND_LOGO_PUBLIC_URL} 
                     alt="Logo AMAKI France" 
                     width={50} 
                     height={50}
