@@ -94,6 +94,28 @@ import Link from "next/link";
 
 const columnHelper = createColumnHelper<any>();
 
+const MERCH_VARIANT_COLOR_PRESETS: Array<{ label: string; hex: string }> = [
+  { label: "Noir", hex: "#0f172a" },
+  { label: "Blanc", hex: "#ffffff" },
+  { label: "Gris", hex: "#94a3b8" },
+  { label: "Rouge", hex: "#ef4444" },
+  { label: "Bordeaux", hex: "#7f1d1d" },
+  { label: "Orange", hex: "#f97316" },
+  { label: "Jaune", hex: "#eab308" },
+  { label: "Vert", hex: "#22c55e" },
+  { label: "Bleu", hex: "#3b82f6" },
+  { label: "Marine", hex: "#1e3a8a" },
+  { label: "Violet", hex: "#a855f7" },
+  { label: "Rose", hex: "#ec4899" },
+];
+
+function getMerchColorHexFromLabel(label: string): string | null {
+  const found = MERCH_VARIANT_COLOR_PRESETS.find(
+    (c) => c.label.toLowerCase() === (label || "").trim().toLowerCase()
+  );
+  return found?.hex || null;
+}
+
 const emptyVariant = (): MerchVariantInput => ({
   taille: "",
   couleur: "",
@@ -1322,9 +1344,50 @@ export default function AdminBoutiquePage() {
                     <Input placeholder="Taille" value={v.taille} onChange={(e) => {
                       const n = [...variants]; n[idx].taille = e.target.value; setVariants(n);
                     }} />
-                    <Input placeholder="Couleur" value={v.couleur} onChange={(e) => {
-                      const n = [...variants]; n[idx].couleur = e.target.value; setVariants(n);
-                    }} />
+                    <div className="space-y-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {MERCH_VARIANT_COLOR_PRESETS.map((c) => {
+                          const selected =
+                            (v.couleur || "").trim().toLowerCase() === c.label.toLowerCase();
+                          return (
+                            <button
+                              key={c.label}
+                              type="button"
+                              title={c.label}
+                              className={`h-6 w-6 rounded-full border transition-all ${
+                                selected
+                                  ? "ring-2 ring-blue-500 border-blue-500"
+                                  : "border-slate-300 hover:border-slate-400"
+                              }`}
+                              style={{ backgroundColor: c.hex }}
+                              onClick={() => {
+                                const n = [...variants];
+                                n[idx].couleur = c.label;
+                                setVariants(n);
+                              }}
+                            />
+                          );
+                        })}
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="h-7 w-7 rounded-md border border-slate-300 bg-slate-100 shrink-0"
+                          style={{
+                            backgroundColor: getMerchColorHexFromLabel(v.couleur) || "#f1f5f9",
+                          }}
+                          title={v.couleur ? `Couleur: ${v.couleur}` : "Couleur non définie"}
+                        />
+                        <Input
+                          placeholder="Couleur (ex: Noir)"
+                          value={v.couleur}
+                          onChange={(e) => {
+                            const n = [...variants];
+                            n[idx].couleur = e.target.value;
+                            setVariants(n);
+                          }}
+                        />
+                      </div>
+                    </div>
                     <Input type="number" placeholder="Prix €" value={v.prix} onChange={(e) => {
                       const n = [...variants]; n[idx].prix = parseFloat(e.target.value) || 0; setVariants(n);
                     }} />
