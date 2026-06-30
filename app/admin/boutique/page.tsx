@@ -67,11 +67,12 @@ import {
   deleteMerchProduct,
   uploadMerchProductImage,
   deleteMerchProductImage,
-  getAllMerchOrders,
+  getMerchOrderStats,
   getMerchStockOverview,
   updateMerchVariantStock,
   getMerchStockMovements,
   exportMerchStockMovementsCsv,
+  type MerchOrderStats,
   type MerchStockLine,
   type MerchStockMovementRow,
 } from "@/actions/boutique";
@@ -79,9 +80,7 @@ import {
   formatMerchPrice,
   type MerchVariantInput,
   MERCH_ORDER_STATUS_LABELS,
-  MERCH_PAYMENT_STATUS_LABELS,
   getMerchOrderStatusBadgeClass,
-  getMerchPaymentStatusBadgeClass,
   getMerchStockLevel,
   getMerchProductStockLevel,
   MERCH_STOCK_LEVEL_LABELS,
@@ -89,9 +88,9 @@ import {
   MERCH_DEFAULT_STOCK_ALERT_THRESHOLD,
   MERCH_STOCK_MOVEMENT_LABELS,
 } from "@/lib/boutique";
-import { MerchOrderDetailDialog, type MerchOrderDetail } from "@/components/boutique/MerchOrderDetailDialog";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import Link from "next/link";
 
 const columnHelper = createColumnHelper<any>();
 
@@ -108,9 +107,18 @@ const emptyVariant = (): MerchVariantInput => ({
  */
 export default function AdminBoutiquePage() {
   const [products, setProducts] = useState<any[]>([]);
-  const [orders, setOrders] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [orderStats, setOrderStats] = useState<MerchOrderStats>({
+    total: 0,
+    montantTotal: 0,
+    paymentReceived: 0,
+    paymentPending: 0,
+    byStatus: {},
+    last30DaysCount: 0,
+    last30DaysRevenue: 0,
+  });
+  const [orderStatsLoading, setOrderStatsLoading] = useState(false);
+  const [orderStatsLoaded, setOrderStatsLoaded] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const [globalFilter, setGlobalFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -123,8 +131,6 @@ export default function AdminBoutiquePage() {
   });
   const [expandedMobileId, setExpandedMobileId] = useState<string | null>(null);
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>("all");
-  const [selectedOrder, setSelectedOrder] = useState<MerchOrderDetail | null>(null);
-  const [orderDialogOpen, setOrderDialogOpen] = useState(false);
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -143,6 +149,7 @@ export default function AdminBoutiquePage() {
   const [stockLines, setStockLines] = useState<MerchStockLine[]>([]);
   const [stockSummary, setStockSummary] = useState({ total: 0, rupture: 0, faible: 0, ok: 0 });
   const [stockLoading, setStockLoading] = useState(false);
+  const [stockLoaded, setStockLoaded] = useState(false);
   const [stockFilter, setStockFilter] = useState<string>("all");
   const [stockSearch, setStockSearch] = useState("");
   const [savingStockId, setSavingStockId] = useState<string | null>(null);
@@ -150,6 +157,7 @@ export default function AdminBoutiquePage() {
   const [activeTab, setActiveTab] = useState("produits");
   const [stockMovements, setStockMovements] = useState<MerchStockMovementRow[]>([]);
   const [movementsLoading, setMovementsLoading] = useState(false);
+  const [movementsLoaded, setMovementsLoaded] = useState(false);
   const [exportingCsv, setExportingCsv] = useState(false);
 
   const productId = editing?.id as string | undefined;
@@ -179,15 +187,26 @@ export default function AdminBoutiquePage() {
     setLoading(false);
   }, []);
 
-  const loadOrders = useCallback(async () => {
-    setOrdersLoading(true);
-    const res = await getAllMerchOrders();
-    if (res.success && res.data) setOrders(res.data);
-    else toast.error(res.error || "Erreur de chargement des commandes");
-    setOrdersLoading(false);
-  }, []);
+  const loadOrderStats = useCallback(
+    async (force = false) => {
+      if (!force && orderStatsLoaded) return;
+      setOrderStatsLoading(true);
+      const res = await getMerchOrderStats({
+        statut: orderStatusFilter === "all" ? "all" : (orderStatusFilter as any),
+      });
+      if (res.success && res.data) {
+        setOrderStats(res.data);
+        setOrderStatsLoaded(true);
+      } else {
+        toast.error(res.error || "Erreur de chargement des statistiques");
+      }
+      setOrderStatsLoading(false);
+    },
+    [orderStatsLoaded, orderStatusFilter]
+  );
 
-  const loadStock = useCallback(async () => {
+  const loadStock = useCallback(async (force = false) => {
+    if (!force && stockLoaded) return;
     setStockLoading(true);
     const res = await getMerchStockOverview();
     if (res.success && res.data) {
@@ -202,15 +221,18 @@ export default function AdminBoutiquePage() {
       toast.error(res.error || "Erreur de chargement du stock");
     }
     setStockLoading(false);
-  }, []);
+    if (res.success) setStockLoaded(true);
+  }, [stockLoaded]);
 
-  const loadMovements = useCallback(async () => {
+  const loadMovements = useCallback(async (force = false) => {
+    if (!force && movementsLoaded) return;
     setMovementsLoading(true);
     const res = await getMerchStockMovements(100);
     if (res.success && res.data) setStockMovements(res.data);
     else toast.error(res.error || "Erreur de chargement de l'historique");
     setMovementsLoading(false);
-  }, []);
+    if (res.success) setMovementsLoaded(true);
+  }, [movementsLoaded]);
 
   useEffect(() => {
     loadProducts();
@@ -274,12 +296,19 @@ export default function AdminBoutiquePage() {
 
   const handleTabChange = (value: string) => {
     setActiveTab(value);
-    if (value === "commandes") loadOrders();
+    if (value === "commandes") loadOrderStats(false);
     if (value === "stock") {
-      loadStock();
-      loadMovements();
+      loadStock(false);
+      loadMovements(false);
     }
   };
+
+  useEffect(() => {
+    if (activeTab !== "commandes") return;
+    setOrderStatsLoaded(false);
+    loadOrderStats(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [orderStatusFilter]);
 
   const handleDialogOpenChange = (open: boolean) => {
     setDialogOpen(open);
@@ -410,7 +439,7 @@ export default function AdminBoutiquePage() {
         await loadProducts();
       }
 
-      if (stockLines.length > 0) await loadStock();
+      if (stockLoaded) await loadStock(true);
 
       toast.success(
         uploadCount > 0
@@ -485,8 +514,8 @@ export default function AdminBoutiquePage() {
     const res = await updateMerchVariantStock({ variantId, stock });
     if (res.success) {
       toast.success(res.message || "Stock mis à jour");
-      await loadStock();
-      await loadMovements();
+      await loadStock(true);
+      await loadMovements(true);
       await loadProducts();
     } else {
       toast.error(res.error || "Erreur lors de la mise à jour");
@@ -638,60 +667,6 @@ export default function AdminBoutiquePage() {
     setExpandedMobileId((current) => (current === productId ? null : productId));
   };
 
-  const filteredOrders = useMemo(() => {
-    if (orderStatusFilter === "all") return orders;
-    return orders.filter((order) => order.statut === orderStatusFilter);
-  }, [orders, orderStatusFilter]);
-
-  const orderStats = useMemo(() => {
-    const total = filteredOrders.length;
-    const montantTotal = filteredOrders.reduce(
-      (sum, o: any) => sum + (typeof o.montantTotal === "number" ? o.montantTotal : Number(o.montantTotal || 0)),
-      0
-    );
-    const paymentReceived = filteredOrders.filter((o: any) => (o.statutPaiement || "EnAttente") === "Recu").length;
-    const paymentPending = filteredOrders.filter((o: any) => (o.statutPaiement || "EnAttente") === "EnAttente").length;
-
-    const byStatus = filteredOrders.reduce((acc: Record<string, number>, o: any) => {
-      const key = o.statut || "EnAttente";
-      acc[key] = (acc[key] || 0) + 1;
-      return acc;
-    }, {});
-
-    const now = Date.now();
-    const in30Days = now - 30 * 24 * 60 * 60 * 1000;
-    const last30Days = filteredOrders.filter((o: any) => {
-      const d = new Date(o.createdAt).getTime();
-      return !Number.isNaN(d) && d >= in30Days;
-    });
-
-    const last30DaysCount = last30Days.length;
-    const last30DaysRevenue = last30Days.reduce(
-      (sum, o: any) => sum + (typeof o.montantTotal === "number" ? o.montantTotal : Number(o.montantTotal || 0)),
-      0
-    );
-
-    return {
-      total,
-      montantTotal,
-      paymentReceived,
-      paymentPending,
-      byStatus,
-      last30DaysCount,
-      last30DaysRevenue,
-    };
-  }, [filteredOrders]);
-
-  const openOrderDetail = (order: MerchOrderDetail) => {
-    setSelectedOrder(order);
-    setOrderDialogOpen(true);
-  };
-
-  const handleOrderUpdated = (order: MerchOrderDetail) => {
-    setSelectedOrder(order);
-    setOrders((prev) => prev.map((o) => (o.id === order.id ? order : o)));
-  };
-
   const table = useReactTable({
     data: filteredProducts,
     columns,
@@ -710,9 +685,9 @@ export default function AdminBoutiquePage() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-3 sm:p-6">
+    <div className="min-h-screen bg-linear-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-3 sm:p-6">
       <Card className="mx-auto w-full max-w-6xl shadow-lg border-blue-200 dark:border-blue-800">
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg px-5 py-5 sm:px-6 sm:py-6">
+        <CardHeader className="bg-linear-to-r from-blue-500 to-blue-600 text-white rounded-t-lg px-5 py-5 sm:px-6 sm:py-6">
           <CardTitle className="flex flex-wrap items-center gap-3 text-xl sm:text-2xl lg:text-3xl font-bold">
             <ShoppingBag className="h-7 w-7 sm:h-8 sm:w-8 shrink-0" />
             <span>Boutique — Produits dérivés</span>
@@ -732,7 +707,7 @@ export default function AdminBoutiquePage() {
                 <Boxes className="h-4 w-4 hidden sm:inline" />
                 Stock
                 {stockAlertCount > 0 && (
-                  <Badge className="bg-amber-500 text-white text-xs px-1.5 py-0 min-w-[1.25rem]">
+                  <Badge className="bg-amber-500 text-white text-xs px-1.5 py-0 min-w-5">
                     {stockAlertCount}
                   </Badge>
                 )}
@@ -1210,63 +1185,10 @@ export default function AdminBoutiquePage() {
             </TabsContent>
 
             <TabsContent value="commandes" className="space-y-4">
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 text-center">
-                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{orderStats.total}</p>
-                  <p className="text-xs text-muted-foreground mt-1">Commandes (filtre)</p>
-                </div>
-                <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 text-center">
-                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
-                    {formatMerchPrice(orderStats.montantTotal)}
-                  </p>
-                  <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">Chiffre d&apos;affaires</p>
-                </div>
-                <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-4 text-center">
-                  <p className="text-2xl font-bold text-green-700 dark:text-green-300">{orderStats.paymentReceived}</p>
-                  <p className="text-xs text-green-700 dark:text-green-400 mt-1">Paiements reçus</p>
-                </div>
-                <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 text-center">
-                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{orderStats.paymentPending}</p>
-                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">Paiements en attente</p>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-                <div className="flex items-center gap-2">
-                  <Badge className={getMerchOrderStatusBadgeClass("EnAttente")}>
-                    {MERCH_ORDER_STATUS_LABELS.EnAttente}
-                  </Badge>
-                  <span className="text-sm font-semibold">
-                    {orderStats.byStatus.EnAttente || 0}
-                  </span>
-                  <Badge className={getMerchOrderStatusBadgeClass("Confirmee")}>
-                    {MERCH_ORDER_STATUS_LABELS.Confirmee}
-                  </Badge>
-                  <span className="text-sm font-semibold">
-                    {orderStats.byStatus.Confirmee || 0}
-                  </span>
-                  <Badge className={getMerchOrderStatusBadgeClass("Expediee")}>
-                    {MERCH_ORDER_STATUS_LABELS.Expediee}
-                  </Badge>
-                  <span className="text-sm font-semibold">
-                    {orderStats.byStatus.Expediee || 0}
-                  </span>
-                  <Badge className={getMerchOrderStatusBadgeClass("Livree")}>
-                    {MERCH_ORDER_STATUS_LABELS.Livree}
-                  </Badge>
-                  <span className="text-sm font-semibold">
-                    {orderStats.byStatus.Livree || 0}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground">
-                  30 derniers jours : {orderStats.last30DaysCount} commande{orderStats.last30DaysCount > 1 ? "s" : ""} — {formatMerchPrice(orderStats.last30DaysRevenue)}
-                </p>
-              </div>
-
               <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2 text-sm font-semibold text-blue-800 dark:text-blue-200">
                   <ClipboardList className="h-4 w-4" />
-                  Commandes clients
+                  Statistiques commandes
                 </div>
                 <Select value={orderStatusFilter} onValueChange={setOrderStatusFilter}>
                   <SelectTrigger className="w-full sm:w-56 bg-white dark:bg-slate-900">
@@ -1283,76 +1205,64 @@ export default function AdminBoutiquePage() {
                 </Select>
               </div>
 
-              {ordersLoading ? (
+              {orderStatsLoading ? (
                 <div className="flex justify-center py-12">
                   <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
                 </div>
-              ) : filteredOrders.length === 0 ? (
-                <p className="text-center text-muted-foreground py-8 border border-dashed rounded-xl">
-                  {orders.length === 0
-                    ? "Aucune commande pour le moment"
-                    : "Aucune commande ne correspond au filtre sélectionné"}
-                </p>
               ) : (
-                <div className="space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    {filteredOrders.length} commande{filteredOrders.length > 1 ? "s" : ""} — cliquez pour voir le détail
-                  </p>
-                  {filteredOrders.map((order) => (
-                    <Card
-                      key={order.id}
-                      className="border-slate-200 dark:border-slate-700 hover:border-blue-300 hover:shadow-md transition-all cursor-pointer"
-                      onClick={() => openOrderDetail(order as MerchOrderDetail)}
-                    >
-                      <CardContent className="p-4">
-                        <div className="flex flex-wrap justify-between gap-3 mb-3">
-                          <div className="min-w-0">
-                            <p className="font-semibold text-base">{order.numeroCommande}</p>
-                            <p className="text-sm text-muted-foreground truncate">
-                              {order.nom} — {order.email}
-                            </p>
-                            <div className="flex flex-wrap gap-2 mt-2">
-                              <Badge className={getMerchOrderStatusBadgeClass(order.statut)}>
-                                {MERCH_ORDER_STATUS_LABELS[order.statut] || order.statut}
-                              </Badge>
-                              <Badge className={getMerchPaymentStatusBadgeClass(order.statutPaiement || "EnAttente")}>
-                                {MERCH_PAYMENT_STATUS_LABELS[order.statutPaiement || "EnAttente"]}
-                              </Badge>
-                            </div>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <p className="font-bold text-blue-600 text-lg">{formatMerchPrice(order.montantTotal)}</p>
-                            <p className="text-xs text-muted-foreground">
-                              {format(new Date(order.createdAt), "dd MMM yyyy HH:mm", { locale: fr })}
-                            </p>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              size="sm"
-                              className="mt-2 border-blue-300"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                openOrderDetail(order as MerchOrderDetail);
-                              }}
-                            >
-                              <Eye className="h-3.5 w-3.5 mr-1" />
-                              Détail
-                            </Button>
-                          </div>
-                        </div>
-                        <ul className="text-sm space-y-1 text-muted-foreground">
-                          {order.items.slice(0, 3).map((item: any) => (
-                            <li key={item.id}>
-                              {item.productTitre} — {item.taille}/{item.couleur} × {item.quantite}
-                            </li>
-                          ))}
-                          {order.items.length > 3 && (
-                            <li className="text-xs italic">+ {order.items.length - 3} autre(s) article(s)</li>
-                          )}
-                        </ul>
-                      </CardContent>
-                    </Card>
-                  ))}
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                    <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 text-center">
+                      <p className="text-2xl font-bold text-slate-900 dark:text-white">{orderStats.total}</p>
+                      <p className="text-xs text-muted-foreground mt-1">Commandes (filtre)</p>
+                    </div>
+                    <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 text-center">
+                      <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                        {formatMerchPrice(orderStats.montantTotal)}
+                      </p>
+                      <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">Chiffre d&apos;affaires</p>
+                    </div>
+                    <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-4 text-center">
+                      <p className="text-2xl font-bold text-green-700 dark:text-green-300">{orderStats.paymentReceived}</p>
+                      <p className="text-xs text-green-700 dark:text-green-400 mt-1">Paiements reçus</p>
+                    </div>
+                    <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 text-center">
+                      <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{orderStats.paymentPending}</p>
+                      <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">Paiements en attente</p>
+                    </div>
+                  </div>
+
+                  <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge className={getMerchOrderStatusBadgeClass("EnAttente")}>
+                        {MERCH_ORDER_STATUS_LABELS.EnAttente}
+                      </Badge>
+                      <span className="text-sm font-semibold">{orderStats.byStatus.EnAttente || 0}</span>
+                      <Badge className={getMerchOrderStatusBadgeClass("Confirmee")}>
+                        {MERCH_ORDER_STATUS_LABELS.Confirmee}
+                      </Badge>
+                      <span className="text-sm font-semibold">{orderStats.byStatus.Confirmee || 0}</span>
+                      <Badge className={getMerchOrderStatusBadgeClass("Expediee")}>
+                        {MERCH_ORDER_STATUS_LABELS.Expediee}
+                      </Badge>
+                      <span className="text-sm font-semibold">{orderStats.byStatus.Expediee || 0}</span>
+                      <Badge className={getMerchOrderStatusBadgeClass("Livree")}>
+                        {MERCH_ORDER_STATUS_LABELS.Livree}
+                      </Badge>
+                      <span className="text-sm font-semibold">{orderStats.byStatus.Livree || 0}</span>
+                    </div>
+                    <div className="flex flex-col sm:flex-row gap-2 sm:items-center sm:justify-end">
+                      <p className="text-xs text-muted-foreground">
+                        30 derniers jours : {orderStats.last30DaysCount} commande{orderStats.last30DaysCount > 1 ? "s" : ""} — {formatMerchPrice(orderStats.last30DaysRevenue)}
+                      </p>
+                      <Link href="/admin/boutique/commandes" className="sm:ml-2">
+                        <Button variant="outline" className="border-blue-300 hover:bg-blue-50">
+                          <Eye className="h-4 w-4 mr-2" />
+                          Voir toutes les commandes
+                        </Button>
+                      </Link>
+                    </div>
+                  </div>
                 </div>
               )}
             </TabsContent>
@@ -1488,13 +1398,6 @@ export default function AdminBoutiquePage() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      <MerchOrderDetailDialog
-        order={selectedOrder}
-        open={orderDialogOpen}
-        onOpenChange={setOrderDialogOpen}
-        onUpdated={handleOrderUpdated}
-      />
     </div>
   );
 }

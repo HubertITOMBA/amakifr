@@ -897,6 +897,89 @@ export async function getAllMerchOrders() {
   }
 }
 
+const OrderStatsFilterSchema = z.object({
+  statut: z.union([z.literal("all"), z.nativeEnum(MerchOrderStatus)]).default("all"),
+});
+
+export interface MerchOrderStats {
+  total: number;
+  montantTotal: number;
+  paymentReceived: number;
+  paymentPending: number;
+  byStatus: Record<string, number>;
+  last30DaysCount: number;
+  last30DaysRevenue: number;
+}
+
+/**
+ * Statistiques commandes boutique (admin)
+ *
+ * Retourne uniquement des compteurs/sommes pour éviter de charger toutes les commandes.
+ */
+export async function getMerchOrderStats(filter?: z.input<typeof OrderStatsFilterSchema>) {
+  try {
+    const admin = await requireAdmin();
+    if (!admin.ok) return { success: false, error: admin.error };
+
+    const validated = OrderStatsFilterSchema.parse(filter || {});
+    const whereBase = validated.statut === "all" ? {} : { statut: validated.statut };
+
+    const aggregate = await db.merchOrder.aggregate({
+      where: whereBase,
+      _count: { _all: true },
+      _sum: { montantTotal: true },
+    });
+
+    const groupStatus = await db.merchOrder.groupBy({
+      by: ["statut"],
+      where: whereBase,
+      _count: { _all: true },
+    });
+
+    const groupPayment = await db.merchOrder.groupBy({
+      by: ["statutPaiement"],
+      where: whereBase,
+      _count: { _all: true },
+    });
+
+    const now = Date.now();
+    const from30Days = new Date(now - 30 * 24 * 60 * 60 * 1000);
+    const last30 = await db.merchOrder.aggregate({
+      where: { ...whereBase, createdAt: { gte: from30Days } },
+      _count: { _all: true },
+      _sum: { montantTotal: true },
+    });
+
+    const byStatus = groupStatus.reduce((acc: Record<string, number>, row) => {
+      acc[row.statut] = row._count._all;
+      return acc;
+    }, {});
+
+    const paymentReceived =
+      groupPayment.find((p) => p.statutPaiement === MerchPaymentStatus.Recu)?._count._all || 0;
+    const paymentPending =
+      groupPayment.find((p) => p.statutPaiement === MerchPaymentStatus.EnAttente)?._count._all || 0;
+
+    const stats: MerchOrderStats = {
+      total: aggregate._count._all,
+      montantTotal: Number(aggregate._sum.montantTotal || 0),
+      paymentReceived,
+      paymentPending,
+      byStatus,
+      last30DaysCount: last30._count._all,
+      last30DaysRevenue: Number(last30._sum.montantTotal || 0),
+    };
+
+    return { success: true, data: stats };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0]?.message || "Données invalides" };
+    }
+    console.error("getMerchOrderStats:", error);
+    return { success: false, error: "Erreur lors du chargement des statistiques" };
+  }
+}
+
 /**
  * Détail d'une commande boutique (admin)
  */
