@@ -643,6 +643,45 @@ export default function AdminBoutiquePage() {
     return orders.filter((order) => order.statut === orderStatusFilter);
   }, [orders, orderStatusFilter]);
 
+  const orderStats = useMemo(() => {
+    const total = filteredOrders.length;
+    const montantTotal = filteredOrders.reduce(
+      (sum, o: any) => sum + (typeof o.montantTotal === "number" ? o.montantTotal : Number(o.montantTotal || 0)),
+      0
+    );
+    const paymentReceived = filteredOrders.filter((o: any) => (o.statutPaiement || "EnAttente") === "Recu").length;
+    const paymentPending = filteredOrders.filter((o: any) => (o.statutPaiement || "EnAttente") === "EnAttente").length;
+
+    const byStatus = filteredOrders.reduce((acc: Record<string, number>, o: any) => {
+      const key = o.statut || "EnAttente";
+      acc[key] = (acc[key] || 0) + 1;
+      return acc;
+    }, {});
+
+    const now = Date.now();
+    const in30Days = now - 30 * 24 * 60 * 60 * 1000;
+    const last30Days = filteredOrders.filter((o: any) => {
+      const d = new Date(o.createdAt).getTime();
+      return !Number.isNaN(d) && d >= in30Days;
+    });
+
+    const last30DaysCount = last30Days.length;
+    const last30DaysRevenue = last30Days.reduce(
+      (sum, o: any) => sum + (typeof o.montantTotal === "number" ? o.montantTotal : Number(o.montantTotal || 0)),
+      0
+    );
+
+    return {
+      total,
+      montantTotal,
+      paymentReceived,
+      paymentPending,
+      byStatus,
+      last30DaysCount,
+      last30DaysRevenue,
+    };
+  }, [filteredOrders]);
+
   const openOrderDetail = (order: MerchOrderDetail) => {
     setSelectedOrder(order);
     setOrderDialogOpen(true);
@@ -1171,6 +1210,59 @@ export default function AdminBoutiquePage() {
             </TabsContent>
 
             <TabsContent value="commandes" className="space-y-4">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 text-center">
+                  <p className="text-2xl font-bold text-slate-900 dark:text-white">{orderStats.total}</p>
+                  <p className="text-xs text-muted-foreground mt-1">Commandes (filtre)</p>
+                </div>
+                <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50 dark:bg-blue-950/30 p-4 text-center">
+                  <p className="text-2xl font-bold text-blue-700 dark:text-blue-300">
+                    {formatMerchPrice(orderStats.montantTotal)}
+                  </p>
+                  <p className="text-xs text-blue-700 dark:text-blue-400 mt-1">Chiffre d&apos;affaires</p>
+                </div>
+                <div className="rounded-xl border border-green-200 dark:border-green-800 bg-green-50 dark:bg-green-950/30 p-4 text-center">
+                  <p className="text-2xl font-bold text-green-700 dark:text-green-300">{orderStats.paymentReceived}</p>
+                  <p className="text-xs text-green-700 dark:text-green-400 mt-1">Paiements reçus</p>
+                </div>
+                <div className="rounded-xl border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/30 p-4 text-center">
+                  <p className="text-2xl font-bold text-amber-700 dark:text-amber-300">{orderStats.paymentPending}</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-1">Paiements en attente</p>
+                </div>
+              </div>
+
+              <div className="rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                <div className="flex items-center gap-2">
+                  <Badge className={getMerchOrderStatusBadgeClass("EnAttente")}>
+                    {MERCH_ORDER_STATUS_LABELS.EnAttente}
+                  </Badge>
+                  <span className="text-sm font-semibold">
+                    {orderStats.byStatus.EnAttente || 0}
+                  </span>
+                  <Badge className={getMerchOrderStatusBadgeClass("Confirmee")}>
+                    {MERCH_ORDER_STATUS_LABELS.Confirmee}
+                  </Badge>
+                  <span className="text-sm font-semibold">
+                    {orderStats.byStatus.Confirmee || 0}
+                  </span>
+                  <Badge className={getMerchOrderStatusBadgeClass("Expediee")}>
+                    {MERCH_ORDER_STATUS_LABELS.Expediee}
+                  </Badge>
+                  <span className="text-sm font-semibold">
+                    {orderStats.byStatus.Expediee || 0}
+                  </span>
+                  <Badge className={getMerchOrderStatusBadgeClass("Livree")}>
+                    {MERCH_ORDER_STATUS_LABELS.Livree}
+                  </Badge>
+                  <span className="text-sm font-semibold">
+                    {orderStats.byStatus.Livree || 0}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  30 derniers jours : {orderStats.last30DaysCount} commande{orderStats.last30DaysCount > 1 ? "s" : ""} — {formatMerchPrice(orderStats.last30DaysRevenue)}
+                </p>
+              </div>
+
               <div className="rounded-xl border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/20 p-4 flex flex-col sm:flex-row gap-3 sm:items-center sm:justify-between">
                 <div className="flex items-center gap-2 text-sm font-semibold text-blue-800 dark:text-blue-200">
                   <ClipboardList className="h-4 w-4" />
