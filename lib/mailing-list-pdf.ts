@@ -21,8 +21,11 @@ const FOOTER_HEIGHT = 20;
 const CONTENT_MAX_Y = PAGE_HEIGHT - FOOTER_HEIGHT - 10;
 const HEADER_HEIGHT = 22;
 
-/** Zone fenêtre enveloppe (adhérent, haut-droite) */
-const WINDOW_X = 110;
+/**
+ * Colonne droite (fenêtre enveloppe + date/signature) :
+ * texte à droite de la page, aligné à gauche dans cette zone (pas flush au bord droit).
+ */
+const RIGHT_COLUMN_X = 110;
 const WINDOW_Y = 52;
 
 function ensureSpace(doc: jsPDF, y: number, need: number): number {
@@ -221,11 +224,19 @@ function drawRecipientWindow(doc: jsPDF, recipient: MailingListRecipient, yStart
   if (cpVille) lines.push(cpVille);
 
   for (const line of lines) {
-    doc.text(line, WINDOW_X, y);
+    // À droite de la page, justifié à gauche (pas aligné au bord droit)
+    doc.text(line, RIGHT_COLUMN_X, y);
     y += LINE_HEIGHT + 0.5;
   }
 
   return y;
+}
+
+/**
+ * Dessine un texte dans la colonne droite, aligné à gauche (date, signature).
+ */
+function drawRightColumnText(doc: jsPDF, text: string, y: number): void {
+  doc.text(text, RIGHT_COLUMN_X, y);
 }
 
 function drawLetterContent(
@@ -247,7 +258,7 @@ function drawLetterContent(
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(0, 0, 0);
-  doc.text(`${lieu}, le ${dateStr}`, RIGHT_X, y, { align: "right" });
+  drawRightColumnText(doc, `${lieu}, le ${dateStr}`, y);
   y += LINE_HEIGHT * 2;
 
   y = ensureSpace(doc, y, LINE_HEIGHT * 2);
@@ -264,9 +275,9 @@ function drawLetterContent(
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
   doc.setTextColor(0, 0, 0);
-  doc.text("L'association AMAKI France", RIGHT_X, y, { align: "right" });
+  drawRightColumnText(doc, "L'association AMAKI France", y);
   y += LINE_HEIGHT;
-  doc.text("Le Bureau", RIGHT_X, y, { align: "right" });
+  drawRightColumnText(doc, "Le Bureau", y);
 
   return y;
 }

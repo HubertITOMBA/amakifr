@@ -83,7 +83,9 @@ function buildRecipientParagraphs(recipient: MailingListRecipient): Paragraph[] 
   return lines.map(
     (line) =>
       new Paragraph({
-        alignment: AlignmentType.RIGHT,
+        // À droite de la page, justifié à gauche (pas flush au bord droit)
+        indent: { left: 4500 },
+        alignment: AlignmentType.LEFT,
         children: [new TextRun({ text: line, size: 22 })],
         spacing: { after: 80 },
       })
@@ -91,15 +93,13 @@ function buildRecipientParagraphs(recipient: MailingListRecipient): Paragraph[] 
 }
 
 /**
- * Place un paragraphe dans la moitié droite de la page (aligné à gauche dans cette zone),
- * sans le coller au bord droit comme le bloc adresse destinataire.
+ * Place un paragraphe dans la moitié droite de la page (aligné à gauche dans cette zone).
  */
 function buildRightSideParagraph(
   text: string,
   options?: { bold?: boolean; spacingBefore?: number; spacingAfter?: number }
 ): Paragraph {
   return new Paragraph({
-    // ~ moitié de la largeur utile A4 : texte à droite, non flush comme l'adresse
     indent: { left: 4500 },
     alignment: AlignmentType.LEFT,
     children: [
