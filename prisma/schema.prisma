@@ -253,6 +253,7 @@ model User {
   notifications                 Notification[] // Notifications reçues
   emailsReceived                Email[]                      @relation("EmailRecipient") // Emails reçus
   emailsSent                    Email[]                      @relation("EmailCreatedBy") // Emails envoyés
+  mailingCampaignsCreated       MailingCampaign[]            @relation("MailingCampaignCreatedBy")
   suppressionsEffectuees        SuppressionAdherent[]        @relation("SuppressionDeletedBy") // Suppressions d'adhérents effectuées
   relancesAbsenteisme           RelanceAbsenteisme[]         @relation("RelanceAbsenteismeCreatedBy")
   dataDeletionRequests          DataDeletionRequest[]        @relation("DataDeletionRequestUser") // Demandes de suppression de données
@@ -380,6 +381,7 @@ model Adherent {
   ReunionsMensuellesHote            ReunionMensuelle[]           @relation("ReunionMensuelleHote") // Réunions où l'adhérent est hôte
   ParticipationsReunion             ParticipationReunion[]       @relation("ParticipationReunionAdherent") // Participations aux réunions
   RelancesAbsenteisme              RelanceAbsenteisme[]
+  mailingCampaignRecipients        MailingCampaignRecipient[]
   created_at                        DateTime?                    @db.Timestamp(0)
   updated_at                        DateTime?                    @db.Timestamp(0)
   userId                            String                       @unique
@@ -2293,4 +2295,62 @@ model MerchStockMovement {
   @@index([orderId])
   @@index([createdAt])
   @@map("merch_stock_movements")
+}
+
+/// Statut d'un destinataire dans une campagne de courriers postaux
+enum MailingRecipientStatus {
+  Envoye
+  Relance
+  Repondu
+}
+
+/// Campagne de courriers postaux (mailing list)
+model MailingCampaign {
+  id        String   @id @default(cuid())
+  objet     String   @db.VarChar(500)
+  corps     String   @db.Text
+  lieu      String   @default("Paris") @db.VarChar(100)
+  createdBy String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  CreatedBy  User                       @relation("MailingCampaignCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  recipients MailingCampaignRecipient[]
+
+  @@index([createdBy])
+  @@index([createdAt])
+  @@map("mailing_campaigns")
+}
+
+/// Destinataire d'une campagne de courriers postaux (snapshot + réponse)
+model MailingCampaignRecipient {
+  id            String                 @id @default(cuid())
+  campaignId    String
+  adherentId    String
+  civilite      String                 @default("") @db.VarChar(50)
+  prenom        String                 @db.VarChar(255)
+  nom           String                 @db.VarChar(255)
+  adresseLigne1 String                 @db.VarChar(500)
+  adresseLigne2 String?                @db.VarChar(500)
+  codePostal    String                 @db.VarChar(20)
+  ville         String                 @db.VarChar(255)
+  format        String                 @db.VarChar(10) // pdf | docx
+  statut        MailingRecipientStatus @default(Envoye)
+  sentAt        DateTime               @default(now())
+  lastSentAt    DateTime               @default(now())
+  sendCount     Int                    @default(1)
+  reponse       String?                @db.Text
+  reponseAt     DateTime?
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
+
+  Campaign MailingCampaign @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  Adherent Adherent        @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, adherentId])
+  @@index([campaignId])
+  @@index([adherentId])
+  @@index([statut])
+  @@index([sentAt])
+  @@map("mailing_campaign_recipients")
 }
