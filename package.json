@@ -72,6 +72,7 @@
     "db:add-absenteisme-menu-sidebar": "tsx scripts/add-absenteisme-menu-sidebar.ts",
     "db:add-connexions-adherents-menu": "tsx scripts/add-connexions-adherents-menu.ts",
     "db:add-boutique-menu": "tsx scripts/add-boutique-menu.ts",
+    "db:add-mailing-list-menu": "tsx scripts/add-mailing-list-menu.ts",
     "db:seed-connexion-badges": "tsx scripts/create-connexion-badges.ts",
     "db:restrict-anniversaires-to-auth": "tsx scripts/add-anniversaires-menu-navbar.ts"
   },
