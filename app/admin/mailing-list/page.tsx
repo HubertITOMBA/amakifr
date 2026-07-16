@@ -33,6 +33,7 @@ import {
   Eye,
 } from "lucide-react";
 import { toast } from "react-toastify";
+import DOMPurify from "isomorphic-dompurify";
 import {
   generateMailingListDocument,
   getMailingListRecipients,
@@ -740,7 +741,45 @@ export default function AdminMailingListPage() {
                 </p>
               </div>
 
+              <div className="rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/40 p-3 space-y-2">
+                <p className="text-xs font-semibold uppercase tracking-wide text-slate-600 dark:text-slate-300">
+                  Contenu de la lettre (historisé)
+                </p>
+                <p className="text-sm">
+                  <span className="font-medium">Objet :</span> {campaignDetail.objet}
+                </p>
+                <p className="text-xs text-muted-foreground">
+                  Lieu / date : {campaignDetail.lieu}
+                </p>
+                <div
+                  className="prose prose-sm max-w-none dark:prose-invert text-sm border-t border-slate-200 dark:border-slate-700 pt-2 mt-1"
+                  dangerouslySetInnerHTML={{
+                    __html: DOMPurify.sanitize(campaignDetail.corps || "", {
+                      ALLOWED_TAGS: [
+                        "p",
+                        "br",
+                        "strong",
+                        "em",
+                        "u",
+                        "span",
+                        "ul",
+                        "ol",
+                        "li",
+                        "h1",
+                        "h2",
+                        "h3",
+                      ],
+                      ALLOWED_ATTR: ["style"],
+                    }),
+                  }}
+                />
+              </div>
+
               <div className="space-y-3">
+                <p className="text-sm font-semibold flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Destinataires ({campaignDetail.recipients.length})
+                </p>
                 {campaignDetail.recipients.map((r) => (
                   <div
                     key={r.id}

@@ -90,6 +90,32 @@ function buildRecipientParagraphs(recipient: MailingListRecipient): Paragraph[] 
   );
 }
 
+/**
+ * Place un paragraphe dans la moitié droite de la page (aligné à gauche dans cette zone),
+ * sans le coller au bord droit comme le bloc adresse destinataire.
+ */
+function buildRightSideParagraph(
+  text: string,
+  options?: { bold?: boolean; spacingBefore?: number; spacingAfter?: number }
+): Paragraph {
+  return new Paragraph({
+    // ~ moitié de la largeur utile A4 : texte à droite, non flush comme l'adresse
+    indent: { left: 4500 },
+    alignment: AlignmentType.LEFT,
+    children: [
+      new TextRun({
+        text,
+        bold: options?.bold,
+        size: 22,
+      }),
+    ],
+    spacing: {
+      before: options?.spacingBefore,
+      after: options?.spacingAfter ?? 80,
+    },
+  });
+}
+
 function blockToParagraph(
   block: ReturnType<typeof parseMailingBodyBlocks>[number]
 ): Paragraph {
@@ -159,10 +185,9 @@ export async function buildMailingListDOCX(
     });
 
     children.push(
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [new TextRun({ text: `${lieu}, le ${dateStr}`, size: 22 })],
-        spacing: { before: 500, after: 200 },
+      buildRightSideParagraph(`${lieu}, le ${dateStr}`, {
+        spacingBefore: 500,
+        spacingAfter: 200,
       }),
       new Paragraph({
         children: [new TextRun({ text: `Objet : ${mergedObjet}`, bold: true, size: 22 })],
@@ -175,15 +200,11 @@ export async function buildMailingListDOCX(
     }
 
     children.push(
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [new TextRun({ text: "L'association AMAKI France", size: 22 })],
-        spacing: { before: 400, after: 80 },
+      buildRightSideParagraph("L'association AMAKI France", {
+        spacingBefore: 400,
+        spacingAfter: 80,
       }),
-      new Paragraph({
-        alignment: AlignmentType.RIGHT,
-        children: [new TextRun({ text: "Le Bureau", size: 22 })],
-      })
+      buildRightSideParagraph("Le Bureau")
     );
   });
 
