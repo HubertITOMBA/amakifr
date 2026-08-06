@@ -74,6 +74,7 @@
     "db:add-boutique-menu": "tsx scripts/add-boutique-menu.ts",
     "db:add-mailing-list-menu": "tsx scripts/add-mailing-list-menu.ts",
     "db:add-sondages-menu": "tsx scripts/add-sondages-menu.ts",
+    "db:seed-sondage-six-mois": "tsx scripts/seed-sondage-six-mois.ts",
     "db:seed-connexion-badges": "tsx scripts/create-connexion-badges.ts",
     "db:restrict-anniversaires-to-auth": "tsx scripts/add-anniversaires-menu-navbar.ts"
   },

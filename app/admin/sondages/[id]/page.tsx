@@ -11,6 +11,7 @@ import {
   Ban,
   Users,
   Eye,
+  BarChart3,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -34,6 +35,7 @@ import {
   getSondageReponseByAdherentAdmin,
   publishSondage,
 } from "@/actions/sondages";
+import { SondageSynthesePanel } from "@/components/sondages/SondageSynthesePanel";
 
 const STATUS_COLORS: Record<string, string> = {
   Brouillon: "bg-slate-100 text-slate-800",
@@ -187,6 +189,10 @@ export default function AdminSondageDetailPage() {
                   <Users className="h-4 w-4 mr-1" />
                   Participation
                 </TabsTrigger>
+                <TabsTrigger value="synthese">
+                  <BarChart3 className="h-4 w-4 mr-1" />
+                  Synthèse
+                </TabsTrigger>
                 <TabsTrigger value="apercu">Aperçu</TabsTrigger>
               </TabsList>
 
@@ -256,6 +262,10 @@ export default function AdminSondageDetailPage() {
                     </div>
                   </>
                 )}
+              </TabsContent>
+
+              <TabsContent value="synthese">
+                <SondageSynthesePanel sondageId={id} />
               </TabsContent>
 
               <TabsContent value="apercu" className="space-y-4">

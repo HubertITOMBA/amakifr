@@ -10,6 +10,9 @@ import {
   type SondageReponseItemInput,
 } from "@/lib/sondages";
 import { sendSondageInvitationsToActiveAdherents } from "@/lib/sondages-notifications";
+import { buildSondageSynthese, type SondageSynthese } from "@/lib/sondages-synthese";
+import { buildSondageSynthesePDF } from "@/lib/sondages-synthese-pdf";
+import jsPDF from "jspdf";
 import {
   Prisma,
   SondageQuestionType,
@@ -1103,5 +1106,119 @@ export async function submitSondageReponse(input: z.infer<typeof SubmitReponseSc
   } finally {
     revalidatePath("/user/profile");
     revalidatePath(`/sondages/${input.sondageId}`);
+  }
+}
+
+function serializeSynthese(synthese: SondageSynthese) {
+  return {
+    ...synthese,
+    dateDebut: synthese.dateDebut.toISOString(),
+    dateFin: synthese.dateFin.toISOString(),
+    generatedAt: synthese.generatedAt.toISOString(),
+  };
+}
+
+async function loadSondageSyntheseData(sondageId: string) {
+  const sondage = await db.sondage.findUnique({
+    where: { id: sondageId },
+    include: {
+      questions: {
+        orderBy: { ordre: "asc" },
+        include: {
+          options: { orderBy: { ordre: "asc" } },
+          lignesMatrice: { orderBy: { ordre: "asc" } },
+        },
+      },
+      reponses: {
+        include: { items: true },
+      },
+    },
+  });
+
+  if (!sondage) return null;
+
+  const totalAdherentsActifs = await db.adherent.count({
+    where: {
+      User: {
+        status: "Actif",
+        role: { in: [UserRole.MEMBRE, UserRole.ADMIN] },
+      },
+    },
+  });
+
+  return buildSondageSynthese({
+    sondageId: sondage.id,
+    sujet: sondage.sujet,
+    dateDebut: sondage.dateDebut,
+    dateFin: sondage.dateFin,
+    status: sondage.status,
+    totalAdherentsActifs,
+    questions: sondage.questions,
+    reponses: sondage.reponses,
+  });
+}
+
+/**
+ * Synthèse agrégée des résultats d'un sondage (admin).
+ */
+export async function getSondageSyntheseAdmin(sondageId: string) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+
+    const parsed = SondageIdSchema.parse({ id: sondageId });
+    const synthese = await loadSondageSyntheseData(parsed.id);
+
+    if (!synthese) {
+      return { success: false, error: "Sondage introuvable" };
+    }
+
+    return { success: true, data: serializeSynthese(synthese) };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Erreur getSondageSyntheseAdmin:", error);
+    return { success: false, error: "Erreur lors du calcul de la synthèse" };
+  }
+}
+
+/**
+ * Génère un PDF imprimable de la synthèse du sondage (admin).
+ */
+export async function generateSondageSynthesePdf(sondageId: string) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+
+    const parsed = SondageIdSchema.parse({ id: sondageId });
+    const synthese = await loadSondageSyntheseData(parsed.id);
+
+    if (!synthese) {
+      return { success: false, error: "Sondage introuvable" };
+    }
+
+    const doc = new jsPDF({ orientation: "portrait", unit: "mm", format: "a4" });
+    buildSondageSynthesePDF(doc, synthese);
+
+    const stamp = new Date().toISOString().slice(0, 10).replace(/-/g, "");
+    const safeName = synthese.sujet
+      .slice(0, 40)
+      .replace(/[^a-zA-Z0-9_-]+/g, "_")
+      .replace(/_+/g, "_");
+
+    return {
+      success: true,
+      fileName: `synthese_sondage_${safeName}_${stamp}.pdf`,
+      mimeType: "application/pdf",
+      data: doc.output("datauristring"),
+      message: "Synthèse PDF générée",
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Erreur generateSondageSynthesePdf:", error);
+    return { success: false, error: "Erreur lors de la génération du PDF" };
   }
 }
