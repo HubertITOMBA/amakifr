@@ -91,6 +91,7 @@ import { getRapportsReunionForAdherents, getRapportReunionById } from "@/actions
 import { getUserBadges } from "@/actions/badges";
 import { getSimulationVersementAssistance, getSimulationVersementAssistanceForUser, getTypesAssistancePourSimulation } from "@/actions/paiements";
 import { CotisationsSection } from "@/components/user/CotisationsSection";
+import { SondageProfileBanner } from "@/components/sondages/SondageProfileBanner";
 import { StatutIdee, TypeDocument } from "@prisma/client";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
@@ -5214,6 +5215,8 @@ function UserProfilePageContent() {
         </div>
       </section>
       )}
+
+      {!isEmbed && <SondageProfileBanner />}
 
       {/* Contenu principal avec menu latéral */}
       {isEmbed ? (

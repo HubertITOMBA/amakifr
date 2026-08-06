@@ -254,6 +254,7 @@ model User {
   emailsReceived                Email[]                      @relation("EmailRecipient") // Emails reçus
   emailsSent                    Email[]                      @relation("EmailCreatedBy") // Emails envoyés
   mailingCampaignsCreated       MailingCampaign[]            @relation("MailingCampaignCreatedBy")
+  sondagesCreated               Sondage[]                    @relation("SondageCreatedBy")
   suppressionsEffectuees        SuppressionAdherent[]        @relation("SuppressionDeletedBy") // Suppressions d'adhérents effectuées
   relancesAbsenteisme           RelanceAbsenteisme[]         @relation("RelanceAbsenteismeCreatedBy")
   dataDeletionRequests          DataDeletionRequest[]        @relation("DataDeletionRequestUser") // Demandes de suppression de données
@@ -382,6 +383,7 @@ model Adherent {
   ParticipationsReunion             ParticipationReunion[]       @relation("ParticipationReunionAdherent") // Participations aux réunions
   RelancesAbsenteisme              RelanceAbsenteisme[]
   mailingCampaignRecipients        MailingCampaignRecipient[]
+  sondageReponses                  SondageReponse[]
   created_at                        DateTime?                    @db.Timestamp(0)
   updated_at                        DateTime?                    @db.Timestamp(0)
   userId                            String                       @unique
@@ -2353,4 +2355,151 @@ model MailingCampaignRecipient {
   @@index([statut])
   @@index([sentAt])
   @@map("mailing_campaign_recipients")
+}
+
+/// Statut d'un sondage
+enum SondageStatus {
+  Brouillon
+  Ouvert
+  Cloture
+}
+
+/// Type de question de sondage
+enum SondageQuestionType {
+  ChoixUnique
+  ChoixMultiple
+  TexteLibre
+  Matrice
+}
+
+/// Campagne de sondage
+model Sondage {
+  id           String        @id @default(cuid())
+  sujet        String        @unique @db.VarChar(255)
+  introduction String?       @db.Text
+  conclusion   String?       @db.Text
+  dateDebut    DateTime
+  dateFin      DateTime
+  status       SondageStatus @default(Brouillon)
+  sourceId     String?
+  createdBy    String
+  createdAt    DateTime      @default(now())
+  updatedAt    DateTime      @updatedAt
+
+  Source    Sondage?           @relation("SondageDuplication", fields: [sourceId], references: [id], onDelete: SetNull)
+  copies    Sondage[]          @relation("SondageDuplication")
+  CreatedBy User               @relation("SondageCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  questions SondageQuestion[]
+  reponses  SondageReponse[]
+
+  @@index([createdBy])
+  @@index([status])
+  @@index([dateDebut])
+  @@index([dateFin])
+  @@index([sourceId])
+  @@map("sondages")
+}
+
+/// Question d'un sondage
+model SondageQuestion {
+  id            String              @id @default(cuid())
+  sondageId     String
+  ordre         Int
+  section       String?             @db.VarChar(255)
+  libelle       String              @db.Text
+  type          SondageQuestionType
+  obligatoire   Boolean             @default(true)
+  maxSelections Int?
+  minCaracteres Int?
+  maxCaracteres Int?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+
+  Sondage         Sondage                @relation(fields: [sondageId], references: [id], onDelete: Cascade)
+  options         SondageOption[]
+  lignesMatrice   SondageMatriceLigne[]
+  reponseItems    SondageReponseItem[]
+
+  @@index([sondageId])
+  @@index([ordre])
+  @@map("sondage_questions")
+}
+
+/// Option de réponse (choix unique/multiple ou colonne de matrice)
+model SondageOption {
+  id              String   @id @default(cuid())
+  questionId      String
+  ordre           Int
+  libelle         String   @db.VarChar(500)
+  permetTexteLibre Boolean @default(false)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  Question     SondageQuestion      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  reponseItems SondageReponseItem[]
+
+  @@index([questionId])
+  @@index([ordre])
+  @@map("sondage_options")
+}
+
+/// Ligne d'une question matrice (ex. « Création du site Internet »)
+model SondageMatriceLigne {
+  id         String   @id @default(cuid())
+  questionId String
+  ordre      Int
+  libelle    String   @db.VarChar(500)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  Question     SondageQuestion      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  reponseItems SondageReponseItem[]
+
+  @@index([questionId])
+  @@index([ordre])
+  @@map("sondage_matrice_lignes")
+}
+
+/// Réponse globale d'un adhérent à un sondage (une seule par adhérent et par sondage)
+model SondageReponse {
+  id         String   @id @default(cuid())
+  sondageId  String
+  adherentId String
+  soumiseLe  DateTime @default(now())
+  modifieLe  DateTime @updatedAt
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  Sondage  Sondage              @relation(fields: [sondageId], references: [id], onDelete: Cascade)
+  Adherent Adherent             @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  items    SondageReponseItem[]
+
+  @@unique([sondageId, adherentId])
+  @@index([sondageId])
+  @@index([adherentId])
+  @@index([soumiseLe])
+  @@map("sondage_reponses")
+}
+
+/// Détail d'une réponse (par question, option, ligne matrice ou texte libre)
+model SondageReponseItem {
+  id             String  @id @default(cuid())
+  reponseId      String
+  questionId     String
+  optionId       String?
+  ligneMatriceId String?
+  texteLibre     String? @db.Text
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  Reponse      SondageReponse       @relation(fields: [reponseId], references: [id], onDelete: Cascade)
+  Question     SondageQuestion      @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  Option       SondageOption?       @relation(fields: [optionId], references: [id], onDelete: SetNull)
+  LigneMatrice SondageMatriceLigne? @relation(fields: [ligneMatriceId], references: [id], onDelete: SetNull)
+
+  @@index([reponseId])
+  @@index([questionId])
+  @@index([optionId])
+  @@index([ligneMatriceId])
+  @@map("sondage_reponse_items")
 }

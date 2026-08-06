@@ -1929,3 +1929,83 @@ export async function sendMerchStockAlertEmail(params: {
 
   return { sent: true };
 }
+
+/**
+ * Envoie l'invitation à participer à un sondage.
+ *
+ * @returns true si l'email a été envoyé, false sinon
+ */
+export async function sendSondageInvitationEmail(params: {
+  email: string;
+  userName: string;
+  sondageSujet: string;
+  sondageIntroduction: string | null;
+  dateDebut: Date;
+  dateFin: Date;
+  sondageUrl: string;
+}): Promise<boolean> {
+  const dateDebutFormatted = params.dateDebut.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const dateFinFormatted = params.dateFin.toLocaleDateString("fr-FR", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  const introHtml = params.sondageIntroduction
+    ? `<p style="margin: 10px 0; color: #666;">${params.sondageIntroduction.replace(/\n/g, "<br>")}</p>`
+    : "";
+
+  const content = `
+    <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Nouveau sondage</h1>
+
+    <div style="margin-bottom: 20px;">
+      <p style="margin: 10px 0; color: #666;">Bonjour ${params.userName},</p>
+      <p style="margin: 10px 0; color: #666;">
+        L'association AMAKI France vous invite à participer à un nouveau sondage.
+        Votre avis nous est précieux pour améliorer nos services.
+      </p>
+    </div>
+
+    <div style="background-color: #f0f7ff; padding: 20px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
+      <h2 style="color: #333; margin-top: 0; font-size: 20px;">${params.sondageSujet}</h2>
+      ${introHtml}
+      <div style="margin-top: 15px; color: #666;">
+        <p style="margin: 8px 0;"><strong>📅 Ouverture :</strong> ${dateDebutFormatted}</p>
+        <p style="margin: 8px 0;"><strong>📅 Clôture :</strong> ${dateFinFormatted}</p>
+      </div>
+    </div>
+
+    <div style="text-align: center; margin: 28px 0;">
+      <a href="${cleanUrl(params.sondageUrl) || params.sondageUrl}"
+         target="_blank"
+         rel="noopener noreferrer"
+         style="display: inline-block; background-color: #2563eb; color: #ffffff; padding: 14px 28px; border-radius: 6px; text-decoration: none; font-weight: bold; font-size: 16px;">
+        Répondre au sondage
+      </a>
+    </div>
+
+    <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #ffc107;">
+      <p style="margin: 0; color: #856404;">
+        <strong>💡 Rappel :</strong> Vous pouvez également accéder au sondage depuis votre page de profil sur le portail adhérent.
+      </p>
+    </div>
+
+    <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
+      Cet email vous a été envoyé par l'administration de l'association AMAKI France.
+    </p>
+  `;
+
+  return sendEmail(
+    {
+      from: "noreply@amaki.fr",
+      to: params.email,
+      subject: `Sondage : ${params.sondageSujet}`,
+      html: wrapEmailContent(content),
+    },
+    false
+  );
+}
