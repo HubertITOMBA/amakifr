@@ -74,6 +74,12 @@ const UpdateSondageSchema = CreateSondageSchema.extend({
   id: z.string().min(1),
 });
 
+/** Ajout de questions à un sondage déjà publié (Ouvert) */
+const AddQuestionsToSondageSchema = z.object({
+  id: z.string().min(1),
+  questions: z.array(QuestionInputSchema).min(1, "Ajoutez au moins une question"),
+});
+
 const SondageIdSchema = z.object({
   id: z.string().min(1),
 });
@@ -451,6 +457,83 @@ export async function updateSondage(input: z.infer<typeof UpdateSondageSchema>) 
   } finally {
     revalidatePath("/admin/sondages");
     revalidatePath(`/admin/sondages/${input.id}`);
+  }
+}
+
+/**
+ * Ajoute une ou plusieurs questions à un sondage déjà publié (statut Ouvert).
+ * Les questions existantes et les réponses déjà soumises ne sont pas modifiées.
+ *
+ * @param input - Identifiant du sondage et questions à ajouter
+ * @returns Succès avec le détail du sondage, ou erreur
+ */
+export async function addQuestionsToSondage(
+  input: z.infer<typeof AddQuestionsToSondageSchema>
+) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+
+    const parsed = AddQuestionsToSondageSchema.parse(input);
+    const structureError = validateQuestionsStructure(parsed.questions);
+    if (structureError) return { success: false, error: structureError };
+
+    const existing = await db.sondage.findUnique({
+      where: { id: parsed.id },
+      select: {
+        id: true,
+        status: true,
+        questions: { select: { ordre: true }, orderBy: { ordre: "desc" }, take: 1 },
+      },
+    });
+
+    if (!existing) {
+      return { success: false, error: "Sondage introuvable" };
+    }
+
+    if (existing.status !== SondageStatus.Ouvert) {
+      return {
+        success: false,
+        error: "Des questions ne peuvent être ajoutées qu'à un sondage ouvert",
+      };
+    }
+
+    const maxOrdre = existing.questions[0]?.ordre ?? -1;
+    const questionsWithOrdre = parsed.questions.map((q, i) => ({
+      ...q,
+      ordre: maxOrdre + 1 + i,
+    }));
+
+    const sondage = await db.sondage.update({
+      where: { id: parsed.id },
+      data: {
+        questions: {
+          create: await createQuestionsNested(questionsWithOrdre),
+        },
+      },
+      include: sondageInclude,
+    });
+
+    const count = questionsWithOrdre.length;
+    return {
+      success: true,
+      message:
+        count === 1
+          ? "Question ajoutée au sondage"
+          : `${count} questions ajoutées au sondage`,
+      data: mapSondageDetail(sondage),
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Erreur addQuestionsToSondage:", error);
+    return { success: false, error: "Erreur lors de l'ajout des questions" };
+  } finally {
+    revalidatePath("/admin/sondages");
+    revalidatePath(`/admin/sondages/${input.id}`);
+    revalidatePath("/user/profile");
+    revalidatePath(`/sondages/${input.id}`);
   }
 }
 

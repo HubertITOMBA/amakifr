@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams } from "next/navigation";
 import { ArrowLeft, ClipboardList, Loader2 } from "lucide-react";
 import { toast } from "react-toastify";
-import DynamicNavbar from "@/components/home/DynamicNavbar";
+import { DynamicNavbar } from "@/components/home/DynamicNavbar";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -44,8 +44,8 @@ export default function SondageReponsePage() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
       <DynamicNavbar />
 
-      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8 space-y-4">
-        <Link href="/user/profile">
+      <div className="max-w-3xl mx-auto px-4 py-6 sm:py-8">
+        <Link href="/user/profile" className="inline-block mb-6">
           <Button variant="outline" size="sm" className="border-slate-300">
             <ArrowLeft className="h-4 w-4 mr-1" />
             Retour au profil
@@ -63,15 +63,21 @@ export default function SondageReponsePage() {
             </CardContent>
           </Card>
         ) : (
-          <>
+          <div className="space-y-4">
             <Card className="shadow-lg border-blue-200 dark:border-slate-700">
               <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
-                <div className="flex items-start justify-between gap-2">
+                <div className="flex items-start justify-between gap-2 pt-1">
                   <CardTitle className="flex items-center gap-2 text-lg">
                     <ClipboardList className="h-5 w-5" />
                     {data.sujet}
                   </CardTitle>
-                  <Badge className="bg-white/20 text-white border-0">
+                  <Badge
+                    className={
+                      data.modifiable
+                        ? "mt-1 bg-white text-green-700 border border-green-200 shadow-sm font-semibold"
+                        : "mt-1 bg-white text-red-700 border border-red-200 shadow-sm font-semibold"
+                    }
+                  >
                     {data.modifiable ? "Ouvert" : "Clôturé"}
                   </Badge>
                 </div>
@@ -106,7 +112,7 @@ export default function SondageReponsePage() {
                 {data.conclusion}
               </p>
             )}
-          </>
+          </div>
         )}
       </div>
     </div>

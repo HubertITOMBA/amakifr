@@ -12,6 +12,7 @@ import {
   Users,
   Eye,
   BarChart3,
+  Plus,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -136,6 +137,7 @@ export default function AdminSondageDetailPage() {
   }
 
   const isBrouillon = sondage.status === "Brouillon";
+  const isOuvert = sondage.status === "Ouvert";
   const tauxParticipation =
     participation && participation.totalActifs > 0
       ? Math.round((participation.totalReponses / participation.totalActifs) * 100)
@@ -158,7 +160,7 @@ export default function AdminSondageDetailPage() {
                 Publier
               </Button>
             )}
-            {sondage.status === "Ouvert" && (
+            {isOuvert && (
               <Button size="sm" variant="destructive" onClick={handleClose}>
                 <Ban className="h-4 w-4 mr-1" />
                 Clôturer
@@ -182,9 +184,15 @@ export default function AdminSondageDetailPage() {
             </p>
           </CardHeader>
           <CardContent className="pt-4">
-            <Tabs defaultValue={isBrouillon ? "edition" : "participation"}>
+            <Tabs defaultValue={isBrouillon ? "edition" : isOuvert ? "ajouter" : "participation"}>
               <TabsList className="mb-4">
                 {isBrouillon && <TabsTrigger value="edition">Édition</TabsTrigger>}
+                {isOuvert && (
+                  <TabsTrigger value="ajouter">
+                    <Plus className="h-4 w-4 mr-1" />
+                    Ajouter des questions
+                  </TabsTrigger>
+                )}
                 <TabsTrigger value="participation">
                   <Users className="h-4 w-4 mr-1" />
                   Participation
@@ -201,6 +209,16 @@ export default function AdminSondageDetailPage() {
                   <SondageForm
                     sondageId={id}
                     initialData={mapSondageDetailToFormValues(sondage)}
+                    onSuccess={() => loadAll()}
+                  />
+                </TabsContent>
+              )}
+
+              {isOuvert && (
+                <TabsContent value="ajouter">
+                  <SondageForm
+                    sondageId={id}
+                    addQuestionsOnly
                     onSuccess={() => loadAll()}
                   />
                 </TabsContent>

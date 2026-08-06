@@ -29,7 +29,7 @@ import {
   Send,
 } from "lucide-react";
 import { toast } from "react-toastify";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -339,19 +339,26 @@ export default function AdminSondagesPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 p-4 sm:p-6">
       <Card className="mx-auto max-w-7xl shadow-lg border-blue-200 dark:border-slate-700">
-        <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
-          <CardTitle className="flex items-center gap-2 text-lg sm:text-xl">
-            <ClipboardList className="h-5 w-5" />
-            Sondages ({filteredData.length})
-          </CardTitle>
-          <div className="flex items-center gap-2">
-            <ColumnVisibilityToggle table={table} storageKey="admin-sondages-column-visibility" />
-            <Link href="/admin/sondages/nouveau">
-              <Button variant="secondary" size="sm" className="bg-white text-blue-700 hover:bg-blue-50">
-                <Plus className="h-4 w-4 mr-1" />
-                Nouveau sondage
-              </Button>
-            </Link>
+        <CardHeader className="bg-gradient-to-r from-blue-500/90 to-blue-600/90 dark:from-blue-600/90 dark:to-blue-700/90 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
+            <div>
+              <CardTitle className="text-xl sm:text-2xl font-bold text-white flex items-center gap-2 sm:gap-3">
+                <ClipboardList className="h-5 w-5 sm:h-6 sm:w-6" />
+                Sondages ({filteredData.length})
+              </CardTitle>
+              <CardDescription className="text-blue-100 dark:text-blue-200 mt-1 sm:mt-2 text-sm sm:text-base">
+                Créer, publier et suivre les sondages destinés aux adhérents
+              </CardDescription>
+            </div>
+            <div className="flex items-center gap-2 w-full sm:w-auto">
+              <ColumnVisibilityToggle table={table} storageKey="admin-sondages-column-visibility" />
+              <Link href="/admin/sondages/nouveau" className="w-full sm:w-auto">
+                <Button className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg">
+                  <Plus className="h-4 w-4 mr-2" />
+                  Nouveau sondage
+                </Button>
+              </Link>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="pt-6">

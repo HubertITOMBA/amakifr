@@ -17,7 +17,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Plus, Trash2, GripVertical } from "lucide-react";
 import { toast } from "react-toastify";
 import type { SondageQuestionType } from "@prisma/client";
-import { createSondage, updateSondage } from "@/actions/sondages";
+import { createSondage, updateSondage, addQuestionsToSondage } from "@/actions/sondages";
 
 export type SondageFormQuestion = {
   ordre: number;
@@ -93,20 +93,28 @@ interface SondageFormProps {
   sondageId?: string;
   initialData?: SondageFormValues;
   readOnly?: boolean;
+  /** Mode dédié : ajouter des questions à un sondage déjà ouvert */
+  addQuestionsOnly?: boolean;
   onSuccess?: (id: string) => void;
 }
 
 /**
  * Formulaire de création / édition d'un sondage (admin).
+ * En mode `addQuestionsOnly`, seules les nouvelles questions sont saisies.
  */
 export function SondageForm({
   sondageId,
   initialData,
   readOnly = false,
+  addQuestionsOnly = false,
   onSuccess,
 }: SondageFormProps) {
   const [values, setValues] = useState<SondageFormValues>(() =>
-    buildDefaultValues(initialData)
+    buildDefaultValues(
+      addQuestionsOnly
+        ? { questions: [defaultQuestion(0)] }
+        : initialData
+    )
   );
   const [saving, setSaving] = useState(false);
 
@@ -139,6 +147,52 @@ export function SondageForm({
 
     setSaving(true);
     try {
+      const questionsPayload = values.questions.map((q, i) => ({
+        ordre: i,
+        section: q.section.trim() || null,
+        libelle: q.libelle.trim(),
+        type: q.type,
+        obligatoire: q.obligatoire,
+        maxSelections: q.maxSelections ? Number(q.maxSelections) : null,
+        minCaracteres: q.minCaracteres ? Number(q.minCaracteres) : null,
+        maxCaracteres: q.maxCaracteres ? Number(q.maxCaracteres) : null,
+        options:
+          q.type === "TexteLibre"
+            ? []
+            : q.options
+                .filter((o) => o.libelle.trim())
+                .map((o, oi) => ({
+                  ordre: oi,
+                  libelle: o.libelle.trim(),
+                  permetTexteLibre: o.permetTexteLibre,
+                })),
+        lignesMatrice:
+          q.type === "Matrice"
+            ? q.lignesMatrice
+                .filter((l) => l.libelle.trim())
+                .map((l, li) => ({ ordre: li, libelle: l.libelle.trim() }))
+            : [],
+      }));
+
+      if (addQuestionsOnly) {
+        if (!sondageId) {
+          toast.error("Identifiant du sondage manquant");
+          return;
+        }
+        const result = await addQuestionsToSondage({
+          id: sondageId,
+          questions: questionsPayload,
+        });
+        if (!result.success) {
+          toast.error(result.error || "Erreur lors de l'ajout des questions");
+          return;
+        }
+        toast.success(result.message || "Questions ajoutées");
+        setValues(buildDefaultValues({ questions: [defaultQuestion(0)] }));
+        onSuccess?.(sondageId);
+        return;
+      }
+
       const payload = {
         sujet: values.sujet.trim(),
         introduction: values.introduction.trim() || null,
@@ -146,32 +200,7 @@ export function SondageForm({
         dateDebut: new Date(values.dateDebut),
         dateFin: new Date(values.dateFin),
         publier: values.publier,
-        questions: values.questions.map((q, i) => ({
-          ordre: i,
-          section: q.section.trim() || null,
-          libelle: q.libelle.trim(),
-          type: q.type,
-          obligatoire: q.obligatoire,
-          maxSelections: q.maxSelections ? Number(q.maxSelections) : null,
-          minCaracteres: q.minCaracteres ? Number(q.minCaracteres) : null,
-          maxCaracteres: q.maxCaracteres ? Number(q.maxCaracteres) : null,
-          options:
-            q.type === "TexteLibre"
-              ? []
-              : q.options
-                  .filter((o) => o.libelle.trim())
-                  .map((o, oi) => ({
-                    ordre: oi,
-                    libelle: o.libelle.trim(),
-                    permetTexteLibre: o.permetTexteLibre,
-                  })),
-          lignesMatrice:
-            q.type === "Matrice"
-              ? q.lignesMatrice
-                  .filter((l) => l.libelle.trim())
-                  .map((l, li) => ({ ordre: li, libelle: l.libelle.trim() }))
-              : [],
-        })),
+        questions: questionsPayload,
       };
 
       const result = sondageId
@@ -184,7 +213,11 @@ export function SondageForm({
       }
 
       toast.success(result.message || "Sondage enregistré");
-      onSuccess?.(result.id || sondageId || "");
+      const newId =
+        result.success && "id" in result && typeof result.id === "string"
+          ? result.id
+          : sondageId || "";
+      onSuccess?.(newId);
     } catch (error) {
       console.error(error);
       toast.error("Erreur lors de l'enregistrement");
@@ -195,6 +228,15 @@ export function SondageForm({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
+      {addQuestionsOnly && (
+        <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+          Les questions déjà publiées restent inchangées. Les nouvelles questions
+          seront ajoutées à la fin du sondage. Les adhérents qui ont déjà répondu
+          pourront compléter leur réponse.
+        </div>
+      )}
+
+      {!addQuestionsOnly && (
       <Card className="border-blue-200 shadow-sm">
         <CardHeader className="bg-gradient-to-r from-blue-50 to-white dark:from-slate-900 dark:to-slate-800">
           <CardTitle className="text-base">Informations générales</CardTitle>
@@ -267,10 +309,13 @@ export function SondageForm({
           )}
         </CardContent>
       </Card>
+      )}
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Questions</h3>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-white">
+            {addQuestionsOnly ? "Nouvelles questions" : "Questions"}
+          </h3>
           {!readOnly && (
             <Button type="button" variant="outline" size="sm" onClick={addQuestion}>
               <Plus className="h-4 w-4 mr-1" />
@@ -529,7 +574,11 @@ export function SondageForm({
         <div className="flex justify-end gap-2">
           <Button type="submit" disabled={saving} className="bg-blue-600 hover:bg-blue-700">
             {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-            {sondageId ? "Enregistrer le brouillon" : "Créer le sondage"}
+            {addQuestionsOnly
+              ? "Ajouter au sondage"
+              : sondageId
+                ? "Enregistrer le brouillon"
+                : "Créer le sondage"}
           </Button>
         </div>
       )}
