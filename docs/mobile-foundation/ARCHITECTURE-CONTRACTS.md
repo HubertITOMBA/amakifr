@@ -290,4 +290,13 @@ Champs : id, periode, annee, mois, typeCotisationId, adherentId, adherentBenefic
 
 Batch affectation, paiements, avoirs, dettes, CdM CRUD, types, `getUserData` / profil — non touchés.
 
+## 17. API `/api/v1` fondation (Phase 2H)
+
+Voir `docs/mobile-foundation/API-V1-CONTRACT.md`.
+
+- Helpers : `lib/api/{types,response,errors,auth-web}.ts`
+- Auth temporaire Web : `resolveApiActorFromWebSession` (pas Bearer) — fail closed, sans fallback rôle/status inventés
+- Routes lecture : `/api/v1/me`, `/me/notifications`, `/me/notifications/unread-count`, `/me/cotisations-mensuelles`
+- Mapping HTTP centralisé ; aucun Prisma dans les routes
+
 

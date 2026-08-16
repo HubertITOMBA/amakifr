@@ -8,7 +8,11 @@ import { defineConfig } from "vitest/config";
 export default defineConfig({
   test: {
     environment: "node",
-    include: ["lib/**/*.test.ts", "lib/**/*.spec.ts"],
+    include: [
+      "lib/**/*.test.ts",
+      "lib/**/*.spec.ts",
+      "app/api/v1/**/*.test.ts",
+    ],
     exclude: ["node_modules", ".next", "templates"],
     passWithNoTests: false,
   },
