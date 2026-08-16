@@ -218,6 +218,28 @@ model Session {
   @@map("sessions")
 }
 
+/// Sessions refresh mobiles (Bearer) — hash uniquement, rotation / révocation persistantes.
+/// Ne pas confondre avec Session (NextAuth).
+model MobileRefreshSession {
+  id               String    @id @default(cuid())
+  userId           String
+  refreshTokenHash String    @unique
+  createdAt        DateTime  @default(now())
+  expiresAt        DateTime
+  lastUsedAt       DateTime?
+  revokedAt        DateTime?
+  rotatedFromId    String?
+
+  user        User                   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  rotatedFrom MobileRefreshSession?  @relation("MobileRefreshRotation", fields: [rotatedFromId], references: [id], onDelete: SetNull)
+  rotatedTo   MobileRefreshSession[] @relation("MobileRefreshRotation")
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@index([revokedAt])
+  @@map("mobile_refresh_sessions")
+}
+
 model User {
   id                            String                       @id @default(cuid())
   name                          String?                      @unique
@@ -227,6 +249,7 @@ model User {
   image                         String?
   accounts                      Account[]
   sessions                      Session[]
+  mobileRefreshSessions         MobileRefreshSession[]
   adherent                      Adherent?
   role                          UserRole                     @default(MEMBRE)
   status                        UserStatus                   @default(Inactif)

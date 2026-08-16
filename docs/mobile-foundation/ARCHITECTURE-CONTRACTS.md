@@ -299,4 +299,12 @@ Voir `docs/mobile-foundation/API-V1-CONTRACT.md`.
 - Routes lecture : `/api/v1/me`, `/me/notifications`, `/me/notifications/unread-count`, `/me/cotisations-mensuelles`
 - Mapping HTTP centralisé ; aucun Prisma dans les routes
 
+## 18. MobileRefreshSession (Phase 2J)
+
+Modèle Prisma `MobileRefreshSession` (`@@map("mobile_refresh_sessions")`) + relation `User.mobileRefreshSessions`.
+
+Migration SQL inspectée : `prisma/migrations/20260816154500_add_mobile_refresh_session/migration.sql`
+
+**Non appliquée** à PostgreSQL. Aucun code auth mobile. Voir `AUTH-MOBILE-CONTRACT.md`.
+
 
