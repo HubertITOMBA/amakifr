@@ -303,8 +303,21 @@ Voir `docs/mobile-foundation/API-V1-CONTRACT.md`.
 
 Modèle Prisma `MobileRefreshSession` (`@@map("mobile_refresh_sessions")`) + relation `User.mobileRefreshSessions`.
 
-Migration SQL inspectée : `prisma/migrations/20260816154500_add_mobile_refresh_session/migration.sql`
+Migration appliquée (environnement courant). Voir `AUTH-MOBILE-CONTRACT.md`.
 
-**Non appliquée** à PostgreSQL. Aucun code auth mobile. Voir `AUTH-MOBILE-CONTRACT.md`.
+## 19. Auth mobile réelle (Phase 2K)
+
+```
+WEB:   NextAuth cookie → resolveApiActorFromWebSession → AuthContext
+MOBILE: Bearer access → resolveApiActorFromBearer → AuthContext
+API:   resolveApiActor (composite, no-downgrade)
+```
+
+- Access JWT 15 min (`jose` 6.1.1, `MOBILE_ACCESS_TOKEN_SECRET`)
+- Refresh opaque 30 j, hash SHA-256, rotation transactionnelle + reuse detection
+- Logout : révocation refresh + blacklist jti (TTL = restant)
+- Endpoints : `/api/v1/auth/{login,refresh,logout}`
+- Routes `/api/v1/me/*` via `resolveApiActor`
+- NextAuth Web **inchangé**
 
 

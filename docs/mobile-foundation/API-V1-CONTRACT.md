@@ -53,18 +53,29 @@ Erreur inconnue → 500 `INTERNAL_ERROR` générique (fail closed).
 | GET | `/api/v1/me/notifications/unread-count` | `getMyUnreadNotificationCount` |
 | GET | `/api/v1/me/cotisations-mensuelles` | `getMyCotisationsMensuelles` |
 
-## 5. Authentification temporaire
+## 5. Authentification (Phase 2K)
 
-`resolveApiActorFromWebSession()` (`lib/api/auth-web.ts`) :
+Resolver composite : `resolveApiActor(request)` (`lib/api/auth-resolve.ts`).
+
+- **Authorization présent** → Bearer mobile (`resolveApiActorFromBearer`) — **no downgrade** vers cookie
+- **Authorization absent** → Web NextAuth (`resolveApiActorFromWebSession`)
+
+Web resolver (`lib/api/auth-web.ts`) :
 
 - lit `auth()` NextAuth
-- sources réelles : `userId` (token.sub), `role` (User.role), `status` (User.status), `sessionId` (token.jti), email/name
+- sources réelles : `userId` (token.sub), `role`, `status`, `sessionId` (token.jti), email/name
 - **fail closed** si id / role / status absents — **aucun** fallback `"MEMBRE"` / `"Actif"`
-- `adminRoles: []` et `adherentId: null` = **non résolus** (pas des faits métier) ; cotisations résolvent Adherent dans le service
+- `adminRoles: []` et `adherentId: null` = **non résolus**
 
-## 6. Future auth Bearer
+Bearer : voir `AUTH-MOBILE-CONTRACT.md` (JWT 15 min, refresh 30 j, role/status relus DB).
 
-Hors Phase 2H. Même `AuthContext` ; autre resolver transport.
+## 6. Auth mobile endpoints
+
+| Méthode | Path |
+|---------|------|
+| POST | `/api/v1/auth/login` |
+| POST | `/api/v1/auth/refresh` |
+| POST | `/api/v1/auth/logout` |
 
 ## 7. Pas de Prisma dans les routes
 
@@ -91,9 +102,8 @@ Services inchangés. Routes = adapters HTTP minces.
 ## 14. Routes non implémentées
 
 - `POST/PATCH/DELETE` notifications
-- auth login / refresh / logout / revoke
 - paiements, admin, batch cotisations
-- Bearer
+- OAuth mobile / OTP mobile
 
 ## 15. Query notifications
 
@@ -105,7 +115,7 @@ Services inchangés. Routes = adapters HTTP minces.
 ## 16. CORS / rate limit
 
 - Pas de CORS `*` global ajouté
-- Rate limit critique prévu sur futurs `/auth/login` et `/auth/refresh`
+- Rate limit login mobile : 10 / 15 min (`IP + email`)
 - CORS navigateur surtout pertinent pour Expo Web futur
 
 ## 17. 401

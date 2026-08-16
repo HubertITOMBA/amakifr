@@ -1,67 +1,128 @@
-# Authentification mobile Bearer — contrat (Phases 2I–2J)
+# Authentification mobile Bearer — contrat (Phases 2I–2K)
 
-> Web NextAuth reste inchangé.  
-> Phase 2I : STOP — besoin de persistence refresh.  
-> Phase 2J : modèle `MobileRefreshSession` + migration SQL **générée, NON appliquée**.
+> Web NextAuth reste inchangé (`auth.ts`, `auth.config.ts`, `middleware.ts`).  
+> Phase 2J : table `MobileRefreshSession` appliquée.  
+> Phase 2K : login / refresh / logout / resolver Bearer / composite.
 
-## Audit (rappel)
+## Variables d'environnement
 
-| Élément | Constat |
-|---------|---------|
-| Password | `User.password` (bcryptjs) |
-| Credentials | `auth.config.ts` |
-| Session NextAuth | JWT + blacklist Redis `jti` |
-| Refresh mobile | **PostgreSQL** via `MobileRefreshSession` |
+| Variable | Rôle |
+|----------|------|
+| `MOBILE_ACCESS_TOKEN_SECRET` | Secret HS256. **Obligatoire**, ≥ **32 octets UTF-8**. Fail closed si absent / vide / trop court (pas de fallback). |
 
-## Modèle final (schema.prisma)
+Ne pas committer de secret. Documenter uniquement — ne pas modifier `.env` automatiquement.
 
-Table SQL : `mobile_refresh_sessions`
+## Endpoints
 
-| Champ | Rôle |
-|-------|------|
-| `id` | cuid PK |
-| `userId` | FK → `users.id`, **Cascade** |
-| `refreshTokenHash` | hash du refresh opaque — **unique**, jamais le token brut |
-| `createdAt` | création |
-| `expiresAt` | expiration (durée décidée par le service auth, pas dans le schema) |
-| `lastUsedAt` | dernier usage |
-| `revokedAt` | `null` = active (si non expirée) ; date = révoquée |
-| `rotatedFromId` | self-FK vers session précédente — **SetNull** à la suppression |
+| Méthode | Path | Body |
+|---------|------|------|
+| POST | `/api/v1/auth/login` | `{ email, password }` strict |
+| POST | `/api/v1/auth/refresh` | `{ refreshToken }` strict |
+| POST | `/api/v1/auth/logout` | `{ refreshToken? }` + `Authorization: Bearer` optionnel |
 
-Indexes : `refreshTokenHash` unique, `userId`, `expiresAt`, `revokedAt`.
+Réponses : contrat `/api/v1` (`success` / `error.code`).
 
-Relation User : `mobileRefreshSessions MobileRefreshSession[]`.
+## Access token
 
-**Pas** de deviceName / userAgent / pushToken dans cette phase.
+- JWT via **`jose` 6.1.1** (dépendance directe)
+- TTL : **15 minutes** (`MOBILE_ACCESS_TOKEN_TTL_SECONDS`)
+- Claims : `sub`, `jti`, `iat`, `exp`, `type=access`
+- Pas de password, emailVerified, adminRoles, adherentId, refresh
 
-## Migration
+## Refresh token
 
-Dossier : `prisma/migrations/20260816154500_add_mobile_refresh_session/`
+- Opaque (`crypto.randomBytes(48)` → base64url)
+- Hash **SHA-256** stocké dans `MobileRefreshSession.refreshTokenHash`
+- TTL : **30 jours** (`MOBILE_REFRESH_TOKEN_TTL_MS`) — côté service uniquement
+- Jamais stocké en clair
 
-Génération SQL (sans toucher la DB) :
+## Rotation (consommation unique)
 
-```bash
-npx prisma migrate diff \
-  --from-schema-datamodel <schema-HEAD> \
-  --to-schema-datamodel prisma/schema.prisma \
-  --script
+Transaction Prisma avec **consommation atomique** :
+
+```ts
+updateMany({ where: { id, revokedAt: null }, data: { revokedAt, lastUsedAt } })
 ```
 
-**Appliquée sur PostgreSQL ? NON.**
+| `count` | Comportement |
+|---------|----------------|
+| `1` | créer le nouveau `MobileRefreshSession` (`rotatedFromId`) |
+| `0` | reuse / concurrence — **aucun** second descendant ; révoquer toutes les sessions actives du user **dans la même transaction** (commit), puis `UNAUTHENTICATED` hors transaction |
 
-### Déploiement futur (à exécuter manuellement plus tard)
+Un refresh ne peut être consommé **qu'une seule fois**, même sous concurrence.
 
-1. Backup DB
-2. `npx prisma migrate deploy` (environnement approprié)
-3. Vérifier table + indexes + FKs
-4. Plan de rollback : drop table `mobile_refresh_sessions` uniquement si jamais utilisée en prod
+### Révocation reuse dans la transaction
 
-## Access / refresh (rappel — non implémentés)
+La révocation globale concurrente est faite **dans** `$transaction` puis le throw a lieu **après** le commit.  
+Sinon un throw interne rollbackerait aussi les révocations → état incohérent.
 
-- Access JWT ~15 min, claims `sub/jti/iat/exp/type=access`
-- Refresh opaque + hash serveur + rotation
-- Redis optionnel : blacklist access `jti` au logout
+## Reuse detection
 
-## Non créé encore
+1. Lookup : refresh déjà `revokedAt != null` → `updateMany` toutes sessions actives du user (hors tx) → `UNAUTHENTICATED`
+2. Course : `updateMany` conditionnel `count === 0` → même politique, **dans** la transaction
 
-login / refresh / logout API, Bearer resolver, Expo, React Native, `auth.ts` modifié.
+## Logout
+
+- révoque le refresh en **PostgreSQL** (source de vérité) — effectif même sans Redis
+- blacklist Redis de l'access `jti` avec TTL = temps restant avant `exp` — **best-effort**
+
+### Redis indisponible (fail-open access)
+
+- logout refresh reste effectif (DB)
+- un access déjà émis peut rester valide jusqu'à son `exp` (max ~15 min)
+- `blacklistAccessTokenJti() === false` ≠ révocation access garantie
+
+Clé Redis : `blacklist:token:${jti}` (compatible `isTokenBlacklisted`).
+
+Redis n'est **jamais** la source de vérité du refresh.
+
+## Resolver Bearer
+
+`resolveApiActorFromBearer(request)` :
+
+1. Authorization / Bearer
+2. verify JWT + type access
+3. blacklist jti
+4. reload User DB (role / status / emailVerified)
+5. `AuthContext` avec `channel: "mobile"`, `sessionId = jti`
+6. `adminRoles: []`, `adherentId: null` = non résolus
+
+User Inactif ou email non vérifié → refus même si JWT valide.
+
+## Resolver composite — no downgrade
+
+`resolveApiActor(request)` :
+
+- **Authorization présent** → Bearer uniquement. Invalide → 401. **Jamais** de fallback cookie Web.
+- **Authorization absent** → `resolveApiActorFromWebSession()`
+
+## Credentials (alignement Web)
+
+| Règle | Comportement |
+|-------|----------------|
+| Email | `normalizeEmail` |
+| Password | bcryptjs |
+| Inconnu / mauvais mdp | même message `Identifiants invalides` |
+| Inactif | `FORBIDDEN` (message bureau) |
+| Email non vérifié | `FORBIDDEN` (Web = OTP ; mobile refuse sans OTP dans 2K) |
+
+Non implémenté en 2K (effets Web `events.signIn`) : lastLogin, loginCount, badges, activity logs.
+
+## Logout — Authorization
+
+| Header | Comportement |
+|--------|----------------|
+| Absent | OK — logout via `refreshToken` seul |
+| `Bearer <token>` valide (syntaxe) | token transmis à `logoutMobileSession` |
+| Scheme invalide / Bearer vide / malformé | **401** fail closed — service **non** appelé |
+
+Idempotence conservée : refresh inconnu / déjà révoqué ; access JWT invalide **après** extraction syntaxiquement correcte (géré dans le service).
+
+## Rate limit login
+
+`checkRateLimit("mobile-login:${ip}:${email}")` — 10 req / 15 min.
+
+## Rate limit refresh (risque connu)
+
+`POST /api/v1/auth/refresh` **n'a pas** encore de rate-limit dédié.  
+Durcissement recommandé avant production. Non bloquant pour 2K : refresh opaque 48 bytes (haute entropie).

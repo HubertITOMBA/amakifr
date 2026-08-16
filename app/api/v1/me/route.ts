@@ -1,4 +1,5 @@
-import { resolveApiActorFromWebSession } from "@/lib/api/auth-web";
+import type { NextRequest } from "next/server";
+import { resolveApiActor } from "@/lib/api/auth-resolve";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/errors";
 import { getMe } from "@/lib/services/user/get-me";
@@ -7,11 +8,11 @@ export const dynamic = "force-dynamic";
 
 /**
  * GET /api/v1/me — profil minimal de l'utilisateur authentifié.
- * Auth temporaire : session Web NextAuth (pas Bearer).
+ * Auth : Bearer mobile OU session Web NextAuth (composite, no-downgrade).
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const actor = await resolveApiActorFromWebSession();
+    const actor = await resolveApiActor(request);
     if (!actor) {
       return apiError("UNAUTHENTICATED", "Non authentifié", 401);
     }
