@@ -68,3 +68,5 @@ public/build-id.json
 
 
 logs/
+# Local database backups
+backups/
