@@ -36,6 +36,15 @@ scripts/backup-users-adherents.json
 maintenance.flag
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+!mobile/.env.example
+!env.example
+!env.local.example
+
+# mobile Expo
+mobile/node_modules/
+mobile/.expo/
+mobile/dist/
 POMPE_Dev_Master.pl
 PROMPTEUR.txt
 data/geonames/*
