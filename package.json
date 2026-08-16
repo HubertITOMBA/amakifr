@@ -9,6 +9,8 @@
     "build": "node scripts/generate-build-id.js && next build",
     "start": "next start -H 0.0.0.0 -p 9060",
     "lint": "next lint",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "db:seed": "tsx scripts/create-test-users.ts",
     "db:seed-elections": "tsx scripts/create-test-elections.ts",
     "db:seed-financial": "tsx scripts/create-financial-fixtures.ts",
@@ -172,6 +174,7 @@
     "prisma": "6.19.0",
     "tailwindcss": "^4",
     "tsx": "^4.20.6",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }
