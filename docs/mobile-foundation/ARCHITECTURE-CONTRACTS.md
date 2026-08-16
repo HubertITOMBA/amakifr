@@ -102,3 +102,50 @@ Ces valeurs sont **acceptables pour getMe** (self-service basé sur `actor.userI
 
 Elles **ne doivent PAS** devenir le resolver AuthContext générique des futures opérations protégées (permissions, ownership, admin). Un resolver riche (rôles bureau, adherentId résolu) sera introduit plus tard, hors Phase 2A.
 
+## 13. Authorization (`lib/authorize.ts`) — Phase 2C
+
+### Rôle
+
+`authorize()` est une **façade commune** au-dessus du système existant `hasPermission` (`lib/dynamic-permissions.ts`).
+
+Elle ne recopie pas la logique métier des permissions : elle l’orchestre.
+
+### Flux
+
+```
+AuthContext (déjà authentifié)
+        │
+        v
+authorize({ actor, permissionKey, type })
+        │
+        ├── userId manquant → ServiceError UNAUTHENTICATED
+        ├── role ADMIN → OK (bypass, sans appeler hasPermission)
+        └── sinon hasPermission(userId, permissionKey, type)
+                ├── true → OK
+                ├── false → ServiceError FORBIDDEN
+                └── throw → ServiceError INTERNAL_ERROR (fail closed)
+```
+
+### Règles
+
+1. Reçoit `AuthContext` — **ne réalise pas** l’authentification  
+2. Indépendante de cookies / Request / Response / NextAuth / `auth()`  
+3. Bypass **ADMIN** via `actor.role` normalisé (aligné historique `User.role === ADMIN`)  
+4. `permissionKey` = clés **legacy** `Permission.action` (noms de Server Actions)  
+5. Types : `READ` | `WRITE` | `DELETE` | `MANAGE` → `PermissionType` Prisma  
+6. **Fail closed** : incertitude = refus  
+7. Erreur technique du moteur → `INTERNAL_ERROR` (accès toujours refusé ; distinct de `FORBIDDEN` métier)  
+8. Ownership / règles métier complexes → **services**, pas `authorize()`  
+9. Migration future `resource:action` → **reportée** (TODO dans le code)  
+10. Utilisable plus tard par Server Actions Web **et** API `/v1` mobile  
+
+### Non branché
+
+Phase 2C ne remplace pas les `canRead` / `assertAdmin` existants dans les actions.  
+Le branchement se fera domaine par domaine lors de l’extraction des services.
+
+### getMe
+
+`getMe` reste une lecture self-service sur `actor.userId` et **n’appelle pas** `authorize()` dans cette phase.
+
+
