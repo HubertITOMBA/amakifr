@@ -14,3 +14,20 @@ export const MOBILE_ACCESS_TOKEN_TYPE = "access" as const;
 
 /** Octets aléatoires pour le refresh opaque (haute entropie) */
 export const MOBILE_REFRESH_TOKEN_BYTES = 48;
+
+/** Tolérance horloge JWT (secondes) — skew mobile léger, pas plusieurs minutes */
+export const MOBILE_ACCESS_TOKEN_CLOCK_TOLERANCE_SECONDS = 10;
+
+/** Rate-limit login mobile : max requêtes / fenêtre */
+export const MOBILE_LOGIN_RATE_MAX = 10;
+export const MOBILE_LOGIN_RATE_WINDOW_MS = 15 * 60 * 1000;
+
+/**
+ * Rate-limit refresh mobile : max / fenêtre.
+ * Plus permissif que login (réseaux mobiles / retries).
+ */
+export const MOBILE_REFRESH_RATE_MAX = 30;
+export const MOBILE_REFRESH_RATE_WINDOW_MS = 15 * 60 * 1000;
+
+/** Longueur du digest court pour clé rate-limit (jamais le refresh brut) */
+export const MOBILE_REFRESH_RATE_HASH_PREFIX_LEN = 16;

@@ -97,6 +97,58 @@ describe("resolveApiActorFromBearer", () => {
     });
   });
 
+  it("Redis dégradé (isTokenBlacklisted=false) + JWT/User OK → actor", async () => {
+    // Comportement helper : Redis down → false (fail-open blacklist)
+    verifyAccessToken.mockResolvedValue({
+      sub: "u1",
+      jti: "jti-ok",
+      iat: 1,
+      exp: 9999999999,
+      type: "access",
+    });
+    isTokenBlacklisted.mockResolvedValue(false);
+    findUnique.mockResolvedValue({
+      id: "u1",
+      name: "Ada",
+      email: "ada@example.com",
+      role: "MEMBRE",
+      status: "Actif",
+      emailVerified: new Date(),
+    });
+    const req = new Request("http://localhost", {
+      headers: { Authorization: "Bearer tok" },
+    });
+    const result = await resolveApiActorFromBearer(req);
+    expect(result.kind).toBe("actor");
+  });
+
+  it("jti non blacklisté → actor valide", async () => {
+    verifyAccessToken.mockResolvedValue({
+      sub: "u1",
+      jti: "jti-clean",
+      iat: 1,
+      exp: 9999999999,
+      type: "access",
+    });
+    isTokenBlacklisted.mockResolvedValue(false);
+    findUnique.mockResolvedValue({
+      id: "u1",
+      name: "Ada",
+      email: "ada@example.com",
+      role: "MEMBRE",
+      status: "Actif",
+      emailVerified: new Date(),
+    });
+    const req = new Request("http://localhost", {
+      headers: { Authorization: "Bearer tok" },
+    });
+    const result = await resolveApiActorFromBearer(req);
+    expect(result.kind).toBe("actor");
+    if (result.kind === "actor") {
+      expect(result.actor.sessionId).toBe("jti-clean");
+    }
+  });
+
   it("User inexistant → UNAUTHENTICATED", async () => {
     verifyAccessToken.mockResolvedValue({
       sub: "u1",

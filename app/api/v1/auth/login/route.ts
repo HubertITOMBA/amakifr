@@ -7,20 +7,18 @@ import { authenticateCredentials } from "@/lib/services/auth/authenticate-creden
 import { createMobileSession } from "@/lib/services/auth/create-mobile-session";
 import { checkRateLimit } from "@/lib/rate-limit";
 import { normalizeEmail } from "@/lib/utils";
+import { getClientIp } from "@/lib/api/client-ip";
+import {
+  MOBILE_LOGIN_RATE_MAX,
+  MOBILE_LOGIN_RATE_WINDOW_MS,
+} from "@/lib/auth-mobile/constants";
 
 export const dynamic = "force-dynamic";
-
-function clientIp(request: NextRequest): string {
-  const forwarded = request.headers.get("x-forwarded-for");
-  if (forwarded) {
-    return forwarded.split(",")[0]?.trim() || "unknown";
-  }
-  return request.headers.get("x-real-ip")?.trim() || "unknown";
-}
 
 /**
  * POST /api/v1/auth/login — authentification mobile (credentials → tokens).
  * Ne touche pas NextAuth / cookies Web.
+ * Rate-limit : IP + email normalisé (jamais le password).
  */
 export async function POST(request: NextRequest) {
   try {
@@ -41,12 +39,15 @@ export async function POST(request: NextRequest) {
 
     const { email, password } = parsed.data;
     const normalizedEmail = normalizeEmail(email);
-    const ip = clientIp(request);
+    const ip = getClientIp(request);
 
-    const rate = await checkRateLimit(`mobile-login:${ip}:${normalizedEmail}`, {
-      maxRequests: 10,
-      windowMs: 15 * 60 * 1000,
-    });
+    const rate = await checkRateLimit(
+      `mobile-login:${ip}:${normalizedEmail}`,
+      {
+        maxRequests: MOBILE_LOGIN_RATE_MAX,
+        windowMs: MOBILE_LOGIN_RATE_WINDOW_MS,
+      }
+    );
     if (!rate.allowed) {
       throw new ServiceError(
         "RATE_LIMITED",

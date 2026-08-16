@@ -2,18 +2,16 @@ import { getRedisClient } from "@/lib/redis";
 
 /**
  * Blacklist un access token mobile par jti, avec TTL = temps restant avant exp.
- * Réutilise la clé Redis `blacklist:token:${jti}` (compatible isTokenBlacklisted).
  *
- * Best-effort uniquement : Redis n'est PAS la source de vérité du refresh
- * (PostgreSQL / MobileRefreshSession l'est). Si Redis est indisponible,
- * `false` ne signifie PAS « révocation access garantie » — l'access déjà
- * émis peut rester valide jusqu'à son `exp` (max ~15 min). Le logout refresh
- * en DB reste effectif indépendamment.
+ * BEST-EFFORT uniquement — Redis n'est PAS une source de vérité.
+ * PostgreSQL (MobileRefreshSession) reste la source persistante du refresh.
  *
- * Ne pas blacklister pour 30 jours un access de 15 minutes.
+ * Si Redis est indisponible / erreur :
+ * - `false` ≠ « access révoqué »
+ * - logout refresh DB reste effectif
+ * - access déjà émis peut rester valide jusqu'à `exp` (max ~15 min)
+ * - `isTokenBlacklisted` retourne false → Bearer continue si JWT+User OK
  *
- * @param jti - Claim jti de l'access token
- * @param expiresAtEpochSeconds - Claim exp (epoch secondes)
  * @returns true si écriture Redis effectuée ; false = best-effort échoué
  */
 export async function blacklistAccessTokenJti(

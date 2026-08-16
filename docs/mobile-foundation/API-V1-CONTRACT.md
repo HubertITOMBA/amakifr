@@ -135,6 +135,7 @@ Services inchangés. Routes = adapters HTTP minces.
 
 - Pas de CORS `*` global ajouté
 - Rate limit login mobile : 10 / 15 min (`IP + email`)
+- Rate limit refresh mobile : 30 / 15 min (`IP + digest SHA-256`) — Phase 2M
 - CORS navigateur surtout pertinent pour Expo Web futur
 
 ## 17. 401

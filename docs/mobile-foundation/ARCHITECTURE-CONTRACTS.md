@@ -334,4 +334,12 @@ Self-service via routes minces réutilisant les services Phase 2E :
 - Aucun Prisma / `revalidatePath` dans les routes API
 - Server Actions Web inchangées (revalidatePath conservé côté Web)
 
+## 21. Hardening auth mobile (Phase 2M)
+
+- Rate-limit `/auth/refresh` : 30 / 15 min, clé `IP + sha256(refresh).slice(0,16)`
+- Redis blacklist access : best-effort ; PostgreSQL = vérité refresh
+- `clockTolerance` JWT : 10 s
+- Isolation reuse User A ≠ User B
+- Checklist avant Expo : voir `AUTH-MOBILE-CONTRACT.md`
+
 

@@ -278,4 +278,91 @@ describe("rotateMobileRefreshSession", () => {
       data: { revokedAt: expect.any(Date) },
     });
   });
+
+  it("reuse User A n'affecte PAS User B (where userId = A)", async () => {
+    findUnique.mockResolvedValue(
+      activeSession({
+        id: "sess-a",
+        userId: "user-a",
+        revokedAt: new Date(),
+        user: {
+          id: "user-a",
+          name: "A",
+          email: "a@b.com",
+          role: "MEMBRE",
+          status: "Actif",
+          emailVerified: new Date(),
+        },
+      })
+    );
+    updateMany.mockResolvedValue({ count: 2 });
+
+    await expect(rotateMobileRefreshSession("revoked-a")).rejects.toMatchObject({
+      code: "UNAUTHENTICATED",
+    });
+
+    expect(updateMany).toHaveBeenCalledTimes(1);
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { userId: "user-a", revokedAt: null },
+      data: { revokedAt: expect.any(Date) },
+    });
+    const where = updateMany.mock.calls[0][0].where;
+    expect(where.userId).toBe("user-a");
+    expect(where.userId).not.toBe("user-b");
+  });
+
+  it("expiré → aucun create / aucune transaction", async () => {
+    findUnique.mockResolvedValue(
+      activeSession({ expiresAt: new Date("2020-01-01") })
+    );
+    await expect(rotateMobileRefreshSession("tok")).rejects.toMatchObject({
+      message: "Session expirée",
+    });
+    expect(transaction).not.toHaveBeenCalled();
+    expect(create).not.toHaveBeenCalled();
+  });
+
+  it("Inactif → FORBIDDEN + révocation session", async () => {
+    findUnique.mockResolvedValue(
+      activeSession({
+        user: {
+          id: "u1",
+          name: "Ada",
+          email: "ada@example.com",
+          role: "MEMBRE",
+          status: "Inactif",
+          emailVerified: new Date(),
+        },
+      })
+    );
+    update.mockResolvedValue({});
+    await expect(rotateMobileRefreshSession("tok")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    expect(update).toHaveBeenCalledWith({
+      where: { id: "old-sess" },
+      data: { revokedAt: expect.any(Date) },
+    });
+    expect(transaction).not.toHaveBeenCalled();
+  });
+
+  it("email non vérifié → FORBIDDEN + révocation", async () => {
+    findUnique.mockResolvedValue(
+      activeSession({
+        user: {
+          id: "u1",
+          name: "Ada",
+          email: "ada@example.com",
+          role: "MEMBRE",
+          status: "Actif",
+          emailVerified: null,
+        },
+      })
+    );
+    update.mockResolvedValue({});
+    await expect(rotateMobileRefreshSession("tok")).rejects.toMatchObject({
+      code: "FORBIDDEN",
+    });
+    expect(transaction).not.toHaveBeenCalled();
+  });
 });

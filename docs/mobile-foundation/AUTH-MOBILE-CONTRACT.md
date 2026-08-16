@@ -1,8 +1,8 @@
-# Authentification mobile Bearer — contrat (Phases 2I–2K)
+# Authentification mobile Bearer — contrat (Phases 2I–2M)
 
 > Web NextAuth reste inchangé (`auth.ts`, `auth.config.ts`, `middleware.ts`).  
-> Phase 2J : table `MobileRefreshSession` appliquée.  
-> Phase 2K : login / refresh / logout / resolver Bearer / composite.
+> Phase 2K : login / refresh / logout / resolver Bearer / composite.  
+> Phase 2M : hardening (rate-limit refresh, Redis dégradé documenté, invariants).
 
 ## Variables d'environnement
 
@@ -20,109 +20,111 @@ Ne pas committer de secret. Documenter uniquement — ne pas modifier `.env` aut
 | POST | `/api/v1/auth/refresh` | `{ refreshToken }` strict |
 | POST | `/api/v1/auth/logout` | `{ refreshToken? }` + `Authorization: Bearer` optionnel |
 
-Réponses : contrat `/api/v1` (`success` / `error.code`).
+Réponses : contrat `/api/v1` (`success` / `error.code`). Cache : `private, no-store`.
 
 ## Access token
 
-- JWT via **`jose` 6.1.1** (dépendance directe)
-- TTL : **15 minutes** (`MOBILE_ACCESS_TOKEN_TTL_SECONDS`)
+- JWT via **`jose` 6.1.1** (dépendance directe), alg **HS256** imposé
+- TTL : **15 minutes**
+- `clockTolerance` : **10 s** (skew mobile léger)
 - Claims : `sub`, `jti`, `iat`, `exp`, `type=access`
-- Pas de password, emailVerified, adminRoles, adherentId, refresh
+- Pas d'`iss`/`aud` (non nécessaires en 2M)
 
 ## Refresh token
 
 - Opaque (`crypto.randomBytes(48)` → base64url)
-- Hash **SHA-256** stocké dans `MobileRefreshSession.refreshTokenHash`
-- TTL : **30 jours** (`MOBILE_REFRESH_TOKEN_TTL_MS`) — côté service uniquement
-- Jamais stocké en clair
+- Hash **SHA-256** en DB uniquement
+- TTL : **30 jours**
+- Multi-device : plusieurs `MobileRefreshSession` actives par user **autorisées**
 
 ## Rotation (consommation unique)
 
-Transaction Prisma avec **consommation atomique** :
+`updateMany({ where: { id, revokedAt: null } })` dans transaction :
 
-```ts
-updateMany({ where: { id, revokedAt: null }, data: { revokedAt, lastUsedAt } })
-```
+| `count` | Effet |
+|---------|--------|
+| `1` | nouveau refresh (`rotatedFromId`) |
+| `0` | reuse/concurrence → révocation **toutes** sessions actives du **même** user → `UNAUTHENTICATED` |
 
-| `count` | Comportement |
-|---------|----------------|
-| `1` | créer le nouveau `MobileRefreshSession` (`rotatedFromId`) |
-| `0` | reuse / concurrence — **aucun** second descendant ; révoquer toutes les sessions actives du user **dans la même transaction** (commit), puis `UNAUTHENTICATED` hors transaction |
-
-Un refresh ne peut être consommé **qu'une seule fois**, même sous concurrence.
-
-### Révocation reuse dans la transaction
-
-La révocation globale concurrente est faite **dans** `$transaction` puis le throw a lieu **après** le commit.  
-Sinon un throw interne rollbackerait aussi les révocations → état incohérent.
+Isolation : `where.userId` = propriétaire uniquement — User B jamais touché.
 
 ## Reuse detection
 
-1. Lookup : refresh déjà `revokedAt != null` → `updateMany` toutes sessions actives du user (hors tx) → `UNAUTHENTICATED`
-2. Course : `updateMany` conditionnel `count === 0` → même politique, **dans** la transaction
+Politique de sécurité **globale par user** : un refresh révoqué représenté révoque toutes les sessions actives de ce user (tous appareils).  
+Sessions d'un autre user : intactes.
 
 ## Logout
 
-- révoque le refresh en **PostgreSQL** (source de vérité) — effectif même sans Redis
-- blacklist Redis de l'access `jti` avec TTL = temps restant avant `exp` — **best-effort**
+| Cas | Comportement |
+|-----|----------------|
+| refresh valide | révoqué en PostgreSQL |
+| refresh inconnu / déjà révoqué | succès idempotent |
+| Bearer syntaxe OK | tentative blacklist jti (best-effort) |
+| Authorization malformé | **401** |
+| Bearer seul (sans refresh) | blacklist access seulement — **aucune** session refresh révoquée (pas de lien jti→refresh dans le modèle) |
 
-### Redis indisponible (fail-open access)
+## Redis / blacklist (best-effort)
 
-- logout refresh reste effectif (DB)
-- un access déjà émis peut rester valide jusqu'à son `exp` (max ~15 min)
-- `blacklistAccessTokenJti() === false` ≠ révocation access garantie
+| Composant | Rôle |
+|-----------|------|
+| PostgreSQL refresh | **source de vérité** |
+| Redis `blacklist:token:${jti}` | complément access, TTL = restant avant `exp` |
 
-Clé Redis : `blacklist:token:${jti}` (compatible `isTokenBlacklisted`).
+Redis down / erreur :
 
-Redis n'est **jamais** la source de vérité du refresh.
+- rate-limit : fallback **mémoire** (`checkRateLimit` fail-open vers Map locale)
+- blacklist : `isTokenBlacklisted` → `false` → access peut rester valide jusqu'à `exp` (~15 min max)
+- API Bearer reste disponible (JWT + User DB)
+- **ne pas** présenter logout access comme immédiat garanti sans Redis
 
-## Resolver Bearer
+## Rate limits
 
-`resolveApiActorFromBearer(request)` :
+| Route | Clé | Seuil |
+|-------|-----|-------|
+| login | `mobile-login:${ip}:${emailNorm}` | **10 / 15 min** |
+| refresh | `mobile-refresh:${ip}:${sha256(refresh).slice(0,16)}` | **30 / 15 min** |
 
-1. Authorization / Bearer
-2. verify JWT + type access
-3. blacklist jti
-4. reload User DB (role / status / emailVerified)
-5. `AuthContext` avec `channel: "mobile"`, `sessionId = jti`
-6. `adminRoles: []`, `adherentId: null` = non résolus
+Jamais password ni refresh brut dans la clé.  
+`x-forwarded-for` : fiable seulement derrière reverse proxy contrôlé.
 
-User Inactif ou email non vérifié → refus même si JWT valide.
+## Resolver / no-downgrade
 
-## Resolver composite — no downgrade
+- Authorization présent → Bearer uniquement ; invalide → 401 ; **jamais** cookie
+- Authorization absent → Web NextAuth
+- `adminRoles` / `adherentId` : **non résolus** (self-service actuel)
 
-`resolveApiActor(request)` :
+## Credentials
 
-- **Authorization présent** → Bearer uniquement. Invalide → 401. **Jamais** de fallback cookie Web.
-- **Authorization absent** → `resolveApiActorFromWebSession()`
+| Règle | Code public |
+|-------|-------------|
+| Inconnu / mauvais mdp | 401 `Identifiants invalides` |
+| Inactif / email non vérifié | 403 |
+| Rate limit | 429 |
+| Body invalide | 400 |
 
-## Credentials (alignement Web)
+Refresh : messages génériques `Session invalide` / `Session expirée` — pas d'id/hash.
 
-| Règle | Comportement |
-|-------|----------------|
-| Email | `normalizeEmail` |
-| Password | bcryptjs |
-| Inconnu / mauvais mdp | même message `Identifiants invalides` |
-| Inactif | `FORBIDDEN` (message bureau) |
-| Email non vérifié | `FORBIDDEN` (Web = OTP ; mobile refuse sans OTP dans 2K) |
+## Hardening Phase 2M
 
-Non implémenté en 2K (effets Web `events.signIn`) : lastLogin, loginCount, badges, activity logs.
+- Rate-limit refresh (IP + digest)
+- Fail mode Redis documenté (best-effort)
+- clockTolerance 10 s
+- Isolation reuse User A / User B testée
+- Multi-device + reuse global documentés
+- Logs : pas de password / tokens / Authorization / secret
+- Cleanup sessions expirées/révoquées : **futur** (pas de cron en 2M)
 
-## Logout — Authorization
+## Checklist avant Expo / React Native
 
-| Header | Comportement |
-|--------|----------------|
-| Absent | OK — logout via `refreshToken` seul |
-| `Bearer <token>` valide (syntaxe) | token transmis à `logoutMobileSession` |
-| Scheme invalide / Bearer vide / malformé | **401** fail closed — service **non** appelé |
+- [ ] `MOBILE_ACCESS_TOKEN_SECRET` configuré en production (≥ 32 octets)
+- [ ] HTTPS obligatoire
+- [ ] reverse proxy `x-forwarded-for` contrôlé
+- [ ] rate-limit login actif
+- [ ] rate-limit refresh actif
+- [ ] backups PostgreSQL
+- [ ] monitoring Redis (blacklist best-effort)
+- [ ] plan cleanup refresh sessions
+- [ ] tests auth verts
+- [ ] build vert
 
-Idempotence conservée : refresh inconnu / déjà révoqué ; access JWT invalide **après** extraction syntaxiquement correcte (géré dans le service).
-
-## Rate limit login
-
-`checkRateLimit("mobile-login:${ip}:${email}")` — 10 req / 15 min.
-
-## Rate limit refresh (risque connu)
-
-`POST /api/v1/auth/refresh` **n'a pas** encore de rate-limit dédié.  
-Durcissement recommandé avant production. Non bloquant pour 2K : refresh opaque 48 bytes (haute entropie).
+**Ne pas démarrer Expo tant que cette checklist n'est pas validée en environnement cible.**

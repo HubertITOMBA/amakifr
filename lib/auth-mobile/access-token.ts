@@ -5,6 +5,7 @@ import { getMobileAccessTokenSecret } from "@/lib/auth-mobile/config";
 import {
   MOBILE_ACCESS_TOKEN_TTL_SECONDS,
   MOBILE_ACCESS_TOKEN_TYPE,
+  MOBILE_ACCESS_TOKEN_CLOCK_TOLERANCE_SECONDS,
 } from "@/lib/auth-mobile/constants";
 
 export type MobileAccessTokenClaims = {
@@ -67,6 +68,7 @@ export async function verifyAccessToken(
   try {
     const { payload } = await jwtVerify(token, secretKey(), {
       algorithms: ["HS256"],
+      clockTolerance: MOBILE_ACCESS_TOKEN_CLOCK_TOLERANCE_SECONDS,
     });
 
     const sub = typeof payload.sub === "string" ? payload.sub.trim() : "";

@@ -128,13 +128,20 @@ describe("POST /api/v1/auth/login", () => {
 describe("POST /api/v1/auth/refresh", () => {
   beforeEach(() => {
     rotateMobileRefreshSession.mockReset();
+    checkRateLimit.mockReset();
+    checkRateLimit.mockResolvedValue({
+      allowed: true,
+      remaining: 29,
+      resetTime: Date.now(),
+    });
   });
 
-  it("invalide body", async () => {
+  it("invalide body — pas de rotation", async () => {
     const res = await refreshPost(
       jsonReq("http://localhost/api/v1/auth/refresh", {})
     );
     expect(res.status).toBe(400);
+    expect(rotateMobileRefreshSession).not.toHaveBeenCalled();
   });
 
   it("inconnu", async () => {
@@ -149,7 +156,7 @@ describe("POST /api/v1/auth/refresh", () => {
     expect(res.status).toBe(401);
   });
 
-  it("succès rotation", async () => {
+  it("succès rotation quand rate-limit allowed", async () => {
     rotateMobileRefreshSession.mockResolvedValue({
       accessToken: "a2",
       refreshToken: "r2",
@@ -165,13 +172,33 @@ describe("POST /api/v1/auth/refresh", () => {
     });
     const res = await refreshPost(
       jsonReq("http://localhost/api/v1/auth/refresh", {
-        refreshToken: "r1",
+        refreshToken: "r1-secret-refresh-token-value",
       })
     );
     expect(res.status).toBe(200);
     const body = await res.json();
     expect(body.data.refreshToken).toBe("r2");
     expect(body.data.accessToken).toBe("a2");
+    expect(rotateMobileRefreshSession).toHaveBeenCalled();
+    expect(checkRateLimit).toHaveBeenCalled();
+    const rateKey = checkRateLimit.mock.calls[0][0] as string;
+    expect(rateKey).toMatch(/^mobile-refresh:/);
+    expect(rateKey).not.toContain("r1-secret-refresh-token-value");
+  });
+
+  it("rate-limit denied → 429, rotation NON appelée", async () => {
+    checkRateLimit.mockResolvedValue({
+      allowed: false,
+      remaining: 0,
+      resetTime: Date.now() + 1000,
+    });
+    const res = await refreshPost(
+      jsonReq("http://localhost/api/v1/auth/refresh", {
+        refreshToken: "r1-secret-refresh-token-value",
+      })
+    );
+    expect(res.status).toBe(429);
+    expect(rotateMobileRefreshSession).not.toHaveBeenCalled();
   });
 });
 
