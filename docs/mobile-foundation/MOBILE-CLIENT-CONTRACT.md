@@ -53,3 +53,23 @@ Pas de secrets backend dans `EXPO_PUBLIC_*`.
 - ownership via Bearer uniquement (pas de `userId` query)
 - anti-IDOR côté backend
 - pas de cache persistant SecureStore
+
+## Cotisations mensuelles (Phase 2P)
+
+Écran `(app)/cotisations` — **lecture seule** :
+
+| Méthode | Path |
+|---------|------|
+| GET | `/api/v1/me/cotisations-mensuelles` |
+
+Règles client :
+
+- auth Bearer via `authenticatedFetch` uniquement
+- **pas** de `userId` / `adherentId` query (anti-IDOR backend)
+- montants DTO en **string** décimale — jamais convertis en `Number` / `parseFloat`
+- dates ISO string — affichage local uniquement
+- ordre serveur (`periode` desc) conservé
+- pull-to-refresh, loading / empty / error
+- **pas** de mutation cotisation
+- **pas** de paiement (Stripe / Mollie / PayPal / WebView)
+- **pas** de cache persistant (SecureStore / AsyncStorage)

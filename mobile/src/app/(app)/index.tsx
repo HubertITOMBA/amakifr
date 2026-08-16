@@ -88,6 +88,15 @@ export default function MeScreen() {
       </Pressable>
 
       <Pressable
+        style={styles.navButton}
+        onPress={() => router.push("/cotisations")}
+        accessibilityRole="button"
+        accessibilityLabel="Ouvrir les cotisations"
+      >
+        <Text style={styles.navButtonText}>Cotisations</Text>
+      </Pressable>
+
+      <Pressable
         style={[styles.button, signingOut && styles.buttonDisabled]}
         onPress={onSignOut}
         disabled={signingOut}

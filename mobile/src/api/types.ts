@@ -92,6 +92,56 @@ export type DeleteNotificationResultDto = {
   deleted: true;
 };
 
+/**
+ * Catégorie type cotisation (miroir string, pas d'import Prisma).
+ * Aligné sur enum backend CategorieTypeCotisation.
+ */
+export type CategorieTypeCotisation =
+  | "ForfaitMensuel"
+  | "Assistance"
+  | "Divers";
+
+/**
+ * Type de cotisation mensuelle (sous-ensemble JSON-safe).
+ * montant : string décimale — jamais number.
+ */
+export type TypeCotisationMensuelleDto = {
+  id: string;
+  nom: string;
+  description: string | null;
+  montant: string;
+  obligatoire: boolean;
+  actif: boolean;
+  ordre: number;
+  categorie: CategorieTypeCotisation;
+  aBeneficiaire: boolean;
+};
+
+/**
+ * Cotisation mensuelle self-service.
+ * Montants : string décimale. Dates : ISO string.
+ * Pas de relation Prisma complète / paiements / secrets.
+ */
+export type CotisationMensuelleDto = {
+  id: string;
+  periode: string;
+  annee: number;
+  mois: number;
+  typeCotisationId: string;
+  adherentId: string;
+  adherentBeneficiaireId: string | null;
+  montantAttendu: string;
+  montantPaye: string;
+  montantRestant: string;
+  dateEcheance: string;
+  statut: string;
+  description: string | null;
+  cotisationDuMoisId: string | null;
+  createdAt: string;
+  updatedAt: string;
+  typeCotisation: TypeCotisationMensuelleDto;
+};
+
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;
