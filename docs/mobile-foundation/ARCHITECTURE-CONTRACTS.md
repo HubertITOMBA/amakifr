@@ -193,10 +193,56 @@ Les clients tolèrent Date ou string via `new Date(...)`, mais le **contrat de l
 ### Next.js
 
 Les services n’appellent pas `auth()`, cookies, headers, `revalidatePath` / `revalidateTag`.  
-Les mutations / email / PDF / rappel restent dans les Server Actions (non extraits en 2D).
+Email / PDF / rappel restent hors extraction (non touchés en 2D/2E).
 
 ### Contrat Web préservé
 
 Retours `{ success, notifications }` / `{ success, count }` / `{ success: false, error }` inchangés pour les consommateurs (`NotificationCenter`, `/notifications`).
+
+## 15. Notifications mutations self-service (Phase 2E)
+
+### Services extraits
+
+| Service | Server Action (adapter Web) |
+|---------|------------------------------|
+| `markMyNotificationAsRead(actor, notificationId)` | `markNotificationAsRead(notificationId)` |
+| `markAllMyNotificationsAsRead(actor)` | `markAllNotificationsAsRead()` |
+| `deleteMyNotification(actor, notificationId)` | `deleteNotification(notificationId)` |
+
+Fichiers : `lib/services/notifications/{mark-my-notification-as-read,mark-all-my-notifications-as-read,delete-my-notification,require-actor-user-id}.ts`
+
+### Ownership / anti-IDOR
+
+- Source de vérité : `actor.userId` uniquement (pas d’`userId` client).
+- Mark one / delete : `updateMany` / `deleteMany` avec `where: { id, userId: actor.userId }`.
+- Mark all : `updateMany` avec `where: { userId: actor.userId, lue: false }`.
+- `count === 0` → `NOT_FOUND` « Notification non trouvée » (inexistant **ou** autre propriétaire — **pas de fuite**).
+
+### Durcissement documenté vs historique
+
+Historique mark/delete one : autre propriétaire → `"Non autorisé"` ; absent → `"Notification non trouvée"`.  
+Phase 2E : les deux cas → `"Notification non trouvée"` (même code métier `NOT_FOUND`).  
+Pas de bypass ADMIN sur ces trois actions (l’historique n’en avait déjà pas).
+
+### Autorisation
+
+**Pas** d’`authorize()` (self-service identité + ownership, comme avant).
+
+### revalidatePath
+
+Uniquement dans les Server Actions adapters : `/notifications` et `/` après succès.  
+Les services n’appellent pas Next.js cache.
+
+### Contrat Web (hors durcissement ci-dessus)
+
+| Aspect | Préservé |
+|--------|----------|
+| Signatures | oui |
+| Messages succès | oui |
+| `count === 0` sur mark-all | succès (pas d’erreur) |
+| Idempotence mark-one déjà lue | succès |
+| Erreurs génériques Prisma | messages historiques |
+
+Consommateurs : `NotificationCenter`, `app/notifications/page.tsx` ; admin liste utilise aussi `deleteNotification` (même ownership self — pas de delete cross-user admin via cette action).
 
 

@@ -11,6 +11,9 @@ import { isServiceError } from "@/lib/service-error";
 import { getMyNotifications } from "@/lib/services/notifications/get-my-notifications";
 import { getMyUnreadNotificationCount } from "@/lib/services/notifications/get-my-unread-count";
 import { mapNotificationDtoForWebAction } from "@/lib/services/notifications/map-notification-for-web";
+import { markMyNotificationAsRead } from "@/lib/services/notifications/mark-my-notification-as-read";
+import { markAllMyNotificationsAsRead } from "@/lib/services/notifications/mark-all-my-notifications-as-read";
+import { deleteMyNotification } from "@/lib/services/notifications/delete-my-notification";
 
 const CreateNotificationSchema = z.object({
   userId: z.string().min(1, "ID utilisateur requis"),
@@ -317,7 +320,8 @@ export async function getUnreadNotificationCount() {
 
 /**
  * Marque une notification comme lue
- * 
+ * Adapter Web → markMyNotificationAsRead (ownership actor.userId).
+ *
  * @param notificationId - L'ID de la notification à marquer comme lue
  * @returns Un objet avec success (boolean), message (string) en cas de succès, 
  *          ou error (string) en cas d'échec
@@ -329,23 +333,10 @@ export async function markNotificationAsRead(notificationId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que la notification appartient à l'utilisateur
-    const notification = await db.notification.findUnique({
-      where: { id: notificationId },
-    });
-
-    if (!notification) {
-      return { success: false, error: "Notification non trouvée" };
-    }
-
-    if (notification.userId !== session.user.id) {
-      return { success: false, error: "Non autorisé" };
-    }
-
-    await db.notification.update({
-      where: { id: notificationId },
-      data: { lue: true },
-    });
+    await markMyNotificationAsRead(
+      authContextFromSession(session),
+      notificationId
+    );
 
     revalidatePath("/notifications");
     revalidatePath("/");
@@ -355,6 +346,15 @@ export async function markNotificationAsRead(notificationId: string) {
       message: "Notification marquée comme lue",
     };
   } catch (error) {
+    if (isServiceError(error)) {
+      if (error.code === "UNAUTHENTICATED") {
+        return { success: false, error: "Non autorisé" };
+      }
+      if (error.code === "NOT_FOUND") {
+        return { success: false, error: "Notification non trouvée" };
+      }
+      return { success: false, error: error.message };
+    }
     console.error("Erreur lors du marquage de la notification:", error);
     return { success: false, error: "Erreur lors du marquage de la notification" };
   }
@@ -362,7 +362,8 @@ export async function markNotificationAsRead(notificationId: string) {
 
 /**
  * Marque toutes les notifications de l'utilisateur connecté comme lues
- * 
+ * Adapter Web → markAllMyNotificationsAsRead.
+ *
  * @returns Un objet avec success (boolean), message (string) en cas de succès, 
  *          ou error (string) en cas d'échec
  */
@@ -373,13 +374,7 @@ export async function markAllNotificationsAsRead() {
       return { success: false, error: "Non autorisé" };
     }
 
-    await db.notification.updateMany({
-      where: {
-        userId: session.user.id,
-        lue: false,
-      },
-      data: { lue: true },
-    });
+    await markAllMyNotificationsAsRead(authContextFromSession(session));
 
     revalidatePath("/notifications");
     revalidatePath("/");
@@ -389,6 +384,12 @@ export async function markAllNotificationsAsRead() {
       message: "Toutes les notifications ont été marquées comme lues",
     };
   } catch (error) {
+    if (isServiceError(error)) {
+      if (error.code === "UNAUTHENTICATED") {
+        return { success: false, error: "Non autorisé" };
+      }
+      return { success: false, error: error.message };
+    }
     console.error("Erreur lors du marquage des notifications:", error);
     return { success: false, error: "Erreur lors du marquage des notifications" };
   }
@@ -396,7 +397,8 @@ export async function markAllNotificationsAsRead() {
 
 /**
  * Supprime une notification
- * 
+ * Adapter Web → deleteMyNotification (ownership actor.userId).
+ *
  * @param notificationId - L'ID de la notification à supprimer
  * @returns Un objet avec success (boolean), message (string) en cas de succès, 
  *          ou error (string) en cas d'échec
@@ -408,22 +410,10 @@ export async function deleteNotification(notificationId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que la notification appartient à l'utilisateur
-    const notification = await db.notification.findUnique({
-      where: { id: notificationId },
-    });
-
-    if (!notification) {
-      return { success: false, error: "Notification non trouvée" };
-    }
-
-    if (notification.userId !== session.user.id) {
-      return { success: false, error: "Non autorisé" };
-    }
-
-    await db.notification.delete({
-      where: { id: notificationId },
-    });
+    await deleteMyNotification(
+      authContextFromSession(session),
+      notificationId
+    );
 
     revalidatePath("/notifications");
     revalidatePath("/");
@@ -433,6 +423,15 @@ export async function deleteNotification(notificationId: string) {
       message: "Notification supprimée avec succès",
     };
   } catch (error) {
+    if (isServiceError(error)) {
+      if (error.code === "UNAUTHENTICATED") {
+        return { success: false, error: "Non autorisé" };
+      }
+      if (error.code === "NOT_FOUND") {
+        return { success: false, error: "Notification non trouvée" };
+      }
+      return { success: false, error: error.message };
+    }
     console.error("Erreur lors de la suppression de la notification:", error);
     return { success: false, error: "Erreur lors de la suppression de la notification" };
   }
