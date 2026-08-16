@@ -245,4 +245,49 @@ Les services n’appellent pas Next.js cache.
 
 Consommateurs : `NotificationCenter`, `app/notifications/page.tsx` ; admin liste utilise aussi `deleteNotification` (même ownership self — pas de delete cross-user admin via cette action).
 
+## 16. Cotisations — mes cotisations mensuelles (Phase 2G)
+
+### Service
+
+`getMyCotisationsMensuelles(actor: AuthContext): Promise<CotisationMensuelleDto[]>`
+
+Fichiers : `lib/services/cotisations/{types,get-my-cotisations-mensuelles,decimal-to-money-string}.ts`
+
+### Résolution User → Adherent (anti-IDOR)
+
+1. Vérifie `actor.userId`
+2. `db.adherent.findUnique({ where: { userId: actor.userId } })`
+3. Charge `CotisationMensuelle` avec `where: { adherentId }` résolu serveur
+
+**Jamais** d’`adherentId` / `userId` client.
+
+### Autorisation
+
+- **Pas** d’`authorize()` / `canRead`
+- Ownership implicite via résolution Adherent
+- **Pas** de bypass ADMIN cross-user dans ce service (self uniquement)
+
+### Server Action Web historique
+
+`getCotisationsMensuellesAdherent(adherentId)` dans `actions/cotisations-mensuelles/index.ts` :
+
+- **non modifiée** en Phase 2G
+- conserve owner **OU** `UserRole.ADMIN` (ADMIN strict, pas bureau)
+- aucun consommateur UI actuel ; contrat public préservé intact
+
+Le mapper Web sera créé uniquement lorsqu'une délégation réelle de `getCotisationsMensuellesAdherent` vers le service sera décidée, afin de reproduire exactement son contrat historique.
+
+### DTO `CotisationMensuelleDto`
+
+Montants : **string** via `Prisma.Decimal.toString()` (API publique `@prisma/client` ; ex. `"25"`, `"25.5"`, `"0"`).  
+Dates : **ISO string**.
+
+Champs : id, periode, annee, mois, typeCotisationId, adherentId, adherentBeneficiaireId, montants, dateEcheance, statut, description, cotisationDuMoisId, createdAt, updatedAt, typeCotisation (sous-ensemble).
+
+**Exclus** : User, Adherent complet, Paiements, Stripe/Mollie/PayPal, receiptUrl, justificatifs, createdBy, password.
+
+### Hors scope (risques financiers restants)
+
+Batch affectation, paiements, avoirs, dettes, CdM CRUD, types, `getUserData` / profil — non touchés.
+
 
