@@ -36,9 +36,20 @@ Obligatoire car le backend **rotate** le refresh.
 
 Pas de secrets backend dans `EXPO_PUBLIC_*`.
 
-## Limites 2N
+## Limites
 
-- Pas d’UI Notifications / Cotisations
 - Pas d’OTP / registration / biométrie
 - Pas d’iOS local sous Fedora
 - `adminRoles` / `adherentId` non utilisés
+- Notifications : pas de pagination infinie / filtres / push OS
+
+## Notifications (Phase 2O)
+
+Écran `(app)/notifications` :
+
+- lecture liste + unread count
+- mark one / mark all / delete
+- pull-to-refresh
+- ownership via Bearer uniquement (pas de `userId` query)
+- anti-IDOR côté backend
+- pas de cache persistant SecureStore

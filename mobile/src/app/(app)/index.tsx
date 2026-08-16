@@ -7,6 +7,7 @@ import {
   Text,
   View,
 } from "react-native";
+import { router } from "expo-router";
 import { useAuth } from "@/auth/auth-context";
 import { ApiClientError } from "@/api/types";
 
@@ -78,6 +79,15 @@ export default function MeScreen() {
       </View>
 
       <Pressable
+        style={styles.navButton}
+        onPress={() => router.push("/notifications")}
+        accessibilityRole="button"
+        accessibilityLabel="Ouvrir les notifications"
+      >
+        <Text style={styles.navButtonText}>Notifications</Text>
+      </Pressable>
+
+      <Pressable
         style={[styles.button, signingOut && styles.buttonDisabled]}
         onPress={onSignOut}
         disabled={signingOut}
@@ -128,8 +138,20 @@ const styles = StyleSheet.create({
     color: "#b91c1c",
     marginBottom: 12,
   },
+  navButton: {
+    marginTop: 8,
+    backgroundColor: "#1d4ed8",
+    borderRadius: 8,
+    paddingVertical: 14,
+    alignItems: "center",
+  },
+  navButtonText: {
+    color: "#fff",
+    fontWeight: "600",
+    fontSize: 16,
+  },
   button: {
-    marginTop: 24,
+    marginTop: 16,
     backgroundColor: "#b91c1c",
     borderRadius: 8,
     paddingVertical: 14,

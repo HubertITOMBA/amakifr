@@ -46,6 +46,52 @@ export type MeDto = {
   adherentId?: string | null;
 };
 
+/** Aligné sur enum Prisma TypeNotification (miroir string, pas d'import Prisma). */
+export type TypeNotification =
+  | "Systeme"
+  | "Email"
+  | "Action"
+  | "Cotisation"
+  | "Idee"
+  | "Election"
+  | "Evenement"
+  | "Chat"
+  | "Autre";
+
+export type GetNotificationsOptions = {
+  lue?: boolean;
+  type?: TypeNotification;
+  limit?: number;
+  offset?: number;
+};
+
+export type NotificationDto = {
+  id: string;
+  userId: string;
+  type: TypeNotification;
+  titre: string;
+  message: string;
+  lien: string | null;
+  lue: boolean;
+  createdAt: string;
+};
+
+export type UnreadCountDto = {
+  count: number;
+};
+
+export type MarkReadResultDto = {
+  updated: true;
+};
+
+export type MarkAllReadResultDto = {
+  count: number;
+};
+
+export type DeleteNotificationResultDto = {
+  deleted: true;
+};
+
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;
