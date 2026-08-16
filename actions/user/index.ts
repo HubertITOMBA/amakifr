@@ -73,42 +73,47 @@ interface UpdateResult {
   adresse?: any;
 }
 
-// Server Action pour récupérer le profil utilisateur
+/**
+ * Récupère le profil utilisateur courant (contrat Web historique).
+ *
+ * Non délégué à getMe : le MeDto exclut volontairement providerAccountId
+ * et ne doit pas forcer une valeur artificielle ici.
+ *
+ * @returns { success, data?: UserProfileData, error? }
+ */
 export async function getUserProfile(): Promise<{ success: boolean; data?: UserProfileData; error?: string }> {
   try {
     const session = await auth();
-    
+
     if (!session?.user?.id) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Récupérer les données complètes de l'utilisateur
     const user = await db.user.findUnique({
       where: {
-        id: session.user.id
+        id: session.user.id,
       },
       include: {
         adherent: {
           include: {
-            Adresse: true
-          }
+            Adresse: true,
+          },
         },
         accounts: {
           select: {
             id: true,
             type: true,
             provider: true,
-            providerAccountId: true
-          }
-        }
-      }
+            providerAccountId: true,
+          },
+        },
+      },
     });
 
     if (!user) {
       return { success: false, error: "Utilisateur non trouvé" };
     }
 
-    // Formater les données pour la réponse
     const profileData: UserProfileData = {
       id: user.id,
       name: user.name,
@@ -119,38 +124,40 @@ export async function getUserProfile(): Promise<{ success: boolean; data?: UserP
       lastLogin: user.lastLogin?.toISOString() || null,
       createdAt: user.createdAt.toISOString(),
       updatedAt: user.updatedAt.toISOString(),
-      adherent: (user as any).adherent ? {
-        id: (user as any).adherent.id,
-        civility: (user as any).adherent.civility,
-        firstname: (user as any).adherent.firstname,
-        lastname: (user as any).adherent.lastname,
-        departement_id: (user as any).adherent.departement_id,
-        sous_departement_id: (user as any).adherent.sous_departement_id,
-        created_at: (user as any).adherent.created_at?.toISOString() || null,
-        updated_at: (user as any).adherent.updated_at?.toISOString() || null,
-        Adresse: (user as any).adherent.Adresse.map((address: any) => ({
-          id: address.id,
-          streetnum: address.streetnum,
-          street1: address.street1,
-          street2: address.street2,
-          codepost: address.codepost,
-          city: address.city,
-          country: address.country,
-          createdAt: address.createdAt.toISOString(),
-          updatedAt: address.updatedAt.toISOString()
-        }))
-      } : null,
-      accounts: (user as any).accounts.map((account: any) => ({
+      adherent: user.adherent
+        ? {
+            id: user.adherent.id,
+            civility: user.adherent.civility,
+            firstname: user.adherent.firstname,
+            lastname: user.adherent.lastname,
+            departement_id: user.adherent.departement_id,
+            sous_departement_id: user.adherent.sous_departement_id,
+            created_at: user.adherent.created_at?.toISOString() || null,
+            updated_at: user.adherent.updated_at?.toISOString() || null,
+            Adresse: user.adherent.Adresse.map((address) => ({
+              id: address.id,
+              streetnum: address.streetnum,
+              street1: address.street1,
+              street2: address.street2,
+              codepost: address.codepost,
+              city: address.city,
+              country: address.country,
+              createdAt: address.createdAt.toISOString(),
+              updatedAt: address.updatedAt.toISOString(),
+            })),
+          }
+        : null,
+      accounts: user.accounts.map((account) => ({
         id: account.id,
         type: account.type,
         provider: account.provider,
         providerAccountId: account.providerAccountId,
-        createdAt: new Date().toISOString()
-      }))
+        // Comportement historique : pas de createdAt Account en select → horodatage de sérialisation
+        createdAt: new Date().toISOString(),
+      })),
     };
 
     return { success: true, data: profileData };
-
   } catch (error) {
     console.error("Erreur lors de la récupération du profil:", error);
     return { success: false, error: "Erreur interne du serveur" };
