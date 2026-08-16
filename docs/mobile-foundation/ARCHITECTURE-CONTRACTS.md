@@ -320,4 +320,18 @@ API:   resolveApiActor (composite, no-downgrade)
 - Routes `/api/v1/me/*` via `resolveApiActor`
 - NextAuth Web **inchangé**
 
+## 20. Mutations Notifications API (Phase 2L)
+
+Self-service via routes minces réutilisant les services Phase 2E :
+
+| Route | Service |
+|-------|---------|
+| `PATCH .../notifications/:id/read` | `markMyNotificationAsRead` |
+| `POST .../notifications/read-all` | `markAllMyNotificationsAsRead` |
+| `DELETE .../notifications/:id` | `deleteMyNotification` |
+
+- Auth composite Bearer/Web ; ownership `actor.userId` ; anti-IDOR NOT_FOUND
+- Aucun Prisma / `revalidatePath` dans les routes API
+- Server Actions Web inchangées (revalidatePath conservé côté Web)
+
 

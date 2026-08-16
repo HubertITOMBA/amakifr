@@ -1,7 +1,6 @@
-# Contrat API `/api/v1` — fondation mobile (Phase 2H)
+# Contrat API `/api/v1` — fondation mobile (Phases 2H–2L)
 
-> Authentification **temporaire** : session Web NextAuth via cookies.  
-> Le futur mobile utilisera **Bearer** (non implémenté ici).  
+> Auth composite : session Web NextAuth **ou** Bearer mobile (`resolveApiActor`).  
 > Ne pas transporter les cookies NextAuth vers React Native / Expo.
 
 ## 1. Format succès
@@ -44,7 +43,7 @@ Jamais : stack, SQL, objet Prisma, secrets.
 
 Erreur inconnue → 500 `INTERNAL_ERROR` générique (fail closed).
 
-## 4. Routes créées (lecture)
+## 4. Routes lecture
 
 | Méthode | Path | Service |
 |---------|------|---------|
@@ -52,6 +51,26 @@ Erreur inconnue → 500 `INTERNAL_ERROR` générique (fail closed).
 | GET | `/api/v1/me/notifications` | `getMyNotifications` |
 | GET | `/api/v1/me/notifications/unread-count` | `getMyUnreadNotificationCount` |
 | GET | `/api/v1/me/cotisations-mensuelles` | `getMyCotisationsMensuelles` |
+
+## 4bis. Mutations Notifications (Phase 2L)
+
+| Méthode | Path | Service | Réponse `data` |
+|---------|------|---------|----------------|
+| PATCH | `/api/v1/me/notifications/:id/read` | `markMyNotificationAsRead` | `{ updated: true }` |
+| POST | `/api/v1/me/notifications/read-all` | `markAllMyNotificationsAsRead` | `{ count: n }` |
+| DELETE | `/api/v1/me/notifications/:id` | `deleteMyNotification` | `{ deleted: true }` |
+
+Règles :
+
+- Auth : `resolveApiActor` (Bearer / Web, no-downgrade)
+- Ownership : `actor.userId` dans le service uniquement — **pas** de `userId` client
+- Inexistante / autre user → `NOT_FOUND` 404 (même message)
+- Mark one déjà lue → succès idempotent
+- Mark all `count === 0` → succès
+- **Pas** de `revalidatePath` (réservé aux Server Actions Web)
+- **Pas** de Prisma dans les routes
+- HTTP succès : **200** + JSON standard
+- Rate-limit dédié mutations : non (auth requise) ; durcissement futur si abuse
 
 ## 5. Authentification (Phase 2K)
 
@@ -101,7 +120,7 @@ Services inchangés. Routes = adapters HTTP minces.
 
 ## 14. Routes non implémentées
 
-- `POST/PATCH/DELETE` notifications
+- createNotification / admin Notifications API
 - paiements, admin, batch cotisations
 - OAuth mobile / OTP mobile
 
