@@ -6,6 +6,11 @@ import { safeFindMany } from "@/lib/prisma-helpers";
 import { revalidatePath } from "next/cache";
 import { TypeNotification } from "@prisma/client";
 import { z } from "zod";
+import type { AuthContext } from "@/lib/auth-context";
+import { isServiceError } from "@/lib/service-error";
+import { getMyNotifications } from "@/lib/services/notifications/get-my-notifications";
+import { getMyUnreadNotificationCount } from "@/lib/services/notifications/get-my-unread-count";
+import { mapNotificationDtoForWebAction } from "@/lib/services/notifications/map-notification-for-web";
 
 const CreateNotificationSchema = z.object({
   userId: z.string().min(1, "ID utilisateur requis"),
@@ -23,6 +28,25 @@ const CreateNotificationsSchema = z.object({
   lien: z.string().max(500, "Lien trop long").optional(),
 });
 
+/**
+ * AuthContext minimal pour lectures notifications self-service
+ * (uniquement userId + role session — pas de resolver générique).
+ */
+function authContextFromSession(session: {
+  user: { id: string; role?: string | null; email?: string | null; name?: string | null };
+}): AuthContext {
+  return {
+    userId: session.user.id,
+    role: (session.user.role || "MEMBRE").toString().trim().toUpperCase(),
+    status: "Actif",
+    email: session.user.email,
+    name: session.user.name,
+    sessionId: null,
+    adminRoles: [],
+    adherentId: null,
+    channel: "web",
+  };
+}
 /**
  * Crée une nouvelle notification pour un utilisateur
  * 
@@ -158,7 +182,8 @@ export async function createNotifications(data: z.infer<typeof CreateNotificatio
 
 /**
  * Récupère les notifications de l'utilisateur connecté
- * 
+ * Adapter Web → getMyNotifications (contrat public inchangé).
+ *
  * @param options - Options de filtrage et pagination
  * @returns Un objet avec success (boolean), notifications (array) en cas de succès, 
  *          ou error (string) en cas d'échec
@@ -175,32 +200,25 @@ export async function getNotifications(options?: {
       return { success: false, error: "Non autorisé" };
     }
 
-    const where: any = {
-      userId: session.user.id,
-    };
+    const notificationsDto = await getMyNotifications(
+      authContextFromSession(session),
+      options
+    );
 
-    if (options?.lue !== undefined) {
-      where.lue = options.lue;
-    }
-
-    if (options?.type) {
-      where.type = options.type;
-    }
-
-    const notifications = await safeFindMany(db.notification.findMany({
-      where,
-      orderBy: {
-        createdAt: "desc",
-      },
-      take: options?.limit || 50,
-      skip: options?.offset || 0,
-    }));
+    // Contrat Web historique : createdAt = Date (lignes Prisma), pas ISO string DTO
+    const notifications = notificationsDto.map(mapNotificationDtoForWebAction);
 
     return {
       success: true,
       notifications,
     };
   } catch (error) {
+    if (isServiceError(error)) {
+      if (error.code === "UNAUTHENTICATED") {
+        return { success: false, error: "Non autorisé" };
+      }
+      return { success: false, error: error.message };
+    }
     console.error("Erreur lors de la récupération des notifications:", error);
     return { success: false, error: "Erreur lors de la récupération des notifications" };
   }
@@ -265,7 +283,8 @@ export async function getAllNotifications(options?: {
 
 /**
  * Récupère le nombre de notifications non lues de l'utilisateur connecté
- * 
+ * Adapter Web → getMyUnreadNotificationCount (contrat public inchangé).
+ *
  * @returns Un objet avec success (boolean), count (number) en cas de succès, 
  *          ou error (string) en cas d'échec
  */
@@ -276,18 +295,21 @@ export async function getUnreadNotificationCount() {
       return { success: false, error: "Non autorisé" };
     }
 
-    const count = await db.notification.count({
-      where: {
-        userId: session.user.id,
-        lue: false,
-      },
-    });
+    const count = await getMyUnreadNotificationCount(
+      authContextFromSession(session)
+    );
 
     return {
       success: true,
       count,
     };
   } catch (error) {
+    if (isServiceError(error)) {
+      if (error.code === "UNAUTHENTICATED") {
+        return { success: false, error: "Non autorisé" };
+      }
+      return { success: false, error: error.message };
+    }
     console.error("Erreur lors du comptage des notifications:", error);
     return { success: false, error: "Erreur lors du comptage des notifications" };
   }

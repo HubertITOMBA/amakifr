@@ -148,4 +148,55 @@ Le branchement se fera domaine par domaine lors de l’extraction des services.
 
 `getMe` reste une lecture self-service sur `actor.userId` et **n’appelle pas** `authorize()` dans cette phase.
 
+## 14. Notification service extraction (Phase 2D)
+
+### Fonctions extraites
+
+| Service | Server Action (adapter Web) |
+|---------|------------------------------|
+| `getMyNotifications(actor, options?)` | `getNotifications(options?)` |
+| `getMyUnreadNotificationCount(actor)` | `getUnreadNotificationCount()` |
+
+Fichiers : `lib/services/notifications/{types,get-my-notifications,get-my-unread-count}.ts`
+
+### AuthContext
+
+Adapter Web : `auth()` → `AuthContext` minimal (`userId` + `role` session).  
+Les champs `adminRoles` / `adherentId` sont laissés vides **uniquement** car ces lectures self-service ne les utilisent pas (pas d’`authorize()`).
+
+### Autorisation
+
+**Pas** d’`authorize()` : comportement historique = session cookie uniquement, filtre Prisma `userId: actor.userId`.  
+Self-service : jamais d’`userId` client arbitraire dans le service.
+
+### DTO
+
+`NotificationDto` : `id`, `userId`, `type`, `titre`, `message`, `lien`, `lue`, `createdAt` (ISO).  
+Pas de secrets / tokens / password.
+
+### Contrat Web `createdAt` (non-régression)
+
+| Couche | `createdAt` |
+|--------|-------------|
+| Service `NotificationDto` | **string ISO** (partage Web/mobile) |
+| Server Action `getNotifications()` | **`Date`** (contrat historique Prisma) via `mapNotificationDtoForWebAction` |
+
+Preuve consommateurs directs de `getNotifications()` uniquement :
+
+- `components/notifications/NotificationCenter.tsx` — client, `new Date(notification.createdAt)`
+- `app/notifications/page.tsx` — client, idem
+
+(`app/admin/notifications` utilise `getAllNotifications`, hors périmètre.)
+
+Les clients tolèrent Date ou string via `new Date(...)`, mais le **contrat de la Server Action** avant 2D était un `Date` Prisma côté serveur → l’adapter Web le restitue.
+
+### Next.js
+
+Les services n’appellent pas `auth()`, cookies, headers, `revalidatePath` / `revalidateTag`.  
+Les mutations / email / PDF / rappel restent dans les Server Actions (non extraits en 2D).
+
+### Contrat Web préservé
+
+Retours `{ success, notifications }` / `{ success, count }` / `{ success: false, error }` inchangés pour les consommateurs (`NotificationCenter`, `/notifications`).
+
 
