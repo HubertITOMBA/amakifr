@@ -27,6 +27,10 @@ export default auth(async (req: NextRequest) => {
         }
     }
     const isApiAuthRoute = nextUrl.pathname.startsWith(apiAuthPrefix);
+    // API mobile /api/v1 : pas de redirect Web — auth via resolveApiActor dans les handlers
+    const isApiV1Route =
+        nextUrl.pathname === "/api/v1" ||
+        nextUrl.pathname.startsWith("/api/v1/");
     
     // Ne pas interférer avec les routes API d'authentification
     // Laisser NextAuth gérer ces routes directement (y compris les cookies PKCE)
@@ -96,7 +100,8 @@ export default auth(async (req: NextRequest) => {
                            nextUrl.searchParams.get('loggedIn') === 'true' ||
                            (nextUrl.pathname === '/' && nextUrl.searchParams.has('loggedIn'));
     
-    if (hasAuthCookies && !req.auth && !isAuthRoute && !isPublicRouteCheck && !isAuthCallbackRoute && 
+    if (hasAuthCookies && !req.auth && !isAuthRoute && !isPublicRouteCheck && !isAuthCallbackRoute &&
+        !isApiV1Route &&
         nextUrl.pathname !== '/' && !isJustLoggedIn) {
         const response = NextResponse.next();
         // Ne supprimer que les cookies de session, PAS les cookies PKCE (ils sont nécessaires pour le flux OAuth)
@@ -143,6 +148,12 @@ export default auth(async (req: NextRequest) => {
             
             return addSecurityHeaders(response, req);
         }
+    }
+
+    // /api/v1 : laisser les Route Handlers (Bearer / JSON 401) — pas de redirect Web
+    if (isApiV1Route) {
+        const response = NextResponse.next();
+        return addSecurityHeaders(response, req);
     }
 
     // Gérer les routes d'authentification

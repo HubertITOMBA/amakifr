@@ -42,8 +42,6 @@ export async function getMe(actor: AuthContext): Promise<MeDto> {
             civility: true,
             firstname: true,
             lastname: true,
-            departement_id: true,
-            sous_departement_id: true,
             created_at: true,
             updated_at: true,
             Adresse: {
@@ -94,8 +92,6 @@ export async function getMe(actor: AuthContext): Promise<MeDto> {
             civility: adherent.civility,
             firstname: adherent.firstname,
             lastname: adherent.lastname,
-            departement_id: adherent.departement_id,
-            sous_departement_id: adherent.sous_departement_id,
             created_at: adherent.created_at?.toISOString() ?? null,
             updated_at: adherent.updated_at?.toISOString() ?? null,
             addresses: adherent.Adresse.map((address) => ({

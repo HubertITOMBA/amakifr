@@ -20,8 +20,6 @@ export type MeAdherentDto = {
   civility: string;
   firstname: string | null;
   lastname: string | null;
-  departement_id: string | null;
-  sous_departement_id: string | null;
   created_at: string | null;
   updated_at: string | null;
   addresses: MeAddressDto[];

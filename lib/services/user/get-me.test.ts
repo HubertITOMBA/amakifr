@@ -87,8 +87,6 @@ describe("getMe", () => {
         civility: "Madame",
         firstname: "Ada",
         lastname: "Lovelace",
-        departement_id: null,
-        sous_departement_id: null,
         created_at: new Date("2024-01-02T00:00:00.000Z"),
         updated_at: new Date("2024-01-03T00:00:00.000Z"),
         Adresse: [
@@ -113,6 +111,9 @@ describe("getMe", () => {
     expect(me.adherent?.id).toBe("adh-1");
     expect(me.adherent?.firstname).toBe("Ada");
     expect(me.adherent?.created_at).toBe("2024-01-02T00:00:00.000Z");
+    expect(me.adherent?.updated_at).toBe("2024-01-03T00:00:00.000Z");
+    expect(me.adherent).not.toHaveProperty("departement_id");
+    expect(me.adherent).not.toHaveProperty("sous_departement_id");
     expect(me.adherent?.addresses).toHaveLength(1);
     expect(me.adherent?.addresses[0]).toMatchObject({
       id: "addr-1",

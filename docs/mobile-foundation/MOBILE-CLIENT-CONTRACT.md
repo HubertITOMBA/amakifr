@@ -73,3 +73,43 @@ Règles client :
 - **pas** de mutation cotisation
 - **pas** de paiement (Stripe / Mollie / PayPal / WebView)
 - **pas** de cache persistant (SecureStore / AsyncStorage)
+
+## Validation Android réelle — Phase 2Q
+
+### Environnement préflight (Fedora)
+
+| Élément | Valeur |
+|---------|--------|
+| IP LAN | `192.168.x.x` (dev local) |
+| Port API | `9052` (`next dev -H 0.0.0.0`) |
+| Firewall | `9052/tcp` déjà ouvert |
+| `EXPO_PUBLIC_API_URL` | `http://<IP_LAN>:9052` |
+| Expo doctor / tsc / tests mobile | verts (45 tests) |
+
+### Bug bloquant observé (STOP backend)
+
+Sans cookie NextAuth, les routes `/api/v1/**` (y compris `/api/v1/auth/login`) reçoivent un **302** vers `/auth/sign-in?callbackUrl=...` via `middleware.ts`.
+
+Contrat attendu (API-V1-CONTRACT §17) : **401 JSON**, pas de redirection HTML.
+
+Conséquence mobile : login / Bearer / refresh **injoignables** tant que le middleware n’exclut pas `/api/v1` (ou n’autorise pas Bearer avant redirect).
+
+**Correction backend requise** (hors scope 2Q auto) — ne pas contourner côté client.
+
+### Parcours téléphone
+
+Non complétés dans cette phase agent (blocage middleware avant Expo Go).
+
+Checklist humaine après correction middleware :
+
+- Boot / sign-in / login réel / `/me`
+- Notifications (liste, mark, delete) + Cotisations
+- Kill/relaunch SecureStore + refresh 401
+- Logout online / offline
+- Aucun token dans logs
+
+### Limites restantes
+
+- Validation physique Expo Go en attente du fix middleware
+- HTTPS production obligatoire
+- Pas iOS local sous Fedora
