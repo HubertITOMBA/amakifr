@@ -68,6 +68,7 @@ function AppTabs() {
         name="profil"
         options={{
           title: "Profil",
+          headerShown: false,
           tabBarIcon: ({ color }) => <TabBarIcon name="profil" color={color} />,
         }}
       />

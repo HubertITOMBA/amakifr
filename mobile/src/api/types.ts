@@ -33,6 +33,34 @@ export type MobileAuthSessionDto = {
   user: AuthUserDto;
 };
 
+export type MeAddressDto = {
+  id: string;
+  streetnum: string | null;
+  street1: string | null;
+  street2: string | null;
+  codepost: string | null;
+  city: string | null;
+  country: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
+
+export type MeAdherentDto = {
+  id: string;
+  civility: string;
+  firstname: string | null;
+  lastname: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+  addresses: MeAddressDto[];
+};
+
+export type MeAccountDto = {
+  id: string;
+  type: string;
+  provider: string;
+};
+
 export type MeDto = {
   id: string;
   name: string | null;
@@ -44,6 +72,8 @@ export type MeDto = {
   createdAt?: string;
   updatedAt?: string;
   adherentId?: string | null;
+  adherent?: MeAdherentDto | null;
+  accounts?: MeAccountDto[];
 };
 
 /** Aligné sur enum Prisma TypeNotification (miroir string, pas d'import Prisma). */

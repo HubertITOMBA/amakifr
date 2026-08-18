@@ -85,6 +85,7 @@ export const AmakiColors = {
   surface: "#ffffff",
   surfaceMuted: "#f1f5f9",
   text: "#0f172a",
+  textSecondary: "#475569",
   textMuted: "#64748b",
   border: "#e2e8f0",
 } as const;

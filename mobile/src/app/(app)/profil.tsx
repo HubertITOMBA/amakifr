@@ -1,13 +1,15 @@
 import { useCallback, useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { Image } from "expo-image";
+import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/auth/auth-context";
-import { ApiClientError } from "@/api/types";
+import { ApiClientError, type MeDto } from "@/api/types";
 import { Card } from "@/components/ui/card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { LoadingState } from "@/components/ui/loading-state";
-import { PrimaryButton } from "@/components/ui/primary-button";
+import { SecondaryButton } from "@/components/ui/secondary-button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { getInitials, formatAddress, formatDateFr } from "@/utils/profile-helpers";
 import {
   AmakiColors,
   AmakiRadius,
@@ -15,25 +17,23 @@ import {
   AmakiTypography,
 } from "@/constants/theme";
 
-function initialsFromName(name: string | null | undefined): string {
-  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
 /**
- * Écran Profil — GET /api/v1/me + déconnexion.
+ * Écran Profil — fiche adhérent enrichie (GET /api/v1/me) + déconnexion.
  */
 export default function ProfilScreen() {
   const { user, refreshMe, signOut } = useAuth();
   const [loading, setLoading] = useState(!user);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isRefresh = false) => {
     setError(null);
-    setLoading(true);
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     try {
       await refreshMe();
     } catch (e) {
@@ -44,11 +44,12 @@ export default function ProfilScreen() {
       }
     } finally {
       setLoading(false);
+      setRefreshing(false);
     }
   }, [refreshMe]);
 
   useEffect(() => {
-    void load();
+    void load(false);
   }, [load]);
 
   async function onSignOut() {
@@ -64,41 +65,138 @@ export default function ProfilScreen() {
     return <LoadingState />;
   }
 
-  const initials = initialsFromName(user?.name);
+  const me = user as MeDto | null;
+  const initials = getInitials(me?.name, me?.email);
+  const adherent = me?.adherent;
+  const addresses = adherent?.addresses ?? [];
+  const hasImage = !!me?.image;
 
   return (
     <SafeAreaView style={styles.safe} edges={["top"]}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={() => void load(true)}
+            tintColor={AmakiColors.primary}
+          />
+        }
+      >
+        <Text style={styles.screenTitle}>Profil</Text>
+        <Text style={styles.screenSubtitle}>Mes informations personnelles</Text>
+
         {error ? <ErrorBanner message={error} /> : null}
 
-        <Card style={styles.identity}>
-          <View style={styles.avatar} accessibilityLabel={`Avatar ${initials}`}>
-            <Text style={styles.avatarText}>{initials}</Text>
+        {/* === IDENTITÉ === */}
+        <Card style={styles.identityCard}>
+          {hasImage ? (
+            <Image
+              source={{ uri: me!.image! }}
+              style={styles.avatarImage}
+              accessibilityLabel={`Photo de ${me?.name ?? "profil"}`}
+              alt={`Photo de ${me?.name ?? "profil"}`}
+            />
+          ) : (
+            <View style={styles.avatar} accessibilityLabel={`Initiales ${initials}`}>
+              <Text style={styles.avatarText}>{initials}</Text>
+            </View>
+          )}
+          <Text style={styles.name}>{me?.name ?? "—"}</Text>
+          <Text style={styles.email}>{me?.email ?? "—"}</Text>
+          <View style={styles.badgeRow}>
+            {me?.role ? <StatusBadge label={me.role} tone="primary" /> : null}
+            {me?.status ? <StatusBadge label={me.status} tone="neutral" /> : null}
           </View>
-          <Text style={styles.name}>{user?.name ?? "—"}</Text>
-          <Text style={styles.email}>{user?.email ?? "—"}</Text>
-          {user?.status ? (
-            <StatusBadge label={user.status} tone="primary" />
+        </Card>
+
+        {/* === INFORMATIONS ADHÉRENT === */}
+        {adherent ? (
+          <>
+            <Text style={styles.sectionTitle}>Informations adhérent</Text>
+            <Card>
+              {adherent.civility ? (
+                <InfoRow label="Civilité" value={adherent.civility} />
+              ) : null}
+              {adherent.firstname ? (
+                <InfoRow label="Prénom" value={adherent.firstname} />
+              ) : null}
+              {adherent.lastname ? (
+                <InfoRow label="Nom" value={adherent.lastname} last />
+              ) : null}
+            </Card>
+          </>
+        ) : (
+          <>
+            <Text style={styles.sectionTitle}>Informations adhérent</Text>
+            <Card muted>
+              <Text style={styles.noDataText}>
+                Informations adhérent non disponibles
+              </Text>
+            </Card>
+          </>
+        )}
+
+        {/* === COORDONNÉES === */}
+        {addresses.length > 0 ? (
+          <>
+            <Text style={styles.sectionTitle}>Mes coordonnées</Text>
+            {addresses.map((addr) => {
+              const lines = formatAddress(addr);
+              if (lines.length === 0) return null;
+              return (
+                <Card key={addr.id} style={styles.addressCard}>
+                  {lines.map((line, i) => (
+                    <Text key={i} style={styles.addressLine}>{line}</Text>
+                  ))}
+                </Card>
+              );
+            })}
+          </>
+        ) : null}
+
+        {/* === COMPTE === */}
+        <Text style={styles.sectionTitle}>Mon compte</Text>
+        <Card>
+          {me?.role ? <InfoRow label="Rôle" value={me.role} /> : null}
+          {me?.status ? <InfoRow label="Statut" value={me.status} /> : null}
+          {me?.lastLogin ? (
+            <InfoRow
+              label="Dernière connexion"
+              value={formatDateFr(me.lastLogin)}
+              last
+            />
           ) : null}
         </Card>
 
-        <Text style={styles.sectionTitle}>Compte</Text>
-        <Card>
-          <View style={styles.row}>
-            <Text style={styles.rowLabel}>Rôle</Text>
-            <Text style={styles.rowValue}>{user?.role ?? "—"}</Text>
-          </View>
-        </Card>
-
-        <PrimaryButton
-          label="Déconnexion"
-          variant="danger"
-          loading={signingOut}
-          onPress={onSignOut}
-          style={styles.logout}
-        />
+        {/* === DÉCONNEXION === */}
+        <View style={styles.logoutSection}>
+          <SecondaryButton
+            label="Se déconnecter"
+            variant="danger"
+            loading={signingOut}
+            onPress={onSignOut}
+            style={styles.logoutBtn}
+            accessibilityLabel="Se déconnecter de l'application"
+          />
+        </View>
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+type InfoRowProps = {
+  label: string;
+  value: string;
+  last?: boolean;
+};
+
+function InfoRow({ label, value, last }: InfoRowProps) {
+  return (
+    <View style={[styles.row, !last && styles.rowBorder]}>
+      <Text style={styles.rowLabel}>{label}</Text>
+      <Text style={styles.rowValue}>{value}</Text>
+    </View>
   );
 }
 
@@ -109,21 +207,40 @@ const styles = StyleSheet.create({
   },
   container: {
     padding: AmakiSpacing.lg,
-    flexGrow: 1,
+    paddingBottom: AmakiSpacing["2xl"],
   },
-  identity: {
-    alignItems: "center",
+  screenTitle: {
+    ...AmakiTypography.title,
+    color: AmakiColors.text,
+    marginBottom: AmakiSpacing.xs,
+  },
+  screenSubtitle: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
     marginBottom: AmakiSpacing.lg,
   },
+  identityCard: {
+    alignItems: "center",
+    marginBottom: AmakiSpacing.lg,
+    paddingVertical: AmakiSpacing.xl,
+  },
   avatar: {
-    width: 64,
-    height: 64,
+    width: 72,
+    height: 72,
     borderRadius: AmakiRadius.pill,
     backgroundColor: AmakiColors.primarySoft,
     borderWidth: 2,
     borderColor: AmakiColors.primary,
     alignItems: "center",
     justifyContent: "center",
+    marginBottom: AmakiSpacing.md,
+  },
+  avatarImage: {
+    width: 72,
+    height: 72,
+    borderRadius: AmakiRadius.pill,
+    borderWidth: 2,
+    borderColor: AmakiColors.primary,
     marginBottom: AmakiSpacing.md,
   },
   avatarText: {
@@ -136,21 +253,46 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
   email: {
-    ...AmakiTypography.body,
+    ...AmakiTypography.caption,
     color: AmakiColors.textMuted,
     textAlign: "center",
     marginTop: AmakiSpacing.xs,
     marginBottom: AmakiSpacing.md,
   },
+  badgeRow: {
+    flexDirection: "row",
+    gap: AmakiSpacing.sm,
+    marginBottom: AmakiSpacing.sm,
+  },
   sectionTitle: {
     ...AmakiTypography.heading,
     color: AmakiColors.text,
+    marginTop: AmakiSpacing.lg,
     marginBottom: AmakiSpacing.sm,
+  },
+  noDataText: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+    textAlign: "center",
+    paddingVertical: AmakiSpacing.sm,
+  },
+  addressCard: {
+    marginBottom: AmakiSpacing.sm,
+  },
+  addressLine: {
+    ...AmakiTypography.body,
+    color: AmakiColors.text,
+    lineHeight: 24,
   },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
+    paddingVertical: AmakiSpacing.sm,
+  },
+  rowBorder: {
+    borderBottomWidth: 1,
+    borderBottomColor: AmakiColors.border,
   },
   rowLabel: {
     ...AmakiTypography.caption,
@@ -161,8 +303,14 @@ const styles = StyleSheet.create({
     ...AmakiTypography.body,
     color: AmakiColors.text,
     fontWeight: "600",
+    flexShrink: 1,
+    textAlign: "right",
   },
-  logout: {
-    marginTop: AmakiSpacing.xl,
+  logoutSection: {
+    marginTop: AmakiSpacing["2xl"],
+    alignItems: "center",
+  },
+  logoutBtn: {
+    minWidth: 200,
   },
 });

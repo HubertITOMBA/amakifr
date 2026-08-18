@@ -17,6 +17,7 @@ import {
 type Props = Omit<PressableProps, "children" | "style"> & {
   label: string;
   loading?: boolean;
+  variant?: "primary" | "danger";
   style?: StyleProp<ViewStyle>;
 };
 
@@ -27,13 +28,20 @@ export function SecondaryButton({
   label,
   loading,
   disabled,
+  variant = "primary",
   style,
   ...rest
 }: Props) {
   const isDisabled = disabled || loading;
+  const tint = variant === "danger" ? AmakiColors.danger : AmakiColors.primary;
   return (
     <Pressable
-      style={[styles.button, isDisabled && styles.disabled, style]}
+      style={[
+        styles.button,
+        variant === "danger" && styles.dangerBorder,
+        isDisabled && styles.disabled,
+        style,
+      ]}
       disabled={isDisabled}
       accessibilityRole="button"
       accessibilityLabel={label}
@@ -41,9 +49,9 @@ export function SecondaryButton({
       {...rest}
     >
       {loading ? (
-        <ActivityIndicator color={AmakiColors.primary} size="small" />
+        <ActivityIndicator color={tint} size="small" />
       ) : (
-        <Text style={styles.label}>{label}</Text>
+        <Text style={[styles.label, { color: tint }]}>{label}</Text>
       )}
     </Pressable>
   );
@@ -63,6 +71,9 @@ const styles = StyleSheet.create({
   },
   disabled: {
     opacity: 0.45,
+  },
+  dangerBorder: {
+    borderColor: AmakiColors.danger,
   },
   label: {
     ...AmakiTypography.caption,

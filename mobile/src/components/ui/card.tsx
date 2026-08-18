@@ -34,6 +34,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: AmakiColors.border,
     padding: AmakiSpacing.md,
+    elevation: 1,
   },
   muted: {
     backgroundColor: AmakiColors.surfaceMuted,
