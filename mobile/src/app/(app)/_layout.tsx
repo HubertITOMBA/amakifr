@@ -1,20 +1,87 @@
-import { Stack } from "expo-router";
+import { Tabs } from "expo-router";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { TabBarIcon } from "@/components/tab-bar-icon";
+import { AmakiColors } from "@/constants/theme";
+import { UnreadCountProvider, useUnreadCount } from "@/hooks/unread-count";
+
+function AppTabs() {
+  const insets = useSafeAreaInsets();
+  const { unreadCount, refreshUnreadCount } = useUnreadCount();
+  const tabBarHeight = 56 + Math.max(insets.bottom, 8);
+
+  return (
+    <Tabs
+      screenOptions={{
+        headerStyle: { backgroundColor: AmakiColors.primary },
+        headerTintColor: AmakiColors.surface,
+        headerTitleStyle: { fontWeight: "600" },
+        tabBarActiveTintColor: AmakiColors.primary,
+        tabBarInactiveTintColor: AmakiColors.textMuted,
+        tabBarStyle: {
+          backgroundColor: AmakiColors.surface,
+          borderTopColor: AmakiColors.border,
+          height: tabBarHeight,
+          paddingBottom: Math.max(insets.bottom, 8),
+          paddingTop: 6,
+        },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: "600" },
+      }}
+    >
+      <Tabs.Screen
+        name="index"
+        options={{
+          title: "Accueil",
+          headerShown: false,
+          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+        }}
+      />
+      <Tabs.Screen
+        name="cotisations"
+        options={{
+          title: "Cotisations",
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="cotisations" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          title: "Notifications",
+          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadgeStyle: {
+            backgroundColor: AmakiColors.danger,
+            color: AmakiColors.surface,
+            fontSize: 10,
+          },
+          tabBarIcon: ({ color }) => (
+            <TabBarIcon name="notifications" color={color} />
+          ),
+        }}
+        listeners={{
+          blur: () => {
+            void refreshUnreadCount();
+          },
+        }}
+      />
+      <Tabs.Screen
+        name="profil"
+        options={{
+          title: "Profil",
+          tabBarIcon: ({ color }) => <TabBarIcon name="profil" color={color} />,
+        }}
+      />
+    </Tabs>
+  );
+}
 
 /**
- * Zone authentifiée.
+ * Zone authentifiée — bottom tabs Accueil / Cotisations / Notifications / Profil.
  */
 export default function AppLayout() {
   return (
-    <Stack
-      screenOptions={{
-        headerStyle: { backgroundColor: "#1d4ed8" },
-        headerTintColor: "#fff",
-        headerTitleStyle: { fontWeight: "600" },
-      }}
-    >
-      <Stack.Screen name="index" options={{ title: "Mon profil" }} />
-      <Stack.Screen name="notifications" options={{ title: "Notifications" }} />
-      <Stack.Screen name="cotisations" options={{ title: "Cotisations" }} />
-    </Stack>
+    <UnreadCountProvider>
+      <AppTabs />
+    </UnreadCountProvider>
   );
 }

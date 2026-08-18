@@ -1,177 +1,202 @@
-import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { Image } from "expo-image";
 import { router } from "expo-router";
+import appIcon from "@/assets/images/icon.png";
+import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/auth/auth-context";
-import { ApiClientError } from "@/api/types";
+import { useUnreadCount } from "@/hooks/unread-count";
+import {
+  AmakiColors,
+  AmakiRadius,
+  AmakiSpacing,
+  AmakiTypography,
+} from "@/constants/theme";
+
+const SERVICES: { id: string; label: string }[] = [
+  { id: "documents", label: "Documents" },
+  { id: "passeport", label: "Passeport" },
+  { id: "reunions", label: "Réunions" },
+  { id: "taches", label: "Tâches" },
+];
 
 /**
- * Écran /me minimal — GET /api/v1/me + déconnexion.
+ * Accueil — hub compact (identité, raccourcis, services futurs).
  */
-export default function MeScreen() {
-  const { user, refreshMe, signOut } = useAuth();
-  const [loading, setLoading] = useState(!user);
-  const [error, setError] = useState<string | null>(null);
-  const [signingOut, setSigningOut] = useState(false);
-
-  const load = useCallback(async () => {
-    setError(null);
-    setLoading(true);
-    try {
-      await refreshMe();
-    } catch (e) {
-      if (e instanceof ApiClientError) {
-        setError(e.message);
-      } else {
-        setError("Impossible de charger le profil");
-      }
-    } finally {
-      setLoading(false);
-    }
-  }, [refreshMe]);
-
-  useEffect(() => {
-    void load();
-  }, [load]);
-
-  async function onSignOut() {
-    setSigningOut(true);
-    try {
-      await signOut();
-    } finally {
-      setSigningOut(false);
-    }
-  }
-
-  if (loading && !user) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1d4ed8" />
-      </View>
-    );
-  }
+export default function AccueilScreen() {
+  const { user } = useAuth();
+  const { unreadCount } = useUnreadCount();
+  const displayName = user?.name?.trim() || "adhérent";
 
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <ScrollView contentContainerStyle={styles.container}>
+        <View style={styles.identity}>
+          <Image
+            source={appIcon}
+            style={styles.logo}
+            accessibilityLabel="AMAKI France"
+          />
+          <Text style={styles.hello}>Bonjour</Text>
+          <Text style={styles.name}>{displayName}</Text>
+          <View style={styles.metaRow}>
+            <Text style={styles.meta}>{user?.role ?? "—"}</Text>
+            <Text style={styles.metaDot}>·</Text>
+            <Text style={styles.meta}>{user?.status ?? "—"}</Text>
+          </View>
+          <Text style={styles.member}>Membre AMAKI France</Text>
+        </View>
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Nom</Text>
-        <Text style={styles.value}>{user?.name ?? "—"}</Text>
-      </View>
-      <View style={styles.field}>
-        <Text style={styles.label}>E-mail</Text>
-        <Text style={styles.value}>{user?.email ?? "—"}</Text>
-      </View>
-      <View style={styles.field}>
-        <Text style={styles.label}>Rôle</Text>
-        <Text style={styles.value}>{user?.role ?? "—"}</Text>
-      </View>
-      <View style={styles.field}>
-        <Text style={styles.label}>Statut</Text>
-        <Text style={styles.value}>{user?.status ?? "—"}</Text>
-      </View>
+        <View style={styles.summaryRow}>
+          <Pressable
+            style={styles.summaryCard}
+            onPress={() => router.push("/cotisations")}
+            accessibilityRole="button"
+            accessibilityLabel="Voir mes cotisations"
+          >
+            <Text style={styles.summaryTitle}>Cotisations</Text>
+            <Text style={styles.summaryHint}>Voir mes cotisations</Text>
+          </Pressable>
+          <Pressable
+            style={styles.summaryCard}
+            onPress={() => router.push("/notifications")}
+            accessibilityRole="button"
+            accessibilityLabel={
+              unreadCount > 0
+                ? `Notifications, ${unreadCount} non lues`
+                : "Notifications, aucune non lue"
+            }
+          >
+            <Text style={styles.summaryTitle}>Notifications</Text>
+            <Text style={styles.summaryHint}>
+              {unreadCount > 0
+                ? `${unreadCount} non lue${unreadCount !== 1 ? "s" : ""}`
+                : "Aucune non lue"}
+            </Text>
+          </Pressable>
+        </View>
 
-      <Pressable
-        style={styles.navButton}
-        onPress={() => router.push("/notifications")}
-        accessibilityRole="button"
-        accessibilityLabel="Ouvrir les notifications"
-      >
-        <Text style={styles.navButtonText}>Notifications</Text>
-      </Pressable>
-
-      <Pressable
-        style={styles.navButton}
-        onPress={() => router.push("/cotisations")}
-        accessibilityRole="button"
-        accessibilityLabel="Ouvrir les cotisations"
-      >
-        <Text style={styles.navButtonText}>Cotisations</Text>
-      </Pressable>
-
-      <Pressable
-        style={[styles.button, signingOut && styles.buttonDisabled]}
-        onPress={onSignOut}
-        disabled={signingOut}
-      >
-        {signingOut ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Déconnexion</Text>
-        )}
-      </Pressable>
-    </ScrollView>
+        <Text style={styles.sectionTitle}>Mes services</Text>
+        <View style={styles.grid}>
+          {SERVICES.map((service) => (
+            <View
+              key={service.id}
+              style={styles.tile}
+              accessibilityRole="text"
+              accessibilityLabel={`${service.label}, bientôt`}
+            >
+              <Text style={styles.tileLabel}>{service.label}</Text>
+              <Text style={styles.tileSoon}>Bientôt</Text>
+            </View>
+          ))}
+        </View>
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  center: {
+  safe: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: AmakiColors.background,
   },
   container: {
-    padding: 20,
-    backgroundColor: "#f8fafc",
-    flexGrow: 1,
+    paddingHorizontal: AmakiSpacing.lg,
+    paddingBottom: AmakiSpacing.xl,
   },
-  field: {
-    marginBottom: 16,
-    backgroundColor: "#fff",
-    borderRadius: 8,
+  identity: {
+    backgroundColor: AmakiColors.primarySoft,
+    borderRadius: AmakiRadius.lg,
+    padding: AmakiSpacing.lg,
+    marginBottom: AmakiSpacing.lg,
     borderWidth: 1,
-    borderColor: "#e2e8f0",
-    padding: 12,
+    borderColor: AmakiColors.border,
   },
-  label: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#64748b",
-    textTransform: "uppercase",
-    marginBottom: 4,
+  logo: {
+    width: 40,
+    height: 40,
+    borderRadius: AmakiRadius.sm,
+    marginBottom: AmakiSpacing.sm,
   },
-  value: {
-    fontSize: 16,
-    color: "#0f172a",
-    fontFamily: "monospace",
+  hello: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
   },
-  error: {
-    color: "#b91c1c",
-    marginBottom: 12,
+  name: {
+    ...AmakiTypography.display,
+    color: AmakiColors.primaryStrong,
+    marginTop: AmakiSpacing.xs,
   },
-  navButton: {
-    marginTop: 8,
-    backgroundColor: "#1d4ed8",
-    borderRadius: 8,
-    paddingVertical: 14,
+  metaRow: {
+    flexDirection: "row",
     alignItems: "center",
+    marginTop: AmakiSpacing.sm,
+    gap: AmakiSpacing.xs,
   },
-  navButtonText: {
-    color: "#fff",
+  meta: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.text,
     fontWeight: "600",
-    fontSize: 16,
   },
-  button: {
-    marginTop: 16,
-    backgroundColor: "#b91c1c",
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: "center",
+  metaDot: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
   },
-  buttonDisabled: {
+  member: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+    marginTop: AmakiSpacing.xs,
+  },
+  summaryRow: {
+    flexDirection: "row",
+    gap: AmakiSpacing.sm,
+    marginBottom: AmakiSpacing.xl,
+  },
+  summaryCard: {
+    flex: 1,
+    backgroundColor: AmakiColors.surface,
+    borderRadius: AmakiRadius.md,
+    borderWidth: 1,
+    borderColor: AmakiColors.border,
+    padding: AmakiSpacing.md,
+    minHeight: 88,
+  },
+  summaryTitle: {
+    ...AmakiTypography.heading,
+    color: AmakiColors.text,
+    marginBottom: AmakiSpacing.xs,
+  },
+  summaryHint: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.primary,
+  },
+  sectionTitle: {
+    ...AmakiTypography.title,
+    color: AmakiColors.text,
+    marginBottom: AmakiSpacing.md,
+  },
+  grid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: AmakiSpacing.sm,
+  },
+  tile: {
+    width: "48%",
+    flexGrow: 1,
+    backgroundColor: AmakiColors.surfaceMuted,
+    borderRadius: AmakiRadius.md,
+    padding: AmakiSpacing.md,
+    borderWidth: 1,
+    borderColor: AmakiColors.border,
     opacity: 0.7,
+    minHeight: 72,
   },
-  buttonText: {
-    color: "#fff",
-    fontWeight: "600",
-    fontSize: 16,
+  tileLabel: {
+    ...AmakiTypography.heading,
+    color: AmakiColors.textMuted,
+  },
+  tileSoon: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+    marginTop: AmakiSpacing.xs,
   },
 });

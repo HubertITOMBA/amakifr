@@ -63,3 +63,54 @@ export const Spacing = {
 
 export const BottomTabInset = Platform.select({ ios: 50, android: 80 }) ?? 0;
 export const MaxContentWidth = 800;
+
+/**
+ * Tokens visuels AMAKI — thème clair (UI-1B.1).
+ * Dark mode : à brancher plus tard, sans changer ces clés.
+ */
+export const AmakiColors = {
+  primary: "#1d4ed8",
+  primaryStrong: "#1e3a8a",
+  primarySoft: "#eff6ff",
+  accent: "#f59e0b",
+  danger: "#b91c1c",
+  success: "#15803d",
+  warning: "#c2410c",
+  background: "#f8fafc",
+  surface: "#ffffff",
+  surfaceMuted: "#f1f5f9",
+  text: "#0f172a",
+  textMuted: "#64748b",
+  border: "#e2e8f0",
+} as const;
+
+export const AmakiSpacing = {
+  xs: 4,
+  sm: 8,
+  md: 12,
+  lg: 16,
+  xl: 24,
+  "2xl": 32,
+} as const;
+
+export const AmakiRadius = {
+  sm: 8,
+  md: 12,
+  lg: 16,
+  pill: 999,
+} as const;
+
+export const AmakiTypography = {
+  display: { fontSize: 28, fontWeight: "700" as const, lineHeight: 34 },
+  title: { fontSize: 20, fontWeight: "700" as const, lineHeight: 26 },
+  heading: { fontSize: 16, fontWeight: "700" as const, lineHeight: 22 },
+  body: { fontSize: 16, fontWeight: "400" as const, lineHeight: 22 },
+  caption: { fontSize: 13, fontWeight: "400" as const, lineHeight: 18 },
+  label: {
+    fontSize: 11,
+    fontWeight: "700" as const,
+    lineHeight: 14,
+    letterSpacing: 0.4,
+    textTransform: "uppercase" as const,
+  },
+};
