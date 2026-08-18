@@ -72,6 +72,13 @@ function AppTabs() {
           tabBarIcon: ({ color }) => <TabBarIcon name="profil" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="documents"
+        options={{
+          title: "Documents",
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

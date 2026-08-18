@@ -74,6 +74,25 @@ Règles client :
 - **pas** de paiement (Stripe / Mollie / PayPal / WebView)
 - **pas** de cache persistant (SecureStore / AsyncStorage)
 
+## Documents (lecture seule)
+
+Écran `(app)/documents` — **lecture seule**, ouvert depuis Accueil (pas d’onglet dédié) :
+
+| Méthode | Path |
+|---------|------|
+| GET | `/api/v1/me/documents` |
+
+Règles client :
+
+- self-service via `actor.userId` côté backend — **pas** de `userId` / `adherentId` client
+- auth Bearer via `authenticatedFetch` uniquement
+- pull-to-refresh, loading / empty / error
+- **pas** d’upload / édition / suppression
+- ouverture actuelle : URL publique `/ressources/documents/*` (helper `buildDocumentOpenUrl`)
+- chemins hors `/ressources/documents/` refusés (galeries, justificatifs, traversal `..` / `%2e%2e`)
+
+Dette sécurité connue : les fichiers Documents sont **historiquement publics par URL** (contrat Web existant). Ce MVP **n’a pas changé** ce stockage ni `/api/ressources`. Un proxy authentifié reste un durcissement futur.
+
 ## Validation Android réelle — Phase 2Q
 
 ### Environnement préflight (Fedora)

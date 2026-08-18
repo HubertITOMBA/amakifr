@@ -12,8 +12,12 @@ import {
   AmakiTypography,
 } from "@/constants/theme";
 
-const SERVICES: { id: string; label: string }[] = [
-  { id: "documents", label: "Documents" },
+const SERVICES: {
+  id: string;
+  label: string;
+  href?: "/documents";
+}[] = [
+  { id: "documents", label: "Documents", href: "/documents" },
   { id: "passeport", label: "Passeport" },
   { id: "reunions", label: "Réunions" },
   { id: "taches", label: "Tâches" },
@@ -35,6 +39,7 @@ export default function AccueilScreen() {
             source={appIcon}
             style={styles.logo}
             accessibilityLabel="AMAKI France"
+            alt="AMAKI France"
           />
           <Text style={styles.hello}>Bonjour</Text>
           <Text style={styles.name}>{displayName}</Text>
@@ -77,17 +82,30 @@ export default function AccueilScreen() {
 
         <Text style={styles.sectionTitle}>Mes services</Text>
         <View style={styles.grid}>
-          {SERVICES.map((service) => (
-            <View
-              key={service.id}
-              style={styles.tile}
-              accessibilityRole="text"
-              accessibilityLabel={`${service.label}, bientôt`}
-            >
-              <Text style={styles.tileLabel}>{service.label}</Text>
-              <Text style={styles.tileSoon}>Bientôt</Text>
-            </View>
-          ))}
+          {SERVICES.map((service) =>
+            service.href ? (
+              <Pressable
+                key={service.id}
+                style={styles.tileActive}
+                onPress={() => router.push(service.href!)}
+                accessibilityRole="button"
+                accessibilityLabel={service.label}
+              >
+                <Text style={styles.tileLabelActive}>{service.label}</Text>
+                <Text style={styles.tileHint}>Voir mes documents</Text>
+              </Pressable>
+            ) : (
+              <View
+                key={service.id}
+                style={styles.tile}
+                accessibilityRole="text"
+                accessibilityLabel={`${service.label}, bientôt`}
+              >
+                <Text style={styles.tileLabel}>{service.label}</Text>
+                <Text style={styles.tileSoon}>Bientôt</Text>
+              </View>
+            )
+          )}
         </View>
       </ScrollView>
     </SafeAreaView>
@@ -190,13 +208,32 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     minHeight: 72,
   },
+  tileActive: {
+    width: "48%",
+    flexGrow: 1,
+    backgroundColor: AmakiColors.surface,
+    borderRadius: AmakiRadius.md,
+    padding: AmakiSpacing.md,
+    borderWidth: 1,
+    borderColor: AmakiColors.border,
+    minHeight: 72,
+  },
   tileLabel: {
     ...AmakiTypography.heading,
     color: AmakiColors.textMuted,
   },
+  tileLabelActive: {
+    ...AmakiTypography.heading,
+    color: AmakiColors.text,
+  },
   tileSoon: {
     ...AmakiTypography.caption,
     color: AmakiColors.textMuted,
+    marginTop: AmakiSpacing.xs,
+  },
+  tileHint: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.primary,
     marginTop: AmakiSpacing.xs,
   },
 });

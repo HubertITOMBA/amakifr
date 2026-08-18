@@ -172,6 +172,31 @@ export type CotisationMensuelleDto = {
   typeCotisation: TypeCotisationMensuelleDto;
 };
 
+/** Aligné sur enum Prisma TypeDocument (miroir string). */
+export type TypeDocument =
+  | "PDF"
+  | "Image"
+  | "Video"
+  | "Excel"
+  | "Word"
+  | "Autre";
+
+/**
+ * Document self-service.
+ * Dates : ISO string. Pas de userId / adherentId / nom interne.
+ */
+export type DocumentDto = {
+  id: string;
+  nomOriginal: string;
+  type: TypeDocument;
+  categorie: string | null;
+  chemin: string;
+  taille: number;
+  mimeType: string;
+  description: string | null;
+  createdAt: string;
+};
+
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;

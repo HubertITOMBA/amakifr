@@ -8,12 +8,14 @@ const {
   getMyNotifications,
   getMyUnreadNotificationCount,
   getMyCotisationsMensuelles,
+  getMyDocuments,
 } = vi.hoisted(() => ({
   resolveApiActorMock: vi.fn(),
   getMe: vi.fn(),
   getMyNotifications: vi.fn(),
   getMyUnreadNotificationCount: vi.fn(),
   getMyCotisationsMensuelles: vi.fn(),
+  getMyDocuments: vi.fn(),
 }));
 
 vi.mock("@/lib/api/auth-resolve", () => ({
@@ -29,11 +31,15 @@ vi.mock("@/lib/services/notifications/get-my-unread-count", () => ({
 vi.mock("@/lib/services/cotisations/get-my-cotisations-mensuelles", () => ({
   getMyCotisationsMensuelles,
 }));
+vi.mock("@/lib/services/documents/get-my-documents", () => ({
+  getMyDocuments,
+}));
 
 import { GET as getMeRoute } from "@/app/api/v1/me/route";
 import { GET as getNotificationsRoute } from "@/app/api/v1/me/notifications/route";
 import { GET as getUnreadRoute } from "@/app/api/v1/me/notifications/unread-count/route";
 import { GET as getCotisationsRoute } from "@/app/api/v1/me/cotisations-mensuelles/route";
+import { GET as getDocumentsRoute } from "@/app/api/v1/me/documents/route";
 
 function actor(overrides: Partial<AuthContext> = {}): AuthContext {
   return {
@@ -233,5 +239,65 @@ describe("GET /api/v1/me/cotisations-mensuelles", () => {
     );
     expect(res.status).toBe(400);
     expect(getMyCotisationsMensuelles).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/v1/me/documents", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    getMyDocuments.mockReset();
+  });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await getDocumentsRoute(req("http://localhost/api/v1/me/documents"));
+    expect(res.status).toBe(401);
+    const body = await res.json();
+    expect(body.error.code).toBe("UNAUTHENTICATED");
+    expect(getMyDocuments).not.toHaveBeenCalled();
+  });
+
+  it("succès avec dates ISO", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    getMyDocuments.mockResolvedValue([
+      {
+        id: "doc-1",
+        nomOriginal: "statuts.pdf",
+        type: "PDF",
+        createdAt: "2025-06-15T10:00:00.000Z",
+      },
+    ]);
+    const res = await getDocumentsRoute(req("http://localhost/api/v1/me/documents"));
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data[0].nomOriginal).toBe("statuts.pdf");
+    expect(typeof body.data[0].createdAt).toBe("string");
+    expect(getMyDocuments).toHaveBeenCalledWith(actor());
+  });
+
+  it("liste vide", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    getMyDocuments.mockResolvedValue([]);
+    const res = await getDocumentsRoute(req("http://localhost/api/v1/me/documents"));
+    const body = await res.json();
+    expect(body.data).toEqual([]);
+  });
+
+  it("refuse userId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getDocumentsRoute(
+      req("http://localhost/api/v1/me/documents?userId=other")
+    );
+    expect(res.status).toBe(400);
+    expect(getMyDocuments).not.toHaveBeenCalled();
+  });
+
+  it("refuse adherentId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getDocumentsRoute(
+      req("http://localhost/api/v1/me/documents?adherentId=x")
+    );
+    expect(res.status).toBe(400);
+    expect(getMyDocuments).not.toHaveBeenCalled();
   });
 });
