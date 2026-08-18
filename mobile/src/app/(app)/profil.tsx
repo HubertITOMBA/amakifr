@@ -1,20 +1,31 @@
 import { useCallback, useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { router } from "expo-router";
+import { ScrollView, StyleSheet, Text, View } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/auth/auth-context";
 import { ApiClientError } from "@/api/types";
+import { Card } from "@/components/ui/card";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { LoadingState } from "@/components/ui/loading-state";
+import { PrimaryButton } from "@/components/ui/primary-button";
+import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  AmakiColors,
+  AmakiRadius,
+  AmakiSpacing,
+  AmakiTypography,
+} from "@/constants/theme";
+
+function initialsFromName(name: string | null | undefined): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
 
 /**
- * Écran /me minimal — GET /api/v1/me + déconnexion.
+ * Écran Profil — GET /api/v1/me + déconnexion.
  */
-export default function MeScreen() {
+export default function ProfilScreen() {
   const { user, refreshMe, signOut } = useAuth();
   const [loading, setLoading] = useState(!user);
   const [error, setError] = useState<string | null>(null);
@@ -50,128 +61,108 @@ export default function MeScreen() {
   }
 
   if (loading && !user) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1d4ed8" />
-      </View>
-    );
+    return <LoadingState />;
   }
 
+  const initials = initialsFromName(user?.name);
+
   return (
-    <ScrollView contentContainerStyle={styles.container}>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+    <SafeAreaView style={styles.safe} edges={["top"]}>
+      <ScrollView contentContainerStyle={styles.container}>
+        {error ? <ErrorBanner message={error} /> : null}
 
-      <View style={styles.field}>
-        <Text style={styles.label}>Nom</Text>
-        <Text style={styles.value}>{user?.name ?? "—"}</Text>
-      </View>
-      <View style={styles.field}>
-        <Text style={styles.label}>E-mail</Text>
-        <Text style={styles.value}>{user?.email ?? "—"}</Text>
-      </View>
-      <View style={styles.field}>
-        <Text style={styles.label}>Rôle</Text>
-        <Text style={styles.value}>{user?.role ?? "—"}</Text>
-      </View>
-      <View style={styles.field}>
-        <Text style={styles.label}>Statut</Text>
-        <Text style={styles.value}>{user?.status ?? "—"}</Text>
-      </View>
+        <Card style={styles.identity}>
+          <View style={styles.avatar} accessibilityLabel={`Avatar ${initials}`}>
+            <Text style={styles.avatarText}>{initials}</Text>
+          </View>
+          <Text style={styles.name}>{user?.name ?? "—"}</Text>
+          <Text style={styles.email}>{user?.email ?? "—"}</Text>
+          {user?.status ? (
+            <StatusBadge label={user.status} tone="primary" />
+          ) : null}
+        </Card>
 
-      <Pressable
-        style={styles.navButton}
-        onPress={() => router.push("/notifications")}
-        accessibilityRole="button"
-        accessibilityLabel="Ouvrir les notifications"
-      >
-        <Text style={styles.navButtonText}>Notifications</Text>
-      </Pressable>
+        <Text style={styles.sectionTitle}>Compte</Text>
+        <Card>
+          <View style={styles.row}>
+            <Text style={styles.rowLabel}>Rôle</Text>
+            <Text style={styles.rowValue}>{user?.role ?? "—"}</Text>
+          </View>
+        </Card>
 
-      <Pressable
-        style={styles.navButton}
-        onPress={() => router.push("/cotisations")}
-        accessibilityRole="button"
-        accessibilityLabel="Ouvrir les cotisations"
-      >
-        <Text style={styles.navButtonText}>Cotisations</Text>
-      </Pressable>
-
-      <Pressable
-        style={[styles.button, signingOut && styles.buttonDisabled]}
-        onPress={onSignOut}
-        disabled={signingOut}
-      >
-        {signingOut ? (
-          <ActivityIndicator color="#fff" />
-        ) : (
-          <Text style={styles.buttonText}>Déconnexion</Text>
-        )}
-      </Pressable>
-    </ScrollView>
+        <PrimaryButton
+          label="Déconnexion"
+          variant="danger"
+          loading={signingOut}
+          onPress={onSignOut}
+          style={styles.logout}
+        />
+      </ScrollView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  center: {
+  safe: {
     flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: AmakiColors.background,
   },
   container: {
-    padding: 20,
-    backgroundColor: "#f8fafc",
+    padding: AmakiSpacing.lg,
     flexGrow: 1,
   },
-  field: {
-    marginBottom: 16,
-    backgroundColor: "#fff",
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    padding: 12,
+  identity: {
+    alignItems: "center",
+    marginBottom: AmakiSpacing.lg,
   },
-  label: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#64748b",
-    textTransform: "uppercase",
-    marginBottom: 4,
+  avatar: {
+    width: 64,
+    height: 64,
+    borderRadius: AmakiRadius.pill,
+    backgroundColor: AmakiColors.primarySoft,
+    borderWidth: 2,
+    borderColor: AmakiColors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: AmakiSpacing.md,
   },
-  value: {
-    fontSize: 16,
-    color: "#0f172a",
-    fontFamily: "monospace",
+  avatarText: {
+    ...AmakiTypography.title,
+    color: AmakiColors.primaryStrong,
   },
-  error: {
-    color: "#b91c1c",
-    marginBottom: 12,
+  name: {
+    ...AmakiTypography.title,
+    color: AmakiColors.text,
+    textAlign: "center",
   },
-  navButton: {
-    marginTop: 8,
-    backgroundColor: "#1d4ed8",
-    borderRadius: 8,
-    paddingVertical: 14,
+  email: {
+    ...AmakiTypography.body,
+    color: AmakiColors.textMuted,
+    textAlign: "center",
+    marginTop: AmakiSpacing.xs,
+    marginBottom: AmakiSpacing.md,
+  },
+  sectionTitle: {
+    ...AmakiTypography.heading,
+    color: AmakiColors.text,
+    marginBottom: AmakiSpacing.sm,
+  },
+  row: {
+    flexDirection: "row",
+    justifyContent: "space-between",
     alignItems: "center",
   },
-  navButtonText: {
-    color: "#fff",
+  rowLabel: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
     fontWeight: "600",
-    fontSize: 16,
   },
-  button: {
-    marginTop: 16,
-    backgroundColor: "#b91c1c",
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: "#fff",
+  rowValue: {
+    ...AmakiTypography.body,
+    color: AmakiColors.text,
     fontWeight: "600",
-    fontSize: 16,
+  },
+  logout: {
+    marginTop: AmakiSpacing.xl,
   },
 });

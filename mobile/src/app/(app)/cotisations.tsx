@@ -1,12 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
+import { FlatList, RefreshControl, StyleSheet, View } from "react-native";
 import { getMyCotisationsMensuelles } from "@/api/cotisations";
 import { cotisationErrorMessage } from "@/api/cotisations-state";
 import {
@@ -18,6 +11,10 @@ import {
 } from "@/api/load-guard";
 import { ApiClientError, type CotisationMensuelleDto } from "@/api/types";
 import { CotisationItem } from "@/components/cotisation-item";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { LoadingState } from "@/components/ui/loading-state";
+import { AmakiColors, AmakiSpacing } from "@/constants/theme";
 
 /**
  * Écran Cotisations mensuelles — lecture seule self-service.
@@ -66,16 +63,12 @@ export default function CotisationsScreen() {
   }, [load]);
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1d4ed8" />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   return (
     <View style={styles.root}>
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorBanner message={error} /> : null}
 
       <FlatList
         data={items}
@@ -87,12 +80,12 @@ export default function CotisationsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => void load(true)}
-            tintColor="#1d4ed8"
+            tintColor={AmakiColors.primary}
           />
         }
         ListEmptyComponent={
           error ? null : (
-            <Text style={styles.empty}>Aucune cotisation mensuelle</Text>
+            <EmptyState title="Aucune cotisation mensuelle" />
           )
         }
         renderItem={({ item }) => <CotisationItem cotisation={item} />}
@@ -104,31 +97,13 @@ export default function CotisationsScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: AmakiColors.background,
   },
   list: {
-    padding: 16,
+    padding: AmakiSpacing.lg,
   },
   emptyContainer: {
     flexGrow: 1,
     justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  empty: {
-    color: "#64748b",
-    fontSize: 16,
-  },
-  error: {
-    color: "#b91c1c",
-    paddingHorizontal: 16,
-    paddingTop: 12,
-    paddingBottom: 4,
   },
 });

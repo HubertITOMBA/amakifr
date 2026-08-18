@@ -1,6 +1,14 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { NotificationDto } from "@/api/types";
 import { formatNotificationDate } from "@/api/notifications-state";
+import { Card } from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
+import {
+  AmakiColors,
+  AmakiRadius,
+  AmakiSpacing,
+  AmakiTypography,
+} from "@/constants/theme";
 
 type Props = {
   notification: NotificationDto;
@@ -10,7 +18,7 @@ type Props = {
 };
 
 /**
- * Ligne de notification (lu / non lu).
+ * Carte notification (lu / non lu).
  */
 export function NotificationItem({
   notification,
@@ -21,10 +29,14 @@ export function NotificationItem({
   const unread = !notification.lue;
 
   return (
-    <View
-      style={[styles.card, unread ? styles.cardUnread : styles.cardRead]}
+    <Card
+      style={[
+        styles.card,
+        unread ? styles.cardUnread : styles.cardRead,
+      ]}
       accessibilityRole="summary"
     >
+      {unread ? <View style={styles.unreadBar} /> : null}
       <Pressable
         onPress={() => onPress(notification)}
         disabled={busy}
@@ -37,17 +49,28 @@ export function NotificationItem({
         style={styles.main}
       >
         <View style={styles.header}>
-          <Text style={[styles.title, unread && styles.titleUnread]}>
+          <Text
+            style={[styles.title, unread && styles.titleUnread]}
+            numberOfLines={2}
+          >
             {notification.titre}
           </Text>
-          {unread ? <Text style={styles.badge}>Non lue</Text> : null}
+          {unread ? (
+            <View style={styles.unreadDot} accessibilityLabel="Non lue" />
+          ) : null}
         </View>
         <Text style={styles.message} numberOfLines={3}>
           {notification.message}
         </Text>
-        <Text style={styles.meta}>
-          {notification.type} · {formatNotificationDate(notification.createdAt)}
-        </Text>
+        <View style={styles.footer}>
+          <StatusBadge label={notification.type} tone="neutral" />
+          <Text style={styles.date}>
+            {formatNotificationDate(notification.createdAt)}
+          </Text>
+        </View>
+        {unread ? (
+          <Text style={styles.unreadLabel}>Non lue</Text>
+        ) : null}
       </Pressable>
       <Pressable
         onPress={() => onDelete(notification)}
@@ -58,69 +81,86 @@ export function NotificationItem({
       >
         <Text style={styles.deleteText}>Supprimer</Text>
       </Pressable>
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: 10,
-    borderWidth: 1,
-    marginBottom: 10,
+    marginBottom: AmakiSpacing.sm,
     overflow: "hidden",
+    padding: 0,
   },
   cardUnread: {
-    backgroundColor: "#eff6ff",
-    borderColor: "#93c5fd",
+    borderColor: AmakiColors.primary,
+    backgroundColor: AmakiColors.primarySoft,
   },
   cardRead: {
-    backgroundColor: "#fff",
-    borderColor: "#e2e8f0",
+    backgroundColor: AmakiColors.surface,
+  },
+  unreadBar: {
+    height: 3,
+    backgroundColor: AmakiColors.primary,
   },
   main: {
-    padding: 12,
+    padding: AmakiSpacing.md,
   },
   header: {
     flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    marginBottom: 4,
+    alignItems: "flex-start",
+    gap: AmakiSpacing.sm,
+    marginBottom: AmakiSpacing.xs,
   },
   title: {
     flex: 1,
-    fontSize: 15,
+    ...AmakiTypography.body,
     fontWeight: "500",
-    color: "#334155",
+    color: AmakiColors.textMuted,
   },
   titleUnread: {
     fontWeight: "700",
-    color: "#0f172a",
+    color: AmakiColors.text,
   },
-  badge: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#1d4ed8",
-    textTransform: "uppercase",
+  unreadDot: {
+    width: 10,
+    height: 10,
+    borderRadius: AmakiRadius.pill,
+    backgroundColor: AmakiColors.primary,
+    marginTop: 4,
   },
   message: {
-    fontSize: 14,
-    color: "#475569",
-    marginBottom: 6,
+    ...AmakiTypography.caption,
+    color: AmakiColors.text,
+    marginBottom: AmakiSpacing.sm,
   },
-  meta: {
-    fontSize: 12,
-    color: "#94a3b8",
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: AmakiSpacing.sm,
+  },
+  date: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+  },
+  unreadLabel: {
+    ...AmakiTypography.label,
+    color: AmakiColors.primary,
+    marginTop: AmakiSpacing.sm,
+    textTransform: "none",
   },
   deleteBtn: {
     borderTopWidth: 1,
-    borderTopColor: "#e2e8f0",
-    paddingVertical: 10,
+    borderTopColor: AmakiColors.border,
+    paddingVertical: AmakiSpacing.md,
+    minHeight: 44,
     alignItems: "center",
-    backgroundColor: "#fff",
+    justifyContent: "center",
+    backgroundColor: AmakiColors.surface,
   },
   deleteText: {
-    color: "#b91c1c",
-    fontWeight: "600",
-    fontSize: 13,
+    ...AmakiTypography.caption,
+    color: AmakiColors.danger,
+    fontWeight: "700",
   },
 });

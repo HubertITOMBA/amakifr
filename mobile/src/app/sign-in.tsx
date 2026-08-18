@@ -1,16 +1,26 @@
 import { useState } from "react";
 import {
-  ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
-  Pressable,
+  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   View,
 } from "react-native";
+import { Image } from "expo-image";
+import { SafeAreaView } from "react-native-safe-area-context";
+import appIcon from "@/assets/images/icon.png";
 import { useAuth } from "@/auth/auth-context";
 import { ApiClientError } from "@/api/types";
+import { PrimaryButton } from "@/components/ui/primary-button";
+import { Card } from "@/components/ui/card";
+import {
+  AmakiColors,
+  AmakiRadius,
+  AmakiSpacing,
+  AmakiTypography,
+} from "@/constants/theme";
 
 /**
  * Écran de connexion email / mot de passe.
@@ -55,120 +65,139 @@ export default function SignInScreen() {
   }
 
   return (
-    <KeyboardAvoidingView
-      style={styles.container}
-      behavior={Platform.OS === "ios" ? "padding" : undefined}
-    >
-      <View style={styles.card}>
-        <Text style={styles.brand}>AMAKI</Text>
-        <Text style={styles.subtitle}>Connexion mobile</Text>
-
-        <Text style={styles.label}>E-mail</Text>
-        <TextInput
-          style={styles.input}
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="email-address"
-          textContentType="emailAddress"
-          value={email}
-          onChangeText={setEmail}
-          editable={!loading}
-          placeholder="vous@exemple.com"
-          placeholderTextColor="#94a3b8"
-        />
-
-        <Text style={styles.label}>Mot de passe</Text>
-        <TextInput
-          style={styles.input}
-          secureTextEntry
-          textContentType="password"
-          value={password}
-          onChangeText={setPassword}
-          editable={!loading}
-          placeholder="••••••••"
-          placeholderTextColor="#94a3b8"
-        />
-
-        {error ? <Text style={styles.error}>{error}</Text> : null}
-
-        <Pressable
-          style={[styles.button, loading && styles.buttonDisabled]}
-          onPress={onSubmit}
-          disabled={loading}
+    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+      <KeyboardAvoidingView
+        style={styles.flex}
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+      >
+        <ScrollView
+          contentContainerStyle={styles.scroll}
+          keyboardShouldPersistTaps="handled"
         >
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.buttonText}>Connexion</Text>
-          )}
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
+          <View style={styles.header}>
+            <Image
+              source={appIcon}
+              style={styles.logo}
+              accessibilityLabel="AMAKI France"
+              alt="AMAKI France"
+            />
+            <Text style={styles.brand}>AMAKI France</Text>
+            <Text style={styles.subtitle}>Espace adhérent</Text>
+          </View>
+
+          <Card style={styles.card}>
+            <Text style={styles.fieldLabel}>E-mail</Text>
+            <TextInput
+              style={styles.input}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="email-address"
+              textContentType="emailAddress"
+              value={email}
+              onChangeText={setEmail}
+              editable={!loading}
+              placeholder="vous@exemple.com"
+              placeholderTextColor={AmakiColors.textMuted}
+              accessibilityLabel="E-mail"
+            />
+
+            <Text style={styles.fieldLabel}>Mot de passe</Text>
+            <TextInput
+              style={styles.input}
+              secureTextEntry
+              textContentType="password"
+              value={password}
+              onChangeText={setPassword}
+              editable={!loading}
+              placeholder="••••••••"
+              placeholderTextColor={AmakiColors.textMuted}
+              accessibilityLabel="Mot de passe"
+            />
+
+            {error ? (
+              <Text
+                style={styles.error}
+                accessibilityRole="alert"
+                accessibilityLiveRegion="polite"
+              >
+                {error}
+              </Text>
+            ) : null}
+
+            <PrimaryButton
+              label="Connexion"
+              loading={loading}
+              onPress={onSubmit}
+              style={styles.submit}
+            />
+          </Card>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  safe: {
     flex: 1,
-    justifyContent: "center",
-    padding: 24,
-    backgroundColor: "#eff6ff",
+    backgroundColor: AmakiColors.primarySoft,
   },
-  card: {
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    padding: 24,
-    borderWidth: 1,
-    borderColor: "#bfdbfe",
+  flex: {
+    flex: 1,
+  },
+  scroll: {
+    flexGrow: 1,
+    justifyContent: "center",
+    padding: AmakiSpacing.xl,
+  },
+  header: {
+    alignItems: "center",
+    marginBottom: AmakiSpacing.xl,
+  },
+  logo: {
+    width: 56,
+    height: 56,
+    borderRadius: AmakiRadius.md,
+    marginBottom: AmakiSpacing.md,
   },
   brand: {
-    fontSize: 28,
-    fontWeight: "700",
-    color: "#1e3a8a",
+    ...AmakiTypography.display,
+    color: AmakiColors.primaryStrong,
     textAlign: "center",
   },
   subtitle: {
-    fontSize: 14,
-    color: "#64748b",
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
     textAlign: "center",
-    marginBottom: 24,
-    marginTop: 4,
+    marginTop: AmakiSpacing.xs,
   },
-  label: {
-    fontSize: 12,
-    fontWeight: "600",
-    color: "#334155",
-    marginBottom: 6,
-    textTransform: "uppercase",
+  card: {
+    padding: AmakiSpacing.lg,
+  },
+  fieldLabel: {
+    ...AmakiTypography.label,
+    color: AmakiColors.textMuted,
+    marginBottom: AmakiSpacing.xs,
   },
   input: {
     borderWidth: 1,
-    borderColor: "#cbd5e1",
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 16,
+    borderColor: AmakiColors.border,
+    borderRadius: AmakiRadius.sm,
+    paddingHorizontal: AmakiSpacing.md,
+    paddingVertical: AmakiSpacing.md,
+    marginBottom: AmakiSpacing.lg,
     fontSize: 16,
-    color: "#0f172a",
-    backgroundColor: "#f8fafc",
+    color: AmakiColors.text,
+    backgroundColor: AmakiColors.background,
+    minHeight: 48,
   },
   error: {
-    color: "#b91c1c",
-    marginBottom: 12,
-    fontSize: 14,
-  },
-  button: {
-    backgroundColor: "#1d4ed8",
-    borderRadius: 8,
-    paddingVertical: 14,
-    alignItems: "center",
-  },
-  buttonDisabled: {
-    opacity: 0.7,
-  },
-  buttonText: {
-    color: "#fff",
+    ...AmakiTypography.caption,
+    color: AmakiColors.danger,
+    marginBottom: AmakiSpacing.md,
     fontWeight: "600",
-    fontSize: 16,
+  },
+  submit: {
+    marginTop: AmakiSpacing.xs,
   },
 });

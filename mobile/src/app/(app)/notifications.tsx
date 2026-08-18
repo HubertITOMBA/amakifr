@@ -1,9 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
-  Pressable,
   RefreshControl,
   StyleSheet,
   Text,
@@ -32,11 +30,22 @@ import {
 } from "@/api/load-guard";
 import { ApiClientError, type NotificationDto } from "@/api/types";
 import { NotificationItem } from "@/components/notification-item";
+import { EmptyState } from "@/components/ui/empty-state";
+import { ErrorBanner } from "@/components/ui/error-banner";
+import { LoadingState } from "@/components/ui/loading-state";
+import { SecondaryButton } from "@/components/ui/secondary-button";
+import { useUnreadCount } from "@/hooks/unread-count";
+import {
+  AmakiColors,
+  AmakiSpacing,
+  AmakiTypography,
+} from "@/constants/theme";
 
 /**
  * Écran Notifications — liste + unread + mark read / mark all / delete.
  */
 export default function NotificationsScreen() {
+  const { refreshUnreadCount } = useUnreadCount();
   const [items, setItems] = useState<NotificationDto[]>([]);
   const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
@@ -45,6 +54,10 @@ export default function NotificationsScreen() {
   const [busyId, setBusyId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const guardRef = useRef<LoadGuard>(createLoadGuard());
+
+  const syncGlobalUnread = useCallback(async () => {
+    await refreshUnreadCount();
+  }, [refreshUnreadCount]);
 
   const load = useCallback(async (isRefresh = false) => {
     const started = beginLoad(guardRef.current);
@@ -65,6 +78,7 @@ export default function NotificationsScreen() {
       if (!shouldApplyLoadResult(gen, guardRef.current.dataGen)) return;
       setItems(list);
       setUnread(count);
+      await syncGlobalUnread();
     } catch (e) {
       if (!shouldApplyLoadResult(gen, guardRef.current.dataGen)) return;
       if (e instanceof ApiClientError) {
@@ -75,16 +89,13 @@ export default function NotificationsScreen() {
     } finally {
       const ended = endLoad(guardRef.current);
       guardRef.current = ended.guard;
-      // Toujours libérer le spinner quand plus aucun load en vol
-      // (même si ce load a été invalidé par une mutation).
       if (ended.clearSpinners) {
         setLoading(false);
         setRefreshing(false);
       }
     }
-  }, []);
+  }, [syncGlobalUnread]);
 
-  /** Invalide les GET en cours avant d'appliquer un état mutation local. */
   function bumpAfterMutation() {
     guardRef.current = invalidatePendingLoads(guardRef.current);
   }
@@ -103,11 +114,13 @@ export default function NotificationsScreen() {
         prev.map((x) => (x.id === n.id ? { ...x, lue: true } : x))
       );
       setUnread((c) => nextUnreadAfterMarkRead(c, true));
+      await syncGlobalUnread();
     } catch (e) {
       if (e instanceof ApiClientError && e.status === 404) {
         bumpAfterMutation();
         setItems((prev) => prev.filter((x) => x.id !== n.id));
         setUnread((c) => nextUnreadAfterDelete(c, !n.lue));
+        await syncGlobalUnread();
         setError("Notification introuvable (mise à jour).");
       } else if (e instanceof ApiClientError) {
         setError(notificationErrorMessage(e));
@@ -127,6 +140,7 @@ export default function NotificationsScreen() {
       bumpAfterMutation();
       setItems((prev) => prev.map((x) => ({ ...x, lue: true })));
       setUnread(nextUnreadAfterMarkAll());
+      await syncGlobalUnread();
     } catch (e) {
       if (e instanceof ApiClientError) {
         setError(notificationErrorMessage(e));
@@ -158,11 +172,13 @@ export default function NotificationsScreen() {
       bumpAfterMutation();
       setItems((prev) => prev.filter((x) => x.id !== n.id));
       setUnread((c) => nextUnreadAfterDelete(c, !n.lue));
+      await syncGlobalUnread();
     } catch (e) {
       if (e instanceof ApiClientError && e.status === 404) {
         bumpAfterMutation();
         setItems((prev) => prev.filter((x) => x.id !== n.id));
         setUnread((c) => nextUnreadAfterDelete(c, !n.lue));
+        await syncGlobalUnread();
         setError("Notification déjà absente.");
       } else if (e instanceof ApiClientError) {
         setError(notificationErrorMessage(e));
@@ -175,38 +191,25 @@ export default function NotificationsScreen() {
   }
 
   if (loading) {
-    return (
-      <View style={styles.center}>
-        <ActivityIndicator size="large" color="#1d4ed8" />
-      </View>
-    );
+    return <LoadingState />;
   }
 
   return (
     <View style={styles.root}>
       <View style={styles.toolbar}>
-        <Text style={styles.unread}>
+        <Text style={styles.unread} accessibilityRole="text">
           {unread} non lue{unread !== 1 ? "s" : ""}
         </Text>
-        <Pressable
+        <SecondaryButton
+          label="Tout marquer comme lu"
+          loading={markingAll}
+          disabled={unread === 0}
           onPress={onMarkAll}
-          disabled={markingAll || unread === 0}
-          accessibilityRole="button"
-          accessibilityLabel="Tout marquer comme lu"
-          style={[
-            styles.markAll,
-            (markingAll || unread === 0) && styles.markAllDisabled,
-          ]}
-        >
-          {markingAll ? (
-            <ActivityIndicator color="#1d4ed8" size="small" />
-          ) : (
-            <Text style={styles.markAllText}>Tout marquer comme lu</Text>
-          )}
-        </Pressable>
+          style={styles.markAllBtn}
+        />
       </View>
 
-      {error ? <Text style={styles.error}>{error}</Text> : null}
+      {error ? <ErrorBanner message={error} /> : null}
 
       <FlatList
         data={items}
@@ -218,11 +221,11 @@ export default function NotificationsScreen() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => void load(true)}
-            tintColor="#1d4ed8"
+            tintColor={AmakiColors.primary}
           />
         }
         ListEmptyComponent={
-          <Text style={styles.empty}>Aucune notification</Text>
+          error ? null : <EmptyState title="Aucune notification" />
         }
         renderItem={({ item }) => (
           <NotificationItem
@@ -240,57 +243,33 @@ export default function NotificationsScreen() {
 const styles = StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: "#f8fafc",
-  },
-  center: {
-    flex: 1,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f8fafc",
+    backgroundColor: AmakiColors.background,
   },
   toolbar: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: AmakiSpacing.lg,
+    paddingVertical: AmakiSpacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: "#e2e8f0",
-    backgroundColor: "#fff",
+    borderBottomColor: AmakiColors.border,
+    backgroundColor: AmakiColors.surface,
+    gap: AmakiSpacing.sm,
   },
   unread: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#1e3a8a",
+    ...AmakiTypography.caption,
+    fontWeight: "700",
+    color: AmakiColors.primaryStrong,
+    flex: 1,
   },
-  markAll: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  markAllDisabled: {
-    opacity: 0.4,
-  },
-  markAllText: {
-    color: "#1d4ed8",
-    fontWeight: "600",
-    fontSize: 13,
-  },
-  error: {
-    color: "#b91c1c",
-    paddingHorizontal: 16,
-    paddingTop: 8,
+  markAllBtn: {
+    flexShrink: 0,
   },
   list: {
-    padding: 16,
+    padding: AmakiSpacing.lg,
   },
   emptyContainer: {
     flexGrow: 1,
     justifyContent: "center",
-    alignItems: "center",
-    padding: 24,
-  },
-  empty: {
-    color: "#64748b",
-    fontSize: 16,
   },
 });

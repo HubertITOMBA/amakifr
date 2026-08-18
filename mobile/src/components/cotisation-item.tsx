@@ -1,7 +1,17 @@
 import { StyleSheet, Text, View } from "react-native";
 import type { CotisationMensuelleDto } from "@/api/types";
+import { mapCotisationStatut } from "@/api/cotisation-display";
 import { formatIsoDate } from "@/api/cotisations-state";
+import { Card } from "@/components/ui/card";
+import { StatusBadge } from "@/components/ui/status-badge";
 import { formatMoneyDecimalString } from "@/utils/money";
+import { isZeroDecimalString } from "@/utils/decimal-string";
+import {
+  AmakiColors,
+  AmakiRadius,
+  AmakiSpacing,
+  AmakiTypography,
+} from "@/constants/theme";
 
 type Props = {
   cotisation: CotisationMensuelleDto;
@@ -12,18 +22,24 @@ type Props = {
  */
 export function CotisationItem({ cotisation }: Props) {
   const type = cotisation.typeCotisation;
+  const statut = mapCotisationStatut(cotisation.statut);
+  const restantNonNul = !isZeroDecimalString(cotisation.montantRestant);
+
   const metaParts: string[] = [type.categorie];
   if (type.obligatoire) {
     metaParts.push("Obligatoire");
   }
 
   return (
-    <View
+    <Card
       style={styles.card}
       accessibilityRole="summary"
-      accessibilityLabel={`Cotisation ${type.nom}, période ${cotisation.periode}, statut ${cotisation.statut}`}
+      accessibilityLabel={`Cotisation ${type.nom}, période ${cotisation.periode}, statut ${statut.label}`}
     >
-      <Text style={styles.title}>{type.nom}</Text>
+      <View style={styles.header}>
+        <Text style={styles.title}>{type.nom}</Text>
+        <StatusBadge label={statut.label} tone={statut.tone} />
+      </View>
       <Text style={styles.meta}>{metaParts.join(" · ")}</Text>
 
       <View style={styles.row}>
@@ -32,11 +48,9 @@ export function CotisationItem({ cotisation }: Props) {
       </View>
       <View style={styles.row}>
         <Text style={styles.label}>Échéance</Text>
-        <Text style={styles.value}>{formatIsoDate(cotisation.dateEcheance)}</Text>
-      </View>
-      <View style={styles.row}>
-        <Text style={styles.label}>Statut</Text>
-        <Text style={styles.value}>{cotisation.statut}</Text>
+        <Text style={styles.value}>
+          {formatIsoDate(cotisation.dateEcheance)}
+        </Text>
       </View>
 
       <View style={styles.amounts}>
@@ -52,81 +66,90 @@ export function CotisationItem({ cotisation }: Props) {
             {formatMoneyDecimalString(cotisation.montantPaye)}
           </Text>
         </View>
-        <View style={[styles.amountBlock, styles.restantBlock]}>
+        <View
+          style={[
+            styles.amountBlock,
+            restantNonNul && styles.restantHighlight,
+          ]}
+        >
           <Text style={styles.amountLabel}>Restant</Text>
-          <Text style={[styles.amountValue, styles.restantValue]}>
+          <Text
+            style={[
+              styles.amountValue,
+              restantNonNul && styles.restantValue,
+            ]}
+          >
             {formatMoneyDecimalString(cotisation.montantRestant)}
           </Text>
         </View>
       </View>
-    </View>
+    </Card>
   );
 }
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: "#e2e8f0",
-    padding: 14,
-    marginBottom: 12,
+    marginBottom: AmakiSpacing.md,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: AmakiSpacing.sm,
+    marginBottom: AmakiSpacing.xs,
   },
   title: {
-    fontSize: 16,
-    fontWeight: "700",
-    color: "#0f172a",
-    marginBottom: 2,
+    ...AmakiTypography.heading,
+    color: AmakiColors.text,
+    flex: 1,
   },
   meta: {
-    fontSize: 12,
-    color: "#64748b",
-    marginBottom: 10,
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+    marginBottom: AmakiSpacing.sm,
   },
   row: {
     flexDirection: "row",
     justifyContent: "space-between",
-    marginBottom: 4,
+    marginBottom: AmakiSpacing.xs,
   },
   label: {
-    fontSize: 13,
-    color: "#64748b",
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
   },
   value: {
-    fontSize: 13,
+    ...AmakiTypography.caption,
     fontWeight: "600",
-    color: "#1e293b",
+    color: AmakiColors.text,
   },
   amounts: {
     flexDirection: "row",
-    marginTop: 12,
-    gap: 8,
+    marginTop: AmakiSpacing.md,
+    gap: AmakiSpacing.sm,
   },
   amountBlock: {
     flex: 1,
-    backgroundColor: "#f8fafc",
-    borderRadius: 8,
-    padding: 8,
+    backgroundColor: AmakiColors.surfaceMuted,
+    borderRadius: AmakiRadius.sm,
+    padding: AmakiSpacing.sm,
   },
-  restantBlock: {
-    backgroundColor: "#eff6ff",
+  restantHighlight: {
+    backgroundColor: AmakiColors.primarySoft,
     borderWidth: 1,
-    borderColor: "#bfdbfe",
+    borderColor: AmakiColors.primaryBorder,
   },
   amountLabel: {
-    fontSize: 11,
-    fontWeight: "700",
-    color: "#64748b",
-    textTransform: "uppercase",
-    marginBottom: 4,
+    ...AmakiTypography.label,
+    color: AmakiColors.textMuted,
+    marginBottom: AmakiSpacing.xs,
   },
   amountValue: {
-    fontSize: 13,
-    fontWeight: "600",
-    color: "#0f172a",
+    ...AmakiTypography.caption,
+    fontWeight: "700",
+    color: AmakiColors.text,
   },
   restantValue: {
-    color: "#1d4ed8",
+    color: AmakiColors.primary,
     fontSize: 14,
   },
 });
