@@ -197,6 +197,16 @@ export type DocumentDto = {
   createdAt: string;
 };
 
+/**
+ * Métadonnées passeport self-service (DTO minimal).
+ */
+export type PasseportDto = {
+  numeroPasseport: string | null;
+  dateGenerationPasseport: string | null;
+  disponible: boolean;
+  peutGenerer: boolean;
+};
+
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;

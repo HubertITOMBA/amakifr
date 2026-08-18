@@ -93,6 +93,27 @@ Règles client :
 
 Dette sécurité connue : les fichiers Documents sont **historiquement publics par URL** (contrat Web existant). Ce MVP **n’a pas changé** ce stockage ni `/api/ressources`. Un proxy authentifié reste un durcissement futur.
 
+## Passeport (self-service)
+
+Écran `(app)/passeport` — ouvert depuis Accueil (pas d’onglet dédié) :
+
+| Méthode | Path |
+|---------|------|
+| GET | `/api/v1/me/passeport` |
+| POST | `/api/v1/me/passeport/generate` |
+| GET | `/api/v1/me/passeport/pdf` |
+
+Règles client :
+
+- self-service via `actor.userId` côté backend — **pas** de `userId` / `adherentId` client
+- compte **Actif** requis (403 si inactif sur metadata / generate / PDF)
+- génération **explicite** via `POST /generate` (pas de génération silencieuse au GET PDF)
+- GET PDF sans effet de bord : refuse si numéro absent (409 CONFLICT)
+- PDF privé Bearer uniquement — **pas** d’URL publique, `Cache-Control: private, no-store`
+- metadata JSON minimal (`numeroPasseport`, `dateGenerationPasseport`, `disponible`, `peutGenerer`)
+- ouverture mobile : fetch binaire authentifié → cache Expo FileSystem → `expo-sharing`
+- fichier temporaire cache uniquement (`Passeport-AMAKI-{numero}.pdf`)
+
 ## Validation Android réelle — Phase 2Q
 
 ### Environnement préflight (Fedora)

@@ -9,6 +9,9 @@ const {
   getMyUnreadNotificationCount,
   getMyCotisationsMensuelles,
   getMyDocuments,
+  getMyPasseport,
+  generateMyPasseport,
+  getMyPasseportPdf,
 } = vi.hoisted(() => ({
   resolveApiActorMock: vi.fn(),
   getMe: vi.fn(),
@@ -16,6 +19,9 @@ const {
   getMyUnreadNotificationCount: vi.fn(),
   getMyCotisationsMensuelles: vi.fn(),
   getMyDocuments: vi.fn(),
+  getMyPasseport: vi.fn(),
+  generateMyPasseport: vi.fn(),
+  getMyPasseportPdf: vi.fn(),
 }));
 
 vi.mock("@/lib/api/auth-resolve", () => ({
@@ -34,12 +40,24 @@ vi.mock("@/lib/services/cotisations/get-my-cotisations-mensuelles", () => ({
 vi.mock("@/lib/services/documents/get-my-documents", () => ({
   getMyDocuments,
 }));
+vi.mock("@/lib/services/passeport/get-my-passeport", () => ({
+  getMyPasseport,
+}));
+vi.mock("@/lib/services/passeport/generate-my-passeport", () => ({
+  generateMyPasseport,
+}));
+vi.mock("@/lib/services/passeport/get-my-passeport-pdf", () => ({
+  getMyPasseportPdf,
+}));
 
 import { GET as getMeRoute } from "@/app/api/v1/me/route";
 import { GET as getNotificationsRoute } from "@/app/api/v1/me/notifications/route";
 import { GET as getUnreadRoute } from "@/app/api/v1/me/notifications/unread-count/route";
 import { GET as getCotisationsRoute } from "@/app/api/v1/me/cotisations-mensuelles/route";
 import { GET as getDocumentsRoute } from "@/app/api/v1/me/documents/route";
+import { GET as getPasseportRoute } from "@/app/api/v1/me/passeport/route";
+import { POST as postPasseportGenerateRoute } from "@/app/api/v1/me/passeport/generate/route";
+import { GET as getPasseportPdfRoute } from "@/app/api/v1/me/passeport/pdf/route";
 
 function actor(overrides: Partial<AuthContext> = {}): AuthContext {
   return {
@@ -299,5 +317,179 @@ describe("GET /api/v1/me/documents", () => {
     );
     expect(res.status).toBe(400);
     expect(getMyDocuments).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/v1/me/passeport", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    getMyPasseport.mockReset();
+  });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await getPasseportRoute(
+      req("http://localhost/api/v1/me/passeport")
+    );
+    expect(res.status).toBe(401);
+    expect(getMyPasseport).not.toHaveBeenCalled();
+  });
+
+  it("succès metadata", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    getMyPasseport.mockResolvedValue({
+      numeroPasseport: "AMAKI-2026-ABC123",
+      dateGenerationPasseport: "2026-08-18T10:00:00.000Z",
+      disponible: true,
+      peutGenerer: false,
+    });
+    const res = await getPasseportRoute(
+      req("http://localhost/api/v1/me/passeport")
+    );
+    expect(res.status).toBe(200);
+    const body = await res.json();
+    expect(body.data.numeroPasseport).toBe("AMAKI-2026-ABC123");
+    expect(getMyPasseport).toHaveBeenCalledWith(actor());
+  });
+
+  it("refuse userId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getPasseportRoute(
+      req("http://localhost/api/v1/me/passeport?userId=other")
+    );
+    expect(res.status).toBe(400);
+    expect(getMyPasseport).not.toHaveBeenCalled();
+  });
+
+  it("refuse adherentId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getPasseportRoute(
+      req("http://localhost/api/v1/me/passeport?adherentId=x")
+    );
+    expect(res.status).toBe(400);
+    expect(getMyPasseport).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/v1/me/passeport/generate", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    generateMyPasseport.mockReset();
+  });
+
+  function postReq(url: string, body?: unknown) {
+    const nextUrl = new URL(url);
+    return {
+      nextUrl,
+      headers: { get: () => null },
+      text: async () => (body !== undefined ? JSON.stringify(body) : ""),
+    } as any;
+  }
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await postPasseportGenerateRoute(
+      postReq("http://localhost/api/v1/me/passeport/generate")
+    );
+    expect(res.status).toBe(401);
+    expect(generateMyPasseport).not.toHaveBeenCalled();
+  });
+
+  it("succès génération", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    generateMyPasseport.mockResolvedValue({
+      numeroPasseport: "AMAKI-2026-NEW",
+      dateGenerationPasseport: "2026-08-18T12:00:00.000Z",
+      disponible: true,
+      peutGenerer: false,
+    });
+    const res = await postPasseportGenerateRoute(
+      postReq("http://localhost/api/v1/me/passeport/generate")
+    );
+    expect(res.status).toBe(200);
+    expect(generateMyPasseport).toHaveBeenCalledWith(actor());
+  });
+
+  it("refuse userId dans le body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postPasseportGenerateRoute(
+      postReq("http://localhost/api/v1/me/passeport/generate", {
+        userId: "other",
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(generateMyPasseport).not.toHaveBeenCalled();
+  });
+
+  it("refuse adherentId dans le body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postPasseportGenerateRoute(
+      postReq("http://localhost/api/v1/me/passeport/generate", {
+        adherentId: "x",
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(generateMyPasseport).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/v1/me/passeport/pdf", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    getMyPasseportPdf.mockReset();
+  });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await getPasseportPdfRoute(
+      req("http://localhost/api/v1/me/passeport/pdf")
+    );
+    expect(res.status).toBe(401);
+    expect(getMyPasseportPdf).not.toHaveBeenCalled();
+  });
+
+  it("retourne application/pdf avec Cache-Control private, no-store", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    getMyPasseportPdf.mockResolvedValue({
+      buffer: Buffer.from("%PDF-1.4 test"),
+      numeroPasseport: "AMAKI-2026-ABC123",
+      filename: "Passeport-AMAKI-AMAKI-2026-ABC123.pdf",
+    });
+    const res = await getPasseportPdfRoute(
+      req("http://localhost/api/v1/me/passeport/pdf")
+    );
+    expect(res.status).toBe(200);
+    expect(res.headers.get("Content-Type")).toBe("application/pdf");
+    expect(res.headers.get("Cache-Control")).toBe("private, no-store");
+    expect(res.headers.get("Content-Disposition")).toContain("inline");
+    expect(res.headers.get("Content-Disposition")).toContain(
+      "Passeport-AMAKI-AMAKI-2026-ABC123.pdf"
+    );
+    const buf = Buffer.from(await res.arrayBuffer());
+    expect(buf.toString()).toContain("%PDF");
+    expect(getMyPasseportPdf).toHaveBeenCalledWith(actor());
+  });
+
+  it("refuse userId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getPasseportPdfRoute(
+      req("http://localhost/api/v1/me/passeport/pdf?userId=other")
+    );
+    expect(res.status).toBe(400);
+    expect(getMyPasseportPdf).not.toHaveBeenCalled();
+  });
+
+  it("pas de redirect Web", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    getMyPasseportPdf.mockResolvedValue({
+      buffer: Buffer.from("%PDF"),
+      numeroPasseport: "AMAKI-2026-X",
+      filename: "Passeport-AMAKI-AMAKI-2026-X.pdf",
+    });
+    const res = await getPasseportPdfRoute(
+      req("http://localhost/api/v1/me/passeport/pdf")
+    );
+    expect(res.status).toBeLessThan(400);
+    expect(res.headers.get("location")).toBeNull();
   });
 });

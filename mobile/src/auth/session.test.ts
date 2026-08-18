@@ -17,6 +17,7 @@ vi.stubEnv("EXPO_PUBLIC_API_URL", "http://example.test:9052");
 
 import {
   __resetRefreshFlightForTests,
+  authenticatedBinaryFetch,
   authenticatedFetch,
   logoutRequest,
   refreshSession,
@@ -289,6 +290,77 @@ describe("refresh single-flight + erreurs", () => {
     // 1er appel + 1 retry après refresh = 2
     expect(meCalls).toBe(2);
     expect(await getRefreshToken()).toBeNull();
+  });
+});
+
+describe("authenticatedBinaryFetch", () => {
+  beforeEach(async () => {
+    store.clear();
+    __resetRefreshFlightForTests();
+    vi.unstubAllGlobals();
+    await saveTokens("old-access", "old-refresh");
+  });
+
+  it("retourne ArrayBuffer sur succès PDF", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () =>
+        new Response(new Uint8Array([37, 80, 68, 70]), {
+          status: 200,
+          headers: { "Content-Type": "application/pdf" },
+        })
+      )
+    );
+
+    const buf = await authenticatedBinaryFetch("/api/v1/me/passeport/pdf");
+    expect(buf.byteLength).toBe(4);
+  });
+
+  it("401 → refresh puis retry binaire", async () => {
+    let pdfCalls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+        const url = String(input);
+        if (url.includes("/api/v1/auth/refresh")) {
+          return jsonResponse(200, {
+            success: true,
+            data: {
+              accessToken: "new-access",
+              refreshToken: "new-refresh",
+              accessTokenExpiresAt: "2030-01-01T00:00:00.000Z",
+              refreshTokenExpiresAt: "2030-02-01T00:00:00.000Z",
+              user: {
+                id: "u1",
+                name: "Ada",
+                email: "a@b.com",
+                role: "MEMBRE",
+                status: "Actif",
+              },
+            },
+          });
+        }
+        if (url.includes("/api/v1/me/passeport/pdf")) {
+          pdfCalls += 1;
+          const auth = (init?.headers as Record<string, string>)?.Authorization;
+          if (auth === "Bearer old-access") {
+            return jsonResponse(401, {
+              success: false,
+              error: { code: "UNAUTHENTICATED", message: "Non authentifié" },
+            });
+          }
+          return new Response(new Uint8Array([37, 80, 68, 70]), {
+            status: 200,
+            headers: { "Content-Type": "application/pdf" },
+          });
+        }
+        return new Response("{}", { status: 404 });
+      })
+    );
+
+    const buf = await authenticatedBinaryFetch("/api/v1/me/passeport/pdf");
+    expect(pdfCalls).toBe(2);
+    expect(buf.byteLength).toBe(4);
   });
 });
 

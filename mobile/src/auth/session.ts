@@ -18,6 +18,7 @@ type FetchOptions = {
   accessToken?: string | null;
   /** Si true, ne tente pas de refresh sur 401 */
   skipAuthRetry?: boolean;
+  accept?: string;
 };
 
 let refreshPromise: Promise<MobileAuthSessionDto> | null = null;
@@ -37,42 +38,9 @@ async function parseJson(response: Response): Promise<unknown> {
 }
 
 /**
- * Appel HTTP bas niveau vers /api/v1 (sans retry auth).
+ * Parse une réponse JSON API en données typées ou lève ApiClientError.
  */
-export async function apiRequest<T>(
-  path: string,
-  options: FetchOptions = {}
-): Promise<T> {
-  const base = getApiBaseUrl();
-  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
-  const headers: Record<string, string> = {
-    Accept: "application/json",
-  };
-
-  if (options.body !== undefined) {
-    headers["Content-Type"] = "application/json";
-  }
-
-  const token = options.accessToken;
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      method: options.method ?? (options.body !== undefined ? "POST" : "GET"),
-      headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    });
-  } catch {
-    throw new ApiClientError(
-      0,
-      "NETWORK_ERROR",
-      "Serveur injoignable. Vérifiez EXPO_PUBLIC_API_URL et le réseau."
-    );
-  }
-
+async function parseApiJsonResponse<T>(response: Response): Promise<T> {
   const json = (await parseJson(response)) as ApiResponse<T> | null;
 
   if (!response.ok || !json || json.success === false) {
@@ -88,6 +56,54 @@ export async function apiRequest<T>(
   }
 
   return json.data as T;
+}
+
+/**
+ * Requête HTTP brute vers /api/v1 (sans parsing JSON).
+ */
+export async function fetchApiResponse(
+  path: string,
+  options: FetchOptions = {}
+): Promise<Response> {
+  const base = getApiBaseUrl();
+  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  const headers: Record<string, string> = {
+    Accept: options.accept ?? "application/json",
+  };
+
+  if (options.body !== undefined) {
+    headers["Content-Type"] = "application/json";
+  }
+
+  const token = options.accessToken;
+  if (token) {
+    headers.Authorization = `Bearer ${token}`;
+  }
+
+  try {
+    return await fetch(url, {
+      method: options.method ?? (options.body !== undefined ? "POST" : "GET"),
+      headers,
+      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+    });
+  } catch {
+    throw new ApiClientError(
+      0,
+      "NETWORK_ERROR",
+      "Serveur injoignable. Vérifiez EXPO_PUBLIC_API_URL et le réseau."
+    );
+  }
+}
+
+/**
+ * Appel HTTP bas niveau vers /api/v1 (sans retry auth).
+ */
+export async function apiRequest<T>(
+  path: string,
+  options: FetchOptions = {}
+): Promise<T> {
+  const response = await fetchApiResponse(path, options);
+  return parseApiJsonResponse<T>(response);
 }
 
 /**
@@ -157,6 +173,43 @@ export function __resetRefreshFlightForTests(): void {
 }
 
 /**
+ * Requête authentifiée brute avec retry unique après refresh sur 401.
+ */
+export async function authenticatedRequest(
+  path: string,
+  options: Omit<FetchOptions, "accessToken" | "skipAuthRetry"> = {}
+): Promise<Response> {
+  const access = await getAccessToken();
+  try {
+    const response = await fetchApiResponse(path, {
+      ...options,
+      accessToken: access,
+    });
+    if (response.status !== 401) {
+      return response;
+    }
+  } catch (error) {
+    if (!(error instanceof ApiClientError) || error.status !== 401) {
+      throw error;
+    }
+  }
+
+  await refreshSession();
+  const newAccess = await getAccessToken();
+  const retryResponse = await fetchApiResponse(path, {
+    ...options,
+    accessToken: newAccess,
+    skipAuthRetry: true,
+  });
+
+  if (retryResponse.status === 401) {
+    await clearTokens();
+  }
+
+  return retryResponse;
+}
+
+/**
  * Fetch authentifié avec retry unique après refresh sur 401.
  * Pas de refresh sur 403 / 429 / 500.
  * Si refresh échoue (réseau/429/500) : propage sans second refresh.
@@ -165,36 +218,35 @@ export async function authenticatedFetch<T>(
   path: string,
   options: Omit<FetchOptions, "accessToken" | "skipAuthRetry"> = {}
 ): Promise<T> {
-  const access = await getAccessToken();
-  try {
-    return await apiRequest<T>(path, {
-      ...options,
-      accessToken: access,
-    });
-  } catch (error) {
-    if (!(error instanceof ApiClientError) || error.status !== 401) {
-      throw error;
-    }
+  const response = await authenticatedRequest(path, options);
+  return parseApiJsonResponse<T>(response);
+}
 
-    // Uniquement 401 — pas 403/429/etc.
-    await refreshSession();
-    const newAccess = await getAccessToken();
-    try {
-      return await apiRequest<T>(path, {
-        ...options,
-        accessToken: newAccess,
-        skipAuthRetry: true,
-      });
-    } catch (retryError) {
-      if (
-        retryError instanceof ApiClientError &&
-        retryError.status === 401
-      ) {
-        await clearTokens();
-      }
-      throw retryError;
+/**
+ * Fetch authentifié binaire (PDF, etc.) avec retry auth identique au JSON.
+ */
+export async function authenticatedBinaryFetch(
+  path: string,
+  options: Omit<FetchOptions, "accessToken" | "skipAuthRetry"> = {}
+): Promise<ArrayBuffer> {
+  const response = await authenticatedRequest(path, {
+    ...options,
+    accept: options.accept ?? "application/pdf",
+  });
+
+  if (!response.ok) {
+    const contentType = response.headers.get("Content-Type") ?? "";
+    if (contentType.includes("application/json")) {
+      await parseApiJsonResponse<unknown>(response);
     }
+    throw new ApiClientError(
+      response.status,
+      "INTERNAL_ERROR",
+      `Erreur HTTP ${response.status}`
+    );
   }
+
+  return response.arrayBuffer();
 }
 
 /**

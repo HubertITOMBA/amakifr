@@ -79,6 +79,13 @@ function AppTabs() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="passeport"
+        options={{
+          title: "Mon passeport",
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

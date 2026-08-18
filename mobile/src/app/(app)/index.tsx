@@ -15,10 +15,11 @@ import {
 const SERVICES: {
   id: string;
   label: string;
-  href?: "/documents";
+  hint?: string;
+  href?: "/documents" | "/passeport";
 }[] = [
-  { id: "documents", label: "Documents", href: "/documents" },
-  { id: "passeport", label: "Passeport" },
+  { id: "documents", label: "Documents", hint: "Voir mes documents", href: "/documents" },
+  { id: "passeport", label: "Passeport", hint: "Mon passeport", href: "/passeport" },
   { id: "reunions", label: "Réunions" },
   { id: "taches", label: "Tâches" },
 ];
@@ -92,7 +93,9 @@ export default function AccueilScreen() {
                 accessibilityLabel={service.label}
               >
                 <Text style={styles.tileLabelActive}>{service.label}</Text>
-                <Text style={styles.tileHint}>Voir mes documents</Text>
+                <Text style={styles.tileHint}>
+                  {service.hint ?? "Voir mes documents"}
+                </Text>
               </Pressable>
             ) : (
               <View
