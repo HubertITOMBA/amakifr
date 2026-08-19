@@ -1,6 +1,6 @@
 import { Image } from "expo-image";
 import { router, type Href } from "expo-router";
-import appIcon from "@/assets/images/icon.png";
+import amakiLogo from "@/assets/images/amaki-logo-full.png";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/auth/auth-context";
@@ -37,10 +37,11 @@ export default function AccueilScreen() {
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.identity}>
           <Image
-            source={appIcon}
+            source={amakiLogo}
             style={styles.logo}
             accessibilityLabel="AMAKI France"
             alt="AMAKI France"
+            contentFit="contain"
           />
           <Text style={styles.hello}>Bonjour</Text>
           <Text style={styles.name}>{displayName}</Text>
@@ -133,9 +134,9 @@ const styles = StyleSheet.create({
     borderColor: AmakiColors.border,
   },
   logo: {
-    width: 40,
-    height: 40,
-    borderRadius: AmakiRadius.sm,
+    width: 64,
+    height: 64,
+    borderRadius: AmakiRadius.md,
     marginBottom: AmakiSpacing.sm,
   },
   hello: {

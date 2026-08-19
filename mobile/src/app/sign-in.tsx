@@ -10,7 +10,7 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { SafeAreaView } from "react-native-safe-area-context";
-import appIcon from "@/assets/images/icon.png";
+import amakiLogo from "@/assets/images/amaki-logo-full.png";
 import { useAuth } from "@/auth/auth-context";
 import { ApiClientError } from "@/api/types";
 import { PrimaryButton } from "@/components/ui/primary-button";
@@ -76,10 +76,11 @@ export default function SignInScreen() {
         >
           <View style={styles.header}>
             <Image
-              source={appIcon}
+              source={amakiLogo}
               style={styles.logo}
               accessibilityLabel="AMAKI France"
               alt="AMAKI France"
+              contentFit="contain"
             />
             <Text style={styles.brand}>AMAKI France</Text>
             <Text style={styles.subtitle}>Espace adhérent</Text>
@@ -155,9 +156,9 @@ const styles = StyleSheet.create({
     marginBottom: AmakiSpacing.xl,
   },
   logo: {
-    width: 56,
-    height: 56,
-    borderRadius: AmakiRadius.md,
+    width: 120,
+    height: 120,
+    borderRadius: AmakiRadius.lg,
     marginBottom: AmakiSpacing.md,
   },
   brand: {
