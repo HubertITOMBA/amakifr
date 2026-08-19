@@ -1,5 +1,5 @@
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { router, type Href } from "expo-router";
 import appIcon from "@/assets/images/icon.png";
 import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -16,12 +16,12 @@ const SERVICES: {
   id: string;
   label: string;
   hint?: string;
-  href?: "/documents" | "/passeport";
+  href?: Href;
 }[] = [
   { id: "documents", label: "Documents", hint: "Voir mes documents", href: "/documents" },
   { id: "passeport", label: "Passeport", hint: "Mon passeport", href: "/passeport" },
+  { id: "taches", label: "Tâches", hint: "Mes tâches", href: "/taches" },
   { id: "reunions", label: "Réunions" },
-  { id: "taches", label: "Tâches" },
 ];
 
 /**

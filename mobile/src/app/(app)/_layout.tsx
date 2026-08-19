@@ -86,6 +86,13 @@ function AppTabs() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="taches"
+        options={{
+          title: "Mes tâches",
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

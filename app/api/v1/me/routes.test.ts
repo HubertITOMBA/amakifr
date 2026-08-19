@@ -12,6 +12,8 @@ const {
   getMyPasseport,
   generateMyPasseport,
   getMyPasseportPdf,
+  getMyTaches,
+  createMyTacheCommentaire,
 } = vi.hoisted(() => ({
   resolveApiActorMock: vi.fn(),
   getMe: vi.fn(),
@@ -22,6 +24,8 @@ const {
   getMyPasseport: vi.fn(),
   generateMyPasseport: vi.fn(),
   getMyPasseportPdf: vi.fn(),
+  getMyTaches: vi.fn(),
+  createMyTacheCommentaire: vi.fn(),
 }));
 
 vi.mock("@/lib/api/auth-resolve", () => ({
@@ -49,6 +53,12 @@ vi.mock("@/lib/services/passeport/generate-my-passeport", () => ({
 vi.mock("@/lib/services/passeport/get-my-passeport-pdf", () => ({
   getMyPasseportPdf,
 }));
+vi.mock("@/lib/services/taches/get-my-taches", () => ({
+  getMyTaches,
+}));
+vi.mock("@/lib/services/taches/create-my-tache-commentaire", () => ({
+  createMyTacheCommentaire,
+}));
 
 import { GET as getMeRoute } from "@/app/api/v1/me/route";
 import { GET as getNotificationsRoute } from "@/app/api/v1/me/notifications/route";
@@ -58,6 +68,8 @@ import { GET as getDocumentsRoute } from "@/app/api/v1/me/documents/route";
 import { GET as getPasseportRoute } from "@/app/api/v1/me/passeport/route";
 import { POST as postPasseportGenerateRoute } from "@/app/api/v1/me/passeport/generate/route";
 import { GET as getPasseportPdfRoute } from "@/app/api/v1/me/passeport/pdf/route";
+import { GET as getTachesRoute } from "@/app/api/v1/me/taches/route";
+import { POST as postTacheCommentaireRoute } from "@/app/api/v1/me/taches/[id]/commentaires/route";
 
 function actor(overrides: Partial<AuthContext> = {}): AuthContext {
   return {
@@ -81,6 +93,22 @@ function req(url: string, headers?: Record<string, string>) {
     headers: {
       get: (name: string) => headers?.[name.toLowerCase()] ?? null,
     },
+  } as any;
+}
+
+function postReq(
+  url: string,
+  body: unknown,
+  headers?: Record<string, string>
+) {
+  const nextUrl = new URL(url);
+  return {
+    nextUrl,
+    method: "POST",
+    headers: {
+      get: (name: string) => headers?.[name.toLowerCase()] ?? null,
+    },
+    json: async () => body,
   } as any;
 }
 
@@ -491,5 +519,182 @@ describe("GET /api/v1/me/passeport/pdf", () => {
     );
     expect(res.status).toBeLessThan(400);
     expect(res.headers.get("location")).toBeNull();
+  });
+});
+
+/* ── Tâches ─────────────────────────────────────────────── */
+
+describe("GET /api/v1/me/taches", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    getMyTaches.mockReset();
+  });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await getTachesRoute(
+      req("http://localhost/api/v1/me/taches")
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("200 succès", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    getMyTaches.mockResolvedValue([]);
+    const res = await getTachesRoute(
+      req("http://localhost/api/v1/me/taches")
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(json.data).toEqual([]);
+  });
+
+  it("400 si userId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getTachesRoute(
+      req("http://localhost/api/v1/me/taches?userId=x")
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 si adherentId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getTachesRoute(
+      req("http://localhost/api/v1/me/taches?adherentId=x")
+    );
+    expect(res.status).toBe(400);
+  });
+});
+
+describe("POST /api/v1/me/taches/[id]/commentaires", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    createMyTacheCommentaire.mockReset();
+  });
+
+  const routeParams = Promise.resolve({ id: "sp-1" });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await postTacheCommentaireRoute(
+      postReq("http://localhost/api/v1/me/taches/sp-1/commentaires", {
+        contenu: "test",
+      }),
+      { params: routeParams }
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("201 succès", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    createMyTacheCommentaire.mockResolvedValue({ id: "com-new" });
+    const res = await postTacheCommentaireRoute(
+      postReq("http://localhost/api/v1/me/taches/sp-1/commentaires", {
+        contenu: "Mon commentaire",
+      }),
+      { params: routeParams }
+    );
+    expect(res.status).toBe(201);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(json.data.id).toBe("com-new");
+  });
+
+  it("400 si userId dans body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postTacheCommentaireRoute(
+      postReq("http://localhost/api/v1/me/taches/sp-1/commentaires", {
+        contenu: "test",
+        userId: "attaque",
+      }),
+      { params: routeParams }
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 si adherentId dans body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postTacheCommentaireRoute(
+      postReq("http://localhost/api/v1/me/taches/sp-1/commentaires", {
+        contenu: "test",
+        adherentId: "attaque",
+      }),
+      { params: routeParams }
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 si auteurId dans body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postTacheCommentaireRoute(
+      postReq("http://localhost/api/v1/me/taches/sp-1/commentaires", {
+        contenu: "test",
+        auteurId: "attaque",
+      }),
+      { params: routeParams }
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 si userId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postTacheCommentaireRoute(
+      postReq(
+        "http://localhost/api/v1/me/taches/sp-1/commentaires?userId=x",
+        { contenu: "test" }
+      ),
+      { params: routeParams }
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("passe actor du Bearer au service", async () => {
+    const a = actor({ userId: "user-bearer" });
+    resolveApiActorMock.mockResolvedValue(a);
+    createMyTacheCommentaire.mockResolvedValue({ id: "c" });
+    await postTacheCommentaireRoute(
+      postReq("http://localhost/api/v1/me/taches/sp-1/commentaires", {
+        contenu: "ok",
+      }),
+      { params: routeParams }
+    );
+    expect(createMyTacheCommentaire).toHaveBeenCalledWith(
+      expect.objectContaining({ userId: "user-bearer" }),
+      "sp-1",
+      expect.any(Object)
+    );
+  });
+
+  it("400 si body est null", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postTacheCommentaireRoute(
+      postReq("http://localhost/api/v1/me/taches/sp-1/commentaires", null),
+      { params: routeParams }
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 si body est un array", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postTacheCommentaireRoute(
+      postReq("http://localhost/api/v1/me/taches/sp-1/commentaires", [
+        { contenu: "test" },
+      ]),
+      { params: routeParams }
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 si body est une string JSON", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postTacheCommentaireRoute(
+      postReq(
+        "http://localhost/api/v1/me/taches/sp-1/commentaires",
+        '{"contenu":"test"}'
+      ),
+      { params: routeParams }
+    );
+    expect(res.status).toBe(400);
   });
 });

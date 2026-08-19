@@ -114,6 +114,35 @@ Règles client :
 - ouverture mobile : fetch binaire authentifié → cache Expo FileSystem → `expo-sharing`
 - fichier temporaire cache uniquement (`Passeport-AMAKI-{numero}.pdf`)
 
+## Tâches (self-service)
+
+Écran `(app)/taches` — ouvert depuis Accueil (pas d'onglet dédié) :
+
+| Méthode | Path |
+|---------|------|
+| GET | `/api/v1/me/taches` |
+| POST | `/api/v1/me/taches/[id]/commentaires` |
+
+Règles client :
+
+- self-service via `actor.userId` côté backend — **pas** de `userId` / `adherentId` client
+- auth Bearer via `authenticatedFetch` uniquement
+- tâches = affectations actives (`dateFinAffectation IS NULL`) de l'adhérent connecté
+- commentaire : `contenu` (requis) + `pourcentageAvancement` (optionnel, 0–100 entier)
+- auteur commentaire déterminé côté serveur — aucun champ identité client
+- statut tâche **read-only** (pas de PATCH/PUT)
+- pull-to-refresh, loading / empty / error
+- groupement par projet dans l'UI
+- **pas** de cache offline / AsyncStorage
+- **pas** de deep linking notifications (futur incrément)
+- route secondaire mobile (`href: null` dans bottom tabs)
+- bottom tabs inchangés : Accueil / Cotisations / Notifications / Profil
+
+Anti-IDOR :
+- GET ne retourne que les tâches de l'adhérent authentifié
+- POST commentaire vérifie que l'adhérent est affecté à la tâche
+- `userId`, `adherentId`, `auteurId`, `authorId` refusés en query et body (400)
+
 ## Validation Android réelle — Phase 2Q
 
 ### Environnement préflight (Fedora)
