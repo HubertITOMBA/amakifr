@@ -172,6 +172,71 @@ export type CotisationMensuelleDto = {
   typeCotisation: TypeCotisationMensuelleDto;
 };
 
+/** Dette initiale self-service (lecture). */
+export type MyDebtDto = {
+  id: string;
+  annee: number;
+  montant: string;
+  montantPaye: string;
+  montantRestant: string;
+  description: string | null;
+};
+
+/** Assistance à payer (ligne CotisationMensuelle catégorie Assistance). */
+export type MyAssistanceDto = {
+  id: string;
+  source: "cotisation";
+  /** Libellé Web prêt à afficher (ex. « Décès adhérent - Madame Henriette ») */
+  displayLabel: string;
+  libelle: string;
+  description: string | null;
+  annee: number;
+  mois: number;
+  periode: string;
+  dateEvenement: string | null;
+  typeEvenement: string | null;
+  montantAttendu: string;
+  montantPaye: string;
+  montantRestant: string;
+  statut: string;
+};
+
+/** Versement self-service (sans secrets / justificatif). */
+export type MyPaymentDto = {
+  id: string;
+  datePaiement: string;
+  montant: string;
+  moyenPaiement: string;
+  statut: string;
+  reference: string | null;
+  destinationLabel: string;
+  cotisationMensuelleId: string | null;
+  detteInitialeId: string | null;
+  assistanceId: string | null;
+};
+
+export type MyCotisationYearItemDto = CotisationMensuelleDto & {
+  paiements: MyPaymentDto[];
+};
+
+export type MyCotisationYearSummaryDto = {
+  detteBrute: string;
+  avoirDisponible: string;
+  resteNet: string;
+  totalPayeAnnee: string;
+};
+
+export type MyCotisationYearDto = {
+  annee: number;
+  summary: MyCotisationYearSummaryDto;
+  cotisations: MyCotisationYearItemDto[];
+  assistances: MyAssistanceDto[];
+  dettes: MyDebtDto[];
+  paiements: MyPaymentDto[];
+};
+
+
+
 /** Aligné sur enum Prisma TypeDocument (miroir string). */
 export type TypeDocument =
   | "PDF"

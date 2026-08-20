@@ -54,24 +54,27 @@ Pas de secrets backend dans `EXPO_PUBLIC_*`.
 - anti-IDOR côté backend
 - pas de cache persistant SecureStore
 
-## Cotisations mensuelles (Phase 2P)
+## Cotisations (Phase A — consultation financière enrichie)
 
 Écran `(app)/cotisations` — **lecture seule** :
 
-| Méthode | Path |
-|---------|------|
-| GET | `/api/v1/me/cotisations-mensuelles` |
+| Méthode | Path | Rôle |
+|---------|------|------|
+| GET | `/api/v1/me/cotisations/year?annee=YYYY` | Synthèse + cotisations + dettes + assistances + historique paiements (année) |
+| GET | `/api/v1/me/cotisations-mensuelles` | Liste plate historique (conservée, non utilisée par l’écran Phase A) |
 
 Règles client :
 
 - auth Bearer via `authenticatedFetch` uniquement
-- **pas** de `userId` / `adherentId` query (anti-IDOR backend)
+- **pas** de `userId` / `adherentId` / `memberId` / `ownerId` query (anti-IDOR backend)
+- année civile `YYYY` (défaut = année courante côté client)
 - montants DTO en **string** décimale — jamais convertis en `Number` / `parseFloat`
 - dates ISO string — affichage local uniquement
-- ordre serveur (`periode` desc) conservé
-- pull-to-refresh, loading / empty / error
-- **pas** de mutation cotisation
-- **pas** de paiement (Stripe / Mollie / PayPal / WebView)
+- synthèse : `detteBrute` / `avoirDisponible` / `resteNet` / `totalPayeAnnee` (miroir métier Web `getCumulDette`, ownership self-only)
+- filtre mois local (Tous / 1–12) — ne recharge pas l’API
+- pull-to-refresh sur **toutes** les sections ; en échec réseau après succès, données conservées + erreur non bloquante
+- **pas** de mutation cotisation / paiement / upload justificatif
+- **pas** de Stripe / Mollie / déclaration virement
 - **pas** de cache persistant (SecureStore / AsyncStorage)
 
 ## Documents (lecture seule)

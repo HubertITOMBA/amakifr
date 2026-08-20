@@ -8,6 +8,7 @@ const {
   getMyNotifications,
   getMyUnreadNotificationCount,
   getMyCotisationsMensuelles,
+  getMyCotisationYear,
   getMyDocuments,
   getMyPasseport,
   generateMyPasseport,
@@ -25,6 +26,7 @@ const {
   getMyNotifications: vi.fn(),
   getMyUnreadNotificationCount: vi.fn(),
   getMyCotisationsMensuelles: vi.fn(),
+  getMyCotisationYear: vi.fn(),
   getMyDocuments: vi.fn(),
   getMyPasseport: vi.fn(),
   generateMyPasseport: vi.fn(),
@@ -50,6 +52,9 @@ vi.mock("@/lib/services/notifications/get-my-unread-count", () => ({
 }));
 vi.mock("@/lib/services/cotisations/get-my-cotisations-mensuelles", () => ({
   getMyCotisationsMensuelles,
+}));
+vi.mock("@/lib/services/cotisations/get-my-cotisation-year", () => ({
+  getMyCotisationYear,
 }));
 vi.mock("@/lib/services/documents/get-my-documents", () => ({
   getMyDocuments,
@@ -89,6 +94,7 @@ import { GET as getMeRoute } from "@/app/api/v1/me/route";
 import { GET as getNotificationsRoute } from "@/app/api/v1/me/notifications/route";
 import { GET as getUnreadRoute } from "@/app/api/v1/me/notifications/unread-count/route";
 import { GET as getCotisationsRoute } from "@/app/api/v1/me/cotisations-mensuelles/route";
+import { GET as getCotisationYearRoute } from "@/app/api/v1/me/cotisations/year/route";
 import { GET as getDocumentsRoute } from "@/app/api/v1/me/documents/route";
 import { GET as getPasseportRoute } from "@/app/api/v1/me/passeport/route";
 import { POST as postPasseportGenerateRoute } from "@/app/api/v1/me/passeport/generate/route";
@@ -354,6 +360,77 @@ describe("GET /api/v1/me/cotisations-mensuelles", () => {
     );
     expect(res.status).toBe(400);
     expect(getMyCotisationsMensuelles).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/v1/me/cotisations/year", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    getMyCotisationYear.mockReset();
+  });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await getCotisationYearRoute(
+      req("http://localhost/api/v1/me/cotisations/year?annee=2026")
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("200 succès", async () => {
+    const a = actor();
+    resolveApiActorMock.mockResolvedValue(a);
+    getMyCotisationYear.mockResolvedValue({
+      annee: 2026,
+      summary: {
+        detteBrute: "0",
+        avoirDisponible: "0",
+        resteNet: "0",
+        totalPayeAnnee: "0",
+      },
+      cotisations: [],
+      assistances: [],
+      dettes: [],
+      paiements: [],
+    });
+    const res = await getCotisationYearRoute(
+      req("http://localhost/api/v1/me/cotisations/year?annee=2026")
+    );
+    expect(res.status).toBe(200);
+    expect(getMyCotisationYear).toHaveBeenCalledWith(a, 2026);
+  });
+
+  it("400 si année absente", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getCotisationYearRoute(
+      req("http://localhost/api/v1/me/cotisations/year")
+    );
+    expect(res.status).toBe(400);
+    expect(getMyCotisationYear).not.toHaveBeenCalled();
+  });
+
+  it("400 si userId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getCotisationYearRoute(
+      req("http://localhost/api/v1/me/cotisations/year?annee=2026&userId=x")
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 si adherentId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getCotisationYearRoute(
+      req("http://localhost/api/v1/me/cotisations/year?annee=2026&adherentId=x")
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("400 si memberId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getCotisationYearRoute(
+      req("http://localhost/api/v1/me/cotisations/year?annee=2026&memberId=x")
+    );
+    expect(res.status).toBe(400);
   });
 });
 
