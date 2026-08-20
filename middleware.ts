@@ -65,8 +65,8 @@ export default auth(async (req: NextRequest) => {
     // Vérifier explicitement que req.auth existe ET a un user valide avec un id
     const isLoggedIn = !!(req.auth?.user && req.auth.user.id);
     
-    // Debug en développement
-    if (process.env.NODE_ENV === 'development') {
+    // Debug ciblé uniquement si DEBUG_MIDDLEWARE=1 (évite flood console en navigation)
+    if (process.env.NODE_ENV === 'development' && process.env.DEBUG_MIDDLEWARE === '1') {
         if (nextUrl.pathname === '/auth/sign-in' || nextUrl.pathname.startsWith('/admin') || nextUrl.pathname === '/') {
             const host = req.headers.get('host') || 'unknown';
             console.log('[Middleware]', nextUrl.pathname, '- Host:', host, '- isAuthRoute:', isAuthRoute, 'isPublicRoute:', isPublicRouteCheck, 'isLoggedIn:', isLoggedIn, 'req.auth:', !!req.auth, 'req.auth?.user:', !!req.auth?.user, 'user.id:', req.auth?.user?.id, 'user.email:', req.auth?.user?.email, 'user.role:', req.auth?.user?.role);

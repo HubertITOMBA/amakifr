@@ -28,8 +28,9 @@ function getPrismaClient(): PrismaClient {
     
     // Créer un nouveau client
     console.log(`🔌 Création d'un nouveau client Prisma (${process.env.NODE_ENV})`);
+    // En dev : pas de log 'query' (I/O console très coûteuse à chaque navigation)
     const client = new PrismaClient({
-        log: process.env.NODE_ENV === "production" ? ['error'] : ['query', 'error', 'warn'],
+        log: process.env.NODE_ENV === "production" ? ['error'] : ['error', 'warn'],
     });
     
     // Mettre en cache le client (en dev ET en production)

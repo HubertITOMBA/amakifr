@@ -112,8 +112,20 @@ const nextConfig: NextConfig = {
   // Désactiver les source maps en production pour accélérer le build
   productionBrowserSourceMaps: false,
   
-  // Optimiser le cache Webpack
+  // Optimiser le cache Webpack + ignorer le sous-projet Expo en watch (dev)
   webpack: (config, { dev, isServer }) => {
+    if (dev) {
+      const ignored = [
+        "**/mobile/**",
+        "**/node_modules/**",
+        "**/.git/**",
+        "**/.next/**",
+      ];
+      config.watchOptions = {
+        ...(config.watchOptions ?? {}),
+        ignored,
+      };
+    }
     if (!dev && !isServer) {
       // Optimiser le cache en production
       config.cache = {

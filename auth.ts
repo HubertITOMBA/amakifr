@@ -193,6 +193,33 @@ export const {
 			try {
 				if (!token.sub) return token;
 
+				// Éviter un hit DB à chaque requête middleware (navigation web très coûteuse).
+				// Rafraîchir au login/update, ou toutes les 60 s, ou si le rôle n'est pas encore en token.
+				const lastDbSync = typeof token.lastDbSync === "number" ? token.lastDbSync : 0;
+				const shouldRefreshUser =
+					trigger === "signIn" ||
+					trigger === "update" ||
+					!token.role ||
+					Date.now() - lastDbSync > 60_000;
+
+				if (!shouldRefreshUser) {
+					// Contrôle révocation toujours non-bloquant, même sans refresh DB
+					if (token.jti) {
+						Promise.resolve().then(async () => {
+							try {
+								const { isTokenBlacklisted } = await import("@/lib/session-tracker");
+								const isBlacklisted = await isTokenBlacklisted(token.jti as string);
+								if (isBlacklisted) {
+									console.warn("[Auth] Token révoqué détecté:", token.jti);
+								}
+							} catch {
+								// Redis indisponible
+							}
+						});
+					}
+					return token;
+				}
+
 				const existingUser = await getUserById(token.sub);
 
 				if (!existingUser) return token;
@@ -206,11 +233,8 @@ export const {
 				// Cela garantit la compatibilité après la migration Admin -> ADMIN
 				const normalizedRole = existingUser.role?.toString().trim().toUpperCase() as UserRole;
 				token.role = normalizedRole;
+				token.lastDbSync = Date.now();
 				
-				// Log en développement pour déboguer
-				if (process.env.NODE_ENV === 'development') {
-					console.log("[auth] JWT callback - existingUser.role:", existingUser.role, "normalisé:", normalizedRole, "email:", existingUser.email);
-				}
 				// Ajouter des champs supplémentaires pour utilisation côté client
 				token.lastLogin = existingUser.lastLogin ? existingUser.lastLogin.toISOString() : undefined;
 				token.createdAt = existingUser.createdAt ? existingUser.createdAt.toISOString() : undefined;

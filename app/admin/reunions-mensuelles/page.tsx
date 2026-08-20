@@ -286,6 +286,7 @@ export default function AdminReunionsMensuellesPage() {
 
   const openEditDialog = async (reunion: any) => {
     const initialIso = reunion.dateReunion ? new Date(reunion.dateReunion).toISOString() : "";
+    setAdherentSearchEditOpen(false);
     setEditingReunion(reunion);
     setSelectedEditAdherent(reunion.AdherentHote || null);
     setEditSelectedDate(reunion.dateReunion ? new Date(reunion.dateReunion) : undefined);
@@ -852,7 +853,12 @@ export default function AdminReunionsMensuellesPage() {
           </Dialog>
 
           {/* Dialog : Modifier une réunion */}
-          <Dialog open={!!editingReunion} onOpenChange={(open) => !open && setEditingReunion(null)}>
+          <Dialog open={!!editingReunion} onOpenChange={(open) => {
+            if (!open) {
+              setEditingReunion(null);
+              setAdherentSearchEditOpen(false);
+            }
+          }}>
             <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto p-0 gap-0 border-2 border-blue-200 dark:border-blue-800">
               <DialogHeader className="rounded-t-lg -mx-0 -mt-0 px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white border-b border-blue-400/30">
                 <DialogTitle className="text-base">Modifier la réunion</DialogTitle>
@@ -908,12 +914,22 @@ export default function AdminReunionsMensuellesPage() {
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => setAdherentSearchEditOpen(true)}
+                        onClick={() => setAdherentSearchEditOpen((v) => !v)}
                       >
                         <User className="h-4 w-4 mr-2" />
-                        Changer
+                        {adherentSearchEditOpen ? "Fermer" : "Changer"}
                       </Button>
                     </div>
+                    <InlineAdherentSearchPanel
+                      open={adherentSearchEditOpen}
+                      onOpenChange={setAdherentSearchEditOpen}
+                      onSelect={(adherent) => {
+                        setSelectedEditAdherent(adherent);
+                        setEditFormData((prev) => ({ ...prev, adherentHoteId: adherent.id }));
+                      }}
+                      title="Changer l'adhérent hôte"
+                      description="Choisissez le nouvel adhérent hôte pour cette réunion"
+                    />
                   </div>
 
                   <div className="space-y-1">
@@ -1168,7 +1184,7 @@ export default function AdminReunionsMensuellesPage() {
             </DialogContent>
           </Dialog>
 
-          {/* Recherche d'adhérent inline (évite Dialog imbriqué) */}
+          {/* Recherche d'adhérent (création) — panneau hors dialog création si besoin */}
           <InlineAdherentSearchPanel
             open={adherentSearchOpen}
             onOpenChange={setAdherentSearchOpen}
@@ -1178,16 +1194,6 @@ export default function AdminReunionsMensuellesPage() {
             }}
             title="Sélectionner l'adhérent hôte"
             description="Choisissez l'adhérent qui accueillera la réunion"
-          />
-          <InlineAdherentSearchPanel
-            open={adherentSearchEditOpen}
-            onOpenChange={setAdherentSearchEditOpen}
-            onSelect={(adherent) => {
-              setSelectedEditAdherent(adherent);
-              setEditFormData((prev) => ({ ...prev, adherentHoteId: adherent.id }));
-            }}
-            title="Changer l'adhérent hôte"
-            description="Choisissez le nouvel adhérent hôte pour cette réunion"
           />
         </CardContent>
       </Card>
