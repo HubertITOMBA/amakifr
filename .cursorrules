@@ -5,6 +5,50 @@
 - Utiliser un langage professionnel et clair
 - Expliquer les décisions techniques de manière concise
 
+## Sélection du modèle selon la tâche
+
+Cette politique guide le choix du modèle selon la nature de la tâche. Ne pas changer automatiquement de modèle si celui déjà utilisé est adapté.
+
+### Claude — implémentation et programmation
+Privilégier Claude pour :
+- écrire ou modifier du code ;
+- implémenter des fonctionnalités ;
+- corriger des bugs ;
+- refactorer du code ;
+- créer ou modifier des tests ;
+- effectuer des modifications multi-fichiers ;
+- travailler directement sur l'implémentation.
+
+### GPT — raisonnement et analyse
+Privilégier GPT pour :
+- analyser un problème complexe ;
+- réfléchir à une architecture ;
+- comparer plusieurs solutions ;
+- analyser les compromis techniques ;
+- diagnostiquer un problème difficile ;
+- élaborer un plan d'implémentation avant de coder ;
+- prendre une décision technique.
+
+### Gemini — contexte et analyse de gros volumes
+Privilégier Gemini lorsque la tâche nécessite principalement :
+- analyser un très grand nombre de fichiers ;
+- comprendre l'ensemble d'un codebase ;
+- analyser une documentation volumineuse ;
+- rechercher des relations entre de nombreux fichiers ;
+- comprendre le contexte global du projet.
+
+### Tâches combinées
+Lorsqu'une tâche nécessite plusieurs capacités, utiliser cette séquence :
+1. GPT pour le raisonnement et la planification.
+2. Gemini si une analyse d'un contexte très large est nécessaire.
+3. Claude pour l'implémentation.
+4. Vérifier ensuite le résultat avec les tests et une revue du code.
+
+### Règle de décision rapide
+- CODE → Claude
+- RAISONNEMENT / ARCHITECTURE → GPT
+- GROS CONTEXTE / CODEBASE → Gemini
+
 ## Architecture et structure
 
 ### Server Actions vs API Routes
