@@ -21,7 +21,7 @@ const SERVICES: {
   { id: "documents", label: "Documents", hint: "Voir mes documents", href: "/documents" },
   { id: "passeport", label: "Passeport", hint: "Mon passeport", href: "/passeport" },
   { id: "taches", label: "Tâches", hint: "Mes tâches", href: "/taches" },
-  { id: "reunions", label: "Réunions" },
+  { id: "reunions", label: "Réunions", hint: "Mes réunions", href: "/reunions" },
 ];
 
 /**

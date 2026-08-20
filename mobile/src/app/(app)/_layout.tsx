@@ -93,6 +93,13 @@ function AppTabs() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="reunions"
+        options={{
+          title: "Mes réunions",
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }

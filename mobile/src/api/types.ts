@@ -249,6 +249,37 @@ export type CreateMyTacheCommentaireResult = {
   id: string;
 };
 
+export type MyReunionHostTelephoneDto = {
+  numero: string;
+  type: string;
+};
+
+export type MyReunionDto = {
+  id: string;
+  titre: string;
+  annee: number;
+  mois: number;
+  dateReunion: string | null;
+  statut: string;
+  typeLieu: string;
+  lieuLabel: string | null;
+  lieuAdresse: string | null;
+  isHost: boolean;
+  hostName: string | null;
+  hostTelephones: MyReunionHostTelephoneDto[] | null;
+  participationStatus: string | null;
+  canUpdateParticipation: boolean;
+  commentaires: string | null;
+};
+
+export type UpdateMyReunionParticipationInput = {
+  statut: "Present" | "Absent" | "Excuse";
+};
+
+export type UpdateMyReunionParticipationResult = {
+  statut: string;
+};
+
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;

@@ -14,6 +14,8 @@ const {
   getMyPasseportPdf,
   getMyTaches,
   createMyTacheCommentaire,
+  getMyReunions,
+  updateMyReunionParticipation,
 } = vi.hoisted(() => ({
   resolveApiActorMock: vi.fn(),
   getMe: vi.fn(),
@@ -26,6 +28,8 @@ const {
   getMyPasseportPdf: vi.fn(),
   getMyTaches: vi.fn(),
   createMyTacheCommentaire: vi.fn(),
+  getMyReunions: vi.fn(),
+  updateMyReunionParticipation: vi.fn(),
 }));
 
 vi.mock("@/lib/api/auth-resolve", () => ({
@@ -59,6 +63,12 @@ vi.mock("@/lib/services/taches/get-my-taches", () => ({
 vi.mock("@/lib/services/taches/create-my-tache-commentaire", () => ({
   createMyTacheCommentaire,
 }));
+vi.mock("@/lib/services/reunions/get-my-reunions", () => ({
+  getMyReunions,
+}));
+vi.mock("@/lib/services/reunions/update-my-reunion-participation", () => ({
+  updateMyReunionParticipation,
+}));
 
 import { GET as getMeRoute } from "@/app/api/v1/me/route";
 import { GET as getNotificationsRoute } from "@/app/api/v1/me/notifications/route";
@@ -70,6 +80,8 @@ import { POST as postPasseportGenerateRoute } from "@/app/api/v1/me/passeport/ge
 import { GET as getPasseportPdfRoute } from "@/app/api/v1/me/passeport/pdf/route";
 import { GET as getTachesRoute } from "@/app/api/v1/me/taches/route";
 import { POST as postTacheCommentaireRoute } from "@/app/api/v1/me/taches/[id]/commentaires/route";
+import { GET as getReunionsRoute } from "@/app/api/v1/me/reunions/route";
+import { PATCH as patchReunionParticipationRoute } from "@/app/api/v1/me/reunions/[id]/participation/route";
 
 function actor(overrides: Partial<AuthContext> = {}): AuthContext {
   return {
@@ -105,6 +117,22 @@ function postReq(
   return {
     nextUrl,
     method: "POST",
+    headers: {
+      get: (name: string) => headers?.[name.toLowerCase()] ?? null,
+    },
+    json: async () => body,
+  } as any;
+}
+
+function patchReq(
+  url: string,
+  body: unknown,
+  headers?: Record<string, string>
+) {
+  const nextUrl = new URL(url);
+  return {
+    nextUrl,
+    method: "PATCH",
     headers: {
       get: (name: string) => headers?.[name.toLowerCase()] ?? null,
     },
@@ -696,5 +724,156 @@ describe("POST /api/v1/me/taches/[id]/commentaires", () => {
       { params: routeParams }
     );
     expect(res.status).toBe(400);
+  });
+});
+
+/* ── Réunions ───────────────────────────────────────────── */
+
+describe("GET /api/v1/me/reunions", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    getMyReunions.mockReset();
+  });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await getReunionsRoute(
+      req("http://localhost/api/v1/me/reunions")
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("200 succès vide", async () => {
+    const a = actor();
+    resolveApiActorMock.mockResolvedValue(a);
+    getMyReunions.mockResolvedValue([]);
+    const res = await getReunionsRoute(
+      req("http://localhost/api/v1/me/reunions")
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.success).toBe(true);
+    expect(json.data).toEqual([]);
+    expect(getMyReunions).toHaveBeenCalledWith(a);
+  });
+
+  it("200 succès avec données", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    getMyReunions.mockResolvedValue([
+      {
+        id: "r1",
+        titre: "Réunion de mars 2026",
+        annee: 2026,
+        mois: 3,
+        dateReunion: null,
+        statut: "EnAttente",
+        typeLieu: "Domicile",
+        lieuLabel: "Chez Alice",
+        lieuAdresse: null,
+        isHost: false,
+        hostName: "Alice",
+        hostTelephones: null,
+        participationStatus: null,
+        canUpdateParticipation: false,
+        commentaires: null,
+      },
+    ]);
+    const res = await getReunionsRoute(
+      req("http://localhost/api/v1/me/reunions")
+    );
+    expect(res.status).toBe(200);
+    const json = await res.json();
+    expect(json.data).toHaveLength(1);
+  });
+
+  it("400 si userId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getReunionsRoute(
+      req("http://localhost/api/v1/me/reunions?userId=x")
+    );
+    expect(res.status).toBe(400);
+    expect(getMyReunions).not.toHaveBeenCalled();
+  });
+
+  it("400 si adherentId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getReunionsRoute(
+      req("http://localhost/api/v1/me/reunions?adherentId=x")
+    );
+    expect(res.status).toBe(400);
+    expect(getMyReunions).not.toHaveBeenCalled();
+  });
+});
+
+describe("PATCH /api/v1/me/reunions/[id]/participation", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    updateMyReunionParticipation.mockReset();
+  });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await patchReunionParticipationRoute(
+      patchReq("http://localhost/api/v1/me/reunions/r1/participation", {
+        statut: "Present",
+      }),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("200 succès", async () => {
+    const a = actor();
+    resolveApiActorMock.mockResolvedValue(a);
+    updateMyReunionParticipation.mockResolvedValue({ statut: "Present" });
+    const res = await patchReunionParticipationRoute(
+      patchReq("http://localhost/api/v1/me/reunions/r1/participation", {
+        statut: "Present",
+      }),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(200);
+    expect(updateMyReunionParticipation).toHaveBeenCalledWith(a, "r1", {
+      statut: "Present",
+    });
+  });
+
+  it("400 si userId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await patchReunionParticipationRoute(
+      patchReq(
+        "http://localhost/api/v1/me/reunions/r1/participation?userId=x",
+        { statut: "Present" }
+      ),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(400);
+    expect(updateMyReunionParticipation).not.toHaveBeenCalled();
+  });
+
+  it("400 si adherentId dans body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await patchReunionParticipationRoute(
+      patchReq("http://localhost/api/v1/me/reunions/r1/participation", {
+        statut: "Present",
+        adherentId: "adh-injected",
+      }),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(400);
+    expect(updateMyReunionParticipation).not.toHaveBeenCalled();
+  });
+
+  it("400 si participantId dans body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await patchReunionParticipationRoute(
+      patchReq("http://localhost/api/v1/me/reunions/r1/participation", {
+        statut: "Present",
+        participantId: "p-injected",
+      }),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(400);
+    expect(updateMyReunionParticipation).not.toHaveBeenCalled();
   });
 });

@@ -143,6 +143,44 @@ Anti-IDOR :
 - POST commentaire vérifie que l'adhérent est affecté à la tâche
 - `userId`, `adherentId`, `auteurId`, `authorId` refusés en query et body (400)
 
+## Réunions (self-service)
+
+Écran `(app)/reunions` — titre **« Les réunions »**, ouvert depuis Accueil (tuile « Réunions », pas d'onglet dédié) :
+
+| Méthode | Path |
+|---------|------|
+| GET | `/api/v1/me/reunions` |
+| PATCH | `/api/v1/me/reunions/[id]/participation` |
+
+Règles client :
+
+- self-service via `actor.userId` côté backend — **pas** de `userId` / `adherentId` / `participantId` client
+- auth Bearer via `authenticatedFetch` uniquement
+- calendrier **collectif** des réunions mensuelles (identique Web `/reunions-mensuelles`)
+- DTO minimal : titre, statut, date (uniquement si `DateConfirmee`), lieu compact, adresse lieu (actives/futures), hôte, téléphones hôte (actives/futures), `isHost`, `participationStatus` propre, `canUpdateParticipation`
+- **exclut** : emails, listes nominatives, `Adherent` complet, `Adresse[]`, téléphones autres participants
+- lieu Domicile compact = `Chez Prénom Nom` ; adresse dépliée = adresse effective du lieu (domicile hôte ou `reunion.adresse`)
+- historique : nom hôte + participation en lecture seule ; **pas** d'adresse ni téléphone hôte (minimisation)
+- participation : `Present` | `Absent` | `Excuse` via PATCH ; body objet JS (pas `JSON.stringify`)
+- modifiable uniquement si `canUpdateParticipation` (`DateConfirmee` + future) — aligné `confirmerParticipationReunion` Web
+- réunions passées, `EnAttente`, `MoisValide`, `Annulee` : participation refusée côté serveur
+- UI : sections « À venir » / « Historique », cartes expandables, boutons participation avec anti double-submit
+- pull-to-refresh ; en cas d'échec refresh, conservation des données + banner
+- **pas** de cache offline / AsyncStorage
+- route secondaire mobile (`href: null` dans bottom tabs)
+- bottom tabs inchangés : Accueil / Cotisations / Notifications / Profil
+
+Anti-IDOR :
+
+- `userId` / `adherentId` / `participantId` query ou body refusés (400)
+- participation upsertée uniquement pour l'adhérent authentifié (`actor.userId`)
+- aucune PII des autres participants dans le DTO
+
+Hors scope :
+
+- création / désistement / admin
+- calendrier natif / cartes / géolocalisation
+
 ## Validation Android réelle — Phase 2Q
 
 ### Environnement préflight (Fedora)
