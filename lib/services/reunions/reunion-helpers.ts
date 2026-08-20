@@ -78,6 +78,26 @@ export function buildLieuLabel(input: {
 }
 
 /**
+ * Patch Prisma des champs lieu au désistement hôte.
+ *
+ * - Domicile : lié à l'identité de l'hôte → `adresse` nullifiée en base
+ *   (évite PII domicile orpheline ; le Web ne le faisait pas, mais le métier
+ *   domicile = chez l'hôte l'exige).
+ * - Restaurant / Autre : lieu indépendant de l'hôte → conservé
+ *   (aligné `desisterReunionMensuelle` qui ne touche pas ces champs ;
+ *   test mobile « sans hôte → adresse Autre conservée »).
+ * - typeLieu / nomRestaurant : inchangés.
+ */
+export function hostWithdrawalLocationPatch(typeLieu: string): {
+  adresse?: null;
+} {
+  if (typeLieu === "Domicile") {
+    return { adresse: null };
+  }
+  return {};
+}
+
+/**
  * Formate une adresse adhérent en une ligne lisible.
  */
 export function formatAdresseLieu(adresse: AdresseLike): string | null {
@@ -104,14 +124,18 @@ export function formatAdresseLieu(adresse: AdresseLike): string | null {
 /**
  * Adresse complète du lieu de réunion (carte dépliée, réunions actives/futures).
  * Fallback domicile hôte uniquement si `allowHostFallback` (DateConfirmee).
+ * Sans hôte + Domicile : jamais d'adresse (défense contre PII orpheline).
  */
 export function buildLieuAdresse(input: {
   typeLieu: string;
   adresse: string | null;
   hostAdresse: AdresseLike | null;
   allowHostFallback?: boolean;
+  /** false après désistement / sans hôte */
+  hasHost?: boolean;
 }): string | null {
   if (input.typeLieu === "Domicile") {
+    if (input.hasHost === false) return null;
     if (input.adresse?.trim()) return input.adresse.trim();
     if (input.allowHostFallback !== false && input.hostAdresse) {
       return formatAdresseLieu(input.hostAdresse);
@@ -147,6 +171,7 @@ export function shouldExposeOperationalCoords(input: {
  * - passée / annulée → null
  * - DateConfirmee → adresse réunion ou fallback domicile hôte
  * - EnAttente / MoisValide → uniquement si adresse réellement définie (pas de fallback hôte)
+ * - Domicile sans hôte → null (jamais l'adresse de l'ancien hôte)
  */
 export function resolveLieuAdresseForDto(input: {
   statut: string;
@@ -155,6 +180,7 @@ export function resolveLieuAdresseForDto(input: {
   hostAdresse: AdresseLike | null;
   dateReunion: Date | null;
   now?: Date;
+  hasHost?: boolean;
 }): string | null {
   if (
     !shouldExposeOperationalCoords({
@@ -172,6 +198,7 @@ export function resolveLieuAdresseForDto(input: {
     adresse: input.adresse,
     hostAdresse: input.hostAdresse,
     allowHostFallback: dateConfirmed,
+    hasHost: input.hasHost,
   });
 }
 

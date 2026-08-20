@@ -121,6 +121,7 @@ export async function getMyReunions(
         hostAdresse,
         dateReunion: r.dateReunion,
         now,
+        hasHost: Boolean(host),
       });
 
       const hostTelephones =

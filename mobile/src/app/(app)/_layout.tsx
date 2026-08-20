@@ -96,7 +96,14 @@ function AppTabs() {
       <Tabs.Screen
         name="reunions"
         options={{
-          title: "Mes réunions",
+          title: "Les réunions",
+          href: null,
+        }}
+      />
+      <Tabs.Screen
+        name="reunions-host"
+        options={{
+          title: "Accueillir une réunion",
           href: null,
         }}
       />

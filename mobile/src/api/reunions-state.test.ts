@@ -3,6 +3,12 @@ import type { MyReunionDto } from "@/api/types";
 import {
   formatReunionDate,
   formatReunionDateTime,
+  formatYearMonthDate,
+  formatYearMonthHost,
+  shouldShowHostWithdrawBlockedBy28DaysMessage,
+  HOST_WITHDRAW_BLOCKED_BY_28_DAYS_MESSAGE,
+  hostProposalBlockedLabel,
+  hostProposalErrorMessage,
   mapParticipationStatut,
   mapReunionStatut,
   reunionsErrorMessage,
@@ -73,6 +79,30 @@ describe("mapParticipationStatut", () => {
   });
 });
 
+describe("hostProposal helpers", () => {
+  it("messages métier", () => {
+    expect(
+      hostProposalErrorMessage({
+        status: 409,
+        code: "CONFLICT",
+        message: "Mois pris",
+      })
+    ).toBe("Mois pris");
+    expect(hostProposalBlockedLabel("ALREADY_HOST_THIS_YEAR")).toMatch(
+      /cette année/
+    );
+  });
+
+  it("format année mois", () => {
+    expect(
+      formatYearMonthHost({ hostName: null })
+    ).toBe("Hôte à désigner");
+    expect(formatYearMonthDate({ dateReunion: null })).toBe(
+      "Date à confirmer"
+    );
+  });
+});
+
 describe("splitReunionsByTime", () => {
   const now = new Date("2026-06-15T12:00:00.000Z");
 
@@ -97,3 +127,50 @@ describe("splitReunionsByTime", () => {
     expect(past.map((r) => r.id)).toEqual(["past", "cancelled"]);
   });
 });
+
+describe("shouldShowHostWithdrawBlockedBy28DaysMessage", () => {
+  it("hôte + J-27 (date + canWithdraw false) → message visible", () => {
+    expect(
+      shouldShowHostWithdrawBlockedBy28DaysMessage({
+        isCurrentUserHost: true,
+        dateReunion: "2026-07-12T12:00:00.000Z",
+        canWithdrawAsHost: false,
+      })
+    ).toBe(true);
+  });
+
+  it("hôte + J-28 (canWithdraw true) → message absent", () => {
+    expect(
+      shouldShowHostWithdrawBlockedBy28DaysMessage({
+        isCurrentUserHost: true,
+        dateReunion: "2026-07-13T12:00:00.000Z",
+        canWithdrawAsHost: true,
+      })
+    ).toBe(false);
+  });
+
+  it("non-hôte → message absent", () => {
+    expect(
+      shouldShowHostWithdrawBlockedBy28DaysMessage({
+        isCurrentUserHost: false,
+        dateReunion: "2026-07-12T12:00:00.000Z",
+        canWithdrawAsHost: false,
+      })
+    ).toBe(false);
+  });
+
+  it("date null → message absent", () => {
+    expect(
+      shouldShowHostWithdrawBlockedBy28DaysMessage({
+        isCurrentUserHost: true,
+        dateReunion: null,
+        canWithdrawAsHost: false,
+      })
+    ).toBe(false);
+  });
+
+  it("libellé message stable", () => {
+    expect(HOST_WITHDRAW_BLOCKED_BY_28_DAYS_MESSAGE).toContain("28 jours");
+  });
+});
+

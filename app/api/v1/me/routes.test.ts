@@ -16,6 +16,9 @@ const {
   createMyTacheCommentaire,
   getMyReunions,
   updateMyReunionParticipation,
+  getMyReunionYear,
+  proposeMyselfAsReunionHost,
+  withdrawMyReunionHostProposal,
 } = vi.hoisted(() => ({
   resolveApiActorMock: vi.fn(),
   getMe: vi.fn(),
@@ -30,6 +33,9 @@ const {
   createMyTacheCommentaire: vi.fn(),
   getMyReunions: vi.fn(),
   updateMyReunionParticipation: vi.fn(),
+  getMyReunionYear: vi.fn(),
+  proposeMyselfAsReunionHost: vi.fn(),
+  withdrawMyReunionHostProposal: vi.fn(),
 }));
 
 vi.mock("@/lib/api/auth-resolve", () => ({
@@ -69,6 +75,15 @@ vi.mock("@/lib/services/reunions/get-my-reunions", () => ({
 vi.mock("@/lib/services/reunions/update-my-reunion-participation", () => ({
   updateMyReunionParticipation,
 }));
+vi.mock("@/lib/services/reunions/get-my-reunion-year", () => ({
+  getMyReunionYear,
+}));
+vi.mock("@/lib/services/reunions/propose-myself-as-reunion-host", () => ({
+  proposeMyselfAsReunionHost,
+}));
+vi.mock("@/lib/services/reunions/withdraw-my-reunion-host-proposal", () => ({
+  withdrawMyReunionHostProposal,
+}));
 
 import { GET as getMeRoute } from "@/app/api/v1/me/route";
 import { GET as getNotificationsRoute } from "@/app/api/v1/me/notifications/route";
@@ -82,6 +97,9 @@ import { GET as getTachesRoute } from "@/app/api/v1/me/taches/route";
 import { POST as postTacheCommentaireRoute } from "@/app/api/v1/me/taches/[id]/commentaires/route";
 import { GET as getReunionsRoute } from "@/app/api/v1/me/reunions/route";
 import { PATCH as patchReunionParticipationRoute } from "@/app/api/v1/me/reunions/[id]/participation/route";
+import { GET as getReunionYearRoute } from "@/app/api/v1/me/reunions/year/route";
+import { POST as postHostProposalRoute } from "@/app/api/v1/me/reunions/host-proposals/route";
+import { DELETE as deleteHostProposalRoute } from "@/app/api/v1/me/reunions/[id]/host-proposal/route";
 
 function actor(overrides: Partial<AuthContext> = {}): AuthContext {
   return {
@@ -135,6 +153,29 @@ function patchReq(
     method: "PATCH",
     headers: {
       get: (name: string) => headers?.[name.toLowerCase()] ?? null,
+    },
+    json: async () => body,
+  } as any;
+}
+
+function deleteReq(
+  url: string,
+  body?: unknown,
+  headers?: Record<string, string>
+) {
+  const nextUrl = new URL(url);
+  const hasBody = body !== undefined;
+  return {
+    nextUrl,
+    method: "DELETE",
+    headers: {
+      get: (name: string) => {
+        const key = name.toLowerCase();
+        if (key === "content-type" && hasBody) {
+          return headers?.[key] ?? "application/json";
+        }
+        return headers?.[key] ?? null;
+      },
     },
     json: async () => body,
   } as any;
@@ -875,5 +916,217 @@ describe("PATCH /api/v1/me/reunions/[id]/participation", () => {
     );
     expect(res.status).toBe(400);
     expect(updateMyReunionParticipation).not.toHaveBeenCalled();
+  });
+});
+
+describe("GET /api/v1/me/reunions/year", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    getMyReunionYear.mockReset();
+  });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await getReunionYearRoute(
+      req("http://localhost/api/v1/me/reunions/year?annee=2026")
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("200 succès", async () => {
+    const a = actor();
+    resolveApiActorMock.mockResolvedValue(a);
+    getMyReunionYear.mockResolvedValue({
+      annee: 2026,
+      alreadyHostThisYear: false,
+      months: [],
+    });
+    const res = await getReunionYearRoute(
+      req("http://localhost/api/v1/me/reunions/year?annee=2026")
+    );
+    expect(res.status).toBe(200);
+    expect(getMyReunionYear).toHaveBeenCalledWith(a, 2026);
+  });
+
+  it("400 si adherentId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getReunionYearRoute(
+      req("http://localhost/api/v1/me/reunions/year?annee=2026&adherentId=x")
+    );
+    expect(res.status).toBe(400);
+    expect(getMyReunionYear).not.toHaveBeenCalled();
+  });
+});
+
+describe("POST /api/v1/me/reunions/host-proposals", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    proposeMyselfAsReunionHost.mockReset();
+  });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await postHostProposalRoute(
+      postReq("http://localhost/api/v1/me/reunions/host-proposals", {
+        annee: 2026,
+        mois: 10,
+      })
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("201 succès", async () => {
+    const a = actor();
+    resolveApiActorMock.mockResolvedValue(a);
+    proposeMyselfAsReunionHost.mockResolvedValue({
+      id: "r1",
+      annee: 2026,
+      mois: 10,
+      statut: "EnAttente",
+      hostName: "Ada",
+    });
+    const res = await postHostProposalRoute(
+      postReq("http://localhost/api/v1/me/reunions/host-proposals", {
+        annee: 2026,
+        mois: 10,
+      })
+    );
+    expect(res.status).toBe(201);
+    expect(proposeMyselfAsReunionHost).toHaveBeenCalledWith(a, {
+      annee: 2026,
+      mois: 10,
+    });
+  });
+
+  it("400 si adherentHoteId body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postHostProposalRoute(
+      postReq("http://localhost/api/v1/me/reunions/host-proposals", {
+        annee: 2026,
+        mois: 10,
+        adherentHoteId: "adh-x",
+      })
+    );
+    expect(res.status).toBe(400);
+    expect(proposeMyselfAsReunionHost).not.toHaveBeenCalled();
+  });
+
+  it("400 si force body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await postHostProposalRoute(
+      postReq("http://localhost/api/v1/me/reunions/host-proposals", {
+        annee: 2026,
+        mois: 10,
+        force: true,
+      })
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("409 si CONFLICT métier", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const { ServiceError } = await import("@/lib/service-error");
+    proposeMyselfAsReunionHost.mockRejectedValue(
+      new ServiceError("CONFLICT", "Mois déjà pris")
+    );
+    const res = await postHostProposalRoute(
+      postReq("http://localhost/api/v1/me/reunions/host-proposals", {
+        annee: 2026,
+        mois: 10,
+      })
+    );
+    expect(res.status).toBe(409);
+  });
+});
+
+describe("DELETE /api/v1/me/reunions/[id]/host-proposal", () => {
+  beforeEach(() => {
+    resolveApiActorMock.mockReset();
+    withdrawMyReunionHostProposal.mockReset();
+  });
+
+  it("401 si non authentifié", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await deleteHostProposalRoute(
+      deleteReq("http://localhost/api/v1/me/reunions/r1/host-proposal"),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(401);
+  });
+
+  it("200 succès", async () => {
+    const a = actor();
+    resolveApiActorMock.mockResolvedValue(a);
+    withdrawMyReunionHostProposal.mockResolvedValue({
+      id: "r1",
+      annee: 2026,
+      mois: 10,
+      statut: "EnAttente",
+    });
+    const res = await deleteHostProposalRoute(
+      deleteReq("http://localhost/api/v1/me/reunions/r1/host-proposal"),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(200);
+    expect(withdrawMyReunionHostProposal).toHaveBeenCalledWith(a, "r1");
+  });
+
+  it("400 si userId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await deleteHostProposalRoute(
+      deleteReq(
+        "http://localhost/api/v1/me/reunions/r1/host-proposal?userId=x"
+      ),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(400);
+    expect(withdrawMyReunionHostProposal).not.toHaveBeenCalled();
+  });
+
+  it("400 si adherentId body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await deleteHostProposalRoute(
+      deleteReq("http://localhost/api/v1/me/reunions/r1/host-proposal", {
+        adherentId: "adh-injected",
+      }),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(400);
+    expect(withdrawMyReunionHostProposal).not.toHaveBeenCalled();
+  });
+
+  it("400 si hostId body", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await deleteHostProposalRoute(
+      deleteReq("http://localhost/api/v1/me/reunions/r1/host-proposal", {
+        hostId: "h-injected",
+      }),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(400);
+  });
+
+  it("403 si pas hôte", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    withdrawMyReunionHostProposal.mockRejectedValue(
+      new ServiceError("FORBIDDEN", "Seul l'hôte de la réunion peut se désister.")
+    );
+    const res = await deleteHostProposalRoute(
+      deleteReq("http://localhost/api/v1/me/reunions/r1/host-proposal"),
+      { params: Promise.resolve({ id: "r1" }) }
+    );
+    expect(res.status).toBe(403);
+  });
+
+  it("404 si réunion inconnue", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    withdrawMyReunionHostProposal.mockRejectedValue(
+      new ServiceError("NOT_FOUND", "Réunion non trouvée")
+    );
+    const res = await deleteHostProposalRoute(
+      deleteReq("http://localhost/api/v1/me/reunions/unknown/host-proposal"),
+      { params: Promise.resolve({ id: "unknown" }) }
+    );
+    expect(res.status).toBe(404);
   });
 });

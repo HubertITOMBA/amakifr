@@ -10,6 +10,7 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import {
   getMyReunions,
   updateMyReunionParticipation,
@@ -37,6 +38,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { LoadingState } from "@/components/ui/loading-state";
+import { PrimaryButton } from "@/components/ui/primary-button";
 import { SecondaryButton } from "@/components/ui/secondary-button";
 import { StatusBadge } from "@/components/ui/status-badge";
 import {
@@ -60,6 +62,7 @@ const PARTICIPATION_CHOICES: Array<{
  * Écran Les réunions — calendrier collectif + participation self-service.
  */
 export default function ReunionsScreen() {
+  const router = useRouter();
   const [reunions, setReunions] = useState<MyReunionDto[]>([]);
   const [mode, setMode] = useState<ScreenMode>("loading");
   const [error, setError] = useState<string | null>(null);
@@ -138,6 +141,13 @@ export default function ReunionsScreen() {
         <Text style={styles.screenSubtitle}>
           Calendrier collectif des réunions mensuelles de l&apos;association.
         </Text>
+
+        <PrimaryButton
+          label="Proposer d'accueillir une réunion"
+          onPress={() => router.push("/reunions-host")}
+          style={styles.hostCta}
+          accessibilityLabel="Proposer d'accueillir une réunion"
+        />
 
         {error ? <ErrorBanner message={error} /> : null}
 
@@ -410,6 +420,9 @@ const styles = StyleSheet.create({
   screenSubtitle: {
     ...AmakiTypography.caption,
     color: AmakiColors.textMuted,
+    marginBottom: AmakiSpacing.md,
+  },
+  hostCta: {
     marginBottom: AmakiSpacing.lg,
   },
   sectionTitle: {

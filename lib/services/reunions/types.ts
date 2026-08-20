@@ -62,3 +62,55 @@ export type UpdateMyReunionParticipationInput = {
 export type UpdateMyReunionParticipationResult = {
   statut: string;
 };
+
+export type HostProposalBlockedReason =
+  | "ALREADY_HOST_THIS_YEAR"
+  | "MONTH_ALREADY_TAKEN"
+  | "MONTH_IN_PAST"
+  | "STATUS_NOT_ELIGIBLE"
+  | "CANCELLED";
+
+export type MyReunionYearMonthDto = {
+  annee: number;
+  mois: number;
+  monthLabel: string;
+  reunionId: string | null;
+  /** ISO uniquement si DateConfirmee */
+  dateReunion: string | null;
+  /** Statut Prisma ou null si aucune réunion */
+  statut: string | null;
+  /** Libellé UI (Disponible, En attente, …) */
+  statusLabel: string;
+  hostName: string | null;
+  isCurrentUserHost: boolean;
+  canProposeAsHost: boolean;
+  /** true si l'adhérent connecté peut se désister (règle Web 28 jours) */
+  canWithdrawAsHost: boolean;
+  hostProposalBlockedReason: HostProposalBlockedReason | null;
+};
+
+export type WithdrawMyReunionHostProposalResult = {
+  id: string;
+  annee: number;
+  mois: number;
+  statut: string;
+};
+
+export type MyReunionYearDto = {
+  annee: number;
+  alreadyHostThisYear: boolean;
+  months: MyReunionYearMonthDto[];
+};
+
+export type ProposeMyselfAsReunionHostInput = {
+  annee: number;
+  mois: number;
+};
+
+export type ProposeMyselfAsReunionHostResult = {
+  id: string;
+  annee: number;
+  mois: number;
+  statut: string;
+  hostName: string;
+};

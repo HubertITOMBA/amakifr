@@ -336,6 +336,33 @@ describe("getMyReunions", () => {
     expect(result[0].lieuAdresse).toBe("Salle communale");
   });
 
+  it("après désistement Domicile → aucune PII ancien hôte (adresse/téléphone)", async () => {
+    findUniqueAdherent.mockResolvedValue({ id: "adh-viewer" });
+    findManyReunions.mockResolvedValue([
+      {
+        id: "r-withdrawn",
+        annee: 2027,
+        mois: 10,
+        dateReunion: null,
+        statut: "EnAttente",
+        typeLieu: "Domicile",
+        // orpheline éventuelle (défense projection)
+        adresse: "99 rue Privée de A",
+        nomRestaurant: null,
+        commentaires: null,
+        AdherentHote: null,
+        Participations: [],
+      },
+    ]);
+
+    const result = await getMyReunions(actor());
+    expect(result[0].hostName).toBeNull();
+    expect(result[0].hostTelephones).toBeNull();
+    expect(result[0].lieuAdresse).toBeNull();
+    expect(result[0].lieuLabel).toBe("Hôte à désigner");
+    expect(result[0].isHost).toBe(false);
+  });
+
   it("filtre la participation uniquement pour l'adhérent courant", async () => {
     findUniqueAdherent.mockResolvedValue({ id: "adh-A" });
     findManyReunions.mockResolvedValue([]);

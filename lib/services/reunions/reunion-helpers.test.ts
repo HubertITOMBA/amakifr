@@ -4,6 +4,7 @@ import {
   buildLieuLabel,
   canUpdateParticipation,
   formatAdresseLieu,
+  hostWithdrawalLocationPatch,
   isReunionPast,
   resolveLieuAdresseForDto,
   selectHostTelephones,
@@ -93,6 +94,17 @@ describe("formatAdresseLieu / buildLieuAdresse", () => {
         },
       })
     ).toBe("Salle annexe, 5 avenue X");
+  });
+
+  it("Domicile sans hôte → jamais d'adresse orpheline", () => {
+    expect(
+      buildLieuAdresse({
+        typeLieu: "Domicile",
+        adresse: "12 rue Privée de l'ancien hôte",
+        hostAdresse: null,
+        hasHost: false,
+      })
+    ).toBeNull();
   });
 
   it("Restaurant → adresse enregistrée sur la réunion", () => {
@@ -196,6 +208,31 @@ describe("resolveLieuAdresseForDto", () => {
         now,
       })
     ).toBe("Salle communale");
+  });
+
+  it("EnAttente Domicile sans hôte + adresse orpheline → null", () => {
+    expect(
+      resolveLieuAdresseForDto({
+        statut: "EnAttente",
+        typeLieu: "Domicile",
+        adresse: "12 rue Privée ancien hôte",
+        hostAdresse: null,
+        dateReunion: null,
+        now,
+        hasHost: false,
+      })
+    ).toBeNull();
+  });
+});
+
+describe("hostWithdrawalLocationPatch", () => {
+  it("Domicile → adresse null", () => {
+    expect(hostWithdrawalLocationPatch("Domicile")).toEqual({ adresse: null });
+  });
+
+  it("Restaurant / Autre → aucun patch", () => {
+    expect(hostWithdrawalLocationPatch("Restaurant")).toEqual({});
+    expect(hostWithdrawalLocationPatch("Autre")).toEqual({});
   });
 });
 

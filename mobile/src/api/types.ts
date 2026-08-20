@@ -280,6 +280,54 @@ export type UpdateMyReunionParticipationResult = {
   statut: string;
 };
 
+export type HostProposalBlockedReason =
+  | "ALREADY_HOST_THIS_YEAR"
+  | "MONTH_ALREADY_TAKEN"
+  | "MONTH_IN_PAST"
+  | "STATUS_NOT_ELIGIBLE"
+  | "CANCELLED";
+
+export type MyReunionYearMonthDto = {
+  annee: number;
+  mois: number;
+  monthLabel: string;
+  reunionId: string | null;
+  dateReunion: string | null;
+  statut: string | null;
+  statusLabel: string;
+  hostName: string | null;
+  isCurrentUserHost: boolean;
+  canProposeAsHost: boolean;
+  canWithdrawAsHost: boolean;
+  hostProposalBlockedReason: HostProposalBlockedReason | null;
+};
+
+export type MyReunionYearDto = {
+  annee: number;
+  alreadyHostThisYear: boolean;
+  months: MyReunionYearMonthDto[];
+};
+
+export type ProposeMyselfAsReunionHostInput = {
+  annee: number;
+  mois: number;
+};
+
+export type ProposeMyselfAsReunionHostResult = {
+  id: string;
+  annee: number;
+  mois: number;
+  statut: string;
+  hostName: string;
+};
+
+export type WithdrawMyReunionHostProposalResult = {
+  id: string;
+  annee: number;
+  mois: number;
+  statut: string;
+};
+
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;

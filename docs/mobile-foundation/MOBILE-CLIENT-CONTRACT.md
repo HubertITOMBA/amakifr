@@ -145,41 +145,44 @@ Anti-IDOR :
 
 ## Réunions (self-service)
 
-Écran `(app)/reunions` — titre **« Les réunions »**, ouvert depuis Accueil (tuile « Réunions », pas d'onglet dédié) :
+Écran `(app)/reunions` — titre **« Les réunions »**, ouvert depuis Accueil (tuile « Réunions », pas d'onglet dédié).
+
+Écran secondaire `(app)/reunions-host` — **« Accueillir une réunion »** (proposition d'hôte, `href: null`).
 
 | Méthode | Path |
 |---------|------|
 | GET | `/api/v1/me/reunions` |
 | PATCH | `/api/v1/me/reunions/[id]/participation` |
+| GET | `/api/v1/me/reunions/year?annee=YYYY` |
+| POST | `/api/v1/me/reunions/host-proposals` |
+| DELETE | `/api/v1/me/reunions/[id]/host-proposal` |
 
 Règles client :
 
-- self-service via `actor.userId` côté backend — **pas** de `userId` / `adherentId` / `participantId` client
-- auth Bearer via `authenticatedFetch` uniquement
+- self-service via `actor.userId` côté backend — **pas** de `userId` / `adherentId` / `participantId` / `hostId` / `adherentHoteId` / `force` / `override` client
+- auth Bearer via `authenticatedFetch` uniquement ; body = objet JS (pas `JSON.stringify`)
 - calendrier **collectif** des réunions mensuelles (identique Web `/reunions-mensuelles`)
-- DTO minimal : titre, statut, date (uniquement si `DateConfirmee`), lieu compact, adresse lieu (actives/futures), hôte, téléphones hôte (actives/futures), `isHost`, `participationStatus` propre, `canUpdateParticipation`
-- **exclut** : emails, listes nominatives, `Adherent` complet, `Adresse[]`, téléphones autres participants
-- lieu Domicile compact = `Chez Prénom Nom` ; adresse dépliée = adresse effective du lieu (domicile hôte ou `reunion.adresse`)
-- historique : nom hôte + participation en lecture seule ; **pas** d'adresse ni téléphone hôte (minimisation)
-- participation : `Present` | `Absent` | `Excuse` via PATCH ; body objet JS (pas `JSON.stringify`)
-- modifiable uniquement si `canUpdateParticipation` (`DateConfirmee` + future) — aligné `confirmerParticipationReunion` Web
-- réunions passées, `EnAttente`, `MoisValide`, `Annulee` : participation refusée côté serveur
-- UI : sections « À venir » / « Historique », cartes expandables, boutons participation avec anti double-submit
-- pull-to-refresh ; en cas d'échec refresh, conservation des données + banner
-- **pas** de cache offline / AsyncStorage
-- route secondaire mobile (`href: null` dans bottom tabs)
+- DTO liste : titre, statut, date (uniquement si `DateConfirmee`), lieu compact, adresse lieu (actives/futures), hôte, téléphones hôte (actives/futures), `isHost`, `participationStatus`, `canUpdateParticipation`
+- historique : nom hôte + participation read-only ; adresse/téléphone masqués
+- participation : `Present` | `Absent` | `Excuse` si `DateConfirmee` future
+- **proposition hôte** (phase 2) : calendrier annuel 12 mois (date / hôte / statut) ; body `{ annee, mois }` ; crée `ReunionMensuelle` `EnAttente` si mois libre, ou reclaim si `EnAttente` sans hôte (après désistement)
+- **désistement hôte** : `DELETE .../host-proposal` — seul l'hôte courant ; règle Web 28 jours (ou pas de date) ; remet `EnAttente` + `adherentHoteId=null` + `dateReunion=null` ; si `typeLieu=Domicile` → `adresse=null` (PII) ; Restaurant/Autre conservés
+- **1 hôte / adhérent / année** en self-service ; recalculé après désistement ; exception multi-hôte = admin uniquement
+- mois passé, mois déjà pris, déjà hôte année, date < 28 j → refus serveur (403/409)
+- concurrence : contrainte unique `annee+mois` (+ P2002 → 409)
+- UI : À venir / Historique + CTA « Proposer d'accueillir une réunion » ; vue annuelle « Se désister » si `canWithdrawAsHost`
+- pull-to-refresh ; offline : banner, pas de mutation offline
 - bottom tabs inchangés : Accueil / Cotisations / Notifications / Profil
 
 Anti-IDOR :
 
-- `userId` / `adherentId` / `participantId` query ou body refusés (400)
-- participation upsertée uniquement pour l'adhérent authentifié (`actor.userId`)
-- aucune PII des autres participants dans le DTO
+- identités / override refusés en query et body (400)
+- hôte = adhérent résolu via `actor.userId` uniquement
 
 Hors scope :
 
-- création / désistement / admin
-- calendrier natif / cartes / géolocalisation
+- changement d'hôte / override 1×/an / actions admin mobile
+- géolocalisation / calendrier natif
 
 ## Validation Android réelle — Phase 2Q
 

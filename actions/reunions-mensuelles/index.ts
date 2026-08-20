@@ -9,6 +9,7 @@ import { logCreation, logModification, logDeletion } from "@/lib/activity-logger
 import { sendEmail } from "@/lib/mail";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
+import { hostWithdrawalLocationPatch } from "@/lib/services/reunions/reunion-helpers";
 
 // Schémas de validation
 const CreateReunionMensuelleSchema = z.object({
@@ -301,6 +302,7 @@ export async function desisterReunionMensuelle(reunionId: string) {
 
     const nomHote = `${reunion.AdherentHote.firstname} ${reunion.AdherentHote.lastname}`;
 
+    // Domicile : nullifier adresse (PII hôte). Restaurant/Autre : lieu conservé.
     await prisma.reunionMensuelle.update({
       where: { id: reunionId },
       data: {
@@ -308,6 +310,7 @@ export async function desisterReunionMensuelle(reunionId: string) {
         statut: StatutReunionMensuelle.EnAttente,
         dateReunion: null,
         updatedBy: session.user.id,
+        ...hostWithdrawalLocationPatch(reunion.typeLieu),
       },
     });
 
