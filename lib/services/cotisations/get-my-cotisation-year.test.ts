@@ -8,6 +8,7 @@ const {
   findManyDette,
   findManyAssistance,
   findManyPaiement,
+  aggregatePaiement,
   findManyObligation,
   findManyAvoir,
 } = vi.hoisted(() => ({
@@ -16,6 +17,7 @@ const {
   findManyDette: vi.fn(),
   findManyAssistance: vi.fn(),
   findManyPaiement: vi.fn(),
+  aggregatePaiement: vi.fn(),
   findManyObligation: vi.fn(),
   findManyAvoir: vi.fn(),
 }));
@@ -26,13 +28,16 @@ vi.mock("@/lib/db", () => ({
     cotisationMensuelle: { findMany: findManyCotisation },
     detteInitiale: { findMany: findManyDette },
     assistance: { findMany: findManyAssistance },
-    paiementCotisation: { findMany: findManyPaiement },
+    paiementCotisation: {
+      findMany: findManyPaiement,
+      aggregate: aggregatePaiement,
+    },
     obligationCotisation: { findMany: findManyObligation },
     avoir: { findMany: findManyAvoir },
   },
 }));
 
-import { getMyCotisationYear } from "@/lib/services/cotisations/get-my-cotisation-year";
+import { getMyCotisationYear, buildPaymentDestinationLabel } from "@/lib/services/cotisations/get-my-cotisation-year";
 import { buildAssistanceDisplayLabel } from "@/lib/services/cotisations/build-assistance-display-label";
 
 function actor(overrides: Partial<AuthContext> = {}): AuthContext {
@@ -56,7 +61,8 @@ function emptyParallel() {
     .mockResolvedValueOnce([]); // open cotisations summary
   findManyDette.mockResolvedValue([]);
   findManyAssistance.mockResolvedValue([]); // open assistances summary only
-  findManyPaiement.mockResolvedValue([]);
+  findManyPaiement.mockResolvedValue([]); // pending EnAttente
+  aggregatePaiement.mockResolvedValue({ _sum: { montant: null } });
   findManyObligation.mockResolvedValue([]);
   findManyAvoir.mockResolvedValue([]);
 }
@@ -97,7 +103,6 @@ function assistanceRow(overrides: Record<string, unknown> = {}) {
       lastname: "Martin",
     },
     CotisationDuMois: null,
-    Paiements: [],
     ...overrides,
   };
 }
@@ -108,6 +113,7 @@ beforeEach(() => {
   findManyDette.mockReset();
   findManyAssistance.mockReset();
   findManyPaiement.mockReset();
+  aggregatePaiement.mockReset();
   findManyObligation.mockReset();
   findManyAvoir.mockReset();
 });
@@ -174,7 +180,7 @@ describe("getMyCotisationYear", () => {
     expect(findManyCotisation.mock.calls[0][0].where.adherentId).toBe("adh-A");
   });
 
-  it("synthèse dette/avoir/resteNet + totalPayeAnnee", async () => {
+  it("synthèse dette/avoir/resteNet + totalPayeAnnee (agrégat, sans historique)", async () => {
     findUniqueAdherent.mockResolvedValue({ id: "adh-A" });
     findManyCotisation
       .mockResolvedValueOnce([]) // year
@@ -194,38 +200,10 @@ describe("getMyCotisationYear", () => {
     findManyAssistance.mockResolvedValue([
       { montantRestant: new Prisma.Decimal("10") },
     ]);
-    findManyPaiement.mockResolvedValue([
-      {
-        id: "p1",
-        datePaiement: new Date("2026-03-12T10:00:00.000Z"),
-        montant: new Prisma.Decimal("30"),
-        moyenPaiement: "Virement",
-        statut: "Valide",
-        reference: null,
-        description: null,
-        cotisationMensuelleId: null,
-        detteInitialeId: "d1",
-        assistanceId: null,
-        CotisationMensuelle: null,
-        DetteInitiale: { annee: 2024 },
-        Assistance: null,
-      },
-      {
-        id: "p2",
-        datePaiement: new Date("2026-03-01T10:00:00.000Z"),
-        montant: new Prisma.Decimal("5"),
-        moyenPaiement: "Virement",
-        statut: "Annule",
-        reference: null,
-        description: null,
-        cotisationMensuelleId: null,
-        detteInitialeId: null,
-        assistanceId: null,
-        CotisationMensuelle: null,
-        DetteInitiale: null,
-        Assistance: null,
-      },
-    ]);
+    findManyPaiement.mockResolvedValue([]); // pending
+    aggregatePaiement.mockResolvedValue({
+      _sum: { montant: new Prisma.Decimal("30") },
+    });
     findManyObligation.mockResolvedValue([]);
     findManyAvoir.mockResolvedValue([
       { montantRestant: new Prisma.Decimal("15") },
@@ -238,8 +216,65 @@ describe("getMyCotisationYear", () => {
     expect(result.summary.resteNet).toBe("75");
     expect(result.summary.totalPayeAnnee).toBe("30");
     expect(result.dettes).toHaveLength(1);
-    expect(result.paiements).toHaveLength(2);
-    expect(result.paiements[0].destinationLabel).toBe("Dette 2024");
+    expect(result.dettes[0].hasPendingPayment).toBe(false);
+    expect(result).not.toHaveProperty("paiements");
+  });
+
+  it("paiement EnAttente → hasPendingPayment ; non compté dans totalPayeAnnee", async () => {
+    findUniqueAdherent.mockResolvedValue({ id: "adh-A" });
+    findManyCotisation
+      .mockResolvedValueOnce([
+        {
+          id: "cot-A",
+          periode: "2026-03",
+          annee: 2026,
+          mois: 3,
+          typeCotisationId: "t1",
+          adherentId: "adh-A",
+          adherentBeneficiaireId: null,
+          montantAttendu: new Prisma.Decimal("100"),
+          montantPaye: new Prisma.Decimal("0"),
+          montantRestant: new Prisma.Decimal("100"),
+          dateEcheance: new Date("2026-03-15T00:00:00.000Z"),
+          statut: "EnAttente",
+          description: null,
+          cotisationDuMoisId: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+          TypeCotisation: {
+            id: "t1",
+            nom: "Cotisation",
+            description: null,
+            montant: new Prisma.Decimal("100"),
+            obligatoire: true,
+            actif: true,
+            ordre: 1,
+            categorie: "Forfaitaire",
+            aBeneficiaire: false,
+          },
+          AdherentBeneficiaire: null,
+          CotisationDuMois: null,
+        },
+      ])
+      .mockResolvedValueOnce([{ montantRestant: new Prisma.Decimal("100") }]);
+    findManyDette.mockResolvedValue([]);
+    findManyAssistance.mockResolvedValue([]);
+    findManyPaiement.mockResolvedValue([
+      {
+        cotisationMensuelleId: "cot-A",
+        detteInitialeId: null,
+        assistanceId: null,
+      },
+    ]);
+    aggregatePaiement.mockResolvedValue({ _sum: { montant: null } });
+    findManyObligation.mockResolvedValue([]);
+    findManyAvoir.mockResolvedValue([]);
+
+    const result = await getMyCotisationYear(actor(), 2026);
+    expect(result.summary.totalPayeAnnee).toBe("0");
+    expect(result.cotisations[0].montantPaye).toBe("0");
+    expect(result.cotisations[0].montantRestant).toBe("100");
+    expect(result.cotisations[0].hasPendingPayment).toBe(true);
   });
 
   it("sépare cotisations forfait et assistances ; masque auto-assistance bénéficiaire", async () => {
@@ -276,27 +311,6 @@ describe("getMyCotisationYear", () => {
           },
           AdherentBeneficiaire: null,
           CotisationDuMois: null,
-          Paiements: [
-            {
-              id: "pv1",
-              datePaiement: new Date("2026-03-10T00:00:00.000Z"),
-              montant: new Prisma.Decimal("30"),
-              moyenPaiement: "Virement",
-              statut: "Valide",
-              reference: "REF1",
-              description: null,
-              cotisationMensuelleId: "cm-forfait",
-              detteInitialeId: null,
-              assistanceId: null,
-              CotisationMensuelle: {
-                mois: 3,
-                annee: 2026,
-                TypeCotisation: { nom: "Forfait" },
-              },
-              DetteInitiale: null,
-              Assistance: null,
-            },
-          ],
         },
         {
           id: "cm-self-ass",
@@ -328,7 +342,6 @@ describe("getMyCotisationYear", () => {
           },
           AdherentBeneficiaire: null,
           CotisationDuMois: null,
-          Paiements: [],
         },
         {
           id: "cm-ass-other",
@@ -365,13 +378,13 @@ describe("getMyCotisationYear", () => {
             lastname: "Dupont",
           },
           CotisationDuMois: null,
-          Paiements: [],
         },
       ])
       .mockResolvedValueOnce([]);
     findManyDette.mockResolvedValue([]);
     findManyAssistance.mockResolvedValue([]);
     findManyPaiement.mockResolvedValue([]);
+    aggregatePaiement.mockResolvedValue({ _sum: { montant: null } });
     findManyObligation.mockResolvedValue([]);
     findManyAvoir.mockResolvedValue([]);
 
@@ -379,8 +392,11 @@ describe("getMyCotisationYear", () => {
 
     expect(result.cotisations).toHaveLength(1);
     expect(result.cotisations[0].id).toBe("cm-forfait");
-    expect(result.cotisations[0].paiements).toHaveLength(1);
+    expect(result.cotisations[0].hasPendingPayment).toBe(false);
     expect(result.assistances.map((a) => a.id)).toEqual(["cm-ass-other"]);
+    expect(result.assistances[0].paymentTargetType).toBe(
+      "cotisation-mensuelle"
+    );
     expect(result.assistances[0].displayLabel).toBe(
       "Assistance Naissance - Monsieur Bruno Dupont"
     );
@@ -432,6 +448,7 @@ describe("getMyCotisationYear", () => {
     findManyDette.mockResolvedValue([]);
     findManyAssistance.mockResolvedValue([]);
     findManyPaiement.mockResolvedValue([]);
+    aggregatePaiement.mockResolvedValue({ _sum: { montant: null } });
     findManyObligation.mockResolvedValue([]);
     findManyAvoir.mockResolvedValue([]);
 
@@ -456,5 +473,119 @@ describe("getMyCotisationYear", () => {
     emptyParallel();
     const result = await getMyCotisationYear(actor(), 2026);
     expect(result.dettes).toEqual([]);
+  });
+});
+
+describe("buildPaymentDestinationLabel", () => {
+  it("dette avec année", () => {
+    expect(
+      buildPaymentDestinationLabel({
+        CotisationMensuelle: null,
+        DetteInitiale: { annee: 2025 },
+        Assistance: null,
+        description: "Déclaration Wero — en attente de validation",
+      })
+    ).toBe("Dette antérieure 2025");
+  });
+
+  it("ne pas utiliser la description Déclaration… comme destination", () => {
+    expect(
+      buildPaymentDestinationLabel({
+        CotisationMensuelle: null,
+        DetteInitiale: null,
+        Assistance: null,
+        description: "Déclaration Wero — en attente de validation",
+        detteInitialeId: "d1",
+      })
+    ).toBe("Dette antérieure");
+  });
+
+  it("cotisation avec période", () => {
+    expect(
+      buildPaymentDestinationLabel({
+        CotisationMensuelle: {
+          mois: 3,
+          annee: 2026,
+          TypeCotisation: { nom: "Cotisation forfaitaire" },
+        },
+        DetteInitiale: null,
+        Assistance: null,
+        description: null,
+      })
+    ).toBe("Cotisation forfaitaire — mars 2026");
+  });
+
+  it("assistance CM avec description explicite → même libellé section Assistances", () => {
+    expect(
+      buildPaymentDestinationLabel({
+        CotisationMensuelle: {
+          mois: 3,
+          annee: 2026,
+          description: "Assistance décès - Madame Henriette",
+          TypeCotisation: {
+            nom: "Assistance décès",
+            categorie: "Assistance",
+            aBeneficiaire: true,
+          },
+        },
+        DetteInitiale: null,
+        Assistance: null,
+        description: "Déclaration Wero — en attente de validation",
+      })
+    ).toBe("Assistance décès - Madame Henriette");
+  });
+
+  it("deux assistances même type / mois → libellés distincts (bénéficiaires)", () => {
+    const base = {
+      mois: 3,
+      annee: 2026,
+      description: null as string | null,
+      TypeCotisation: {
+        nom: "Décès adhérent",
+        categorie: "Assistance",
+        aBeneficiaire: true,
+      },
+    };
+    const labelA = buildPaymentDestinationLabel({
+      CotisationMensuelle: {
+        ...base,
+        AdherentBeneficiaire: {
+          civility: "Madame",
+          firstname: "Henriette",
+          lastname: null,
+        },
+      },
+      DetteInitiale: null,
+      Assistance: null,
+      description: null,
+    });
+    const labelB = buildPaymentDestinationLabel({
+      CotisationMensuelle: {
+        ...base,
+        AdherentBeneficiaire: {
+          civility: "Monsieur",
+          firstname: "Bruno",
+          lastname: null,
+        },
+      },
+      DetteInitiale: null,
+      Assistance: null,
+      description: null,
+    });
+    expect(labelA).toBe("Décès adhérent - Madame Henriette");
+    expect(labelB).toBe("Décès adhérent - Monsieur Bruno");
+    expect(labelA).not.toBe(labelB);
+    expect(labelA).not.toMatch(/mars/i);
+  });
+
+  it("assistance avec type", () => {
+    expect(
+      buildPaymentDestinationLabel({
+        CotisationMensuelle: null,
+        DetteInitiale: null,
+        Assistance: { type: "DecesFamille", description: "Madame Henriette" },
+        description: null,
+      })
+    ).toBe("Assistance Décès familial — Madame Henriette");
   });
 });

@@ -127,30 +127,122 @@ function mapCotisationRow(row: {
   };
 }
 
-function buildPaymentDestinationLabel(input: {
-  CotisationMensuelle: { mois: number; annee: number; TypeCotisation: { nom: string } } | null;
+/**
+ * Libellé de destination d'un paiement (historique / détail).
+ * Ne jamais exposer la description technique « Déclaration Wero… » comme destination.
+ *
+ * Pour une CotisationMensuelle catégorie Assistance : même règle que
+ * la section Assistances (`buildAssistanceDisplayLabel`) — pas le mois à la place
+ * du bénéficiaire.
+ */
+export function buildPaymentDestinationLabel(input: {
+  CotisationMensuelle: {
+    mois: number;
+    annee: number;
+    description?: string | null;
+    TypeCotisation: {
+      nom: string;
+      categorie?: string | null;
+      aBeneficiaire?: boolean | null;
+    };
+    AdherentBeneficiaire?: {
+      civility?: string | null;
+      firstname?: string | null;
+      lastname?: string | null;
+    } | null;
+    CotisationDuMois?: {
+      AdherentBeneficiaire?: {
+        civility?: string | null;
+        firstname?: string | null;
+        lastname?: string | null;
+      } | null;
+    } | null;
+  } | null;
   DetteInitiale: { annee: number } | null;
-  Assistance: { type: string } | null;
+  Assistance: { type: string; description?: string | null } | null;
   description: string | null;
+  detteInitialeId?: string | null;
+  cotisationMensuelleId?: string | null;
+  assistanceId?: string | null;
 }): string {
   if (input.CotisationMensuelle) {
-    const moisLabel =
-      MOIS_LABELS[input.CotisationMensuelle.mois - 1] ??
-      String(input.CotisationMensuelle.mois);
-    return `${input.CotisationMensuelle.TypeCotisation.nom} — ${moisLabel} ${input.CotisationMensuelle.annee}`;
+    const cm = input.CotisationMensuelle;
+    const isAssistanceCategory =
+      cm.TypeCotisation.categorie === "Assistance" ||
+      cm.TypeCotisation.aBeneficiaire === true;
+
+    if (isAssistanceCategory) {
+      const benef =
+        cm.AdherentBeneficiaire ??
+        cm.CotisationDuMois?.AdherentBeneficiaire ??
+        null;
+      return buildAssistanceDisplayLabel({
+        typeNom: cm.TypeCotisation.nom,
+        description: cm.description,
+        beneficiaire: benef,
+      });
+    }
+
+    const moisLabel = MOIS_LABELS[cm.mois - 1] ?? String(cm.mois);
+    const nom = cm.TypeCotisation.nom.trim();
+    return `${nom} — ${moisLabel} ${cm.annee}`;
   }
   if (input.DetteInitiale) {
-    return `Dette ${input.DetteInitiale.annee}`;
+    return `Dette antérieure ${input.DetteInitiale.annee}`;
+  }
+  if (input.detteInitialeId) {
+    return "Dette antérieure";
   }
   if (input.Assistance) {
     const label =
       ASSISTANCE_TYPE_LABELS[input.Assistance.type] ?? input.Assistance.type;
+    const detail = input.Assistance.description?.trim();
+    if (detail) {
+      return `Assistance ${label} — ${detail}`;
+    }
     return `Assistance — ${label}`;
   }
-  return input.description?.trim() || "Paiement";
+  if (input.assistanceId) {
+    return "Assistance";
+  }
+  if (input.cotisationMensuelleId) {
+    return "Cotisation";
+  }
+  const desc = input.description?.trim();
+  if (desc && !/^Déclaration\s/i.test(desc) && !/\ben attente de validation\b/i.test(desc)) {
+    return desc;
+  }
+  return "Paiement";
 }
 
-function mapPayment(row: {
+const cotisationMensuelleForPaymentSelect = {
+  mois: true,
+  annee: true,
+  description: true,
+  TypeCotisation: {
+    select: { nom: true, categorie: true, aBeneficiaire: true },
+  },
+  AdherentBeneficiaire: {
+    select: {
+      civility: true,
+      firstname: true,
+      lastname: true,
+    },
+  },
+  CotisationDuMois: {
+    select: {
+      AdherentBeneficiaire: {
+        select: {
+          civility: true,
+          firstname: true,
+          lastname: true,
+        },
+      },
+    },
+  },
+} as const;
+
+export function mapPayment(row: {
   id: string;
   datePaiement: Date;
   montant: Prisma.Decimal;
@@ -164,10 +256,27 @@ function mapPayment(row: {
   CotisationMensuelle: {
     mois: number;
     annee: number;
-    TypeCotisation: { nom: string };
+    description?: string | null;
+    TypeCotisation: {
+      nom: string;
+      categorie?: string | null;
+      aBeneficiaire?: boolean | null;
+    };
+    AdherentBeneficiaire?: {
+      civility?: string | null;
+      firstname?: string | null;
+      lastname?: string | null;
+    } | null;
+    CotisationDuMois?: {
+      AdherentBeneficiaire?: {
+        civility?: string | null;
+        firstname?: string | null;
+        lastname?: string | null;
+      } | null;
+    } | null;
   } | null;
   DetteInitiale: { annee: number } | null;
-  Assistance: { type: string } | null;
+  Assistance: { type: string; description?: string | null } | null;
 }): MyPaymentDto {
   return {
     id: row.id,
@@ -214,7 +323,8 @@ export async function getMyCotisationYear(
     const [
       cotisationsRows,
       dettesRows,
-      paiementsRows,
+      pendingPayments,
+      payeAnneeAgg,
       openCotisations,
       openAssistances,
       openObligations,
@@ -273,31 +383,6 @@ export async function getMyCotisationYear(
               },
             },
           },
-          Paiements: {
-            where: { adherentId },
-            select: {
-              id: true,
-              datePaiement: true,
-              montant: true,
-              moyenPaiement: true,
-              statut: true,
-              reference: true,
-              description: true,
-              cotisationMensuelleId: true,
-              detteInitialeId: true,
-              assistanceId: true,
-              CotisationMensuelle: {
-                select: {
-                  mois: true,
-                  annee: true,
-                  TypeCotisation: { select: { nom: true } },
-                },
-              },
-              DetteInitiale: { select: { annee: true } },
-              Assistance: { select: { type: true } },
-            },
-            orderBy: { datePaiement: "asc" },
-          },
         },
         orderBy: [{ mois: "asc" }, { periode: "asc" }],
       }),
@@ -313,33 +398,22 @@ export async function getMyCotisationYear(
         },
         orderBy: { annee: "desc" },
       }),
+      // Une seule requête pour tous les EnAttente (pas de N+1 par carte)
       db.paiementCotisation.findMany({
-        where: {
-          adherentId,
-          datePaiement: { gte: yearStart, lt: yearEnd },
-        },
+        where: { adherentId, statut: "EnAttente" },
         select: {
-          id: true,
-          datePaiement: true,
-          montant: true,
-          moyenPaiement: true,
-          statut: true,
-          reference: true,
-          description: true,
           cotisationMensuelleId: true,
           detteInitialeId: true,
           assistanceId: true,
-          CotisationMensuelle: {
-            select: {
-              mois: true,
-              annee: true,
-              TypeCotisation: { select: { nom: true } },
-            },
-          },
-          DetteInitiale: { select: { annee: true } },
-          Assistance: { select: { type: true } },
         },
-        orderBy: { datePaiement: "desc" },
+      }),
+      db.paiementCotisation.aggregate({
+        where: {
+          adherentId,
+          statut: "Valide",
+          datePaiement: { gte: yearStart, lt: yearEnd },
+        },
+        _sum: { montant: true },
       }),
       // --- synthèse (miroir getCumulDette, scoped self) ---
       db.cotisationMensuelle.findMany({
@@ -370,6 +444,17 @@ export async function getMyCotisationYear(
       }),
     ]);
 
+    const pendingCotisationIds = new Set(
+      pendingPayments
+        .map((p) => p.cotisationMensuelleId)
+        .filter((id): id is string => Boolean(id))
+    );
+    const pendingDetteIds = new Set(
+      pendingPayments
+        .map((p) => p.detteInitialeId)
+        .filter((id): id is string => Boolean(id))
+    );
+
     let totalDette = new Prisma.Decimal(0);
     for (const d of dettesRows) {
       totalDette = totalDette.plus(d.montantRestant);
@@ -393,12 +478,7 @@ export async function getMyCotisationYear(
       ? totalDette.minus(totalAvoirs)
       : new Prisma.Decimal(0);
 
-    let totalPayeAnnee = new Prisma.Decimal(0);
-    for (const p of paiementsRows) {
-      if (p.statut === "Valide") {
-        totalPayeAnnee = totalPayeAnnee.plus(p.montant);
-      }
-    }
+    const totalPayeAnnee = new Prisma.Decimal(payeAnneeAgg._sum.montant ?? 0);
 
     const cotisations: MyCotisationYearItemDto[] = [];
     const assistances: MyAssistanceDto[] = [];
@@ -417,8 +497,7 @@ export async function getMyCotisationYear(
       }
 
       const base = mapCotisationRow(row);
-      const paiements = row.Paiements.map(mapPayment);
-      const item: MyCotisationYearItemDto = { ...base, paiements };
+      const hasPendingPayment = pendingCotisationIds.has(row.id);
 
       if (isAssistanceCategory) {
         const benef =
@@ -429,6 +508,7 @@ export async function getMyCotisationYear(
         assistances.push({
           id: row.id,
           source: "cotisation",
+          paymentTargetType: "cotisation-mensuelle",
           displayLabel: buildAssistanceDisplayLabel({
             typeNom,
             description: row.description,
@@ -445,9 +525,10 @@ export async function getMyCotisationYear(
           montantPaye: base.montantPaye,
           montantRestant: base.montantRestant,
           statut: row.statut,
+          hasPendingPayment,
         });
       } else {
-        cotisations.push(item);
+        cotisations.push({ ...base, hasPendingPayment });
       }
     }
 
@@ -458,9 +539,8 @@ export async function getMyCotisationYear(
       montantPaye: decimalToMoneyString(d.montantPaye),
       montantRestant: decimalToMoneyString(d.montantRestant),
       description: d.description,
+      hasPendingPayment: pendingDetteIds.has(d.id),
     }));
-
-    const paiements = paiementsRows.map(mapPayment);
 
     return {
       annee: year,
@@ -473,7 +553,6 @@ export async function getMyCotisationYear(
       cotisations,
       assistances,
       dettes,
-      paiements,
     };
   } catch (error) {
     if (error instanceof ServiceError) throw error;

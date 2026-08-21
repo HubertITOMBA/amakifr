@@ -6,7 +6,13 @@ const { authenticatedFetch } = vi.hoisted(() => ({
 
 vi.mock("@/auth/session", () => ({ authenticatedFetch }));
 
-import { getMyCotisationsMensuelles } from "@/api/cotisations";
+import {
+  buildMyPaymentsQuery,
+  getMyCotisationLines,
+  getMyCotisationYear,
+  getMyCotisationsMensuelles,
+  getMyPayments,
+} from "@/api/cotisations";
 
 describe("cotisations API client", () => {
   beforeEach(() => {
@@ -23,7 +29,55 @@ describe("cotisations API client", () => {
     const path = authenticatedFetch.mock.calls[0][0] as string;
     expect(path).not.toContain("userId");
     expect(path).not.toContain("adherentId");
-    // Pas d'options method → GET implicite authenticatedFetch
     expect(authenticatedFetch.mock.calls[0][1]).toBeUndefined();
+  });
+
+  it("getMyCotisationYear sans historique dans le path", async () => {
+    authenticatedFetch.mockResolvedValue({});
+    await getMyCotisationYear(2026);
+    expect(authenticatedFetch).toHaveBeenCalledWith(
+      "/api/v1/me/cotisations/year?annee=2026"
+    );
+  });
+
+  it("getMyPayments — query paginée sans id client", async () => {
+    authenticatedFetch.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+    await getMyPayments({ annee: 2026, limit: 20, offset: 0 });
+    const path = authenticatedFetch.mock.calls[0][0] as string;
+    expect(path).toBe(
+      "/api/v1/me/cotisations/payments?annee=2026&limit=20&offset=0"
+    );
+    expect(path).not.toContain("userId");
+    expect(path).not.toContain("adherentId");
+  });
+
+  it("buildMyPaymentsQuery sans année = toutes", () => {
+    expect(buildMyPaymentsQuery({ limit: 20, offset: 40 })).toBe(
+      "?limit=20&offset=40"
+    );
+  });
+
+  it("getMyCotisationLines — Toutes les années", async () => {
+    authenticatedFetch.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+      summary: {
+        detteBrute: "0",
+        avoirDisponible: "0",
+        resteNet: "0",
+        totalPayeAnnee: "0",
+      },
+    });
+    await getMyCotisationLines({ limit: 20, offset: 0 });
+    expect(authenticatedFetch).toHaveBeenCalledWith(
+      "/api/v1/me/cotisations/lines?limit=20&offset=0"
+    );
   });
 });

@@ -19,6 +19,8 @@ import {
   __resetRefreshFlightForTests,
   authenticatedBinaryFetch,
   authenticatedFetch,
+  fetchApiResponse,
+  isFormDataBody,
   logoutRequest,
   refreshSession,
 } from "@/auth/session";
@@ -381,5 +383,84 @@ describe("logout", () => {
 
     await logoutRequest();
     expect(await getRefreshToken()).toBeNull();
+  });
+});
+
+describe("fetchApiResponse FormData vs JSON", () => {
+  beforeEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it("détecte FormData natif et duck-type RN (getParts)", () => {
+    expect(isFormDataBody(new FormData())).toBe(true);
+    expect(isFormDataBody({ foo: 1 })).toBe(false);
+    expect(isFormDataBody(null)).toBe(false);
+    const rnLike = {
+      append: () => undefined,
+      getParts: () => [],
+    };
+    expect(isFormDataBody(rnLike)).toBe(true);
+  });
+
+  it("body objet JS → JSON.stringify + application/json", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { success: true, data: {} }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    await fetchApiResponse("/api/v1/me/x", {
+      method: "POST",
+      body: { a: 1 },
+      accessToken: "tok",
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBe("application/json");
+    expect(headers.Authorization).toBe("Bearer tok");
+    expect(init.body).toBe(JSON.stringify({ a: 1 }));
+  });
+
+  it("FormData → body brut, aucun Content-Type forcé, auth conservé", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { success: true, data: {} }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const form = new FormData();
+    form.append("targetType", "cotisation-mensuelle");
+    form.append("amount", "10");
+
+    await fetchApiResponse("/api/v1/me/payments/bank-transfer", {
+      method: "POST",
+      body: form,
+      accessToken: "tok-2",
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBeUndefined();
+    expect(headers.Authorization).toBe("Bearer tok-2");
+    expect(init.body).toBe(form);
+    expect(init.method).toBe("POST");
+  });
+
+  it("duck-type RN FormData → pas de JSON.stringify", async () => {
+    const fetchMock = vi.fn(async () => jsonResponse(200, { success: true, data: {} }));
+    vi.stubGlobal("fetch", fetchMock);
+
+    const rnForm = {
+      append: vi.fn(),
+      getParts: vi.fn(() => []),
+    };
+
+    await fetchApiResponse("/api/v1/me/payments/bank-transfer", {
+      method: "POST",
+      body: rnForm,
+      accessToken: "t",
+    });
+
+    const [, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    const headers = init.headers as Record<string, string>;
+    expect(headers["Content-Type"]).toBeUndefined();
+    expect(init.body).toBe(rnForm);
+    expect(typeof init.body).not.toBe("string");
   });
 });

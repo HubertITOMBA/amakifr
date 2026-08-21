@@ -180,12 +180,18 @@ export type MyDebtDto = {
   montantPaye: string;
   montantRestant: string;
   description: string | null;
+  hasPendingPayment: boolean;
 };
 
 /** Assistance à payer (ligne CotisationMensuelle catégorie Assistance). */
 export type MyAssistanceDto = {
   id: string;
   source: "cotisation";
+  /**
+   * Cible de paiement réelle (serveur) — ne pas déduire du libellé UI.
+   * Lignes section Assistances = CotisationMensuelle → cotisation-mensuelle.
+   */
+  paymentTargetType: "cotisation-mensuelle";
   /** Libellé Web prêt à afficher (ex. « Décès adhérent - Madame Henriette ») */
   displayLabel: string;
   libelle: string;
@@ -199,6 +205,7 @@ export type MyAssistanceDto = {
   montantPaye: string;
   montantRestant: string;
   statut: string;
+  hasPendingPayment: boolean;
 };
 
 /** Versement self-service (sans secrets / justificatif). */
@@ -216,7 +223,7 @@ export type MyPaymentDto = {
 };
 
 export type MyCotisationYearItemDto = CotisationMensuelleDto & {
-  paiements: MyPaymentDto[];
+  hasPendingPayment: boolean;
 };
 
 export type MyCotisationYearSummaryDto = {
@@ -232,7 +239,40 @@ export type MyCotisationYearDto = {
   cotisations: MyCotisationYearItemDto[];
   assistances: MyAssistanceDto[];
   dettes: MyDebtDto[];
-  paiements: MyPaymentDto[];
+};
+
+export type MyCotisationLineDto = {
+  kind: "dette" | "cotisation" | "assistance";
+  id: string;
+  annee: number;
+  mois: number | null;
+  label: string;
+  montantAttendu: string;
+  montantPaye: string;
+  montantRestant: string;
+  statut: string;
+  hasPendingPayment: boolean;
+  paymentTargetType:
+    | "cotisation-mensuelle"
+    | "dette-initiale"
+    | "assistance"
+    | "obligation";
+  paymentTargetId: string;
+};
+
+export type MyPaymentsPageDto = {
+  items: MyPaymentDto[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type MyCotisationLinesPageDto = {
+  items: MyCotisationLineDto[];
+  total: number;
+  limit: number;
+  offset: number;
+  summary: MyCotisationYearSummaryDto;
 };
 
 

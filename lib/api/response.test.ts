@@ -41,6 +41,8 @@ describe("handleApiError / SERVICE_ERROR_HTTP_STATUS", () => {
       ["FORBIDDEN", 403],
       ["NOT_FOUND", 404],
       ["CONFLICT", 409],
+      ["PAYMENT_ALREADY_PENDING", 409],
+      ["PAYMENT_EXCEEDS_REMAINING", 409],
       ["RATE_LIMITED", 429],
       ["INTERNAL_ERROR", 500],
     ];

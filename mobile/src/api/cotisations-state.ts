@@ -63,6 +63,29 @@ export function formatIsoDate(iso: string): string {
 }
 
 /**
+ * Date + heure fr-FR pour l'historique des paiements (ex. « 21 août 2026 à 10:32 »).
+ */
+export function formatPaymentDateTimeFr(iso: string): string {
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    const datePart = new Intl.DateTimeFormat("fr-FR", {
+      day: "numeric",
+      month: "long",
+      year: "numeric",
+    }).format(d);
+    const timePart = new Intl.DateTimeFormat("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+    return `${datePart} à ${timePart}`;
+  } catch {
+    return "—";
+  }
+}
+
+/**
  * Libellé période courte pour une assistance (ex. « Mars 2026 »).
  */
 export function formatAssistanceMonthLabel(
@@ -224,10 +247,4 @@ export function formatAssistanceTitle(
 
 export function hasOpenDebt(dettes: MyDebtDto[]): boolean {
   return dettes.some((d) => Number(d.montantRestant) > 0);
-}
-
-export function countNestedPayments(
-  item: Pick<MyCotisationYearItemDto, "paiements">
-): number {
-  return item.paiements?.length ?? 0;
 }

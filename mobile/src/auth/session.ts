@@ -14,12 +14,38 @@ import { shouldClearTokensAfterRefreshError } from "@/auth/refresh-error-policy"
 
 type FetchOptions = {
   method?: string;
+  /** JSON serializable, ou FormData (multipart — ne pas JSON.stringify). */
   body?: unknown;
   accessToken?: string | null;
   /** Si true, ne tente pas de refresh sur 401 */
   skipAuthRetry?: boolean;
   accept?: string;
+  /** Fetch injectable (ex. expo/fetch pour multipart). Défaut : fetch global. */
+  fetchImpl?: typeof fetch;
+  /** Timeout diagnostic (ms). Uniquement si > 0. */
+  timeoutMs?: number;
 };
+
+/**
+ * Détecte FormData de façon fiable (Web + React Native / Hermes).
+ * `instanceof` seul peut échouer selon le realm / polyfill RN.
+ */
+export function isFormDataBody(body: unknown): body is FormData {
+  if (body == null || typeof body !== "object") return false;
+  if (typeof FormData !== "undefined") {
+    try {
+      if (body instanceof FormData) return true;
+    } catch {
+      // ignore cross-realm
+    }
+  }
+  if (Object.prototype.toString.call(body) === "[object FormData]") {
+    return true;
+  }
+  // React Native FormData expose getParts()
+  const rn = body as { append?: unknown; getParts?: unknown };
+  return typeof rn.append === "function" && typeof rn.getParts === "function";
+}
 
 let refreshPromise: Promise<MobileAuthSessionDto> | null = null;
 
@@ -71,7 +97,8 @@ export async function fetchApiResponse(
     Accept: options.accept ?? "application/json",
   };
 
-  if (options.body !== undefined) {
+  const formData = isFormDataBody(options.body);
+  if (options.body !== undefined && !formData) {
     headers["Content-Type"] = "application/json";
   }
 
@@ -81,18 +108,57 @@ export async function fetchApiResponse(
   }
 
   try {
-    return await fetch(url, {
+    let body: BodyInit | undefined;
+    if (options.body !== undefined) {
+      body = formData
+        ? (options.body as FormData)
+        : JSON.stringify(options.body);
+    }
+    const doFetch = options.fetchImpl ?? fetch;
+    const fetchPromise = doFetch(url, {
       method: options.method ?? (options.body !== undefined ? "POST" : "GET"),
       headers,
-      body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
+      body,
     });
-  } catch {
+
+    if (options.timeoutMs && options.timeoutMs > 0) {
+      let timer: ReturnType<typeof setTimeout> | undefined;
+      try {
+        const timeoutPromise = new Promise<never>((_, reject) => {
+          timer = setTimeout(() => {
+            reject(new Error("REQUEST_TIMEOUT"));
+          }, options.timeoutMs);
+        });
+        return await Promise.race([fetchPromise, timeoutPromise]);
+      } finally {
+        if (timer) clearTimeout(timer);
+      }
+    }
+
+    return await fetchPromise;
+  } catch (error) {
+    if (typeof __DEV__ !== "undefined" && __DEV__) {
+      const detail =
+        error instanceof Error ? error.message : String(error ?? "unknown");
+      // eslint-disable-next-line no-console
+      console.warn("[MOBILE_HTTP] request failed", path, detail);
+      if (detail === "REQUEST_TIMEOUT") {
+        // eslint-disable-next-line no-console
+        console.warn("[MOBILE_PAYMENT] request timeout");
+      }
+    }
     throw new ApiClientError(
       0,
       "NETWORK_ERROR",
-      "Serveur injoignable. Vérifiez EXPO_PUBLIC_API_URL et le réseau."
+      detailIsTimeout(error)
+        ? "Délai dépassé lors de l'envoi du paiement. Réessayez."
+        : "Serveur injoignable. Vérifiez EXPO_PUBLIC_API_URL et le réseau."
     );
   }
+}
+
+function detailIsTimeout(error: unknown): boolean {
+  return error instanceof Error && error.message === "REQUEST_TIMEOUT";
 }
 
 /**

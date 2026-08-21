@@ -114,10 +114,10 @@ const CreatePaiementSchema = z.object({
   adherentId: z.string().min(1, "L'ID de l'adhérent est requis"),
   montant: z.number().positive("Le montant doit être positif"),
   datePaiement: z.string().optional(), // ISO string
-  moyenPaiement: z.enum(["Especes", "Cheque", "Virement", "CarteBancaire"]),
+  moyenPaiement: z.enum(["Especes", "Cheque", "Virement", "CarteBancaire", "Wero"]),
   reference: z.string().optional(),
   description: z.string().optional(),
-  justificatifChemin: z.string().optional(), // Obligatoire si moyenPaiement === "Virement"
+  justificatifChemin: z.string().optional(), // Obligatoire si moyenPaiement === "Virement" | "Wero"
   obligationCotisationId: z.string().optional(),
   cotisationMensuelleId: z.string().optional(),
   detteInitialeId: z.string().optional(),
@@ -133,53 +133,10 @@ export async function appliquerAvoirs(
   type: 'cotisationMensuelle' | 'detteInitiale' | 'assistance' | 'obligationCotisation',
   id: string
 ) {
-  let montantRestant = montantDu;
-  const avoirsDisponibles = await prisma.avoir.findMany({
-    where: {
-      adherentId,
-      statut: "Disponible",
-      montantRestant: { gt: 0 },
-    },
-    orderBy: {
-      createdAt: 'asc', // Utiliser les plus anciens en premier
-    },
-  });
-
-  for (const avoir of avoirsDisponibles) {
-    if (montantRestant.lte(0)) break;
-
-    const montantAUtiliser = Decimal.min(avoir.montantRestant, montantRestant);
-    const nouveauMontantUtilise = new Decimal(avoir.montantUtilise).plus(montantAUtiliser);
-    const nouveauMontantRestant = new Decimal(avoir.montantRestant).minus(montantAUtiliser);
-    const nouveauStatut = nouveauMontantRestant.lte(0) ? "Utilise" : "Disponible";
-
-    // Créer l'utilisation de l'avoir
-    await prisma.utilisationAvoir.create({
-      data: {
-        avoirId: avoir.id,
-        montant: montantAUtiliser,
-        cotisationMensuelleId: type === 'cotisationMensuelle' ? id : null,
-        obligationCotisationId: type === 'obligationCotisation' ? id : null,
-        detteInitialeId: type === 'detteInitiale' ? id : null,
-        assistanceId: type === 'assistance' ? id : null,
-        description: `Utilisation automatique pour ${type}`,
-      },
-    });
-
-    // Mettre à jour l'avoir
-    await prisma.avoir.update({
-      where: { id: avoir.id },
-      data: {
-        montantUtilise: nouveauMontantUtilise,
-        montantRestant: nouveauMontantRestant,
-        statut: nouveauStatut,
-      },
-    });
-
-    montantRestant = montantRestant.minus(montantAUtiliser);
-  }
-
-  return montantRestant;
+  const { appliquerAvoirs: appliquerAvoirsService } = await import(
+    "@/lib/services/paiements/avoir-allocation"
+  );
+  return appliquerAvoirsService(adherentId, new Decimal(montantDu), type, id, prisma);
 }
 
 /**
@@ -189,34 +146,10 @@ export async function appliquerAvoirs(
  * @returns Le montant total appliqué sur les dettes initiales (pour message de succès).
  */
 export async function appliquerAvoirSurDettesInitiales(adherentId: string): Promise<{ montantApplique: Decimal }> {
-  let montantApplique = new Decimal(0);
-  const dettes = await prisma.detteInitiale.findMany({
-    where: { adherentId, montantRestant: { gt: 0 } },
-    orderBy: { annee: "asc" },
-  });
-  for (const dette of dettes) {
-    const montantDette = new Decimal(dette.montantRestant);
-    if (montantDette.lte(0)) continue;
-    const montantRestantApresAvoirs = await appliquerAvoirs(
-      adherentId,
-      montantDette,
-      "detteInitiale",
-      dette.id
-    );
-    const avoirsUtilises = montantDette.minus(montantRestantApresAvoirs);
-    if (avoirsUtilises.gt(0)) {
-      montantApplique = montantApplique.plus(avoirsUtilises);
-      const nouveauMontantPaye = new Decimal(dette.montantPaye).plus(avoirsUtilises);
-      const nouveauMontantRestant = montantRestantApresAvoirs.gt(0)
-        ? montantRestantApresAvoirs
-        : new Decimal(0);
-      await prisma.detteInitiale.update({
-        where: { id: dette.id },
-        data: { montantPaye: nouveauMontantPaye },
-      });
-    }
-  }
-  return { montantApplique };
+  const { appliquerAvoirSurDettesInitiales: appliquerService } = await import(
+    "@/lib/services/paiements/avoir-allocation"
+  );
+  return appliquerService(adherentId, prisma);
 }
 
 /**
@@ -230,27 +163,106 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
       return { success: false, error: "Non autorisé" };
     }
     const { canWrite } = await import("@/lib/dynamic-permissions");
-    let hasAccess = await canWrite(session.user.id, "createPaiement");
-    if (!hasAccess) {
-      // Autoriser l'adhérent à enregistrer un paiement par virement pour lui-même (page /paiement)
-      const selfAdherent = await prisma.adherent.findFirst({
-        where: { userId: session.user.id },
-      });
-      const isSelfVirement =
-        data.moyenPaiement === "Virement" &&
-        !!data.justificatifChemin?.trim() &&
-        selfAdherent?.id === data.adherentId;
-      if (isSelfVirement) {
-        hasAccess = true;
-      } else {
-        return { success: false, error: "Non autorisé" };
-      }
+    const isAdminWriter = await canWrite(session.user.id, "createPaiement");
+    const selfAdherent = await prisma.adherent.findFirst({
+      where: { userId: session.user.id },
+      select: { id: true },
+    });
+    const isSelfDeclaration =
+      (data.moyenPaiement === "Virement" || data.moyenPaiement === "Wero") &&
+      !!data.justificatifChemin?.trim() &&
+      !!selfAdherent &&
+      selfAdherent.id === data.adherentId;
+
+    if (!isAdminWriter && !isSelfDeclaration) {
+      return { success: false, error: "Non autorisé" };
     }
 
     const validatedData = CreatePaiementSchema.parse(data);
-    if (validatedData.moyenPaiement === "Virement" && !validatedData.justificatifChemin?.trim()) {
-      return { success: false, error: "Un justificatif (preuve de virement) est obligatoire pour valider un paiement par virement. Téléchargez un document en guise de preuve." };
+    if (
+      (validatedData.moyenPaiement === "Virement" ||
+        validatedData.moyenPaiement === "Wero") &&
+      !validatedData.justificatifChemin?.trim()
+    ) {
+      return {
+        success: false,
+        error:
+          "Un justificatif (preuve de paiement) est obligatoire pour un virement ou Wero.",
+      };
     }
+
+    // Self-service : déclaration EnAttente SANS crédit (validation admin requise)
+    if (!isAdminWriter && isSelfDeclaration) {
+      const { declareBankOrWeroPayment } = await import(
+        "@/lib/services/paiements/declare-bank-wero-payment"
+      );
+      let targetType:
+        | "cotisation-mensuelle"
+        | "dette-initiale"
+        | "assistance"
+        | "obligation"
+        | null = null;
+      let targetId: string | null = null;
+      if (validatedData.cotisationMensuelleId) {
+        targetType = "cotisation-mensuelle";
+        targetId = validatedData.cotisationMensuelleId;
+      } else if (validatedData.detteInitialeId) {
+        targetType = "dette-initiale";
+        targetId = validatedData.detteInitialeId;
+      } else if (validatedData.assistanceId) {
+        targetType = "assistance";
+        targetId = validatedData.assistanceId;
+      } else if (validatedData.obligationCotisationId) {
+        targetType = "obligation";
+        targetId = validatedData.obligationCotisationId;
+      }
+      if (!targetType || !targetId) {
+        return {
+          success: false,
+          error: "Cible de paiement manquante ou non autorisée",
+        };
+      }
+
+      try {
+        const declared = await declareBankOrWeroPayment(
+          {
+            userId: session.user.id,
+            role: (session.user as { role?: string }).role ?? "MEMBRE",
+            status: "Actif",
+            email: session.user.email ?? "",
+            name: session.user.name ?? null,
+            sessionId: null,
+            adminRoles: [],
+            adherentId: selfAdherent!.id,
+            channel: "web",
+          },
+          {
+            targetType,
+            targetId,
+            amount: String(validatedData.montant),
+            paymentMethod:
+              validatedData.moyenPaiement === "Wero" ? "Wero" : "Virement",
+            justificatifChemin: validatedData.justificatifChemin!.trim(),
+          }
+        );
+        revalidatePath("/paiement");
+        revalidatePath("/user/profile");
+        revalidatePath("/admin/finances/historique-paiements");
+        return {
+          success: true,
+          message: declared.message,
+          data: declared,
+          pendingValidation: true,
+        };
+      } catch (err: unknown) {
+        const msg =
+          err && typeof err === "object" && "message" in err
+            ? String((err as { message: string }).message)
+            : "Erreur lors de la déclaration du paiement";
+        return { success: false, error: msg };
+      }
+    }
+
     const montantPaiement = new Decimal(validatedData.montant);
     const datePaiement = validatedData.datePaiement ? new Date(validatedData.datePaiement) : new Date();
 
@@ -399,25 +411,29 @@ export async function createPaiement(data: z.infer<typeof CreatePaiementSchema>)
       },
     });
 
-    // Si il y a un excédent, créer un avoir puis tenter de l'appliquer sur les dettes initiales
+    // Excédent → autres dettes ouvertes (ordre métier) → Avoir sur le reliquat
     if (montantRestantAPayer.gt(0)) {
-      avoirCree = await prisma.avoir.create({
-        data: {
-          adherentId: validatedData.adherentId,
-          montant: montantRestantAPayer,
-          montantUtilise: new Decimal(0),
-          montantRestant: montantRestantAPayer,
-          paiementId: paiement.id,
-          description: `Avoir créé suite à un excédent de paiement de ${montantRestantAPayer.toFixed(2)}€`,
-          statut: "Disponible",
+      const { createAvoirFromPaymentSurplus } = await import(
+        "@/lib/services/paiements/avoir-allocation"
+      );
+      const surplusResult = await createAvoirFromPaymentSurplus(prisma, {
+        adherentId: validatedData.adherentId,
+        paiementId: paiement.id,
+        montant: new Decimal(montantRestantAPayer),
+        exclude: {
+          cotisationMensuelleId: validatedData.cotisationMensuelleId || null,
+          detteInitialeId: validatedData.detteInitialeId || null,
+          assistanceId: validatedData.assistanceId || null,
         },
       });
-      const { montantApplique } = await appliquerAvoirSurDettesInitiales(validatedData.adherentId);
-      // Recharger l'avoir au cas où il a été partiellement ou totalement utilisé sur une dette
-      if (avoirCree?.id) {
-        avoirCree = await prisma.avoir.findUnique({ where: { id: avoirCree.id } }) ?? avoirCree;
+      if (surplusResult?.avoirId) {
+        avoirCree = await prisma.avoir.findUnique({
+          where: { id: surplusResult.avoirId },
+        });
       }
-      avoirAppliqueSurDetteInitiale = montantApplique;
+      avoirAppliqueSurDetteInitiale = new Decimal(
+        surplusResult?.montantAppliqueSurDettes ?? 0
+      );
     }
 
     // Logger l'activité
@@ -1604,30 +1620,67 @@ export async function getAllPaiements() {
       data: paiements.map((p) => ({
         ...p,
         montant: Number(p.montant),
-        CotisationMensuelle: p.CotisationMensuelle ? {
-          ...p.CotisationMensuelle,
-          montantAttendu: Number(p.CotisationMensuelle.montantAttendu),
-          montantPaye: Number(p.CotisationMensuelle.montantPaye),
-          montantRestant: Number(p.CotisationMensuelle.montantRestant),
-        } : null,
-        DetteInitiale: p.DetteInitiale ? {
-          ...p.DetteInitiale,
-          montant: Number(p.DetteInitiale.montant),
-          montantPaye: Number(p.DetteInitiale.montantPaye),
-          montantRestant: Number(p.DetteInitiale.montantRestant),
-        } : null,
-        Assistance: p.Assistance ? {
-          ...p.Assistance,
-          montant: Number(p.Assistance.montant),
-          montantPaye: Number(p.Assistance.montantPaye),
-          montantRestant: Number(p.Assistance.montantRestant),
-        } : null,
-        ObligationCotisation: p.ObligationCotisation ? {
-          ...p.ObligationCotisation,
-          montantAttendu: Number(p.ObligationCotisation.montantAttendu),
-          montantPaye: Number(p.ObligationCotisation.montantPaye),
-          montantRestant: Number(p.ObligationCotisation.montantRestant),
-        } : null,
+        CotisationMensuelle: p.CotisationMensuelle
+          ? {
+              id: p.CotisationMensuelle.id,
+              periode: p.CotisationMensuelle.periode,
+              annee: p.CotisationMensuelle.annee,
+              mois: p.CotisationMensuelle.mois,
+              montantAttendu: Number(p.CotisationMensuelle.montantAttendu),
+              montantPaye: Number(p.CotisationMensuelle.montantPaye),
+              montantRestant: Number(p.CotisationMensuelle.montantRestant),
+              statut: p.CotisationMensuelle.statut,
+              TypeCotisation: p.CotisationMensuelle.TypeCotisation
+                ? {
+                    id: p.CotisationMensuelle.TypeCotisation.id,
+                    nom: p.CotisationMensuelle.TypeCotisation.nom,
+                    description:
+                      p.CotisationMensuelle.TypeCotisation.description,
+                    montant: Number(
+                      p.CotisationMensuelle.TypeCotisation.montant
+                    ),
+                    obligatoire:
+                      p.CotisationMensuelle.TypeCotisation.obligatoire,
+                    actif: p.CotisationMensuelle.TypeCotisation.actif,
+                    ordre: p.CotisationMensuelle.TypeCotisation.ordre,
+                    categorie: p.CotisationMensuelle.TypeCotisation.categorie,
+                    aBeneficiaire:
+                      p.CotisationMensuelle.TypeCotisation.aBeneficiaire,
+                  }
+                : null,
+            }
+          : null,
+        DetteInitiale: p.DetteInitiale
+          ? {
+              id: p.DetteInitiale.id,
+              annee: p.DetteInitiale.annee,
+              montant: Number(p.DetteInitiale.montant),
+              montantPaye: Number(p.DetteInitiale.montantPaye),
+              montantRestant: Number(p.DetteInitiale.montantRestant),
+              description: p.DetteInitiale.description,
+            }
+          : null,
+        Assistance: p.Assistance
+          ? {
+              id: p.Assistance.id,
+              type: p.Assistance.type,
+              montant: Number(p.Assistance.montant),
+              montantPaye: Number(p.Assistance.montantPaye),
+              montantRestant: Number(p.Assistance.montantRestant),
+              statut: p.Assistance.statut,
+              description: p.Assistance.description,
+            }
+          : null,
+        ObligationCotisation: p.ObligationCotisation
+          ? {
+              id: p.ObligationCotisation.id,
+              montantAttendu: Number(p.ObligationCotisation.montantAttendu),
+              montantPaye: Number(p.ObligationCotisation.montantPaye),
+              montantRestant: Number(p.ObligationCotisation.montantRestant),
+              statut: p.ObligationCotisation.statut,
+              description: p.ObligationCotisation.description,
+            }
+          : null,
       })),
     };
   } catch (error) {

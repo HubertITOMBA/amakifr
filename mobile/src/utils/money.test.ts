@@ -3,6 +3,7 @@ import { formatMoneyDecimalString } from "@/utils/money";
 import {
   cotisationErrorMessage,
   formatIsoDate,
+  formatPaymentDateTimeFr,
 } from "@/api/cotisations-state";
 
 describe("formatMoneyDecimalString", () => {
@@ -40,6 +41,19 @@ describe("formatIsoDate", () => {
 
   it("date invalide → tiret", () => {
     expect(formatIsoDate("not-a-date")).toBe("—");
+  });
+});
+
+describe("formatPaymentDateTimeFr", () => {
+  it("inclut date et heure", () => {
+    const out = formatPaymentDateTimeFr("2026-08-21T08:32:00.000Z");
+    expect(out).toMatch(/2026/);
+    expect(out).toMatch(/à/);
+    expect(out).not.toBe("—");
+  });
+
+  it("invalide → tiret", () => {
+    expect(formatPaymentDateTimeFr("nope")).toBe("—");
   });
 });
 

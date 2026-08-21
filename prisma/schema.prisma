@@ -107,6 +107,7 @@ enum MoyenPaiement {
   PayPal
   Mollie
   GooglePay
+  Wero
 }
 
 enum TypeTelephone {
@@ -263,6 +264,7 @@ model User {
   relancesCotisationMensuelle   RelanceCotisationMensuelle[] // Relances créées
   dettesInitialesCreees         DetteInitiale[]              @relation("DetteInitialeCreatedBy") // Dettes initiales créées
   paiementsCreees               PaiementCotisation[]         @relation("PaiementCreatedBy") // Paiements créés
+  comptesPaiementAssociation    ComptePaiementAssociation[]  @relation("ComptePaiementCreatedBy") // Comptes bancaires / Wero association
   assistancesCreees             Assistance[]                 @relation("AssistanceCreatedBy") // Assistances créées
   evenements                    Evenement[] // Événements créés
   conversations                 Conversation[] // Conversations créées
@@ -963,6 +965,30 @@ model PaiementCotisation {
   updatedAt DateTime @updatedAt
 
   @@map("paiements_cotisation")
+}
+
+/// Comptes bancaires / Wero de l'association (administrables).
+/// Au plus un compte avec actifPourPaiement=true est présenté aux adhérents.
+model ComptePaiementAssociation {
+  id                String   @id @default(cuid())
+  libelle           String   @db.VarChar(120)
+  titulaire         String   @db.VarChar(200)
+  iban              String   @db.VarChar(34)
+  bic               String   @db.VarChar(11)
+  codeBanque        String?  @db.VarChar(5)
+  codeGuichet       String?  @db.VarChar(5)
+  numeroCompte      String?  @db.VarChar(14)
+  cleRib            String?  @db.VarChar(2)
+  telephoneWero     String?  @db.VarChar(20)
+  weroActif         Boolean  @default(false)
+  actifPourPaiement Boolean  @default(false)
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+  createdBy         String
+  CreatedBy         User     @relation("ComptePaiementCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+
+  @@index([actifPourPaiement])
+  @@map("comptes_paiement_association")
 }
 
 // Modèle pour les avoirs (excédents de paiement)

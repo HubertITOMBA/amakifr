@@ -25,6 +25,7 @@ import { Footer } from "@/components/home/Footer";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Upload } from "lucide-react";
+import { ActivePaymentMeansCard } from "@/components/paiement/ActivePaymentMeansCard";
 
 export default function PaymentPage() {
   const searchParams = useSearchParams();
@@ -344,6 +345,8 @@ export default function PaymentPage() {
               <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">
                 Méthodes de paiement disponibles
               </h3>
+
+              <ActivePaymentMeansCard />
 
               {/* Carte bancaire (Stripe / Mollie) — désactivable via NEXT_PUBLIC_ENABLE_CARD_PAYMENT=false */}
               <Card

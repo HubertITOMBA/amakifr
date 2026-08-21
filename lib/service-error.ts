@@ -10,6 +10,8 @@ export type ServiceErrorCode =
   | "FORBIDDEN"
   | "NOT_FOUND"
   | "CONFLICT"
+  | "PAYMENT_ALREADY_PENDING"
+  | "PAYMENT_EXCEEDS_REMAINING"
   | "RATE_LIMITED"
   | "INTERNAL_ERROR";
 

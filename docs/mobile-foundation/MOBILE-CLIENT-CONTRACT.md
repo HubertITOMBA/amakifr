@@ -54,28 +54,33 @@ Pas de secrets backend dans `EXPO_PUBLIC_*`.
 - anti-IDOR côté backend
 - pas de cache persistant SecureStore
 
-## Cotisations (Phase A — consultation financière enrichie)
+## Cotisations (Phase A + B)
 
-Écran `(app)/cotisations` — **lecture seule** :
+Écran `(app)/cotisations` :
 
 | Méthode | Path | Rôle |
 |---------|------|------|
-| GET | `/api/v1/me/cotisations/year?annee=YYYY` | Synthèse + cotisations + dettes + assistances + historique paiements (année) |
-| GET | `/api/v1/me/cotisations-mensuelles` | Liste plate historique (conservée, non utilisée par l’écran Phase A) |
+| GET | `/api/v1/me/cotisations/year?annee=YYYY` | Synthèse + cotisations + dettes + assistances + flags pending (sans historique détaillé) |
+| GET | `/api/v1/me/cotisations/payments?annee=&limit=&offset=` | Historique paiements paginé (lazy) |
+| GET | `/api/v1/me/cotisations/lines?limit=&offset=` | Vue « Toutes les années » paginée |
+| GET | `/api/v1/me/payment-account` | Compte bancaire / Wero actif (lecture, lazy au clic Payer) |
+| POST | `/api/v1/me/payments/bank-transfer` | Déclaration Virement/Wero + justificatif → `EnAttente` |
 
 Règles client :
 
 - auth Bearer via `authenticatedFetch` uniquement
-- **pas** de `userId` / `adherentId` / `memberId` / `ownerId` query (anti-IDOR backend)
-- année civile `YYYY` (défaut = année courante côté client)
-- montants DTO en **string** décimale — jamais convertis en `Number` / `parseFloat`
-- dates ISO string — affichage local uniquement
-- synthèse : `detteBrute` / `avoirDisponible` / `resteNet` / `totalPayeAnnee` (miroir métier Web `getCumulDette`, ownership self-only)
-- filtre mois local (Tous / 1–12) — ne recharge pas l’API
-- pull-to-refresh sur **toutes** les sections ; en échec réseau après succès, données conservées + erreur non bloquante
-- **pas** de mutation cotisation / paiement / upload justificatif
-- **pas** de Stripe / Mollie / déclaration virement
-- **pas** de cache persistant (SecureStore / AsyncStorage)
+- **pas** de `userId` / `adherentId` / `memberId` / `ownerId` / `status` client (anti-IDOR)
+- montants DTO en **string** décimale
+- compte actif : le mobile ne choisit pas le compte
+- Wero : affiché seulement si `weroActif` + téléphone
+- déclaration paiement : statut `EnAttente` — **pas** de crédit immédiat ; validation admin
+- justificatif obligatoire (PDF/image, max 10 Mo) — stockage `storage/justificatifs-paiements/` (privé)
+- **Carte Stripe/Mollie : hors scope mobile (Phase C)**
+- deps Expo recommandées pour upload/copie native (non installées dans ce prompt) :
+  - `expo-clipboard`
+  - `expo-document-picker`
+  - `expo-image-picker`
+  (compatible SDK 57 via `npx expo install …` ; rebuild dev client probable)
 
 ## Documents (lecture seule)
 

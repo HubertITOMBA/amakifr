@@ -41,7 +41,7 @@ function item(mois: number, id = String(mois)): MyCotisationYearItemDto {
       categorie: "ForfaitMensuel",
       aBeneficiaire: false,
     },
-    paiements: [],
+    hasPendingPayment: false,
   };
 }
 
@@ -53,6 +53,7 @@ function assistance(
   return {
     id,
     source: "cotisation",
+    paymentTargetType: "cotisation-mensuelle",
     displayLabel,
     libelle: "Décès adhérent",
     description: displayLabel,
@@ -65,6 +66,7 @@ function assistance(
     montantPaye: "0",
     montantRestant: "50",
     statut: "EnAttente",
+    hasPendingPayment: false,
   };
 }
 

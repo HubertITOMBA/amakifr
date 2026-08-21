@@ -26,10 +26,16 @@ import {
   AlertTriangle,
   Euro,
   Hash,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { toast } from "sonner";
 import Link from "next/link";
 import { getAllPaiements, createPaiement, getAdherentFinancialItems } from "@/actions/paiements";
+import {
+  adminValidatePaiement,
+  adminRejectPaiement,
+} from "@/actions/paiement-comptes";
 import {
   createColumnHelper,
   getCoreRowModel,
@@ -58,6 +64,8 @@ const getMoyenPaiementLabel = (moyen: string) => {
       return "Virement";
     case "CarteBancaire":
       return "Carte bancaire";
+    case "Wero":
+      return "Wero";
     default:
       return moyen;
   }
@@ -73,8 +81,40 @@ const getMoyenPaiementColor = (moyen: string) => {
       return "bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200";
     case "CarteBancaire":
       return "bg-orange-100 text-orange-800 dark:bg-orange-900 dark:text-orange-200";
+    case "Wero":
+      return "bg-amber-100 text-amber-900 dark:bg-amber-900 dark:text-amber-100";
     default:
       return "bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200";
+  }
+};
+
+const getStatutPaiementLabel = (statut: string) => {
+  switch (statut) {
+    case "EnAttente":
+      return "En attente";
+    case "Valide":
+      return "Validé";
+    case "Annule":
+      return "Annulé";
+    case "EnCours":
+      return "En cours";
+    default:
+      return statut || "—";
+  }
+};
+
+const getStatutPaiementColor = (statut: string) => {
+  switch (statut) {
+    case "EnAttente":
+      return "bg-amber-100 text-amber-900 border-amber-200 dark:bg-amber-900/40 dark:text-amber-100";
+    case "Valide":
+      return "bg-emerald-100 text-emerald-800 border-emerald-200 dark:bg-emerald-900/40 dark:text-emerald-100";
+    case "Annule":
+      return "bg-red-100 text-red-800 border-red-200 dark:bg-red-900/40 dark:text-red-100";
+    case "EnCours":
+      return "bg-sky-100 text-sky-800 border-sky-200 dark:bg-sky-900/40 dark:text-sky-100";
+    default:
+      return "bg-gray-100 text-gray-800 border-gray-200 dark:bg-gray-800 dark:text-gray-200";
   }
 };
 
@@ -95,6 +135,7 @@ export default function AdminHistoriquePaiementsPage() {
   const [anneeFilter, setAnneeFilter] = useState<string>("all");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedPaiement, setSelectedPaiement] = useState<any | null>(null);
+  const [detailActionLoading, setDetailActionLoading] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
   const [pagination, setPagination] = useState({ pageIndex: 0, pageSize: 10 });
   const [columnVisibility, setColumnVisibility] = useState<VisibilityState>(() => {
@@ -113,6 +154,7 @@ export default function AdminHistoriquePaiementsPage() {
             moyenPaiement: false,
             datePaiement: false,
             reference: false,
+            statut: true,
             objetPaye: false,
             actions: true,
           };
@@ -154,6 +196,7 @@ export default function AdminHistoriquePaiementsPage() {
           moyenPaiement: false,
           datePaiement: false,
           reference: false,
+          statut: true,
           objetPaye: false,
           actions: true,
         });
@@ -249,6 +292,7 @@ export default function AdminHistoriquePaiementsPage() {
           item.reference || "",
           item.description || "",
           getMoyenPaiementLabel(item.moyenPaiement) || "",
+          getStatutPaiementLabel(item.statut || "Valide") || "",
         ]
           .join(" ")
           .toLowerCase();
@@ -416,6 +460,11 @@ export default function AdminHistoriquePaiementsPage() {
                   {getMoyenPaiementLabel(moyenPaiement)}
                 </span>
               )}
+              {row.original.statut && (
+                <span className="text-xs text-gray-500 dark:text-gray-400 md:hidden font-normal">
+                  {getStatutPaiementLabel(row.original.statut)}
+                </span>
+              )}
             </div>
           );
         },
@@ -465,6 +514,24 @@ export default function AdminHistoriquePaiementsPage() {
         maxSize: 200,
         enableResizing: true,
       }),
+      columnHelper.accessor("statut", {
+        header: "Statut",
+        cell: ({ row }) => {
+          const statut = (row.getValue("statut") as string) || "Valide";
+          return (
+            <Badge
+              variant="outline"
+              className={getStatutPaiementColor(statut)}
+            >
+              {getStatutPaiementLabel(statut)}
+            </Badge>
+          );
+        },
+        size: 130,
+        minSize: 110,
+        maxSize: 180,
+        enableResizing: true,
+      }),
       columnHelper.display({
         id: "objetPaye",
         header: "Cotisation / Objet payé",
@@ -499,25 +566,31 @@ export default function AdminHistoriquePaiementsPage() {
         maxSize: 400,
         enableResizing: true,
       }),
-      // 6. Actions
+      // Actions (œil) — colonne dédiée, hors zone de recherche
       columnHelper.display({
         id: "actions",
         header: "Actions",
+        meta: { forceVisible: true },
         cell: ({ row }) => (
-          <Button
-            variant="ghost"
-            size="sm"
-            className="h-8 w-8 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
-            onClick={() => {
-              setSelectedPaiement(row.original);
-              setDetailDialogOpen(true);
-            }}
-            aria-label="Voir les détails"
-          >
-            <Eye className="h-4 w-4" />
-          </Button>
+          <div className="flex items-center justify-center">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8 w-8 p-0 border-emerald-300 text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
+              onClick={() => {
+                setSelectedPaiement(row.original);
+                setDetailDialogOpen(true);
+              }}
+              aria-label="Voir les détails"
+              title="Voir les détails"
+            >
+              <Eye className="h-4 w-4" />
+            </Button>
+          </div>
         ),
         size: 80,
+        minSize: 70,
+        maxSize: 100,
         enableResizing: false,
       }),
     ],
@@ -559,6 +632,7 @@ export default function AdminHistoriquePaiementsPage() {
             moyenPaiement: false,
             datePaiement: false,
             reference: false,
+            statut: true,
             objetPaye: false,
             actions: true,
           }
@@ -628,7 +702,21 @@ export default function AdminHistoriquePaiementsPage() {
                 <Receipt className="h-5 w-5 text-white" />
                 Historique des paiements ({filteredData.length})
               </CardTitle>
-              <div className="flex items-center gap-2 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void loadData()}
+                  disabled={loading}
+                  className="bg-white/95 text-green-700 border-white hover:bg-green-50"
+                >
+                  {loading ? (
+                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  ) : (
+                    <RefreshCw className="h-4 w-4 mr-2" />
+                  )}
+                  Actualiser
+                </Button>
                 <ColumnVisibilityToggle
                   table={table}
                   storageKey="admin-historique-paiements-column-visibility"
@@ -896,13 +984,16 @@ export default function AdminHistoriquePaiementsPage() {
           </CardHeader>
           <CardContent className="pt-0 pb-4 px-4 sm:px-6 flex-1 flex flex-col min-h-0 overflow-auto">
             <div className="flex flex-col sm:flex-row gap-3 sm:gap-4 mb-4 sm:mb-6 flex-wrap">
-              <div className="relative flex-1 min-w-[200px]">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+              <div className="flex flex-1 items-center gap-2 min-w-[200px]">
+                <Search
+                  className="h-4 w-4 shrink-0 text-gray-400 dark:text-gray-500"
+                  aria-hidden
+                />
                 <Input
                   placeholder="Rechercher par adhérent (nom, email)..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-28"
+                  className="flex-1"
                 />
               </div>
               <Select value={moisFilter} onValueChange={setMoisFilter}>
@@ -941,6 +1032,7 @@ export default function AdminHistoriquePaiementsPage() {
                   <SelectItem value="Cheque">Chèque</SelectItem>
                   <SelectItem value="Virement">Virement</SelectItem>
                   <SelectItem value="CarteBancaire">Carte bancaire</SelectItem>
+                  <SelectItem value="Wero">Wero</SelectItem>
                 </SelectContent>
               </Select>
             </div>
@@ -1054,7 +1146,16 @@ export default function AdminHistoriquePaiementsPage() {
         </Card>
 
         {/* Dialog Détails du paiement */}
-        <Dialog open={detailDialogOpen} onOpenChange={setDetailDialogOpen}>
+        <Dialog
+          open={detailDialogOpen}
+          onOpenChange={(open) => {
+            setDetailDialogOpen(open);
+            if (!open) {
+              setSelectedPaiement(null);
+              setDetailActionLoading(false);
+            }
+          }}
+        >
           <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto bg-white dark:bg-gray-900 border-2 border-emerald-200 dark:border-emerald-800 shadow-xl">
             <DialogHeader className="rounded-t-lg -mx-6 -mt-6 px-6 py-4 bg-gradient-to-r from-emerald-500 to-teal-600 dark:from-emerald-700 dark:to-teal-800 border-b border-emerald-200 dark:border-emerald-800">
               <DialogTitle className="flex items-center gap-2 text-white">
@@ -1065,8 +1166,19 @@ export default function AdminHistoriquePaiementsPage() {
                 Toutes les informations enregistrées pour ce paiement
               </DialogDescription>
             </DialogHeader>
-            {selectedPaiement && (
+            {selectedPaiement ? (
               <div className="space-y-4 pt-4">
+                <div className="flex items-center justify-between gap-2">
+                  <Label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                    Statut
+                  </Label>
+                  <Badge
+                    variant="outline"
+                    className={getStatutPaiementColor(selectedPaiement.statut || "Valide")}
+                  >
+                    {getStatutPaiementLabel(selectedPaiement.statut || "Valide")}
+                  </Badge>
+                </div>
                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3 space-y-1">
                   <Label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5" />
@@ -1136,7 +1248,7 @@ export default function AdminHistoriquePaiementsPage() {
                   <div className="rounded-lg border border-emerald-200 dark:border-emerald-800 bg-emerald-50/50 dark:bg-emerald-950/30 p-3 space-y-1">
                     <Label className="text-xs font-semibold text-emerald-800 dark:text-emerald-300 uppercase tracking-wide">Justificatif (virement)</Label>
                     <a
-                      href={selectedPaiement.justificatifChemin}
+                      href={`/api/admin/payments/${selectedPaiement.id}/justificatif`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sm text-emerald-700 dark:text-emerald-300 underline hover:no-underline"
@@ -1160,8 +1272,83 @@ export default function AdminHistoriquePaiementsPage() {
                     </p>
                   </div>
                 )}
+
+                <div className="flex flex-col sm:flex-row gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+                  {(selectedPaiement.statut === "EnAttente" ||
+                    selectedPaiement.statut === "Annule") && (
+                    <Button
+                      className="bg-green-600 hover:bg-green-700"
+                      disabled={detailActionLoading}
+                      onClick={async () => {
+                        try {
+                          setDetailActionLoading(true);
+                          const res = await adminValidatePaiement(selectedPaiement.id);
+                          if (res.success) {
+                            toast.success(res.message || "Validé");
+                            setDetailDialogOpen(false);
+                            setSelectedPaiement(null);
+                            await loadData();
+                          } else {
+                            toast.error(res.error || "Erreur");
+                          }
+                        } finally {
+                          setDetailActionLoading(false);
+                        }
+                      }}
+                    >
+                      {detailActionLoading ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : null}
+                      {selectedPaiement.statut === "Annule"
+                        ? "Valider (corriger le rejet)"
+                        : "Valider le paiement"}
+                    </Button>
+                  )}
+                  {(selectedPaiement.statut === "EnAttente" ||
+                    selectedPaiement.statut === "Valide") && (
+                    <Button
+                      variant="outline"
+                      className="border-red-300 text-red-700 hover:bg-red-50"
+                      disabled={detailActionLoading}
+                      onClick={async () => {
+                        try {
+                          setDetailActionLoading(true);
+                          const res = await adminRejectPaiement(selectedPaiement.id);
+                          if (res.success) {
+                            toast.success(res.message || "Rejeté");
+                            setDetailDialogOpen(false);
+                            setSelectedPaiement(null);
+                            await loadData();
+                          } else {
+                            toast.error(res.error || "Erreur");
+                          }
+                        } finally {
+                          setDetailActionLoading(false);
+                        }
+                      }}
+                    >
+                      {detailActionLoading ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : null}
+                      {selectedPaiement.statut === "Valide"
+                        ? "Annuler le paiement (crédits)"
+                        : "Rejeter"}
+                    </Button>
+                  )}
+                  <Button
+                    variant="outline"
+                    className="sm:ml-auto"
+                    disabled={detailActionLoading}
+                    onClick={() => {
+                      setDetailDialogOpen(false);
+                      setSelectedPaiement(null);
+                    }}
+                  >
+                    Fermer
+                  </Button>
+                </div>
               </div>
-            )}
+            ) : null}
           </DialogContent>
         </Dialog>
       </div>

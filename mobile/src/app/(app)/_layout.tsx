@@ -73,6 +73,13 @@ function AppTabs() {
         }}
       />
       <Tabs.Screen
+        name="cotisations-historique"
+        options={{
+          title: "Historique des paiements",
+          href: null,
+        }}
+      />
+      <Tabs.Screen
         name="documents"
         options={{
           title: "Documents",

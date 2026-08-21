@@ -53,6 +53,8 @@ export type MyDebtDto = {
   montantPaye: string;
   montantRestant: string;
   description: string | null;
+  /** Un paiement EnAttente existe déjà pour cette dette. */
+  hasPendingPayment: boolean;
 };
 
 /** Assistance à payer (ligne CotisationMensuelle catégorie Assistance). */
@@ -60,6 +62,11 @@ export type MyAssistanceDto = {
   id: string;
   /** Toujours `cotisation` : aligné liste mensuelle Web (pas l’entité Assistance bénéficiaire). */
   source: "cotisation";
+  /**
+   * Cible de paiement réelle (serveur) — ne pas déduire du libellé UI.
+   * Pour les lignes affichées en « Assistances », c’est toujours cotisation-mensuelle.
+   */
+  paymentTargetType: "cotisation-mensuelle";
   /**
    * Libellé prêt à afficher (règle Web) :
    * ex. « Décès adhérent - Madame Henriette »
@@ -79,6 +86,8 @@ export type MyAssistanceDto = {
   montantPaye: string;
   montantRestant: string;
   statut: string;
+  /** Un paiement EnAttente existe déjà pour cette ligne CM. */
+  hasPendingPayment: boolean;
 };
 
 /** Versement self-service (sans secrets / justificatif). */
@@ -96,9 +105,9 @@ export type MyPaymentDto = {
   assistanceId: string | null;
 };
 
-/** Cotisation annuelle avec versements liés (paiements fractionnés). */
+/** Cotisation annuelle (sans historique détaillé — lazy via /payments). */
 export type MyCotisationYearItemDto = CotisationMensuelleDto & {
-  paiements: MyPaymentDto[];
+  hasPendingPayment: boolean;
 };
 
 /**
@@ -113,7 +122,7 @@ export type MyCotisationYearSummaryDto = {
   totalPayeAnnee: string;
 };
 
-/** Vue annuelle financière self-service (Phase A lecture seule). */
+/** Vue annuelle financière self-service (historique paiements hors DTO). */
 export type MyCotisationYearDto = {
   annee: number;
   summary: MyCotisationYearSummaryDto;
@@ -122,6 +131,41 @@ export type MyCotisationYearDto = {
   /** Lignes CotisationMensuelle Assistance (pas l’entité Assistance bénéficiaire) */
   assistances: MyAssistanceDto[];
   dettes: MyDebtDto[];
-  /** Historique versements de l'année (tous rattachements) */
-  paiements: MyPaymentDto[];
+};
+
+/** Ligne unifiée (vue Toutes les années). */
+export type MyCotisationLineDto = {
+  kind: "dette" | "cotisation" | "assistance";
+  id: string;
+  annee: number;
+  mois: number | null;
+  label: string;
+  montantAttendu: string;
+  montantPaye: string;
+  montantRestant: string;
+  statut: string;
+  hasPendingPayment: boolean;
+  paymentTargetType:
+    | "cotisation-mensuelle"
+    | "dette-initiale"
+    | "assistance"
+    | "obligation";
+  paymentTargetId: string;
+};
+
+/** Page historique paiements. */
+export type MyPaymentsPageDto = {
+  items: MyPaymentDto[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+/** Page lignes Toutes les années. */
+export type MyCotisationLinesPageDto = {
+  items: MyCotisationLineDto[];
+  total: number;
+  limit: number;
+  offset: number;
+  summary: MyCotisationYearSummaryDto;
 };
