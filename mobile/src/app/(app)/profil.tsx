@@ -1,14 +1,21 @@
 import { useCallback, useEffect, useState } from "react";
+import { Alert, Linking } from "react-native";
 import { Image } from "expo-image";
 import { RefreshControl, ScrollView, StyleSheet, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import * as WebBrowser from "expo-web-browser";
 import { useAuth } from "@/auth/auth-context";
 import { ApiClientError, type MeDto } from "@/api/types";
+import {
+  getMyDataDeletionRequest,
+  submitMyDataDeletionRequest,
+} from "@/api/rgpd";
 import { Card } from "@/components/ui/card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { LoadingState } from "@/components/ui/loading-state";
 import { SecondaryButton } from "@/components/ui/secondary-button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { getApiBaseUrl } from "@/config/api";
 import { getInitials, formatAddress, formatDateFr } from "@/utils/profile-helpers";
 import {
   AmakiColors,
@@ -26,6 +33,11 @@ export default function ProfilScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
+  const [deletionStatus, setDeletionStatus] = useState<{
+    id: string;
+    statut: string;
+  } | null>(null);
+  const [deletionLoading, setDeletionLoading] = useState(false);
 
   const load = useCallback(async (isRefresh = false) => {
     setError(null);
@@ -36,6 +48,12 @@ export default function ProfilScreen() {
     }
     try {
       await refreshMe();
+      try {
+        const req = await getMyDataDeletionRequest();
+        setDeletionStatus(req);
+      } catch {
+        // RGPD optionnel — ne bloque pas le profil
+      }
     } catch (e) {
       if (e instanceof ApiClientError) {
         setError(e.message);
@@ -59,6 +77,51 @@ export default function ProfilScreen() {
     } finally {
       setSigningOut(false);
     }
+  }
+
+  async function openConfidentialite() {
+    const url = `${getApiBaseUrl().replace(/\/$/, "")}/confidentialite`;
+    try {
+      await WebBrowser.openBrowserAsync(url);
+    } catch {
+      await Linking.openURL(url);
+    }
+  }
+
+  function onRequestAccountDeletion() {
+    Alert.alert(
+      "Suppression de compte",
+      "Vous allez demander la suppression de vos données personnelles (RGPD). Cette action concerne le compte entier, pas un document isolé.",
+      [
+        { text: "Annuler", style: "cancel" },
+        {
+          text: "Confirmer",
+          style: "destructive",
+          onPress: () => {
+            void (async () => {
+              setDeletionLoading(true);
+              try {
+                const res = await submitMyDataDeletionRequest();
+                setDeletionStatus({ id: res.id, statut: res.statut });
+                Alert.alert(
+                  "Demande enregistrée",
+                  "Votre demande de suppression a été transmise à l'administration."
+                );
+              } catch (e) {
+                Alert.alert(
+                  "Demande impossible",
+                  e instanceof ApiClientError
+                    ? e.message
+                    : "Erreur lors de la demande"
+                );
+              } finally {
+                setDeletionLoading(false);
+              }
+            })();
+          },
+        },
+      ]
+    );
   }
 
   if (loading && !user) {
@@ -167,6 +230,36 @@ export default function ProfilScreen() {
               last
             />
           ) : null}
+        </Card>
+
+        {/* === CONFIDENTIALITÉ / RGPD === */}
+        <Text style={styles.sectionTitle}>Confidentialité / RGPD</Text>
+        <Card>
+          <Text style={styles.rgpdHint}>
+            Accès aux droits déjà supportés sur le portail Web AMAKI.
+          </Text>
+          <SecondaryButton
+            label="Politique de confidentialité"
+            onPress={() => void openConfidentialite()}
+            style={styles.rgpdBtn}
+          />
+          <SecondaryButton
+            label={
+              deletionStatus
+                ? `Demande en cours (${deletionStatus.statut})`
+                : "Demander la suppression de mon compte"
+            }
+            onPress={() => void onRequestAccountDeletion()}
+            disabled={Boolean(deletionStatus) || deletionLoading}
+            loading={deletionLoading}
+            variant="danger"
+            style={styles.rgpdBtn}
+          />
+          <Text style={styles.rgpdNote}>
+            Ceci concerne la suppression de votre compte (RGPD). Pour un
+            document validé et public, utilisez « Demander la suppression »
+            dans Mes documents — ce sont deux workflows distincts.
+          </Text>
         </Card>
 
         {/* === DÉCONNEXION === */}
@@ -312,5 +405,19 @@ const styles = StyleSheet.create({
   },
   logoutBtn: {
     minWidth: 200,
+  },
+  rgpdHint: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textSecondary,
+    marginBottom: AmakiSpacing.sm,
+  },
+  rgpdBtn: {
+    alignSelf: "stretch",
+    marginBottom: AmakiSpacing.sm,
+  },
+  rgpdNote: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+    marginTop: AmakiSpacing.xs,
   },
 });

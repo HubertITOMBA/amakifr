@@ -37,7 +37,7 @@ import {
 } from "lucide-react";
 import { formatDistanceToNow, format } from "date-fns";
 import { fr } from "date-fns/locale";
-import { getAllDocuments, adminDeleteDocument } from "@/actions/documents";
+import { getAllDocuments, adminDeleteDocument, adminValidateDocumentAction, adminRejectDocumentAction, adminSetDocumentPublicAction } from "@/actions/documents";
 import { toast } from "sonner";
 import { TypeDocument } from "@prisma/client";
 import { useSession } from "next-auth/react";
@@ -219,6 +219,37 @@ export default function AdminDocumentsPage() {
     }
   };
 
+  const handleValidate = async (documentId: string) => {
+    const result = await adminValidateDocumentAction(documentId);
+    if (result.success) {
+      toast.success(result.message || "Document validé");
+      loadDocuments();
+    } else {
+      toast.error(result.error || "Erreur");
+    }
+  };
+
+  const handleReject = async (documentId: string) => {
+    const reason = window.prompt("Motif du rejet (optionnel) :") ?? undefined;
+    const result = await adminRejectDocumentAction(documentId, reason);
+    if (result.success) {
+      toast.success(result.message || "Document rejeté");
+      loadDocuments();
+    } else {
+      toast.error(result.error || "Erreur");
+    }
+  };
+
+  const handleSetPublic = async (documentId: string, estPublic: boolean) => {
+    const result = await adminSetDocumentPublicAction(documentId, estPublic);
+    if (result.success) {
+      toast.success(result.message || "Publication mise à jour");
+      loadDocuments();
+    } else {
+      toast.error(result.error || "Erreur");
+    }
+  };
+
   const handleUploadSuccess = (document: any) => {
     setDocuments((prev) => [document, ...prev]);
     setShowUploadDialog(false);
@@ -376,6 +407,44 @@ export default function AdminDocumentsPage() {
       maxSize: 120,
       enableResizing: true,
     }),
+    columnHelper.accessor("statutValidation", {
+      header: "Validation",
+      cell: ({ row }) => {
+        const doc = row.original;
+        const statut = doc.statutValidation || "EnAttente";
+        const pendingDelete = (doc.DeletionRequests?.length ?? 0) > 0;
+        return (
+          <div className="space-y-1">
+            <Badge
+              variant="outline"
+              className={
+                statut === "Valide"
+                  ? "bg-green-100 text-green-800"
+                  : statut === "Rejete"
+                    ? "bg-red-100 text-red-800"
+                    : "bg-amber-100 text-amber-800"
+              }
+            >
+              {statut}
+            </Badge>
+            <div>
+              <Badge variant="outline" className="text-[10px]">
+                {doc.estPublic ? "Public" : "Privé"}
+              </Badge>
+            </div>
+            {pendingDelete ? (
+              <div className="text-[10px] font-semibold text-red-600">
+                Demande suppression
+              </div>
+            ) : null}
+          </div>
+        );
+      },
+      size: 140,
+      minSize: 120,
+      maxSize: 180,
+      enableResizing: true,
+    }),
     columnHelper.accessor("createdAt", {
       header: "Date",
       cell: ({ row }) => {
@@ -421,7 +490,11 @@ export default function AdminDocumentsPage() {
                 <DropdownMenuSeparator />
                 <DropdownMenuItem asChild>
                   <a
-                    href={document.chemin}
+                    href={
+                      String(document.chemin || "").startsWith("private/")
+                        ? `/api/admin/documents/${document.id}/file`
+                        : document.chemin
+                    }
                     target="_blank"
                     rel="noopener noreferrer"
                     className="flex items-center gap-2 cursor-pointer"
@@ -429,6 +502,32 @@ export default function AdminDocumentsPage() {
                     <Eye className="h-4 w-4" />
                     <span>Voir / Télécharger</span>
                   </a>
+                </DropdownMenuItem>
+                {document.statutValidation !== "Valide" ? (
+                  <DropdownMenuItem
+                    onClick={() => void handleValidate(document.id)}
+                    className="cursor-pointer"
+                  >
+                    <span>Valider</span>
+                  </DropdownMenuItem>
+                ) : null}
+                {document.statutValidation !== "Rejete" ? (
+                  <DropdownMenuItem
+                    onClick={() => void handleReject(document.id)}
+                    className="cursor-pointer"
+                  >
+                    <span>Rejeter</span>
+                  </DropdownMenuItem>
+                ) : null}
+                <DropdownMenuItem
+                  onClick={() =>
+                    void handleSetPublic(document.id, !document.estPublic)
+                  }
+                  className="cursor-pointer"
+                >
+                  <span>
+                    {document.estPublic ? "Rendre privé" : "Rendre public"}
+                  </span>
                 </DropdownMenuItem>
                 {canEdit && (
                   <>

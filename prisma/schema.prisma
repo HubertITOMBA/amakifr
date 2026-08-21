@@ -288,6 +288,8 @@ model User {
   dataDeletionRequestsRejected  DataDeletionRequest[]        @relation("DataDeletionRequestRejectedBy") // Demandes rejetées
   dataDeletionRequestsCompleted DataDeletionRequest[]        @relation("DataDeletionRequestCompletedBy") // Demandes complétées
   documents                     Document[] // Documents uploadés
+  documentsValidated            Document[]                   @relation("DocumentValidatedBy")
+  documentDeletionRequestsResolved DocumentDeletionRequest[] @relation("DocumentDeletionResolvedBy")
   badgesAttribues               BadgeAttribution[] // Badges attribués à cet utilisateur
   ressourcesCreees              Ressource[]                  @relation("RessourceCreatedBy") // Ressources créées
   reservationsConfirmees        Reservation[]                @relation("ReservationConfirmeePar") // Réservations confirmées
@@ -1293,6 +1295,20 @@ enum TypeDocument {
   Autre
 }
 
+/** Validation administrative d'un document adhérent (Phase 1.5). */
+enum StatutValidationDocument {
+  EnAttente
+  Valide
+  Rejete
+}
+
+/** Demande de suppression d'un document verrouillé (Valide+Public). */
+enum StatutDemandeSuppressionDocument {
+  EnAttente
+  Traitee
+  Annulee
+}
+
 // Modèle pour les idées de la boîte à idées
 model Idee {
   id                 String     @id @default(cuid())
@@ -1533,28 +1549,65 @@ model DataDeletionRequest {
 
 // Modèle pour les documents uploadés
 model Document {
-  id          String       @id @default(cuid())
-  userId      String
-  adherentId  String? // Optionnel, pour lier à un adhérent spécifique
-  nom         String       @db.VarChar(255) // Nom du fichier stocké
-  nomOriginal String       @db.VarChar(255) // Nom original du fichier
-  type        TypeDocument
-  categorie   String?      @db.VarChar(100) // Catégorie personnalisée
-  chemin      String       @db.VarChar(500) // Chemin relatif dans /public/ressources
-  taille      Int // Taille en bytes
-  mimeType    String       @db.VarChar(100)
-  description String?      @db.Text
-  estPublic   Boolean      @default(false) // Si visible par les admins
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  User        User         @relation(fields: [userId], references: [id], onDelete: Cascade)
-  Adherent    Adherent?    @relation("DocumentAdherent", fields: [adherentId], references: [id], onDelete: SetNull)
+  id               String                   @id @default(cuid())
+  userId           String
+  adherentId       String? // Optionnel, pour lier à un adhérent spécifique
+  nom              String                   @db.VarChar(255) // Nom du fichier stocké
+  nomOriginal      String                   @db.VarChar(255) // Nom original du fichier
+  type             TypeDocument
+  categorie        String?                  @db.VarChar(100) // Catégorie personnalisée
+  chemin           String                   @db.VarChar(500) // Chemin relatif (public legacy ou private/documents)
+  taille           Int // Taille en bytes
+  mimeType         String                   @db.VarChar(100)
+  description      String?                  @db.Text
+  /**
+   * Visibilité métier / UI admin (pas l'accès physique au fichier).
+   * Les nouveaux uploads mobiles restent en stockage privé.
+   */
+  estPublic        Boolean                  @default(false)
+  /** Validation administrative — distincte de estPublic. */
+  statutValidation StatutValidationDocument @default(EnAttente)
+  validatedAt      DateTime?
+  validatedBy      String?
+  rejectionReason  String?                  @db.Text
+  createdAt        DateTime                 @default(now())
+  updatedAt        DateTime                 @updatedAt
+  User             User                     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  Adherent         Adherent?                @relation("DocumentAdherent", fields: [adherentId], references: [id], onDelete: SetNull)
+  ValidatedBy      User?                    @relation("DocumentValidatedBy", fields: [validatedBy], references: [id], onDelete: SetNull)
+  DeletionRequests DocumentDeletionRequest[]
 
   @@index([userId])
   @@index([adherentId])
   @@index([type])
   @@index([createdAt])
+  @@index([statutValidation])
+  @@index([estPublic])
   @@map("documents")
+}
+
+/**
+ * Demande de suppression d'un document verrouillé (Valide + Public).
+ * Distinct du RGPD compte (DataDeletionRequest).
+ */
+model DocumentDeletionRequest {
+  id           String                          @id @default(cuid())
+  documentId   String
+  requestedBy  String // userId du demandeur
+  motif        String?                         @db.Text
+  statut       StatutDemandeSuppressionDocument @default(EnAttente)
+  createdAt    DateTime                        @default(now())
+  updatedAt    DateTime                        @updatedAt
+  resolvedAt   DateTime?
+  resolvedBy   String?
+  Document     Document                        @relation(fields: [documentId], references: [id], onDelete: Cascade)
+  ResolvedBy   User?                           @relation("DocumentDeletionResolvedBy", fields: [resolvedBy], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+  @@index([requestedBy])
+  @@index([statut])
+  @@index([createdAt])
+  @@map("document_deletion_requests")
 }
 
 // Modèle pour les rapports de réunions mensuelles (rédigé après la réunion)

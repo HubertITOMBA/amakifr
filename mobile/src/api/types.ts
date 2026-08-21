@@ -288,18 +288,23 @@ export type TypeDocument =
 
 /**
  * Document self-service.
- * Dates : ISO string. Pas de userId / adherentId / nom interne.
+ * Dates : ISO string. Pas de userId / adherentId / chemin physique.
  */
 export type DocumentDto = {
   id: string;
   nomOriginal: string;
   type: TypeDocument;
   categorie: string | null;
-  chemin: string;
   taille: number;
   mimeType: string;
   description: string | null;
   createdAt: string;
+  estPublic: boolean;
+  statutValidation: "EnAttente" | "Valide" | "Rejete";
+  statusLabel: string;
+  canDelete: boolean;
+  canRequestDelete: boolean;
+  deletionRequestStatus: "EnAttente" | "Traitee" | "Annulee" | null;
 };
 
 /**

@@ -82,24 +82,37 @@ Règles client :
   - `expo-image-picker`
   (compatible SDK 57 via `npx expo install …` ; rebuild dev client probable)
 
-## Documents (lecture seule)
+## Documents
 
-Écran `(app)/documents` — **lecture seule**, ouvert depuis Accueil (pas d’onglet dédié) :
+Écran `(app)/documents` :
+
+| Méthode | Path | Rôle |
+|---------|------|------|
+| GET | `/api/v1/me/documents` | Liste DTO (sans chemin physique) |
+| POST | `/api/v1/me/documents` | Upload multipart PDF/image → stockage privé |
+| DELETE | `/api/v1/me/documents/[id]` | Suppression owner si non verrouillé |
+| GET | `/api/v1/me/documents/[id]/file` | Téléchargement authentifié |
+| POST | `/api/v1/me/documents/[id]/deletion-request` | Demande suppression si Valide+Public |
+
+Règles :
+- ownership `actor.userId` uniquement (refus `userId` / `adherentId` / `ownerId` client)
+- Phase 1 : PDF + images (vidéo refusée)
+- nouveaux fichiers : `storage/documents/` (`private/documents/...` en DB)
+- legacy `/ressources/documents/...` toujours servis via `/file`
+- upload → `statutValidation=EnAttente`, `estPublic=false`
+- `estPublic` = publication métier / visible admin — **distinct** de l’accès fichier (privé)
+- verrou adhérent : `Valide` **et** `estPublic` → `canDelete=false`, `canRequestDelete=true`
+- serveur calcule `canDelete` / `canRequestDelete` (jamais confiance client)
+- justificatifs cotisations : silo `PaiementCotisation` (hors Document)
+
+## RGPD compte (mobile) — distinct des documents
 
 | Méthode | Path |
 |---------|------|
-| GET | `/api/v1/me/documents` |
+| GET/POST | `/api/v1/me/rgpd/data-deletion` |
 
-Règles client :
-
-- self-service via `actor.userId` côté backend — **pas** de `userId` / `adherentId` client
-- auth Bearer via `authenticatedFetch` uniquement
-- pull-to-refresh, loading / empty / error
-- **pas** d’upload / édition / suppression
-- ouverture actuelle : URL publique `/ressources/documents/*` (helper `buildDocumentOpenUrl`)
-- chemins hors `/ressources/documents/` refusés (galeries, justificatifs, traversal `..` / `%2e%2e`)
-
-Dette sécurité connue : les fichiers Documents sont **historiquement publics par URL** (contrat Web existant). Ce MVP **n’a pas changé** ce stockage ni `/api/ressources`. Un proxy authentifié reste un durcissement futur.
+Profil → Confidentialité : politique Web + **« Demander la suppression de mon compte »** (`DataDeletionRequest`).
+Documents → **« Demander la suppression »** d’un document verrouillé (`DocumentDeletionRequest`) — workflows séparés.
 
 ## Passeport (self-service)
 

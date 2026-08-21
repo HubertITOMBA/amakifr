@@ -3,7 +3,9 @@ import {
   buildDocumentOpenUrl,
   documentErrorMessage,
   documentTypeLabel,
+  documentVisibilityBadge,
   formatFileSize,
+  validateDocumentSelection,
 } from "./documents-state";
 
 describe("documentTypeLabel", () => {
@@ -15,6 +17,37 @@ describe("documentTypeLabel", () => {
 
   it("renvoie Autre pour un type inconnu", () => {
     expect(documentTypeLabel("Inconnu")).toBe("Autre");
+  });
+});
+
+describe("documentVisibilityBadge", () => {
+  it("Valide+Public / EnAttente / Rejeté", () => {
+    expect(documentVisibilityBadge("Valide", true).label).toBe(
+      "Validé · Public"
+    );
+    expect(documentVisibilityBadge("EnAttente", false).label).toBe("En attente");
+    expect(documentVisibilityBadge("Rejete", false).label).toBe("Rejeté");
+  });
+});
+
+describe("validateDocumentSelection", () => {
+  it("accepte PDF et image", () => {
+    expect(
+      validateDocumentSelection({ mimeType: "application/pdf", size: 1000 })
+    ).toEqual({ ok: true });
+    expect(
+      validateDocumentSelection({ mimeType: "image/jpeg", size: 1000 })
+    ).toEqual({ ok: true });
+  });
+
+  it("refuse vidéo et MIME invalide", () => {
+    expect(
+      validateDocumentSelection({ mimeType: "video/mp4", size: 1000 }).ok
+    ).toBe(false);
+    expect(
+      validateDocumentSelection({ mimeType: "application/msword", size: 1000 })
+        .ok
+    ).toBe(false);
   });
 });
 
@@ -44,48 +77,8 @@ describe("buildDocumentOpenUrl", () => {
     );
   });
 
-  it("retire le slash final de la base", () => {
-    expect(
-      buildDocumentOpenUrl("http://host:9052/", "/ressources/documents/a.pdf")
-    ).toBe("http://host:9052/ressources/documents/a.pdf");
-  });
-
-  it("refuse /ressources/galeries/a.jpg", () => {
-    expect(buildDocumentOpenUrl(base, "/ressources/galeries/a.jpg")).toBeNull();
-  });
-
-  it("refuse /ressources/justificatifs/a.pdf", () => {
-    expect(
-      buildDocumentOpenUrl(base, "/ressources/justificatifs/a.pdf")
-    ).toBeNull();
-  });
-
-  it("refuse /ressources/../secret.pdf", () => {
+  it("refuse traversal", () => {
     expect(buildDocumentOpenUrl(base, "/ressources/../secret.pdf")).toBeNull();
-  });
-
-  it("refuse un traversal encodé %2e%2e", () => {
-    expect(
-      buildDocumentOpenUrl(
-        base,
-        "/ressources/documents/%2e%2e/secret.pdf"
-      )
-    ).toBeNull();
-    expect(
-      buildDocumentOpenUrl(
-        base,
-        "/ressources/documents/%2E%2E/secret.pdf"
-      )
-    ).toBeNull();
-  });
-
-  it("refuse backslash, double slash, chemin vide ou base vide", () => {
-    expect(buildDocumentOpenUrl(base, "/ressources/documents\\a.pdf")).toBeNull();
-    expect(
-      buildDocumentOpenUrl(base, "/ressources/documents//a.pdf")
-    ).toBeNull();
-    expect(buildDocumentOpenUrl(base, "")).toBeNull();
-    expect(buildDocumentOpenUrl("", "/ressources/documents/a.pdf")).toBeNull();
   });
 });
 

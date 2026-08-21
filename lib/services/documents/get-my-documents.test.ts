@@ -32,14 +32,17 @@ function actor(overrides: Partial<AuthContext> = {}): AuthContext {
 
 const sampleRow = {
   id: "doc-1",
+  userId: "user-1",
   nomOriginal: "statuts.pdf",
   type: "PDF" as const,
   categorie: "Administratif",
-  chemin: "/ressources/documents/Administratif/123.pdf",
   taille: 2048,
   mimeType: "application/pdf",
   description: "Statuts",
   createdAt: new Date("2025-06-15T10:00:00.000Z"),
+  estPublic: false,
+  statutValidation: "EnAttente" as const,
+  DeletionRequests: [],
 };
 
 describe("getMyDocuments", () => {
@@ -73,26 +76,48 @@ describe("getMyDocuments", () => {
     await expect(getMyDocuments(actor())).resolves.toEqual([]);
   });
 
-  it("mappe les DTO (dates ISO, sans userId)", async () => {
+  it("A — EnAttente privé → canDelete=true", async () => {
     findManyDocument.mockResolvedValue([sampleRow]);
     const result = await getMyDocuments(actor());
 
-    expect(result).toEqual([
+    expect(result[0]).toMatchObject({
+      id: "doc-1",
+      estPublic: false,
+      statutValidation: "EnAttente",
+      canDelete: true,
+      canRequestDelete: false,
+      deletionRequestStatus: null,
+    });
+    expect(result[0]).not.toHaveProperty("userId");
+    expect(result[0]).not.toHaveProperty("chemin");
+  });
+
+  it("C — Valide+Public → canDelete=false, canRequestDelete=true", async () => {
+    findManyDocument.mockResolvedValue([
       {
-        id: "doc-1",
-        nomOriginal: "statuts.pdf",
-        type: "PDF",
-        categorie: "Administratif",
-        chemin: "/ressources/documents/Administratif/123.pdf",
-        taille: 2048,
-        mimeType: "application/pdf",
-        description: "Statuts",
-        createdAt: "2025-06-15T10:00:00.000Z",
+        ...sampleRow,
+        statutValidation: "Valide",
+        estPublic: true,
+        DeletionRequests: [],
       },
     ]);
-    expect(result[0]).not.toHaveProperty("userId");
-    expect(result[0]).not.toHaveProperty("adherentId");
-    expect(result[0]).not.toHaveProperty("nom");
+    const result = await getMyDocuments(actor());
+    expect(result[0].canDelete).toBe(false);
+    expect(result[0].canRequestDelete).toBe(true);
+  });
+
+  it("demande EnAttente → canRequestDelete=false + status", async () => {
+    findManyDocument.mockResolvedValue([
+      {
+        ...sampleRow,
+        statutValidation: "Valide",
+        estPublic: true,
+        DeletionRequests: [{ statut: "EnAttente" }],
+      },
+    ]);
+    const result = await getMyDocuments(actor());
+    expect(result[0].canRequestDelete).toBe(false);
+    expect(result[0].deletionRequestStatus).toBe("EnAttente");
   });
 
   it("enveloppe une erreur Prisma en INTERNAL_ERROR", async () => {

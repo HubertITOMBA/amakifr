@@ -287,7 +287,6 @@ export async function deleteDocument(documentId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Vérifier que le document appartient à l'utilisateur
     const document = await db.document.findUnique({
       where: { id: documentId },
     });
@@ -300,18 +299,36 @@ export async function deleteDocument(documentId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Supprimer le fichier physique
-    const filePath = join(process.cwd(), "public", document.chemin);
-    if (existsSync(filePath)) {
-      try {
-        await unlinkAsync(filePath);
-      } catch (fileError) {
-        console.error("Erreur lors de la suppression du fichier:", fileError);
-        // Continuer même si la suppression du fichier échoue
+    const { computeCanDeleteDocument } = await import(
+      "@/lib/services/documents/document-lock"
+    );
+    if (!computeCanDeleteDocument(document, session.user.id)) {
+      return {
+        success: false,
+        error:
+          "Ce document validé et public ne peut être supprimé que par l'administration. Vous pouvez demander sa suppression depuis l'application.",
+      };
+    }
+
+    try {
+      const { resolveDocumentAbsolutePath } = await import(
+        "@/lib/services/documents/resolve-document-path"
+      );
+      const abs = resolveDocumentAbsolutePath(document.chemin);
+      if (existsSync(abs)) {
+        await unlinkAsync(abs);
+      }
+    } catch {
+      const filePath = join(process.cwd(), "public", document.chemin);
+      if (existsSync(filePath)) {
+        try {
+          await unlinkAsync(filePath);
+        } catch (fileError) {
+          console.error("Erreur lors de la suppression du fichier:", fileError);
+        }
       }
     }
 
-    // Supprimer l'enregistrement de la base de données
     await db.document.delete({
       where: { id: documentId },
     });
@@ -460,6 +477,11 @@ export async function getAllDocuments(options?: {
             lastname: true,
           },
         },
+        DeletionRequests: {
+          where: { statut: "EnAttente" },
+          select: { id: true, statut: true, motif: true, createdAt: true },
+          take: 1,
+        },
       },
     }));
 
@@ -559,14 +581,12 @@ export async function adminDeleteDocument(documentId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Permission dynamique (suppression admin)
     const { canDelete } = await import("@/lib/dynamic-permissions");
     const hasAccess = await canDelete(session.user.id, "adminDeleteDocument");
     if (!hasAccess) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Récupérer le document
     const document = await db.document.findUnique({
       where: { id: documentId },
     });
@@ -575,18 +595,37 @@ export async function adminDeleteDocument(documentId: string) {
       return { success: false, error: "Document non trouvé" };
     }
 
-    // Supprimer le fichier physique
-    const filePath = join(process.cwd(), "public", document.chemin);
-    if (existsSync(filePath)) {
-      try {
-        await unlinkAsync(filePath);
-      } catch (fileError) {
-        console.error("Erreur lors de la suppression du fichier:", fileError);
-        // Continuer même si la suppression du fichier échoue
+    // Fichier privé ou legacy public
+    try {
+      const { resolveDocumentAbsolutePath } = await import(
+        "@/lib/services/documents/resolve-document-path"
+      );
+      const abs = resolveDocumentAbsolutePath(document.chemin);
+      if (existsSync(abs)) {
+        await unlinkAsync(abs);
+      }
+    } catch (fileError) {
+      // Fallback legacy public/ + chemin
+      const filePath = join(process.cwd(), "public", document.chemin);
+      if (existsSync(filePath)) {
+        try {
+          await unlinkAsync(filePath);
+        } catch {
+          console.error("Erreur suppression fichier document:", fileError);
+        }
       }
     }
 
-    // Supprimer l'enregistrement de la base de données
+    // Clôturer les demandes EnAttente
+    await db.documentDeletionRequest.updateMany({
+      where: { documentId: document.id, statut: "EnAttente" },
+      data: {
+        statut: "Traitee",
+        resolvedAt: new Date(),
+        resolvedBy: session.user.id,
+      },
+    });
+
     await db.document.delete({
       where: { id: documentId },
     });
@@ -604,6 +643,104 @@ export async function adminDeleteDocument(documentId: string) {
     return {
       success: false,
       error: "Erreur lors de la suppression du document",
+    };
+  }
+}
+
+/**
+ * Valide un document adhérent (admin — tous documents).
+ */
+export async function adminValidateDocumentAction(documentId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    if (!(await canWrite(session.user.id, "adminUpdateDocument"))) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { adminValidateDocumentDb } = await import(
+      "@/lib/services/documents/admin-document-actions"
+    );
+    const result = await adminValidateDocumentDb(session.user.id, documentId);
+    revalidatePath("/admin/documents");
+    return { success: true, message: "Document validé", data: result };
+  } catch (error) {
+    console.error(error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erreur validation",
+    };
+  }
+}
+
+/**
+ * Rejette un document (admin).
+ */
+export async function adminRejectDocumentAction(
+  documentId: string,
+  reason?: string
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    if (!(await canWrite(session.user.id, "adminUpdateDocument"))) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { adminRejectDocumentDb } = await import(
+      "@/lib/services/documents/admin-document-actions"
+    );
+    const result = await adminRejectDocumentDb(
+      session.user.id,
+      documentId,
+      reason
+    );
+    revalidatePath("/admin/documents");
+    return { success: true, message: "Document rejeté", data: result };
+  } catch (error) {
+    console.error(error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erreur rejet",
+    };
+  }
+}
+
+/**
+ * Rend public / privé un document (admin — n'importe quel document).
+ */
+export async function adminSetDocumentPublicAction(
+  documentId: string,
+  estPublic: boolean
+) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) return { success: false, error: "Non autorisé" };
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    if (!(await canWrite(session.user.id, "adminUpdateDocument"))) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { adminSetDocumentPublicDb } = await import(
+      "@/lib/services/documents/admin-document-actions"
+    );
+    const result = await adminSetDocumentPublicDb(documentId, estPublic);
+    revalidatePath("/admin/documents");
+    return {
+      success: true,
+      message: estPublic ? "Document rendu public" : "Document rendu privé",
+      data: result,
+    };
+  } catch (error) {
+    console.error(error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Erreur publication",
     };
   }
 }
