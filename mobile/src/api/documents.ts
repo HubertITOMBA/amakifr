@@ -5,17 +5,42 @@ import {
   authenticatedBinaryFetch,
   authenticatedFetch,
 } from "@/auth/session";
-import type { DocumentDto } from "@/api/types";
+import type { DocumentDto, MyDocumentsPageDto } from "@/api/types";
 import {
   appendJustificatifToFormData,
   buildReactNativeFilePart,
 } from "@/api/react-native-form-data-file";
 
+export type GetMyDocumentsOptions = {
+  limit?: number;
+  offset?: number;
+};
+
 /**
- * GET /api/v1/me/documents
+ * Construit la query string pagination documents.
  */
-export async function getMyDocuments(): Promise<DocumentDto[]> {
-  return authenticatedFetch<DocumentDto[]>("/api/v1/me/documents");
+export function buildMyDocumentsQuery(
+  options: GetMyDocumentsOptions = {}
+): string {
+  const params = new URLSearchParams();
+  if (options.limit !== undefined) params.set("limit", String(options.limit));
+  if (options.offset !== undefined) {
+    params.set("offset", String(options.offset));
+  }
+  const qs = params.toString();
+  return qs ? `?${qs}` : "";
+}
+
+/**
+ * GET /api/v1/me/documents?limit=&offset=
+ */
+export async function getMyDocuments(
+  options: GetMyDocumentsOptions = { limit: 20, offset: 0 }
+): Promise<MyDocumentsPageDto> {
+  const qs = buildMyDocumentsQuery(options);
+  return authenticatedFetch<MyDocumentsPageDto>(
+    `/api/v1/me/documents${qs}`
+  );
 }
 
 export type UploadMyDocumentInput = {

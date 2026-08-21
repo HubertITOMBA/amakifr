@@ -27,6 +27,7 @@ vi.mock("@/api/react-native-form-data-file", () => ({
 }));
 
 import {
+  buildMyDocumentsQuery,
   deleteMyDocument,
   getMyDocuments,
   requestMyDocumentDeletion,
@@ -38,10 +39,26 @@ describe("documents API client", () => {
     authenticatedFetch.mockReset();
   });
 
-  it("getMyDocuments GET path exact, sans id client", async () => {
-    authenticatedFetch.mockResolvedValue([]);
-    await getMyDocuments();
-    expect(authenticatedFetch).toHaveBeenCalledWith("/api/v1/me/documents");
+  it("buildMyDocumentsQuery limit/offset", () => {
+    expect(buildMyDocumentsQuery({ limit: 20, offset: 0 })).toBe(
+      "?limit=20&offset=0"
+    );
+    expect(buildMyDocumentsQuery({ limit: 20, offset: 40 })).toBe(
+      "?limit=20&offset=40"
+    );
+  });
+
+  it("getMyDocuments GET paginé, sans id client", async () => {
+    authenticatedFetch.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 20,
+      offset: 0,
+    });
+    await getMyDocuments({ limit: 20, offset: 0 });
+    expect(authenticatedFetch).toHaveBeenCalledWith(
+      "/api/v1/me/documents?limit=20&offset=0"
+    );
     const path = authenticatedFetch.mock.calls[0][0] as string;
     expect(path).not.toContain("userId");
     expect(path).not.toContain("adherentId");

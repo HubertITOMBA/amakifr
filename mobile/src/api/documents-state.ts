@@ -25,7 +25,7 @@ export function documentTypeLabel(type: TypeDocument | string): string {
 }
 
 /**
- * Badge publication / validation (modèle Phase 1.5).
+ * Badge publication / validation (modèle Phase 1.5) — combiné (legacy UI).
  */
 export function documentVisibilityBadge(
   statutValidation: string,
@@ -47,6 +47,63 @@ export function documentVisibilityBadge(
     return { label: "En attente · Visible admin", tone: "warning" };
   }
   return { label: "En attente", tone: "neutral" };
+}
+
+/**
+ * Badge statut validation seul (texte obligatoire + tone).
+ */
+export function documentValidationBadge(statutValidation: string): {
+  label: string;
+  tone: "neutral" | "primary" | "success" | "warning" | "danger";
+} {
+  if (statutValidation === "Valide") {
+    return { label: "Validé", tone: "success" };
+  }
+  if (statutValidation === "Rejete") {
+    return { label: "Rejeté", tone: "danger" };
+  }
+  return { label: "En attente", tone: "warning" };
+}
+
+/**
+ * Badge publication secondaire (Public / Privé).
+ */
+export function documentPublicationBadge(estPublic: boolean): {
+  label: string;
+  tone: "neutral" | "primary";
+} {
+  if (estPublic) {
+    return { label: "Public", tone: "primary" };
+  }
+  return { label: "Privé", tone: "neutral" };
+}
+
+/**
+ * Description card : trim ; null si vide (pas de ligne vide).
+ */
+export function documentCardDescription(
+  description: string | null | undefined
+): string | null {
+  const t = String(description ?? "").trim();
+  return t.length > 0 ? t : null;
+}
+
+/**
+ * Titre card = libellé TypeDocument (pas le nom de fichier).
+ */
+export function documentCardTitle(type: TypeDocument | string): string {
+  return documentTypeLabel(type);
+}
+
+/**
+ * Accent sémantique card (mappé vers AmakiColors dans le composant).
+ */
+export function documentCardAccentTone(
+  statutValidation: string
+): "warning" | "success" | "danger" {
+  if (statutValidation === "Valide") return "success";
+  if (statutValidation === "Rejete") return "danger";
+  return "warning";
 }
 
 /**
@@ -131,6 +188,42 @@ export function documentErrorMessage(error: {
     return "Impossible de charger les documents";
   }
   return error.message || "Impossible de charger les documents";
+}
+
+/** Taille de page documents (alignée API défaut). */
+export const DOCUMENTS_PAGE_SIZE = 20;
+
+/**
+ * Indique s'il reste des documents à charger.
+ */
+export function hasMoreDocuments(
+  loadedCount: number,
+  total: number
+): boolean {
+  return loadedCount < total;
+}
+
+/**
+ * Concatène une page suivante sans doublon d'id.
+ */
+export function appendDocumentsPage<T extends { id: string }>(
+  current: T[],
+  next: T[]
+): T[] {
+  if (next.length === 0) return current;
+  const seen = new Set(current.map((d) => d.id));
+  const unique = next.filter((d) => !seen.has(d.id));
+  return unique.length === 0 ? current : [...current, ...unique];
+}
+
+/**
+ * Préfixe un document uploadé en tête (sans doublon).
+ */
+export function prependUploadedDocument<T extends { id: string }>(
+  current: T[],
+  uploaded: T
+): T[] {
+  return [uploaded, ...current.filter((d) => d.id !== uploaded.id)];
 }
 
 /**

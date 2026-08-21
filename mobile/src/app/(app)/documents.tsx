@@ -20,7 +20,10 @@ import {
   uploadMyDocument,
 } from "@/api/documents";
 import {
+  DOCUMENTS_PAGE_SIZE,
+  appendDocumentsPage,
   documentErrorMessage,
+  hasMoreDocuments,
   validateDocumentSelection,
 } from "@/api/documents-state";
 import {
@@ -44,12 +47,14 @@ import {
 } from "@/constants/theme";
 
 /**
- * Écran Mes documents — liste + upload PDF/photo + suppression.
+ * Écran Mes documents — liste paginée + upload PDF/photo + suppression.
  */
 export default function DocumentsScreen() {
   const [items, setItems] = useState<DocumentDto[]>([]);
+  const [total, setTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [uploadOpen, setUploadOpen] = useState(false);
   const [description, setDescription] = useState("");
@@ -61,39 +66,71 @@ export default function DocumentsScreen() {
     mimeType: string;
   } | null>(null);
   const guardRef = useRef<LoadGuard>(createLoadGuard());
+  const offsetRef = useRef(0);
+  const appendLockRef = useRef(false);
 
-  const load = useCallback(async (isRefresh = false) => {
+  const fetchPage = useCallback(async (mode: "replace" | "append" | "refresh") => {
+    if (mode === "append" && appendLockRef.current) return;
+
     const started = beginLoad(guardRef.current);
     guardRef.current = started.guard;
     const gen = started.gen;
 
-    if (isRefresh) setRefreshing(true);
-    else setLoading(true);
-    setError(null);
+    if (mode === "append") {
+      appendLockRef.current = true;
+      setLoadingMore(true);
+    } else if (mode === "refresh") {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
+
+    if (mode !== "append") {
+      setError(null);
+    }
+
+    const nextOffset = mode === "append" ? offsetRef.current : 0;
+
     try {
-      const list = await getMyDocuments();
+      const page = await getMyDocuments({
+        limit: DOCUMENTS_PAGE_SIZE,
+        offset: nextOffset,
+      });
       if (!shouldApplyLoadResult(gen, guardRef.current.dataGen)) return;
-      setItems(list);
+
+      if (mode === "append") {
+        setItems((prev) => appendDocumentsPage(prev, page.items));
+      } else {
+        setItems(page.items);
+      }
+      setTotal(page.total);
+      offsetRef.current = nextOffset + page.items.length;
     } catch (e) {
       if (!shouldApplyLoadResult(gen, guardRef.current.dataGen)) return;
-      if (e instanceof ApiClientError) {
-        setError(documentErrorMessage(e));
-      } else {
-        setError("Impossible de charger les documents");
-      }
+      // Refresh / append en échec : conserver les items déjà affichés
+      setError(
+        e instanceof ApiClientError
+          ? documentErrorMessage(e)
+          : "Impossible de charger les documents"
+      );
     } finally {
       const ended = endLoad(guardRef.current);
       guardRef.current = ended.guard;
       if (ended.clearSpinners) {
         setLoading(false);
         setRefreshing(false);
+        setLoadingMore(false);
+      }
+      if (mode === "append") {
+        appendLockRef.current = false;
       }
     }
   }, []);
 
   useEffect(() => {
-    void load(false);
-  }, [load]);
+    offsetRef.current = 0;
+    void fetchPage("replace");
+  }, [fetchPage]);
 
   async function onOpen(document: DocumentDto) {
     const result = await openMyDocumentFile(document);
@@ -122,6 +159,8 @@ export default function DocumentsScreen() {
             try {
               await deleteMyDocument(document.id);
               setItems((prev) => prev.filter((d) => d.id !== document.id));
+              setTotal((t) => Math.max(0, t - 1));
+              offsetRef.current = Math.max(0, offsetRef.current - 1);
             } catch (e) {
               Alert.alert(
                 "Suppression impossible",
@@ -247,16 +286,18 @@ export default function DocumentsScreen() {
     }
     setUploading(true);
     try {
-      const created = await uploadMyDocument({
+      await uploadMyDocument({
         uri: pendingFile.uri,
         name: pendingFile.name,
         mimeType: pendingFile.mimeType,
         description,
       });
-      setItems((prev) => [created, ...prev]);
       setUploadOpen(false);
       setPendingFile(null);
       setDescription("");
+      // Refresh 1ʳᵉ page : nouveau doc en tête + reset pagination
+      offsetRef.current = 0;
+      await fetchPage("replace");
     } catch (e) {
       Alert.alert(
         "Upload impossible",
@@ -269,7 +310,7 @@ export default function DocumentsScreen() {
     }
   }
 
-  if (loading) {
+  if (loading && items.length === 0) {
     return <LoadingState />;
   }
 
@@ -294,7 +335,7 @@ export default function DocumentsScreen() {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => void load(true)}
+            onRefresh={() => void fetchPage("refresh")}
             tintColor={AmakiColors.primary}
           />
         }
@@ -302,6 +343,20 @@ export default function DocumentsScreen() {
           error ? null : (
             <EmptyState title="Aucun document" />
           )
+        }
+        ListFooterComponent={
+          hasMoreDocuments(items.length, total) ? (
+            <SecondaryButton
+              label={loadingMore ? "Chargement…" : "Voir plus"}
+              onPress={() => void fetchPage("append")}
+              disabled={loadingMore}
+              style={styles.moreBtn}
+            />
+          ) : items.length > 0 ? (
+            <Text style={styles.footerCount}>
+              {items.length} / {total}
+            </Text>
+          ) : null
         }
         renderItem={({ item }) => (
           <DocumentItem
@@ -394,6 +449,17 @@ const styles = StyleSheet.create({
     padding: AmakiSpacing.lg,
     paddingTop: AmakiSpacing.sm,
     paddingBottom: AmakiSpacing["2xl"],
+  },
+  moreBtn: {
+    alignSelf: "stretch",
+    marginTop: AmakiSpacing.sm,
+    marginBottom: AmakiSpacing.md,
+  },
+  footerCount: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+    textAlign: "center",
+    marginVertical: AmakiSpacing.md,
   },
   emptyContainer: {
     flexGrow: 1,

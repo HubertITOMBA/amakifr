@@ -88,7 +88,7 @@ Règles client :
 
 | Méthode | Path | Rôle |
 |---------|------|------|
-| GET | `/api/v1/me/documents` | Liste DTO (sans chemin physique) |
+| GET | `/api/v1/me/documents` | Liste paginée (`limit` défaut 20, max 50, `offset`) — DTO sans chemin |
 | POST | `/api/v1/me/documents` | Upload multipart PDF/image → stockage privé |
 | DELETE | `/api/v1/me/documents/[id]` | Suppression owner si non verrouillé |
 | GET | `/api/v1/me/documents/[id]/file` | Téléchargement authentifié |
@@ -96,6 +96,7 @@ Règles client :
 
 Règles :
 - ownership `actor.userId` uniquement (refus `userId` / `adherentId` / `ownerId` client)
+- liste : `GET ?limit=&offset=` → `{ items, total, limit, offset }` ; mobile : 1ʳᵉ page + « Voir plus »
 - Phase 1 : PDF + images (vidéo refusée)
 - nouveaux fichiers : `storage/documents/` (`private/documents/...` en DB)
 - legacy `/ressources/documents/...` toujours servis via `/file`

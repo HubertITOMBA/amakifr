@@ -307,6 +307,14 @@ export type DocumentDto = {
   deletionRequestStatus: "EnAttente" | "Traitee" | "Annulee" | null;
 };
 
+/** Page paginée GET /api/v1/me/documents */
+export type MyDocumentsPageDto = {
+  items: DocumentDto[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
 /**
  * Métadonnées passeport self-service (DTO minimal).
  */

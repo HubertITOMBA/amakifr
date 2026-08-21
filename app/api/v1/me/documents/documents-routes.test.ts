@@ -118,15 +118,43 @@ describe("GET /api/v1/me/documents", () => {
     expect(getMyDocuments).not.toHaveBeenCalled();
   });
 
-  it("retourne la liste self", async () => {
+  it("retourne la page self", async () => {
     resolveApiActorMock.mockResolvedValue(actor());
-    getMyDocuments.mockResolvedValue([{ id: "d1" }]);
+    getMyDocuments.mockResolvedValue({
+      items: [{ id: "d1" }],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
     const res = await GET(getReq("http://localhost/api/v1/me/documents"));
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.data).toEqual([{ id: "d1" }]);
+    expect(json.data).toEqual({
+      items: [{ id: "d1" }],
+      total: 1,
+      limit: 20,
+      offset: 0,
+    });
     expect(getMyDocuments).toHaveBeenCalledWith(
-      expect.objectContaining({ userId: "user-A" })
+      expect.objectContaining({ userId: "user-A" }),
+      expect.objectContaining({})
+    );
+  });
+
+  it("passe limit/offset à getMyDocuments", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    getMyDocuments.mockResolvedValue({
+      items: [],
+      total: 0,
+      limit: 10,
+      offset: 20,
+    });
+    await GET(
+      getReq("http://localhost/api/v1/me/documents?limit=10&offset=20")
+    );
+    expect(getMyDocuments).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ limit: 10, offset: 20 })
     );
   });
 });

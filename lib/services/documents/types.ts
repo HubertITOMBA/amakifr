@@ -36,3 +36,11 @@ export type DocumentDto = {
 
 /** Alias explicite mobile. */
 export type MyDocumentDto = DocumentDto;
+
+/** Page paginée GET /api/v1/me/documents */
+export type MyDocumentsPageDto = {
+  items: DocumentDto[];
+  total: number;
+  limit: number;
+  offset: number;
+};

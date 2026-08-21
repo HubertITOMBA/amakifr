@@ -1,10 +1,18 @@
 import { describe, expect, it } from "vitest";
 import {
   buildDocumentOpenUrl,
+  documentCardAccentTone,
+  documentCardDescription,
+  documentCardTitle,
   documentErrorMessage,
+  documentPublicationBadge,
   documentTypeLabel,
+  documentValidationBadge,
   documentVisibilityBadge,
   formatFileSize,
+  hasMoreDocuments,
+  appendDocumentsPage,
+  prependUploadedDocument,
   validateDocumentSelection,
 } from "./documents-state";
 
@@ -27,6 +35,43 @@ describe("documentVisibilityBadge", () => {
     );
     expect(documentVisibilityBadge("EnAttente", false).label).toBe("En attente");
     expect(documentVisibilityBadge("Rejete", false).label).toBe("Rejeté");
+  });
+});
+
+describe("document card presentation", () => {
+  it("titre = type, pas le nom de fichier", () => {
+    expect(documentCardTitle("PDF")).toBe("PDF");
+    expect(documentCardTitle("Image")).toBe("Image");
+    expect(documentCardTitle("secret_1787056936718.pdf")).toBe("Autre");
+  });
+
+  it("description affichée si non vide", () => {
+    expect(documentCardDescription("  Pièce d'identité  ")).toBe(
+      "Pièce d'identité"
+    );
+  });
+
+  it("description vide → null (pas de ligne vide)", () => {
+    expect(documentCardDescription(null)).toBeNull();
+    expect(documentCardDescription("")).toBeNull();
+    expect(documentCardDescription("   ")).toBeNull();
+  });
+
+  it("statuts texte + publication secondaire", () => {
+    expect(documentValidationBadge("EnAttente")).toEqual({
+      label: "En attente",
+      tone: "warning",
+    });
+    expect(documentValidationBadge("Valide").label).toBe("Validé");
+    expect(documentValidationBadge("Rejete").label).toBe("Rejeté");
+    expect(documentPublicationBadge(false).label).toBe("Privé");
+    expect(documentPublicationBadge(true).label).toBe("Public");
+  });
+
+  it("accent sémantique selon statut (texte badge reste obligatoire)", () => {
+    expect(documentCardAccentTone("EnAttente")).toBe("warning");
+    expect(documentCardAccentTone("Valide")).toBe("success");
+    expect(documentCardAccentTone("Rejete")).toBe("danger");
   });
 });
 
@@ -90,5 +135,29 @@ describe("documentErrorMessage", () => {
     expect(
       documentErrorMessage({ status: 500, code: "INTERNAL_ERROR", message: "x" })
     ).toBe("Impossible de charger les documents");
+  });
+});
+
+describe("pagination documents helpers", () => {
+  it("hasMoreDocuments — Voir plus disparaît quand tout est chargé", () => {
+    expect(hasMoreDocuments(20, 45)).toBe(true);
+    expect(hasMoreDocuments(45, 45)).toBe(false);
+    expect(hasMoreDocuments(0, 0)).toBe(false);
+  });
+
+  it("appendDocumentsPage — pas de doublon", () => {
+    const merged = appendDocumentsPage(
+      [{ id: "a" }, { id: "b" }],
+      [{ id: "b" }, { id: "c" }]
+    );
+    expect(merged.map((d) => d.id)).toEqual(["a", "b", "c"]);
+  });
+
+  it("prependUploadedDocument — upload en tête", () => {
+    const list = prependUploadedDocument(
+      [{ id: "old" }],
+      { id: "new" }
+    );
+    expect(list.map((d) => d.id)).toEqual(["new", "old"]);
   });
 });

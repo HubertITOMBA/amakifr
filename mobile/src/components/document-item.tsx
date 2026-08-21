@@ -1,15 +1,23 @@
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import type { DocumentDto } from "@/api/types";
 import {
-  documentTypeLabel,
-  documentVisibilityBadge,
+  documentCardDescription,
+  documentCardTitle,
+  documentPublicationBadge,
+  documentValidationBadge,
   formatFileSize,
 } from "@/api/documents-state";
-import { formatDateFr } from "@/utils/profile-helpers";
+import {
+  DocumentCardPastel,
+  documentCardPastelAccent,
+  documentPublicationPastelBadge,
+  documentValidationPastelBadge,
+} from "@/api/documents-card-pastel";
+import { formatDateTimeFr } from "@/utils/profile-helpers";
 import { Card } from "@/components/ui/card";
-import { StatusBadge } from "@/components/ui/status-badge";
 import {
   AmakiColors,
+  AmakiRadius,
   AmakiSpacing,
   AmakiTypography,
 } from "@/constants/theme";
@@ -22,8 +30,30 @@ type Props = {
   deleting?: boolean;
 };
 
+type PastelBadgeProps = {
+  label: string;
+  bg: string;
+  text: string;
+  border: string;
+};
+
+function PastelBadge({ label, bg, text, border }: PastelBadgeProps) {
+  return (
+    <View
+      style={[
+        styles.badge,
+        { backgroundColor: bg, borderColor: border },
+      ]}
+      accessibilityRole="text"
+      accessibilityLabel={label}
+    >
+      <Text style={[styles.badgeText, { color: text }]}>{label}</Text>
+    </View>
+  );
+}
+
 /**
- * Carte document adhérent — Ouvrir / Supprimer / Demander suppression.
+ * Carte document adhérent — palette pastel locale (sans thème global).
  */
 export function DocumentItem({
   document,
@@ -32,38 +62,54 @@ export function DocumentItem({
   onRequestDelete,
   deleting,
 }: Props) {
-  const typeLabel = documentTypeLabel(document.type);
-  const visibility = documentVisibilityBadge(
-    document.statutValidation,
-    document.estPublic
+  const title = documentCardTitle(document.type);
+  const description = documentCardDescription(document.description);
+  const validation = documentValidationBadge(document.statutValidation);
+  const publication = documentPublicationBadge(document.estPublic);
+  const accent = documentCardPastelAccent(document.statutValidation);
+  const validationColors = documentValidationPastelBadge(
+    document.statutValidation
   );
+  const publicationColors = documentPublicationPastelBadge(document.estPublic);
   const pendingDeletion = document.deletionRequestStatus === "EnAttente";
+  const a11yTitle = description ? `${title}, ${description}` : title;
 
   return (
     <Card
-      style={styles.card}
+      style={[
+        styles.card,
+        {
+          borderLeftColor: accent.borderLeft,
+          backgroundColor: accent.cardBg,
+        },
+      ]}
       accessibilityRole="summary"
-      accessibilityLabel={`Document ${document.nomOriginal}, ${typeLabel}`}
+      accessibilityLabel={`Document ${a11yTitle}`}
     >
-      <View style={styles.header}>
-        <Text style={styles.title} numberOfLines={2}>
-          {document.nomOriginal}
+      <Text style={styles.title} numberOfLines={1}>
+        {title}
+      </Text>
+      {description ? (
+        <Text style={styles.description} numberOfLines={3}>
+          {description}
         </Text>
-        <StatusBadge label={typeLabel} tone="primary" />
-      </View>
+      ) : null}
       <View style={styles.badgeRow}>
-        <StatusBadge label={visibility.label} tone={visibility.tone} />
+        <PastelBadge
+          label={validation.label}
+          bg={validationColors.bg}
+          text={validationColors.text}
+          border={validationColors.border}
+        />
+        <PastelBadge
+          label={publication.label}
+          bg={publicationColors.bg}
+          text={publicationColors.text}
+          border={publicationColors.border}
+        />
       </View>
       {pendingDeletion ? (
         <Text style={styles.pendingDelete}>Suppression demandée</Text>
-      ) : null}
-      {document.categorie ? (
-        <Text style={styles.meta}>{document.categorie}</Text>
-      ) : null}
-      {document.description ? (
-        <Text style={styles.description} numberOfLines={2}>
-          {document.description}
-        </Text>
       ) : null}
       <View style={styles.row}>
         <Text style={styles.label}>Taille</Text>
@@ -71,13 +117,13 @@ export function DocumentItem({
       </View>
       <View style={styles.row}>
         <Text style={styles.label}>Ajouté le</Text>
-        <Text style={styles.value}>{formatDateFr(document.createdAt)}</Text>
+        <Text style={styles.value}>{formatDateTimeFr(document.createdAt)}</Text>
       </View>
       <View style={styles.actions}>
         <Pressable
           onPress={() => onOpen(document)}
           accessibilityRole="button"
-          accessibilityLabel={`Ouvrir ${document.nomOriginal}`}
+          accessibilityLabel={`Ouvrir ${a11yTitle}`}
           style={styles.actionBtn}
           hitSlop={8}
         >
@@ -88,7 +134,7 @@ export function DocumentItem({
             onPress={() => onDelete(document)}
             disabled={deleting}
             accessibilityRole="button"
-            accessibilityLabel={`Supprimer ${document.nomOriginal}`}
+            accessibilityLabel={`Supprimer ${a11yTitle}`}
             style={[styles.actionBtn, styles.deleteBtn]}
             hitSlop={8}
           >
@@ -102,7 +148,7 @@ export function DocumentItem({
             onPress={() => onRequestDelete(document)}
             disabled={deleting}
             accessibilityRole="button"
-            accessibilityLabel={`Demander la suppression de ${document.nomOriginal}`}
+            accessibilityLabel={`Demander la suppression de ${a11yTitle}`}
             style={[styles.actionBtn, styles.deleteBtn]}
             hitSlop={8}
           >
@@ -118,38 +164,41 @@ const styles = StyleSheet.create({
   card: {
     marginBottom: AmakiSpacing.md,
     paddingBottom: 0,
-  },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: AmakiSpacing.sm,
-    marginBottom: AmakiSpacing.xs,
-  },
-  badgeRow: {
-    flexDirection: "row",
-    marginBottom: AmakiSpacing.xs,
-  },
-  pendingDelete: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.warning,
-    fontWeight: "700",
-    marginBottom: AmakiSpacing.xs,
+    borderLeftWidth: 3,
+    overflow: "hidden",
   },
   title: {
     ...AmakiTypography.heading,
     color: AmakiColors.text,
-    flex: 1,
-  },
-  meta: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.textMuted,
     marginBottom: AmakiSpacing.xs,
   },
   description: {
-    ...AmakiTypography.caption,
+    ...AmakiTypography.body,
     color: AmakiColors.textSecondary,
     marginBottom: AmakiSpacing.sm,
+  },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: AmakiSpacing.xs,
+    marginBottom: AmakiSpacing.sm,
+  },
+  badge: {
+    alignSelf: "flex-start",
+    borderRadius: AmakiRadius.pill,
+    borderWidth: 1,
+    paddingHorizontal: AmakiSpacing.sm,
+    paddingVertical: AmakiSpacing.xs,
+  },
+  badgeText: {
+    ...AmakiTypography.caption,
+    fontWeight: "700",
+  },
+  pendingDelete: {
+    ...AmakiTypography.caption,
+    color: DocumentCardPastel.waiting.badgeText,
+    fontWeight: "700",
+    marginBottom: AmakiSpacing.xs,
   },
   row: {
     flexDirection: "row",

@@ -80,3 +80,31 @@ export function formatDateFr(iso: string | null | undefined): string {
     return "—";
   }
 }
+
+/**
+ * Date + heure fr-FR (même schéma que formatPaymentDateTimeFr des cotisations).
+ * Ex. « 21/08/2026 à 18:03 » — sans secondes.
+ *
+ * @param iso - Date ISO string (heure incluse)
+ * @returns Date/heure formatées ou "—" si invalide
+ */
+export function formatDateTimeFr(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  try {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "—";
+    const datePart = new Intl.DateTimeFormat("fr-FR", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+    }).format(d);
+    const timePart = new Intl.DateTimeFormat("fr-FR", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false,
+    }).format(d);
+    return `${datePart} à ${timePart}`;
+  } catch {
+    return "—";
+  }
+}

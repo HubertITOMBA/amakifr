@@ -36,8 +36,30 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    const documents = await getMyDocuments(actor);
-    return apiSuccess(documents);
+    const limitRaw = params.get("limit");
+    const offsetRaw = params.get("offset");
+    const limit =
+      limitRaw === null || limitRaw === ""
+        ? undefined
+        : Number.parseInt(limitRaw, 10);
+    const offset =
+      offsetRaw === null || offsetRaw === ""
+        ? undefined
+        : Number.parseInt(offsetRaw, 10);
+
+    if (
+      (limitRaw !== null &&
+        limitRaw !== "" &&
+        (!Number.isFinite(limit) || Number.isNaN(limit))) ||
+      (offsetRaw !== null &&
+        offsetRaw !== "" &&
+        (!Number.isFinite(offset) || Number.isNaN(offset)))
+    ) {
+      throw new ServiceError("VALIDATION_ERROR", "Paramètres invalides");
+    }
+
+    const page = await getMyDocuments(actor, { limit, offset });
+    return apiSuccess(page);
   } catch (error) {
     return handleApiError(error);
   }

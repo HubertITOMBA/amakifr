@@ -1,5 +1,10 @@
 import { describe, expect, it } from "vitest";
-import { getInitials, formatAddress, formatDateFr } from "./profile-helpers";
+import {
+  getInitials,
+  formatAddress,
+  formatDateFr,
+  formatDateTimeFr,
+} from "./profile-helpers";
 import type { MeAddressDto } from "@/api/types";
 
 describe("getInitials", () => {
@@ -113,5 +118,23 @@ describe("formatDateFr", () => {
 
   it("renvoie — pour une chaîne vide", () => {
     expect(formatDateFr("")).toBe("—");
+  });
+});
+
+describe("formatDateTimeFr", () => {
+  it("affiche date numérique et heure sans secondes", () => {
+    const out = formatDateTimeFr("2026-08-21T16:03:45.000Z");
+    expect(out).toMatch(/21\/08\/2026/);
+    expect(out).toMatch(/à/);
+    expect(out).toMatch(/\d{2}:\d{2}/);
+    expect(out).not.toMatch(/:\d{2}:\d{2}/);
+    expect(out).not.toBe("—");
+  });
+
+  it("retourne — pour invalide / vide", () => {
+    expect(formatDateTimeFr(null)).toBe("—");
+    expect(formatDateTimeFr(undefined)).toBe("—");
+    expect(formatDateTimeFr("")).toBe("—");
+    expect(formatDateTimeFr("nope")).toBe("—");
   });
 });
