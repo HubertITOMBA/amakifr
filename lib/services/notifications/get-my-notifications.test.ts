@@ -160,6 +160,16 @@ describe("getMyUnreadNotificationCount", () => {
     await expect(getMyUnreadNotificationCount(actor())).resolves.toBe(0);
   });
 
+  it("ignore les notifications d'un autre user (filtre userId)", async () => {
+    count.mockResolvedValue(0);
+    await getMyUnreadNotificationCount(actor({ userId: "user-A" }));
+    expect(count).toHaveBeenCalledWith({
+      where: { userId: "user-A", lue: false },
+    });
+    // Jamais user-B dans le where
+    expect(count.mock.calls[0][0].where.userId).not.toBe("user-B");
+  });
+
   it("lance INTERNAL_ERROR si Prisma échoue", async () => {
     count.mockRejectedValue(new Error("db down"));
     await expect(getMyUnreadNotificationCount(actor())).rejects.toMatchObject({

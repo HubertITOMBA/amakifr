@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -7,10 +7,10 @@ import {
   Text,
   View,
 } from "react-native";
+import { useFocusEffect } from "expo-router";
 import {
   deleteNotification,
   getNotifications,
-  getUnreadNotificationCount,
   markAllNotificationsAsRead,
   markNotificationAsRead,
 } from "@/api/notifications";
@@ -42,67 +42,66 @@ import {
 } from "@/constants/theme";
 
 /**
- * Écran Notifications — liste + unread + mark read / mark all / delete.
+ * Écran Notifications — liste + sync compteur global.
  */
 export default function NotificationsScreen() {
-  const { refreshUnreadCount } = useUnreadCount();
+  const { unreadCount, refreshUnreadCount, setUnreadCountLocal } =
+    useUnreadCount();
   const [items, setItems] = useState<NotificationDto[]>([]);
-  const [unread, setUnread] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
   const guardRef = useRef<LoadGuard>(createLoadGuard());
+  const hasLoadedRef = useRef(false);
 
-  const syncGlobalUnread = useCallback(async () => {
-    await refreshUnreadCount();
-  }, [refreshUnreadCount]);
+  const load = useCallback(
+    async (isRefresh = false) => {
+      const started = beginLoad(guardRef.current);
+      guardRef.current = started.guard;
+      const gen = started.gen;
 
-  const load = useCallback(async (isRefresh = false) => {
-    const started = beginLoad(guardRef.current);
-    guardRef.current = started.guard;
-    const gen = started.gen;
-
-    if (isRefresh) {
-      setRefreshing(true);
-    } else {
-      setLoading(true);
-    }
-    setError(null);
-    try {
-      const [list, count] = await Promise.all([
-        getNotifications({ limit: 50, offset: 0 }),
-        getUnreadNotificationCount(),
-      ]);
-      if (!shouldApplyLoadResult(gen, guardRef.current.dataGen)) return;
-      setItems(list);
-      setUnread(count);
-      await syncGlobalUnread();
-    } catch (e) {
-      if (!shouldApplyLoadResult(gen, guardRef.current.dataGen)) return;
-      if (e instanceof ApiClientError) {
-        setError(notificationErrorMessage(e));
-      } else {
-        setError("Impossible de charger les notifications");
+      if (isRefresh) {
+        setRefreshing(true);
+      } else if (!hasLoadedRef.current) {
+        setLoading(true);
       }
-    } finally {
-      const ended = endLoad(guardRef.current);
-      guardRef.current = ended.guard;
-      if (ended.clearSpinners) {
-        setLoading(false);
-        setRefreshing(false);
+      setError(null);
+      try {
+        const list = await getNotifications({ limit: 50, offset: 0 });
+        if (!shouldApplyLoadResult(gen, guardRef.current.dataGen)) return;
+        setItems(list);
+        hasLoadedRef.current = true;
+        await refreshUnreadCount();
+      } catch (e) {
+        if (!shouldApplyLoadResult(gen, guardRef.current.dataGen)) return;
+        if (e instanceof ApiClientError) {
+          setError(notificationErrorMessage(e));
+        } else {
+          setError("Impossible de charger les notifications");
+        }
+      } finally {
+        const ended = endLoad(guardRef.current);
+        guardRef.current = ended.guard;
+        if (ended.clearSpinners) {
+          setLoading(false);
+          setRefreshing(false);
+        }
       }
-    }
-  }, [syncGlobalUnread]);
+    },
+    [refreshUnreadCount]
+  );
 
   function bumpAfterMutation() {
     guardRef.current = invalidatePendingLoads(guardRef.current);
   }
 
-  useEffect(() => {
-    void load(false);
-  }, [load]);
+  useFocusEffect(
+    useCallback(() => {
+      void load(false);
+    }, [load])
+  );
 
   async function onMarkRead(n: NotificationDto) {
     if (n.lue) return;
@@ -113,14 +112,14 @@ export default function NotificationsScreen() {
       setItems((prev) =>
         prev.map((x) => (x.id === n.id ? { ...x, lue: true } : x))
       );
-      setUnread((c) => nextUnreadAfterMarkRead(c, true));
-      await syncGlobalUnread();
+      setUnreadCountLocal((c) => nextUnreadAfterMarkRead(c, true));
+      await refreshUnreadCount();
     } catch (e) {
       if (e instanceof ApiClientError && e.status === 404) {
         bumpAfterMutation();
         setItems((prev) => prev.filter((x) => x.id !== n.id));
-        setUnread((c) => nextUnreadAfterDelete(c, !n.lue));
-        await syncGlobalUnread();
+        setUnreadCountLocal((c) => nextUnreadAfterDelete(c, !n.lue));
+        await refreshUnreadCount();
         setError("Notification introuvable (mise à jour).");
       } else if (e instanceof ApiClientError) {
         setError(notificationErrorMessage(e));
@@ -139,8 +138,8 @@ export default function NotificationsScreen() {
       await markAllNotificationsAsRead();
       bumpAfterMutation();
       setItems((prev) => prev.map((x) => ({ ...x, lue: true })));
-      setUnread(nextUnreadAfterMarkAll());
-      await syncGlobalUnread();
+      setUnreadCountLocal(nextUnreadAfterMarkAll());
+      await refreshUnreadCount();
     } catch (e) {
       if (e instanceof ApiClientError) {
         setError(notificationErrorMessage(e));
@@ -171,14 +170,14 @@ export default function NotificationsScreen() {
       await deleteNotification(n.id);
       bumpAfterMutation();
       setItems((prev) => prev.filter((x) => x.id !== n.id));
-      setUnread((c) => nextUnreadAfterDelete(c, !n.lue));
-      await syncGlobalUnread();
+      setUnreadCountLocal((c) => nextUnreadAfterDelete(c, !n.lue));
+      await refreshUnreadCount();
     } catch (e) {
       if (e instanceof ApiClientError && e.status === 404) {
         bumpAfterMutation();
         setItems((prev) => prev.filter((x) => x.id !== n.id));
-        setUnread((c) => nextUnreadAfterDelete(c, !n.lue));
-        await syncGlobalUnread();
+        setUnreadCountLocal((c) => nextUnreadAfterDelete(c, !n.lue));
+        await refreshUnreadCount();
         setError("Notification déjà absente.");
       } else if (e instanceof ApiClientError) {
         setError(notificationErrorMessage(e));
@@ -190,7 +189,7 @@ export default function NotificationsScreen() {
     }
   }
 
-  if (loading) {
+  if (loading && items.length === 0) {
     return <LoadingState />;
   }
 
@@ -198,12 +197,12 @@ export default function NotificationsScreen() {
     <View style={styles.root}>
       <View style={styles.toolbar}>
         <Text style={styles.unread} accessibilityRole="text">
-          {unread} non lue{unread !== 1 ? "s" : ""}
+          {unreadCount} non lue{unreadCount !== 1 ? "s" : ""}
         </Text>
         <SecondaryButton
           label="Tout marquer comme lu"
           loading={markingAll}
-          disabled={unread === 0}
+          disabled={unreadCount === 0}
           onPress={onMarkAll}
           style={styles.markAllBtn}
         />

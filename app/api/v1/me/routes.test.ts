@@ -308,6 +308,34 @@ describe("GET /api/v1/me/notifications/unread-count", () => {
     expect(await res.json()).toEqual({ success: true, data: { count: 3 } });
   });
 
+  it("0 non lue → 0", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    getMyUnreadNotificationCount.mockResolvedValue(0);
+    const res = await getUnreadRoute(
+      req("http://localhost/api/v1/me/notifications/unread-count")
+    );
+    expect(res.status).toBe(200);
+    expect(await res.json()).toEqual({ success: true, data: { count: 0 } });
+  });
+
+  it("refuse userId query", async () => {
+    resolveApiActorMock.mockResolvedValue(actor());
+    const res = await getUnreadRoute(
+      req("http://localhost/api/v1/me/notifications/unread-count?userId=other")
+    );
+    expect(res.status).toBe(400);
+    expect(getMyUnreadNotificationCount).not.toHaveBeenCalled();
+  });
+
+  it("401 sans auth", async () => {
+    resolveApiActorMock.mockResolvedValue(null);
+    const res = await getUnreadRoute(
+      req("http://localhost/api/v1/me/notifications/unread-count")
+    );
+    expect(res.status).toBe(401);
+    expect(getMyUnreadNotificationCount).not.toHaveBeenCalled();
+  });
+
   it("erreur ServiceError", async () => {
     resolveApiActorMock.mockResolvedValue(actor());
     getMyUnreadNotificationCount.mockRejectedValue(
@@ -464,7 +492,10 @@ describe("GET /api/v1/me/documents", () => {
     const body = await res.json();
     expect(body.data[0].nomOriginal).toBe("statuts.pdf");
     expect(typeof body.data[0].createdAt).toBe("string");
-    expect(getMyDocuments).toHaveBeenCalledWith(actor());
+    expect(getMyDocuments).toHaveBeenCalledWith(actor(), {
+      limit: undefined,
+      offset: undefined,
+    });
   });
 
   it("liste vide", async () => {

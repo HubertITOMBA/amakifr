@@ -1,5 +1,5 @@
 /**
- * Helpers purs pour le compteur non lu (jamais négatif).
+ * Helpers purs pour le compteur non lu (jamais négatif) + badge / AppState.
  */
 
 export function nextUnreadAfterMarkRead(
@@ -20,6 +20,29 @@ export function nextUnreadAfterDelete(
 
 export function nextUnreadAfterMarkAll(): number {
   return 0;
+}
+
+/**
+ * Badge tab : absent si 0, plafonné à 99+.
+ */
+export function formatTabUnreadBadge(
+  unreadCount: number
+): number | string | undefined {
+  if (!Number.isFinite(unreadCount) || unreadCount <= 0) return undefined;
+  if (unreadCount > 99) return "99+";
+  return unreadCount;
+}
+
+/**
+ * Refresh unread uniquement au passage background/inactive → active.
+ */
+export function shouldRefreshUnreadOnAppState(
+  previous: string | null,
+  next: string
+): boolean {
+  if (next !== "active") return false;
+  if (previous === null) return false;
+  return previous === "background" || previous === "inactive";
 }
 
 /**

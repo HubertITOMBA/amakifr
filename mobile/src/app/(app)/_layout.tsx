@@ -1,6 +1,7 @@
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { TabBarIcon } from "@/components/tab-bar-icon";
+import { formatTabUnreadBadge } from "@/api/notifications-state";
 import { AmakiColors } from "@/constants/theme";
 import { UnreadCountProvider, useUnreadCount } from "@/hooks/unread-count";
 
@@ -8,6 +9,7 @@ function AppTabs() {
   const insets = useSafeAreaInsets();
   const { unreadCount, refreshUnreadCount } = useUnreadCount();
   const tabBarHeight = 56 + Math.max(insets.bottom, 8);
+  const badge = formatTabUnreadBadge(unreadCount);
 
   return (
     <Tabs
@@ -34,6 +36,11 @@ function AppTabs() {
           headerShown: false,
           tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
         }}
+        listeners={{
+          focus: () => {
+            void refreshUnreadCount();
+          },
+        }}
       />
       <Tabs.Screen
         name="cotisations"
@@ -48,7 +55,7 @@ function AppTabs() {
         name="notifications"
         options={{
           title: "Notifications",
-          tabBarBadge: unreadCount > 0 ? unreadCount : undefined,
+          tabBarBadge: badge,
           tabBarBadgeStyle: {
             backgroundColor: AmakiColors.danger,
             color: AmakiColors.surface,
@@ -59,7 +66,7 @@ function AppTabs() {
           ),
         }}
         listeners={{
-          blur: () => {
+          focus: () => {
             void refreshUnreadCount();
           },
         }}

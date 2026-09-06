@@ -4,7 +4,9 @@ import {
   nextUnreadAfterMarkAll,
   nextUnreadAfterMarkRead,
   formatNotificationDate,
+  formatTabUnreadBadge,
   notificationErrorMessage,
+  shouldRefreshUnreadOnAppState,
 } from "@/api/notifications-state";
 
 describe("unread count helpers", () => {
@@ -31,6 +33,43 @@ describe("unread count helpers", () => {
   it("jamais négatif", () => {
     expect(nextUnreadAfterMarkRead(0, true)).toBe(0);
     expect(nextUnreadAfterDelete(0, true)).toBe(0);
+  });
+});
+
+describe("formatTabUnreadBadge", () => {
+  it("0 → badge absent", () => {
+    expect(formatTabUnreadBadge(0)).toBeUndefined();
+  });
+
+  it(">0 → badge visible", () => {
+    expect(formatTabUnreadBadge(1)).toBe(1);
+    expect(formatTabUnreadBadge(12)).toBe(12);
+  });
+
+  it("très élevé → 99+", () => {
+    expect(formatTabUnreadBadge(100)).toBe("99+");
+  });
+});
+
+describe("shouldRefreshUnreadOnAppState", () => {
+  it("background → active : refresh", () => {
+    expect(shouldRefreshUnreadOnAppState("background", "active")).toBe(true);
+  });
+
+  it("inactive → active : refresh", () => {
+    expect(shouldRefreshUnreadOnAppState("inactive", "active")).toBe(true);
+  });
+
+  it("active → active : pas de refetch", () => {
+    expect(shouldRefreshUnreadOnAppState("active", "active")).toBe(false);
+  });
+
+  it("active → background : pas de refresh count", () => {
+    expect(shouldRefreshUnreadOnAppState("active", "background")).toBe(false);
+  });
+
+  it("premier mount (prev null) : pas de double refresh AppState", () => {
+    expect(shouldRefreshUnreadOnAppState(null, "active")).toBe(false);
   });
 });
 
