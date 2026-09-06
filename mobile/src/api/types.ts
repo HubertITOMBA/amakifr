@@ -446,6 +446,76 @@ export type WithdrawMyReunionHostProposalResult = {
   statut: string;
 };
 
+/* ── Sondages ───────────────────────────────────────────── */
+
+export type MySurveysSummaryDto = {
+  aCompleterCount: number;
+};
+
+export type MyActiveSurveyDto = {
+  id: string;
+  sujet: string;
+  introduction: string | null;
+  dateDebut: string;
+  dateFin: string;
+  statusLabel: string;
+  requiredTotal: number;
+  requiredAnswered: number;
+  estComplet: boolean;
+  modifiable: boolean;
+};
+
+export type MySurveysListDto = {
+  items: MyActiveSurveyDto[];
+  total: number;
+};
+
+export type MySurveyAnswerItem = {
+  questionId: string;
+  optionId?: string | null;
+  ligneMatriceId?: string | null;
+  texteLibre?: string | null;
+};
+
+export type MySurveyQuestionDto = {
+  id: string;
+  ordre: number;
+  section: string | null;
+  libelle: string;
+  type: string;
+  obligatoire: boolean;
+  maxSelections: number | null;
+  minCaracteres: number | null;
+  maxCaracteres: number | null;
+  options: Array<{
+    id: string;
+    ordre: number;
+    libelle: string;
+    permetTexteLibre: boolean;
+  }>;
+  lignesMatrice: Array<{ id: string; ordre: number; libelle: string }>;
+};
+
+export type MySurveyDetailDto = {
+  id: string;
+  sujet: string;
+  introduction: string | null;
+  conclusion: string | null;
+  dateDebut: string;
+  dateFin: string;
+  modifiable: boolean;
+  estComplet: boolean;
+  requiredTotal: number;
+  requiredAnswered: number;
+  questions: MySurveyQuestionDto[];
+  maReponse: {
+    id: string;
+    soumiseLe: string;
+    modifieLe: string;
+    items: MySurveyAnswerItem[];
+  } | null;
+};
+
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;

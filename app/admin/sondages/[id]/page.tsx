@@ -29,6 +29,7 @@ import {
   SondageForm,
   mapSondageDetailToFormValues,
 } from "@/components/sondages/SondageForm";
+import { SondageDatesEditor } from "@/components/sondages/SondageDatesEditor";
 import {
   closeSondage,
   getSondageByIdAdmin,
@@ -183,7 +184,14 @@ export default function AdminSondageDetailPage() {
               {new Date(sondage.dateFin).toLocaleString("fr-FR")}
             </p>
           </CardHeader>
-          <CardContent className="pt-4">
+          <CardContent className="pt-4 space-y-4">
+            <SondageDatesEditor
+              sondageId={sondage.id}
+              dateDebut={sondage.dateDebut}
+              dateFin={sondage.dateFin}
+              status={sondage.status}
+              onSuccess={() => loadAll()}
+            />
             <Tabs defaultValue={isBrouillon ? "edition" : isOuvert ? "ajouter" : "participation"}>
               <TabsList className="mb-4">
                 {isBrouillon && <TabsTrigger value="edition">Édition</TabsTrigger>}

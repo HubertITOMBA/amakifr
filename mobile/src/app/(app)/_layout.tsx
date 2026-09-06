@@ -114,6 +114,14 @@ function AppTabs() {
           href: null,
         }}
       />
+      <Tabs.Screen
+        name="sondages"
+        options={{
+          title: "Mes sondages",
+          href: null,
+          headerShown: false,
+        }}
+      />
     </Tabs>
   );
 }

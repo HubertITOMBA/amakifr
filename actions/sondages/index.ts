@@ -91,6 +91,12 @@ const DuplicateSondageSchema = z.object({
   dateFin: z.coerce.date(),
 });
 
+const UpdateSondageDatesSchema = z.object({
+  id: z.string().min(1),
+  dateDebut: z.coerce.date(),
+  dateFin: z.coerce.date(),
+});
+
 const SubmitReponseSchema = z.object({
   sondageId: z.string().min(1),
   items: z.array(
@@ -380,6 +386,81 @@ export async function createSondage(input: z.infer<typeof CreateSondageSchema>) 
   } finally {
     revalidatePath("/admin/sondages");
     revalidatePath("/user/profile");
+  }
+}
+
+/**
+ * Met à jour uniquement les dates d'un sondage (brouillon ou ouvert).
+ * Ne touche pas aux questions ni aux réponses existantes.
+ */
+export async function updateSondageDates(
+  input: z.infer<typeof UpdateSondageDatesSchema>
+) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+
+    const parsed = UpdateSondageDatesSchema.parse(input);
+    const dateError = validateSondageDates(parsed.dateDebut, parsed.dateFin);
+    if (dateError) return { success: false, error: dateError };
+
+    const existing = await db.sondage.findUnique({
+      where: { id: parsed.id },
+      select: {
+        id: true,
+        status: true,
+        _count: { select: { reponses: true } },
+      },
+    });
+
+    if (!existing) {
+      return { success: false, error: "Sondage introuvable" };
+    }
+
+    if (existing.status === SondageStatus.Cloture) {
+      return {
+        success: false,
+        error: "Impossible de modifier les dates d'un sondage clôturé",
+      };
+    }
+
+    const updated = await db.sondage.update({
+      where: { id: parsed.id },
+      data: {
+        dateDebut: parsed.dateDebut,
+        dateFin: parsed.dateFin,
+      },
+      select: {
+        id: true,
+        dateDebut: true,
+        dateFin: true,
+        status: true,
+        _count: { select: { reponses: true } },
+      },
+    });
+
+    return {
+      success: true,
+      message: "Dates du sondage mises à jour",
+      data: {
+        id: updated.id,
+        dateDebut: updated.dateDebut.toISOString(),
+        dateFin: updated.dateFin.toISOString(),
+        status: updated.status,
+        reponseCount: updated._count.reponses,
+      },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Erreur updateSondageDates:", error);
+    return { success: false, error: "Erreur lors de la mise à jour des dates" };
+  } finally {
+    revalidatePath("/admin/sondages");
+    revalidatePath(`/admin/sondages/${input.id}`);
+    revalidatePath("/user/profile");
+    revalidatePath(`/sondages/${input.id}`);
   }
 }
 
