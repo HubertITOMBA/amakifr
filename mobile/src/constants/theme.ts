@@ -88,6 +88,14 @@ export const AmakiColors = {
   textSecondary: "#475569",
   textMuted: "#64748b",
   border: "#e2e8f0",
+  /** Fonds sombre login/accueil (alignés blue-900 / slate Web AMAKI) */
+  gradientDeep: "#0b1f4a",
+  gradientMid: "#1e3a8a",
+  gradientBottom: "#0f172a",
+  onDark: "#f8fafc",
+  onDarkMuted: "#cbd5e1",
+  onDarkSoft: "rgba(255,255,255,0.12)",
+  cardOnDark: "rgba(255,255,255,0.94)",
 } as const;
 
 export const AmakiSpacing = {

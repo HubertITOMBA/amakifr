@@ -7,6 +7,7 @@ const {
   updateMany,
   transaction,
   issueAccessToken,
+  userUpdate,
 } = vi.hoisted(() => ({
   findUnique: vi.fn(),
   update: vi.fn(),
@@ -14,11 +15,13 @@ const {
   updateMany: vi.fn(),
   transaction: vi.fn(),
   issueAccessToken: vi.fn(),
+  userUpdate: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
   db: {
     mobileRefreshSession: { findUnique, update, create, updateMany },
+    user: { update: userUpdate },
     $transaction: transaction,
   },
 }));
@@ -74,6 +77,8 @@ describe("createMobileSession", () => {
   beforeEach(() => {
     create.mockReset();
     issueAccessToken.mockReset();
+    userUpdate.mockReset();
+    userUpdate.mockResolvedValue({});
   });
 
   it("crée session avec hash (pas le brut)", async () => {
@@ -100,6 +105,13 @@ describe("createMobileSession", () => {
     expect(data.refreshTokenHash).not.toBe(result.refreshToken);
     expect(data.userId).toBe("user-1");
     expect(data.rotatedFromId).toBeNull();
+    expect(userUpdate).toHaveBeenCalledWith({
+      where: { id: "user-1" },
+      data: {
+        lastLogin: expect.any(Date),
+        loginCount: { increment: 1 },
+      },
+    });
   });
 });
 

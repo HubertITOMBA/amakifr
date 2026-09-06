@@ -6,6 +6,7 @@ import {
   hashRefreshToken,
 } from "@/lib/auth-mobile/refresh-token";
 import { MOBILE_REFRESH_TOKEN_TTL_MS } from "@/lib/auth-mobile/constants";
+import { recordSuccessfulLogin } from "@/lib/services/auth/record-successful-login";
 import type {
   AuthenticatedUserDto,
   MobileAuthSessionDto,
@@ -13,6 +14,7 @@ import type {
 
 /**
  * Crée une session mobile : access JWT + refresh opaque hashé en DB.
+ * Enregistre aussi la dernière connexion (login réel, pas refresh).
  *
  * @param user - Utilisateur déjà authentifié (sans password)
  * @returns Tokens + user minimal
@@ -40,6 +42,9 @@ export async function createMobileSession(
         rotatedFromId: null,
       },
     });
+
+    // Aligné Web (NextAuth signIn) — login réussi uniquement
+    await recordSuccessfulLogin(user.id);
 
     return {
       accessToken: access.token,

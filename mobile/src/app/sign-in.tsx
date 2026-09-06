@@ -9,10 +9,12 @@ import {
   View,
 } from "react-native";
 import { Image } from "expo-image";
+import { StatusBar } from "expo-status-bar";
 import { SafeAreaView } from "react-native-safe-area-context";
 import amakiLogo from "@/assets/images/amaki-logo-full.png";
 import { useAuth } from "@/auth/auth-context";
 import { ApiClientError } from "@/api/types";
+import { AmakiDarkBackground } from "@/components/ui/amaki-dark-background";
 import { PrimaryButton } from "@/components/ui/primary-button";
 import { Card } from "@/components/ui/card";
 import {
@@ -23,7 +25,7 @@ import {
 } from "@/constants/theme";
 
 /**
- * Écran de connexion email / mot de passe.
+ * Écran de connexion email / mot de passe — fond sombre AMAKI.
  */
 export default function SignInScreen() {
   const { signIn } = useAuth();
@@ -65,83 +67,86 @@ export default function SignInScreen() {
   }
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
-      <KeyboardAvoidingView
-        style={styles.flex}
-        behavior={Platform.OS === "ios" ? "padding" : undefined}
-      >
-        <ScrollView
-          contentContainerStyle={styles.scroll}
-          keyboardShouldPersistTaps="handled"
+    <AmakiDarkBackground>
+      <StatusBar style="light" />
+      <SafeAreaView style={styles.safe} edges={["top", "bottom"]}>
+        <KeyboardAvoidingView
+          style={styles.flex}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
         >
-          <View style={styles.header}>
-            <Image
-              source={amakiLogo}
-              style={styles.logo}
-              accessibilityLabel="AMAKI France"
-              alt="AMAKI France"
-              contentFit="contain"
-            />
-            <Text style={styles.brand}>AMAKI France</Text>
-            <Text style={styles.subtitle}>Espace adhérent</Text>
-          </View>
+          <ScrollView
+            contentContainerStyle={styles.scroll}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.header}>
+              <Image
+                source={amakiLogo}
+                style={styles.logo}
+                accessibilityLabel="AMAKI France"
+                alt="AMAKI France"
+                contentFit="contain"
+              />
+              <Text style={styles.brand}>AMAKI France</Text>
+              <Text style={styles.subtitle}>Espace adhérent</Text>
+            </View>
 
-          <Card style={styles.card}>
-            <Text style={styles.fieldLabel}>E-mail</Text>
-            <TextInput
-              style={styles.input}
-              autoCapitalize="none"
-              autoCorrect={false}
-              keyboardType="email-address"
-              textContentType="emailAddress"
-              value={email}
-              onChangeText={setEmail}
-              editable={!loading}
-              placeholder="vous@exemple.com"
-              placeholderTextColor={AmakiColors.textMuted}
-              accessibilityLabel="E-mail"
-            />
+            <Card style={styles.card}>
+              <Text style={styles.fieldLabel}>E-mail</Text>
+              <TextInput
+                style={styles.input}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                textContentType="emailAddress"
+                value={email}
+                onChangeText={setEmail}
+                editable={!loading}
+                placeholder="vous@exemple.com"
+                placeholderTextColor={AmakiColors.textMuted}
+                accessibilityLabel="E-mail"
+              />
 
-            <Text style={styles.fieldLabel}>Mot de passe</Text>
-            <TextInput
-              style={styles.input}
-              secureTextEntry
-              textContentType="password"
-              value={password}
-              onChangeText={setPassword}
-              editable={!loading}
-              placeholder="••••••••"
-              placeholderTextColor={AmakiColors.textMuted}
-              accessibilityLabel="Mot de passe"
-            />
+              <Text style={styles.fieldLabel}>Mot de passe</Text>
+              <TextInput
+                style={styles.input}
+                secureTextEntry
+                textContentType="password"
+                value={password}
+                onChangeText={setPassword}
+                editable={!loading}
+                placeholder="••••••••"
+                placeholderTextColor={AmakiColors.textMuted}
+                accessibilityLabel="Mot de passe"
+              />
 
-            {error ? (
-              <Text
-                style={styles.error}
-                accessibilityRole="alert"
-                accessibilityLiveRegion="polite"
-              >
-                {error}
-              </Text>
-            ) : null}
+              {error ? (
+                <Text
+                  style={styles.error}
+                  accessibilityRole="alert"
+                  accessibilityLiveRegion="polite"
+                >
+                  {error}
+                </Text>
+              ) : null}
 
-            <PrimaryButton
-              label="Connexion"
-              loading={loading}
-              onPress={onSubmit}
-              style={styles.submit}
-            />
-          </Card>
-        </ScrollView>
-      </KeyboardAvoidingView>
-    </SafeAreaView>
+              <PrimaryButton
+                label="Connexion"
+                loading={loading}
+                onPress={onSubmit}
+                style={styles.submit}
+              />
+            </Card>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </SafeAreaView>
+    </AmakiDarkBackground>
   );
 }
 
 const styles = StyleSheet.create({
   safe: {
     flex: 1,
-    backgroundColor: AmakiColors.primarySoft,
+    backgroundColor: "transparent",
   },
   flex: {
     flex: 1,
@@ -160,20 +165,22 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: AmakiRadius.lg,
     marginBottom: AmakiSpacing.md,
+    backgroundColor: AmakiColors.surface,
   },
   brand: {
     ...AmakiTypography.display,
-    color: AmakiColors.primaryStrong,
+    color: AmakiColors.onDark,
     textAlign: "center",
   },
   subtitle: {
     ...AmakiTypography.caption,
-    color: AmakiColors.textMuted,
+    color: AmakiColors.onDarkMuted,
     textAlign: "center",
     marginTop: AmakiSpacing.xs,
   },
   card: {
     padding: AmakiSpacing.lg,
+    backgroundColor: AmakiColors.cardOnDark,
   },
   fieldLabel: {
     ...AmakiTypography.label,

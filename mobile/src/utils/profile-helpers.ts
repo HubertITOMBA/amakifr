@@ -2,8 +2,6 @@
  * Helpers purs pour l'écran Profil (initiales, adresse, date).
  */
 
-import type { MeAddressDto } from "@/api/types";
-
 /**
  * Extrait les initiales d'un utilisateur à partir de son nom, prénom+nom, ou email.
  *
@@ -40,7 +38,14 @@ export function getInitials(
  * @param address - DTO adresse depuis /api/v1/me
  * @returns Tableau de lignes (ex: ["12 rue X", "75000 Paris", "France"])
  */
-export function formatAddress(address: MeAddressDto): string[] {
+export function formatAddress(address: {
+  streetnum?: string | null;
+  street1?: string | null;
+  street2?: string | null;
+  codepost?: string | null;
+  city?: string | null;
+  country?: string | null;
+}): string[] {
   const lines: string[] = [];
 
   const streetParts: string[] = [];
