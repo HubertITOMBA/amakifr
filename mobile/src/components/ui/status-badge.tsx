@@ -6,6 +6,7 @@ import {
   AmakiTypography,
 } from "@/constants/theme";
 import type { CotisationStatusTone } from "@/api/cotisation-display";
+import { badgeDisplayLabel } from "@/components/ui/status-badge-label";
 
 type Tone = CotisationStatusTone;
 
@@ -47,9 +48,12 @@ const TONE_STYLES: Record<
 
 /**
  * Badge de statut texte + couleur (pas uniquement couleur).
+ * Largeur intrinsèque au contenu — ne doit jamais être compressé.
  */
 export function StatusBadge({ label, tone = "neutral" }: Props) {
   const palette = TONE_STYLES[tone];
+  const display = badgeDisplayLabel(label);
+
   return (
     <View
       style={[
@@ -62,7 +66,7 @@ export function StatusBadge({ label, tone = "neutral" }: Props) {
       accessibilityRole="text"
       accessibilityLabel={label}
     >
-      <Text style={[styles.text, { color: palette.text }]}>{label}</Text>
+      <Text style={[styles.text, { color: palette.text }]}>{display}</Text>
     </View>
   );
 }
@@ -70,6 +74,8 @@ export function StatusBadge({ label, tone = "neutral" }: Props) {
 const styles = StyleSheet.create({
   badge: {
     alignSelf: "flex-start",
+    flexGrow: 0,
+    flexShrink: 0,
     borderRadius: AmakiRadius.pill,
     borderWidth: 1,
     paddingHorizontal: AmakiSpacing.sm,

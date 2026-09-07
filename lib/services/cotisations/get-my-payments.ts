@@ -107,12 +107,13 @@ export async function getMyPayments(
       annee !== undefined
         ? {
             adherentId,
+            inscriptionEvenementId: null,
             datePaiement: {
               gte: new Date(Date.UTC(annee, 0, 1, 0, 0, 0, 0)),
               lt: new Date(Date.UTC(annee + 1, 0, 1, 0, 0, 0, 0)),
             },
           }
-        : { adherentId };
+        : { adherentId, inscriptionEvenementId: null };
 
     const [total, rows] = await Promise.all([
       db.paiementCotisation.count({ where }),

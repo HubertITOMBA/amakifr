@@ -516,6 +516,76 @@ export type MySurveyDetailDto = {
   } | null;
 };
 
+/* ── Événements (≠ réunions mensuelles) ─────────────────── */
+
+export type MyEventListItemDto = {
+  id: string;
+  titre: string;
+  description: string;
+  categorie: string;
+  dateDebut: string;
+  dateFin: string | null;
+  lieu: string | null;
+  statutLabel: string;
+  inscriptionRequis: boolean;
+  dateLimiteInscription: string | null;
+  placesDisponibles: number | null;
+  placesReservees: number;
+  placesRestantes: number | null;
+  estInscrit: boolean;
+  canRegister: boolean;
+  canWithdraw: boolean;
+  obligatoireParticipation: boolean;
+  prix: string | null;
+};
+
+export type MyEventDetailDto = MyEventListItemDto & {
+  contenu: string | null;
+  adresse: string | null;
+  contactEmail: string | null;
+  contactTelephone: string | null;
+  imagePrincipale: string | null;
+  tags: string[] | null;
+  inscriptionId: string | null;
+  nombrePersonnes: number | null;
+  estPublic: boolean;
+  montantAttendu: string | null;
+  montantPaye: string | null;
+  montantRestant: string | null;
+  statutPaiement: string | null;
+  paymentRequired: boolean;
+  hasPendingPayment: boolean;
+  canPay: boolean;
+  paiements: MyEventPaymentDto[];
+};
+
+export type MyEventPaymentDto = {
+  id: string;
+  montant: string;
+  moyenPaiement: string;
+  statut: string;
+  datePaiement: string;
+  reference: string | null;
+  destinationLabel: string;
+};
+
+export type MyEventsListDto = {
+  items: MyEventListItemDto[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type MyEventsSummaryDto = {
+  upcomingCount: number;
+  nextEvent: {
+    id: string;
+    titre: string;
+    dateDebut: string;
+    lieu: string | null;
+  } | null;
+};
+
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;

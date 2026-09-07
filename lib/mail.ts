@@ -632,7 +632,11 @@ export const sendAdherentInscriptionConfirmationEmail = async(
   evenementTitre: string,
   evenementDateDebut: Date,
   evenementLieu?: string | null,
-  nombrePersonnes: number = 1
+  nombrePersonnes: number = 1,
+  paymentInfo?: {
+    prixUnitaire?: number | null;
+    montantAttendu?: number | null;
+  } | null
 ) => {
   const dateDebut = new Date(evenementDateDebut).toLocaleDateString('fr-FR', {
     day: 'numeric',
@@ -641,6 +645,26 @@ export const sendAdherentInscriptionConfirmationEmail = async(
     hour: '2-digit',
     minute: '2-digit'
   });
+
+  const payant =
+    paymentInfo?.montantAttendu != null &&
+    paymentInfo.montantAttendu > 0;
+
+  const paymentBlock = payant
+    ? `
+    <div style="background-color: #fff7ed; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #f97316;">
+      <h3 style="color: #333; margin-top: 0;">Règlement</h3>
+      ${
+        paymentInfo?.prixUnitaire != null && paymentInfo.prixUnitaire > 0
+          ? `<p style="margin: 8px 0;"><strong>Prix unitaire :</strong> ${paymentInfo.prixUnitaire.toFixed(2).replace(".", ",")} €</p>`
+          : ""
+      }
+      <p style="margin: 8px 0;"><strong>Nombre de personnes :</strong> ${nombrePersonnes}</p>
+      <p style="margin: 8px 0;"><strong>Montant total attendu :</strong> ${Number(paymentInfo!.montantAttendu).toFixed(2).replace(".", ",")} €</p>
+      <p style="margin: 10px 0; color: #9a3412;">Votre inscription est enregistrée. Le règlement reste à effectuer.</p>
+      <p style="margin: 0; color: #666; font-size: 14px;">Consultez votre espace adhérent pour effectuer le règlement.</p>
+    </div>`
+    : "";
 
   const content = `
     <h1 style="color: #4a90e2; margin-bottom: 20px; margin-top: 0;">Confirmation d'inscription</h1>
@@ -658,6 +682,8 @@ export const sendAdherentInscriptionConfirmationEmail = async(
       ${evenementLieu ? `<p style="margin: 10px 0;"><strong>Lieu :</strong> ${evenementLieu}</p>` : ''}
       <p style="margin: 10px 0;"><strong>Nombre de personnes :</strong> ${nombrePersonnes}</p>
     </div>
+    
+    ${paymentBlock}
     
     <div style="background-color: #f0f7ff; padding: 15px; border-radius: 5px; margin-bottom: 20px; border-left: 4px solid #4a90e2;">
       <p style="margin: 0; color: #666;"><strong>Rappel :</strong> Nous vous rappelons la date et l'heure de l'événement. N'hésitez pas à nous contacter si vous avez des questions.</p>

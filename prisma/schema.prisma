@@ -939,6 +939,7 @@ model PaiementCotisation {
   cotisationMensuelleId  String? // Si le paiement concerne une cotisation mensuelle
   detteInitialeId        String? // Si le paiement concerne une dette initiale
   assistanceId           String? // Si le paiement concerne une assistance
+  inscriptionEvenementId String? // Si le paiement concerne une inscription événement (pas d'allocation cotisation)
 
   // Informations pour les paiements en ligne
   stripePaymentIntentId String? @unique @db.VarChar(255) // ID du PaymentIntent Stripe
@@ -959,6 +960,7 @@ model PaiementCotisation {
   CotisationMensuelle  CotisationMensuelle?  @relation(fields: [cotisationMensuelleId], references: [id], onDelete: SetNull)
   DetteInitiale        DetteInitiale?        @relation(fields: [detteInitialeId], references: [id], onDelete: SetNull)
   Assistance           Assistance?           @relation(fields: [assistanceId], references: [id], onDelete: SetNull)
+  InscriptionEvenement InscriptionEvenement? @relation(fields: [inscriptionEvenementId], references: [id], onDelete: SetNull)
   CreatedBy            User                  @relation("PaiementCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
   Avoir                Avoir?                @relation("AvoirFromPaiement") // Avoir créé par ce paiement (si excédent)
 
@@ -966,6 +968,7 @@ model PaiementCotisation {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([inscriptionEvenementId])
   @@map("paiements_cotisation")
 }
 
@@ -1133,6 +1136,15 @@ model Evenement {
   @@map("evenements")
 }
 
+/// Statut de règlement d'une inscription événement (distinct du statut inscription).
+enum StatutPaiementEvenement {
+  NonApplicable
+  APayer
+  EnAttenteValidation
+  PartiellementPaye
+  Paye
+}
+
 // Modèle pour les inscriptions aux événements
 model InscriptionEvenement {
   id              String   @id @default(cuid())
@@ -1146,6 +1158,11 @@ model InscriptionEvenement {
   justificatifFournit Boolean @default(false)
   justificatifNote String? @db.Text
 
+  /// Snapshot prix×places à l'inscription (indépendant d'un changement ultérieur de Evenement.prix)
+  montantAttendu Decimal @default(0) @db.Decimal(10, 2)
+  montantPaye    Decimal @default(0) @db.Decimal(10, 2)
+  statutPaiement StatutPaiementEvenement @default(NonApplicable)
+
   // Informations du visiteur (pour les non-adhérents)
   visiteurNom       String? @db.VarChar(255)
   visiteurEmail     String? @db.VarChar(255)
@@ -1155,6 +1172,7 @@ model InscriptionEvenement {
   // Relations
   Evenement Evenement @relation(fields: [evenementId], references: [id], onDelete: Cascade)
   Adherent  Adherent? @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  Paiements PaiementCotisation[]
 
   // Métadonnées
   createdAt DateTime @default(now())
@@ -1162,6 +1180,7 @@ model InscriptionEvenement {
 
   @@index([evenementId, adherentId])
   @@index([evenementId, visiteurEmail])
+  @@index([statutPaiement])
   @@map("inscriptions_evenements")
 }
 

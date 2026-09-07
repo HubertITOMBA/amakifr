@@ -1,4 +1,4 @@
-import { Prisma, MoyenPaiement } from "@prisma/client";
+import { Prisma, MoyenPaiement, StatutPaiementEvenement } from "@prisma/client";
 import { db } from "@/lib/db";
 import { z } from "zod";
 import type { AuthContext } from "@/lib/auth-context";
@@ -9,12 +9,17 @@ import {
   appliquerAvoirs,
   createAvoirFromPaymentSurplus,
 } from "@/lib/services/paiements/avoir-allocation";
+import {
+  inscriptionMontantRestant,
+  resolveStatutPaiementAfterAmounts,
+} from "@/lib/services/evenements/inscription-payment";
 
 export type PayableTargetType =
   | "cotisation-mensuelle"
   | "dette-initiale"
   | "assistance"
-  | "obligation";
+  | "obligation"
+  | "inscription-evenement";
 
 export type DeclaredPaymentDto = {
   id: string;
@@ -33,6 +38,7 @@ const DeclareSchema = z.object({
     "dette-initiale",
     "assistance",
     "obligation",
+    "inscription-evenement",
   ]),
   targetId: z.string().min(1),
   amount: z
@@ -73,7 +79,9 @@ export function buildPaymentReference(
         ? "DET"
         : targetType === "assistance"
           ? "ASS"
-          : "OBL";
+          : targetType === "inscription-evenement"
+            ? "EVT"
+            : "OBL";
   const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
   const ts = Date.now().toString(36).slice(-4).toUpperCase();
   return `AMAKI-${year}-${typeCode}-${rand}${ts}`;
@@ -106,12 +114,18 @@ export function pendingPaymentWhere(
   if (targetType === "assistance") {
     return { ...base, assistanceId: targetId };
   }
+  if (targetType === "inscription-evenement") {
+    return { ...base, inscriptionEvenementId: targetId };
+  }
   return { ...base, obligationCotisationId: targetId };
 }
 
 function pendingAlreadyMessage(targetType: PayableTargetType): string {
   if (targetType === "cotisation-mensuelle") {
     return "Un paiement est déjà en attente de validation pour cette cotisation.";
+  }
+  if (targetType === "inscription-evenement") {
+    return "Un paiement est déjà en attente de validation pour cet événement.";
   }
   return "Un paiement est déjà en attente de validation pour cette échéance.";
 }
@@ -148,6 +162,54 @@ async function loadOwnedTarget(
     });
     if (!row) throw new ServiceError("NOT_FOUND", "Assistance introuvable");
     return row;
+  }
+  if (targetType === "inscription-evenement") {
+    const row = await client.inscriptionEvenement.findFirst({
+      where: { id: targetId, adherentId },
+      select: {
+        adherentId: true,
+        statut: true,
+        montantAttendu: true,
+        montantPaye: true,
+        statutPaiement: true,
+        Evenement: { select: { prix: true } },
+      },
+    });
+    if (!row) {
+      throw new ServiceError("NOT_FOUND", "Inscription événement introuvable");
+    }
+    if (row.statut === "Annulee") {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        "Cette inscription est annulée"
+      );
+    }
+    const montantAttendu = new Prisma.Decimal(row.montantAttendu);
+    if (montantAttendu.lte(0)) {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        "Cette inscription ne nécessite pas de paiement"
+      );
+    }
+    const montantRestant = inscriptionMontantRestant(
+      row.montantAttendu,
+      row.montantPaye
+    );
+    if (
+      row.statutPaiement === StatutPaiementEvenement.NonApplicable ||
+      (row.statutPaiement === StatutPaiementEvenement.Paye &&
+        montantRestant.lte(0))
+    ) {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        "Cette ligne est déjà soldée"
+      );
+    }
+    return {
+      adherentId,
+      montantRestant,
+      statut: row.statutPaiement,
+    };
   }
   const row = await client.obligationCotisation.findFirst({
     where: { id: targetId, adherentId },
@@ -230,16 +292,26 @@ export async function declareBankOrWeroPayment(
         if (amount.lte(0)) {
           throw new ServiceError("VALIDATION_ERROR", "Montant invalide");
         }
-        // Surpaiement autorisé : l'excédent est ventilé à la validation admin
+        // Surpaiement autorisé pour cotisations : l'excédent est ventilé à la validation admin
         // (cible plafonnée → dettes → avoir). Le montant déclaré est conservé tel quel.
+        // Inscription événement : surpaiement refusé (pas d'avoir / allocation cotisation).
         if (target.montantRestant.lte(0) || target.statut === "Paye") {
           throw new ServiceError(
             "VALIDATION_ERROR",
             "Cette ligne est déjà soldée"
           );
         }
+        if (
+          data.targetType === "inscription-evenement" &&
+          amount.gt(target.montantRestant)
+        ) {
+          throw new ServiceError(
+            "VALIDATION_ERROR",
+            "Montant supérieur au reste à payer"
+          );
+        }
 
-        return tx.paiementCotisation.create({
+        const created = await tx.paiementCotisation.create({
           data: {
             adherentId,
             montant: amount,
@@ -259,8 +331,23 @@ export async function declareBankOrWeroPayment(
               data.targetType === "assistance" ? data.targetId : null,
             obligationCotisationId:
               data.targetType === "obligation" ? data.targetId : null,
+            inscriptionEvenementId:
+              data.targetType === "inscription-evenement"
+                ? data.targetId
+                : null,
           },
         });
+
+        if (data.targetType === "inscription-evenement") {
+          await tx.inscriptionEvenement.update({
+            where: { id: data.targetId },
+            data: {
+              statutPaiement: StatutPaiementEvenement.EnAttenteValidation,
+            },
+          });
+        }
+
+        return created;
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.Serializable }
     );
@@ -310,10 +397,49 @@ export async function applyValidatedPaymentCredit(
     detteInitialeId: string | null;
     assistanceId: string | null;
     obligationCotisationId: string | null;
+    inscriptionEvenementId?: string | null;
   }
 ): Promise<{ creditedToTarget: string; surplus: string }> {
   const amount = new Prisma.Decimal(paiement.montant);
   let credited = new Prisma.Decimal(0);
+
+  // Branche événement : crédit isolé, jamais d'avoir / allocation cotisation.
+  if (paiement.inscriptionEvenementId) {
+    const insc = await tx.inscriptionEvenement.findFirst({
+      where: {
+        id: paiement.inscriptionEvenementId,
+        adherentId: paiement.adherentId,
+      },
+    });
+    if (!insc) {
+      throw new ServiceError("NOT_FOUND", "Inscription événement introuvable");
+    }
+
+    const restant = inscriptionMontantRestant(
+      insc.montantAttendu,
+      insc.montantPaye
+    );
+    credited = Prisma.Decimal.min(amount, restant);
+
+    const paye = new Prisma.Decimal(insc.montantPaye).plus(credited);
+    await tx.inscriptionEvenement.update({
+      where: { id: insc.id },
+      data: {
+        montantPaye: paye,
+        statutPaiement: resolveStatutPaiementAfterAmounts({
+          montantAttendu: new Prisma.Decimal(insc.montantAttendu),
+          montantPaye: paye,
+          hasPendingPayment: false,
+        }),
+      },
+    });
+
+    const surplus = amount.minus(credited);
+    return {
+      creditedToTarget: credited.toString(),
+      surplus: surplus.toString(),
+    };
+  }
 
   if (paiement.cotisationMensuelleId) {
     const cot = await tx.cotisationMensuelle.findFirst({
@@ -466,10 +592,32 @@ async function debitTargetByAmount(
     detteInitialeId: string | null;
     assistanceId: string | null;
     obligationCotisationId: string | null;
+    inscriptionEvenementId?: string | null;
   }
 ): Promise<void> {
   const amount = new Prisma.Decimal(params.montant);
   if (amount.lte(0)) return;
+
+  if (params.inscriptionEvenementId) {
+    const insc = await tx.inscriptionEvenement.findFirst({
+      where: { id: params.inscriptionEvenementId },
+    });
+    if (!insc) return;
+    const payeRaw = new Prisma.Decimal(insc.montantPaye).minus(amount);
+    const paye = payeRaw.gt(0) ? payeRaw : new Prisma.Decimal(0);
+    await tx.inscriptionEvenement.update({
+      where: { id: insc.id },
+      data: {
+        montantPaye: paye,
+        statutPaiement: resolveStatutPaiementAfterAmounts({
+          montantAttendu: new Prisma.Decimal(insc.montantAttendu),
+          montantPaye: paye,
+          hasPendingPayment: false,
+        }),
+      },
+    });
+    return;
+  }
 
   if (params.cotisationMensuelleId) {
     const cot = await tx.cotisationMensuelle.findFirst({
@@ -586,6 +734,7 @@ export async function reverseValidatedPaymentCredit(
     detteInitialeId: string | null;
     assistanceId: string | null;
     obligationCotisationId: string | null;
+    inscriptionEvenementId?: string | null;
   }
 ): Promise<{ creditedToTarget: string; surplus: string }> {
   const surplus = await reverseAvoirFromPayment(tx, paiement.id);
@@ -598,6 +747,7 @@ export async function reverseValidatedPaymentCredit(
       detteInitialeId: paiement.detteInitialeId,
       assistanceId: paiement.assistanceId,
       obligationCotisationId: paiement.obligationCotisationId,
+      inscriptionEvenementId: paiement.inscriptionEvenementId,
     });
   }
   return {
@@ -645,6 +795,7 @@ type PaiementNotifyRelations = {
   montant: Prisma.Decimal;
   moyenPaiement: string;
   reference: string | null;
+  inscriptionEvenementId?: string | null;
   Adherent: { userId: string } | null;
   CotisationMensuelle: {
     mois: number;
@@ -654,6 +805,11 @@ type PaiementNotifyRelations = {
   DetteInitiale: { annee: number } | null;
   Assistance: { type: string } | null;
   ObligationCotisation: { periode: string } | null;
+  InscriptionEvenement: {
+    id: string;
+    evenementId: string;
+    Evenement: { titre: string } | null;
+  } | null;
 };
 
 /**
@@ -662,6 +818,10 @@ type PaiementNotifyRelations = {
 export function formatPaymentTargetLabel(
   paiement: PaiementNotifyRelations
 ): string {
+  if (paiement.InscriptionEvenement) {
+    const titre = paiement.InscriptionEvenement.Evenement?.titre?.trim();
+    return titre ? `événement « ${titre} »` : "événement";
+  }
   if (paiement.CotisationMensuelle) {
     const cm = paiement.CotisationMensuelle;
     const typeNom = cm.TypeCotisation?.nom?.trim();
@@ -695,6 +855,13 @@ const paiementNotifyInclude = {
   DetteInitiale: { select: { annee: true } },
   Assistance: { select: { type: true } },
   ObligationCotisation: { select: { periode: true } },
+  InscriptionEvenement: {
+    select: {
+      id: true,
+      evenementId: true,
+      Evenement: { select: { titre: true } },
+    },
+  },
 } as const;
 
 /**
@@ -715,21 +882,37 @@ export async function notifyAdherentPaymentDecision(params: {
     const moyen = formatMoyenPaiementLabel(params.paiement.moyenPaiement);
     const cible = formatPaymentTargetLabel(params.paiement);
     const ref = params.paiement.reference?.trim();
+    const isEvent = Boolean(
+      params.paiement.inscriptionEvenementId ||
+        params.paiement.InscriptionEvenement
+    );
+    const evenementId = params.paiement.InscriptionEvenement?.evenementId;
+    const eventLien = evenementId
+      ? `/evenements/${evenementId}`
+      : "/evenements";
 
     if (params.decision === "valide") {
       await db.notification.create({
         data: {
           userId,
-          type: "Cotisation",
-          titre: "Paiement validé",
-          message: [
-            `Votre paiement par ${moyen} de ${montant} € concernant ${cible} a été validé par l'administration.`,
-            "Le montant a été crédité sur votre situation.",
-            ref ? `Référence : ${ref}.` : null,
-          ]
-            .filter(Boolean)
-            .join(" "),
-          lien: "/paiement",
+          type: isEvent ? "Evenement" : "Cotisation",
+          titre: isEvent ? "Paiement événement validé" : "Paiement validé",
+          message: isEvent
+            ? [
+                `Votre paiement par ${moyen} de ${montant} € pour ${cible} a été validé par l'administration.`,
+                "Le montant a été crédité sur votre inscription.",
+                ref ? `Référence : ${ref}.` : null,
+              ]
+                .filter(Boolean)
+                .join(" ")
+            : [
+                `Votre paiement par ${moyen} de ${montant} € concernant ${cible} a été validé par l'administration.`,
+                "Le montant a été crédité sur votre situation.",
+                ref ? `Référence : ${ref}.` : null,
+              ]
+                .filter(Boolean)
+                .join(" "),
+          lien: isEvent ? eventLien : "/paiement",
           lue: false,
         },
       });
@@ -739,17 +922,26 @@ export async function notifyAdherentPaymentDecision(params: {
     await db.notification.create({
       data: {
         userId,
-        type: "Cotisation",
-        titre: "Paiement rejeté",
-        message: [
-          `Votre paiement par ${moyen} de ${montant} € concernant ${cible} a été rejeté par l'administration.`,
-          "Aucun montant n'a été crédité.",
-          ref ? `Référence : ${ref}.` : null,
-          "Pour toute question, contactez le bureau.",
-        ]
-          .filter(Boolean)
-          .join(" "),
-        lien: "/paiement",
+        type: isEvent ? "Evenement" : "Cotisation",
+        titre: isEvent ? "Paiement événement rejeté" : "Paiement rejeté",
+        message: isEvent
+          ? [
+              `Votre paiement par ${moyen} de ${montant} € pour ${cible} a été rejeté par l'administration.`,
+              "Aucun montant n'a été crédité sur votre inscription.",
+              ref ? `Référence : ${ref}.` : null,
+              "Pour toute question, contactez le bureau.",
+            ]
+              .filter(Boolean)
+              .join(" ")
+          : [
+              `Votre paiement par ${moyen} de ${montant} € concernant ${cible} a été rejeté par l'administration.`,
+              "Aucun montant n'a été crédité.",
+              ref ? `Référence : ${ref}.` : null,
+              "Pour toute question, contactez le bureau.",
+            ]
+              .filter(Boolean)
+              .join(" "),
+        lien: isEvent ? eventLien : "/paiement",
         lue: false,
       },
     });
@@ -895,6 +1087,26 @@ export async function rejectPendingPayment(
         "CONFLICT",
         "Ce paiement ne peut pas être rejeté (statut actuel incompatible)"
       );
+    }
+
+    // Rejet EnAttente d'un paiement événement : recalcul statutPaiement (sans débit).
+    if (!wasValide && paiement.inscriptionEvenementId) {
+      const insc = await tx.inscriptionEvenement.findFirst({
+        where: { id: paiement.inscriptionEvenementId },
+        select: { id: true, montantAttendu: true, montantPaye: true },
+      });
+      if (insc) {
+        await tx.inscriptionEvenement.update({
+          where: { id: insc.id },
+          data: {
+            statutPaiement: resolveStatutPaiementAfterAmounts({
+              montantAttendu: new Prisma.Decimal(insc.montantAttendu),
+              montantPaye: new Prisma.Decimal(insc.montantPaye),
+              hasPendingPayment: false,
+            }),
+          },
+        });
+      }
     }
 
     return {

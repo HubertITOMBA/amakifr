@@ -19,7 +19,8 @@ export type PayableTargetType =
   | "cotisation-mensuelle"
   | "dette-initiale"
   | "assistance"
-  | "obligation";
+  | "obligation"
+  | "inscription-evenement";
 
 export const JUSTIFICATIF_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -110,6 +111,7 @@ type PendingPaymentLike = {
   detteInitialeId?: string | null;
   assistanceId?: string | null;
   obligationCotisationId?: string | null;
+  inscriptionEvenementId?: string | null;
 };
 
 /**
@@ -133,6 +135,9 @@ export function targetHasPendingPayment(
     }
     if (targetType === "obligation") {
       return p.obligationCotisationId === targetId;
+    }
+    if (targetType === "inscription-evenement") {
+      return p.inscriptionEvenementId === targetId;
     }
     return false;
   });
@@ -372,7 +377,9 @@ export function buildClientPaymentReference(
         ? "DET"
         : targetType === "assistance"
           ? "ASS"
-          : "OBL";
+          : targetType === "inscription-evenement"
+            ? "EVT"
+            : "OBL";
   const rand = Math.random().toString(36).slice(2, 6).toUpperCase();
   const ts = Date.now().toString(36).slice(-4).toUpperCase();
   return `AMAKI-${year}-${typeCode}-${rand}${ts}`;

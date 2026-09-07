@@ -52,6 +52,23 @@ import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggl
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 
+import {
+  eventPaymentDestinationLabel,
+  inscriptionParticipantKindLabel,
+  matchesPaymentDomaineFilter,
+  matchesPaymentPersonTypeFilter,
+  normalizePersonTypeFilterForDomaine,
+  resolveInscriptionParticipantKind,
+  resolvePaymentDomaine,
+  shouldShowPaymentPersonTypeFilter,
+  type PaymentPersonTypeFilter,
+} from "@/lib/services/evenements/admin-event-stats";
+import {
+  buildPaymentDestinationLabel,
+  isTechnicalPaymentNote,
+  adminHistoriqueColumnVisibilityForDomaine,
+} from "@/lib/services/cotisations/payment-destination-label";
+
 const columnHelper = createColumnHelper<any>();
 
 const getMoyenPaiementLabel = (moyen: string) => {
@@ -123,16 +140,70 @@ const MOIS_LABELS: Record<number, string> = {
   7: "Juillet", 8: "Août", 9: "Septembre", 10: "Octobre", 11: "Novembre", 12: "Décembre",
 };
 
+const getInscriptionEvenementLabel = (p: {
+  InscriptionEvenement?: { Evenement?: { titre?: string | null } | null } | null;
+}) => {
+  return eventPaymentDestinationLabel(
+    p.InscriptionEvenement?.Evenement?.titre
+  );
+};
+
+/** Destination métier admin (jamais les notes techniques description). */
+const getPaymentDestinationLabel = (p: any): string =>
+  buildPaymentDestinationLabel({
+    CotisationMensuelle: p.CotisationMensuelle
+      ? {
+          mois: p.CotisationMensuelle.mois,
+          annee: p.CotisationMensuelle.annee,
+          description: p.CotisationMensuelle.description,
+          TypeCotisation: {
+            nom: p.CotisationMensuelle.TypeCotisation?.nom || "Cotisation",
+            categorie: p.CotisationMensuelle.TypeCotisation?.categorie,
+            aBeneficiaire: p.CotisationMensuelle.TypeCotisation?.aBeneficiaire,
+          },
+          AdherentBeneficiaire: p.CotisationMensuelle.AdherentBeneficiaire ?? null,
+        }
+      : null,
+    DetteInitiale: p.DetteInitiale
+      ? { annee: p.DetteInitiale.annee }
+      : null,
+    Assistance: p.Assistance
+      ? {
+          type: p.Assistance.type,
+          description: p.Assistance.description,
+        }
+      : null,
+    ObligationCotisation: p.ObligationCotisation
+      ? { periode: p.ObligationCotisation.periode }
+      : null,
+    InscriptionEvenement: p.InscriptionEvenement ?? null,
+    description: p.description ?? null,
+    detteInitialeId: p.detteInitialeId,
+    cotisationMensuelleId: p.cotisationMensuelleId,
+    assistanceId: p.assistanceId,
+    obligationCotisationId: p.obligationCotisationId,
+    inscriptionEvenementId: p.inscriptionEvenementId,
+  });
+
 export default function AdminHistoriquePaiementsPage() {
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [sorting, setSorting] = useState<SortingState>([]);
+  const [sorting, setSorting] = useState<SortingState>([
+    { id: "datePaiement", desc: true },
+  ]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
   const [globalFilter, setGlobalFilter] = useState("");
   const [searchTerm, setSearchTerm] = useState("");
   const [moyenFilter, setMoyenFilter] = useState<string>("all");
   const [moisFilter, setMoisFilter] = useState<string>("all");
   const [anneeFilter, setAnneeFilter] = useState<string>("all");
+  const [domaineFilter, setDomaineFilter] = useState<
+    "all" | "cotisations" | "evenements"
+  >("all");
+  const [typePersonneFilter, setTypePersonneFilter] =
+    useState<PaymentPersonTypeFilter>("all");
+  const [statutFilter, setStatutFilter] = useState<string>("all");
+  const [evenementFilter, setEvenementFilter] = useState<string>("all");
   const [detailDialogOpen, setDetailDialogOpen] = useState(false);
   const [selectedPaiement, setSelectedPaiement] = useState<any | null>(null);
   const [detailActionLoading, setDetailActionLoading] = useState(false);
@@ -149,26 +220,30 @@ export default function AdminHistoriquePaiementsPage() {
         const mobile = window.innerWidth < 768;
         if (mobile) {
           return {
-            description: true,
+            ...adminHistoriqueColumnVisibilityForDomaine("all"),
+            personne: true,
+            destination: true,
             montant: false,
             moyenPaiement: false,
             datePaiement: false,
             reference: false,
             statut: true,
-            objetPaye: false,
             actions: true,
           };
         }
-        // Ordre par défaut : Adhérent, Description, Montant, Moyen, Date, Actions (masquer référence et objetPaye)
+        // Domaine = Tous par défaut : Destination + Domaine, pas Événement vide
         return {
+          ...adminHistoriqueColumnVisibilityForDomaine("all"),
           reference: false,
-          objetPaye: false,
         };
       } catch (e) {
         console.error(e);
       }
     }
-    return { reference: false, objetPaye: false };
+    return {
+      ...adminHistoriqueColumnVisibilityForDomaine("all"),
+      reference: false,
+    };
   });
 
   useEffect(() => {
@@ -289,14 +364,34 @@ export default function AdminHistoriquePaiementsPage() {
           item.Adherent?.firstname || "",
           item.Adherent?.lastname || "",
           item.Adherent?.User?.email || "",
+          item.InscriptionEvenement?.visiteurNom || "",
+          item.InscriptionEvenement?.visiteurEmail || "",
           item.reference || "",
           item.description || "",
+          item.InscriptionEvenement?.Evenement?.titre || "",
           getMoyenPaiementLabel(item.moyenPaiement) || "",
           getStatutPaiementLabel(item.statut || "Valide") || "",
         ]
           .join(" ")
           .toLowerCase();
         if (!searchText.includes(q)) return false;
+      }
+      if (!matchesPaymentDomaineFilter(item, domaineFilter)) return false;
+      if (
+        !matchesPaymentPersonTypeFilter(
+          item,
+          typePersonneFilter,
+          domaineFilter
+        )
+      ) {
+        return false;
+      }
+      if (statutFilter !== "all" && (item.statut || "Valide") !== statutFilter) {
+        return false;
+      }
+      if (evenementFilter !== "all") {
+        const evtId = item.InscriptionEvenement?.Evenement?.id;
+        if (evtId !== evenementFilter) return false;
       }
       if (moyenFilter !== "all" && item.moyenPaiement !== moyenFilter) return false;
       if (moisFilter !== "all" && item.datePaiement) {
@@ -309,7 +404,30 @@ export default function AdminHistoriquePaiementsPage() {
       }
       return true;
     });
-  }, [data, globalFilter, moyenFilter, moisFilter, anneeFilter]);
+  }, [
+    data,
+    globalFilter,
+    moyenFilter,
+    moisFilter,
+    anneeFilter,
+    domaineFilter,
+    typePersonneFilter,
+    statutFilter,
+    evenementFilter,
+  ]);
+
+  const evenementsOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    data.forEach((item) => {
+      const evt = item.InscriptionEvenement?.Evenement;
+      if (evt?.id && evt?.titre) {
+        map.set(evt.id, evt.titre);
+      }
+    });
+    return Array.from(map.entries())
+      .map(([id, titre]) => ({ id, titre }))
+      .sort((a, b) => a.titre.localeCompare(b.titre, "fr"));
+  }, [data]);
 
   const stats = useMemo(() => {
     const total = filteredData.length;
@@ -383,68 +501,161 @@ export default function AdminHistoriquePaiementsPage() {
     }
   };
 
+  // Colonnes dynamiques selon Domaine (pas de colonne Événement vide en Cotisations)
+  useEffect(() => {
+    if (isMobile) return;
+    setColumnVisibility((prev) => ({
+      ...prev,
+      ...adminHistoriqueColumnVisibilityForDomaine(domaineFilter),
+    }));
+  }, [domaineFilter, isMobile]);
+
   const columns = useMemo(
     () => [
-      // 1. Adhérent (ordre par défaut)
-      columnHelper.accessor("Adherent", {
-        header: "Adhérent",
-        cell: ({ row }) => {
-          const adherent = row.original.Adherent;
-          const datePaiement = row.original.datePaiement;
-          return (
-            <div className="flex flex-col gap-0.5">
-              <div className="flex items-center gap-2">
-                <User className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" />
-                <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
-                  {adherent?.firstname} {adherent?.lastname}
-                </span>
-              </div>
-              {datePaiement && (
-                <span className="text-xs text-gray-500 dark:text-gray-400 md:hidden ml-6 font-normal">
-                  {format(new Date(datePaiement), "d MMM yyyy", { locale: fr })}
-                </span>
-              )}
-            </div>
-          );
+      columnHelper.accessor(
+        (row) => {
+          if (row.InscriptionEvenement && !row.Adherent) {
+            return row.InscriptionEvenement.visiteurNom || "Visiteur";
+          }
+          return `${row.Adherent?.firstname ?? ""} ${row.Adherent?.lastname ?? ""}`.trim();
         },
-        size: 200,
-        minSize: 120,
-        maxSize: 300,
-        enableResizing: true,
-      }),
-      // 2. Description
+        {
+          id: "personne",
+          header: "Personne",
+          cell: ({ row }) => {
+            const p = row.original;
+            const isEventVisitor =
+              resolvePaymentDomaine(p) === "evenements" &&
+              resolveInscriptionParticipantKind(
+                p.InscriptionEvenement?.adherentId ?? p.Adherent?.id
+              ) === "Visiteur";
+            const name = isEventVisitor
+              ? p.InscriptionEvenement?.visiteurNom || "Visiteur"
+              : `${p.Adherent?.firstname ?? ""} ${p.Adherent?.lastname ?? ""}`.trim() ||
+                "—";
+            const datePaiement = p.datePaiement;
+            return (
+              <div className="flex flex-col gap-0.5">
+                <div className="flex items-center gap-2">
+                  <User className="h-4 w-4 text-gray-400 dark:text-gray-500 shrink-0" />
+                  <span className="text-sm font-medium text-gray-900 dark:text-gray-100 truncate">
+                    {name}
+                  </span>
+                </div>
+                {datePaiement && (
+                  <span className="text-xs text-gray-500 dark:text-gray-400 md:hidden ml-6 font-normal">
+                    {format(new Date(datePaiement), "d MMM yyyy", { locale: fr })}
+                  </span>
+                )}
+              </div>
+            );
+          },
+          size: 200,
+          minSize: 120,
+          maxSize: 300,
+          enableResizing: true,
+        }
+      ),
+      columnHelper.accessor(
+        (row) =>
+          resolvePaymentDomaine(row) === "evenements" ? "Événements" : "Cotisations",
+        {
+          id: "domaine",
+          header: "Domaine",
+          cell: ({ getValue }) => (
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              {getValue()}
+            </span>
+          ),
+          size: 110,
+          minSize: 90,
+          maxSize: 140,
+        }
+      ),
       columnHelper.display({
-        id: "description",
-        header: "Description",
+        id: "typePersonne",
+        header: "Type",
         cell: ({ row }) => {
           const p = row.original;
-          const cm = p.CotisationMensuelle;
-          const desc = (cm?.description ?? p.description) || "";
-          const typeNom = cm?.TypeCotisation?.nom || "";
-          let label = desc || typeNom || "—";
-          if (label === "—") {
-            if (cm?.mois != null && cm?.annee != null) {
-              label = `Cotisation ${MOIS_LABELS[cm.mois] ?? cm.mois} ${cm.annee}`;
-            } else if (p.DetteInitiale) {
-              label = "Dette initiale";
-            } else if (p.Assistance) {
-              label = "Assistance";
-            } else if (p.description) {
-              label = p.description;
-            }
+          if (resolvePaymentDomaine(p) !== "evenements") {
+            return <span className="text-xs text-slate-400">—</span>;
           }
+          const kind = resolveInscriptionParticipantKind(
+            p.InscriptionEvenement?.adherentId ??
+              (p.Adherent?.id ? p.Adherent.id : null)
+          );
           return (
-            <span className="text-sm text-gray-600 dark:text-gray-400" title={label}>
+            <span className="text-sm text-gray-700 dark:text-gray-300">
+              {inscriptionParticipantKindLabel(kind)}
+            </span>
+          );
+        },
+        size: 100,
+        minSize: 80,
+        maxSize: 120,
+      }),
+      columnHelper.accessor(
+        (row) => row.InscriptionEvenement?.Evenement?.titre || "",
+        {
+          id: "evenement",
+          header: "Événement",
+          cell: ({ row }) => {
+            const p = row.original;
+            if (!p.InscriptionEvenement) {
+              return <span className="text-xs text-slate-400">—</span>;
+            }
+            const label = getInscriptionEvenementLabel(p);
+            return (
+              <span
+                className="text-sm text-gray-700 dark:text-gray-300"
+                title={label}
+              >
+                {p.InscriptionEvenement.Evenement?.titre || "Événement"}
+              </span>
+            );
+          },
+          size: 180,
+          minSize: 120,
+          maxSize: 260,
+        }
+      ),
+      columnHelper.accessor((row) => getPaymentDestinationLabel(row), {
+        id: "destination",
+        header: "Destination",
+        cell: ({ row }) => {
+          const label = getPaymentDestinationLabel(row.original);
+          return (
+            <span
+              className="text-sm text-gray-700 dark:text-gray-300"
+              title={label}
+            >
               {label}
             </span>
           );
         },
-        size: 200,
+        size: 220,
         minSize: 150,
-        maxSize: 400,
+        maxSize: 360,
         enableResizing: true,
       }),
-      // 3. Montant
+      // Conservé pour compat localStorage / toggle — masqué (notes techniques)
+      columnHelper.display({
+        id: "description",
+        header: "Note technique",
+        cell: ({ row }) => {
+          const raw = row.original.description?.trim();
+          if (!raw || !isTechnicalPaymentNote(raw)) {
+            return <span className="text-xs text-slate-400">—</span>;
+          }
+          return (
+            <span className="text-xs text-slate-500 line-clamp-2" title={raw}>
+              {raw}
+            </span>
+          );
+        },
+        size: 160,
+        enableResizing: true,
+      }),
       columnHelper.accessor("montant", {
         header: "Montant",
         cell: ({ row }) => {
@@ -473,45 +684,16 @@ export default function AdminHistoriquePaiementsPage() {
         maxSize: 150,
         enableResizing: true,
       }),
-      // 4. Moyen de paiement
       columnHelper.accessor("moyenPaiement", {
-        header: "Moyen de paiement",
+        header: "Moyen",
         cell: ({ row }) => (
           <Badge className={getMoyenPaiementColor(row.getValue("moyenPaiement"))}>
             {getMoyenPaiementLabel(row.getValue("moyenPaiement"))}
           </Badge>
         ),
-        size: 150,
-        minSize: 120,
-        maxSize: 200,
-        enableResizing: true,
-      }),
-      // 5. Date
-      columnHelper.accessor("datePaiement", {
-        header: "Date",
-        cell: ({ row }) => (
-          <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-gray-400" />
-            <span className="text-sm text-gray-600 dark:text-gray-400">
-              {format(new Date(row.getValue("datePaiement")), "d MMM yyyy", { locale: fr })}
-            </span>
-          </div>
-        ),
-        size: 150,
-        minSize: 120,
-        maxSize: 200,
-        enableResizing: true,
-      }),
-      columnHelper.accessor("reference", {
-        header: "Référence",
-        cell: ({ row }) => (
-          <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
-            {row.getValue("reference") || "—"}
-          </span>
-        ),
-        size: 150,
-        minSize: 120,
-        maxSize: 200,
+        size: 130,
+        minSize: 100,
+        maxSize: 180,
         enableResizing: true,
       }),
       columnHelper.accessor("statut", {
@@ -532,41 +714,45 @@ export default function AdminHistoriquePaiementsPage() {
         maxSize: 180,
         enableResizing: true,
       }),
-      columnHelper.display({
-        id: "objetPaye",
-        header: "Cotisation / Objet payé",
-        cell: ({ row }) => {
-          const p = row.original;
-          const cm = p.CotisationMensuelle;
-          const nomType = cm?.TypeCotisation?.nom;
-          const mois = cm?.mois;
-          const annee = cm?.annee;
-          let label = "—";
-          if (cm) {
-            label = nomType
-              ? `${nomType} ${mois != null && annee != null ? `${MOIS_LABELS[mois] ?? mois} ${annee}` : ""}`.trim()
-              : mois != null && annee != null
-                ? `Cotisation ${MOIS_LABELS[mois] ?? mois} ${annee}`
-                : "Cotisation";
-          } else if (p.DetteInitiale) {
-            label = "Dette initiale";
-          } else if (p.Assistance) {
-            label = "Assistance";
-          } else if (p.description) {
-            label = p.description;
-          }
-          return (
-            <span className="text-sm text-gray-700 dark:text-gray-300" title={label}>
-              {label}
-            </span>
-          );
-        },
-        size: 220,
-        minSize: 150,
-        maxSize: 400,
+      columnHelper.accessor("reference", {
+        header: "Référence",
+        cell: ({ row }) => (
+          <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">
+            {row.getValue("reference") || "—"}
+          </span>
+        ),
+        size: 150,
+        minSize: 120,
+        maxSize: 200,
         enableResizing: true,
       }),
-      // Actions (œil) — colonne dédiée, hors zone de recherche
+      columnHelper.accessor("datePaiement", {
+        header: "Date",
+        cell: ({ row }) => (
+          <div className="flex items-center gap-2">
+            <Calendar className="h-4 w-4 text-gray-400" />
+            <span className="text-sm text-gray-600 dark:text-gray-400">
+              {format(new Date(row.getValue("datePaiement")), "d MMM yyyy HH:mm", {
+                locale: fr,
+              })}
+            </span>
+          </div>
+        ),
+        size: 170,
+        minSize: 140,
+        maxSize: 220,
+        enableResizing: true,
+      }),
+      columnHelper.display({
+        id: "objetPaye",
+        header: "Objet (legacy)",
+        cell: ({ row }) => (
+          <span className="text-sm text-gray-700 dark:text-gray-300">
+            {getPaymentDestinationLabel(row.original)}
+          </span>
+        ),
+        size: 180,
+      }),
       columnHelper.display({
         id: "actions",
         header: "Actions",
@@ -626,8 +812,12 @@ export default function AdminHistoriquePaiementsPage() {
       columnFilters,
       columnVisibility: isMobile
         ? {
-            Adherent: true,
-            description: true,
+            personne: true,
+            domaine: domaineFilter === "all",
+            typePersonne: domaineFilter === "evenements",
+            evenement: domaineFilter === "evenements",
+            destination: domaineFilter !== "evenements",
+            description: false,
             montant: false,
             moyenPaiement: false,
             datePaiement: false,
@@ -637,6 +827,7 @@ export default function AdminHistoriquePaiementsPage() {
             actions: true,
           }
         : columnVisibility,
+
       pagination,
     },
     onPaginationChange: setPagination,
@@ -990,12 +1181,72 @@ export default function AdminHistoriquePaiementsPage() {
                   aria-hidden
                 />
                 <Input
-                  placeholder="Rechercher par adhérent (nom, email)..."
+                  placeholder="Rechercher personne, événement, référence…"
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   className="flex-1"
                 />
               </div>
+              <Select
+                value={domaineFilter}
+                onValueChange={(v) => {
+                  const next = v as "all" | "cotisations" | "evenements";
+                  setDomaineFilter(next);
+                  setTypePersonneFilter((prev) =>
+                    normalizePersonTypeFilterForDomaine(next, prev)
+                  );
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-44">
+                  <SelectValue placeholder="Domaine" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les domaines</SelectItem>
+                  <SelectItem value="cotisations">Cotisations</SelectItem>
+                  <SelectItem value="evenements">Événements</SelectItem>
+                </SelectContent>
+              </Select>
+              {shouldShowPaymentPersonTypeFilter(domaineFilter) ? (
+                <Select
+                  value={typePersonneFilter}
+                  onValueChange={(v) =>
+                    setTypePersonneFilter(v as PaymentPersonTypeFilter)
+                  }
+                >
+                  <SelectTrigger className="w-full sm:w-40">
+                    <SelectValue placeholder="Type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">Tous</SelectItem>
+                    <SelectItem value="adherents">Adhérents</SelectItem>
+                    <SelectItem value="visiteurs">Visiteurs</SelectItem>
+                  </SelectContent>
+                </Select>
+              ) : null}
+              <Select value={statutFilter} onValueChange={setStatutFilter}>
+                <SelectTrigger className="w-full sm:w-40">
+                  <SelectValue placeholder="Statut" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les statuts</SelectItem>
+                  <SelectItem value="EnAttente">En attente</SelectItem>
+                  <SelectItem value="Valide">Validé</SelectItem>
+                  <SelectItem value="Annule">Rejeté / Annulé</SelectItem>
+                </SelectContent>
+              </Select>
+              <Select value={evenementFilter} onValueChange={setEvenementFilter}>
+                <SelectTrigger className="w-full sm:w-52">
+                  <SelectValue placeholder="Événement" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Tous les événements</SelectItem>
+                  {evenementsOptions.map((e) => (
+                    <SelectItem key={e.id} value={e.id}>
+                      {e.titre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               <Select value={moisFilter} onValueChange={setMoisFilter}>
                 <SelectTrigger className="w-full sm:w-44">
                   <SelectValue placeholder="Mois" />
@@ -1135,10 +1386,10 @@ export default function AdminHistoriquePaiementsPage() {
                   Informations importantes
                 </h3>
                 <ul className="mt-2 text-sm text-amber-700 dark:text-amber-300 space-y-1">
-                  <li>• Les paiements enregistrés ici sont liés aux cotisations mensuelles, dettes initiales ou assistances.</li>
-                  <li>• Pour modifier le montant attendu ou la date d&apos;échéance d&apos;une cotisation, consultez la page &quot;Cotisations du mois&quot;.</li>
-                  <li>• Un paiement peut être partiel (plusieurs paiements pour une même cotisation) ou complet.</li>
-                  <li>• <strong>Les cotisations</strong> (montant, échéance, statut) se consultent et se modifient depuis Admin &gt; Cotisations du mois.</li>
+                  <li>• Les paiements peuvent concerner les cotisations (mensuelles, dettes, assistances) ou les inscriptions à un événement.</li>
+                  <li>• Filtrez par domaine « Événements » pour isoler les paiements d&apos;inscription (libellé « Événement — … »).</li>
+                  <li>• Un paiement peut être partiel (plusieurs paiements pour une même cible) ou complet.</li>
+                  <li>• <strong>Les cotisations</strong> (montant, échéance, statut) se consultent depuis Admin &gt; Cotisations du mois.</li>
                 </ul>
               </div>
             </div>
@@ -1182,29 +1433,51 @@ export default function AdminHistoriquePaiementsPage() {
                 <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800/50 p-3 space-y-1">
                   <Label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide flex items-center gap-1.5">
                     <User className="h-3.5 w-3.5" />
-                    Adhérent
+                    Personne
                   </Label>
                   <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-                    {selectedPaiement.Adherent?.firstname} {selectedPaiement.Adherent?.lastname}
+                    {selectedPaiement.Adherent
+                      ? `${selectedPaiement.Adherent.firstname} ${selectedPaiement.Adherent.lastname}`
+                      : selectedPaiement.InscriptionEvenement?.visiteurNom ||
+                        "—"}
                   </p>
-                  {selectedPaiement.Adherent?.User?.email && (
-                    <p className="text-xs text-slate-600 dark:text-slate-400">{selectedPaiement.Adherent.User.email}</p>
+                  {(selectedPaiement.Adherent?.User?.email ||
+                    selectedPaiement.InscriptionEvenement?.visiteurEmail) && (
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      {selectedPaiement.Adherent?.User?.email ||
+                        selectedPaiement.InscriptionEvenement?.visiteurEmail}
+                    </p>
+                  )}
+                  {selectedPaiement.InscriptionEvenement && (
+                    <p className="text-xs text-slate-500">
+                      Type :{" "}
+                      {inscriptionParticipantKindLabel(
+                        resolveInscriptionParticipantKind(
+                          selectedPaiement.InscriptionEvenement.adherentId ??
+                            selectedPaiement.Adherent?.id
+                        )
+                      )}
+                    </p>
                   )}
                 </div>
                 <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/50 dark:bg-blue-950/30 p-3 space-y-1">
-                  <Label className="text-xs font-semibold text-blue-800 dark:text-blue-300 uppercase tracking-wide">Description / Objet</Label>
+                  <Label className="text-xs font-semibold text-blue-800 dark:text-blue-300 uppercase tracking-wide">
+                    Destination
+                  </Label>
                   <p className="text-sm text-blue-900 dark:text-blue-100">
-                    {selectedPaiement.CotisationMensuelle
-                      ? selectedPaiement.CotisationMensuelle.TypeCotisation?.nom
-                        ? `${selectedPaiement.CotisationMensuelle.TypeCotisation.nom} ${selectedPaiement.CotisationMensuelle.mois != null && selectedPaiement.CotisationMensuelle.annee != null ? `${MOIS_LABELS[selectedPaiement.CotisationMensuelle.mois] ?? selectedPaiement.CotisationMensuelle.mois} ${selectedPaiement.CotisationMensuelle.annee}` : ""}`.trim()
-                        : `Cotisation ${selectedPaiement.CotisationMensuelle.mois != null && selectedPaiement.CotisationMensuelle.annee != null ? `${MOIS_LABELS[selectedPaiement.CotisationMensuelle.mois] ?? selectedPaiement.CotisationMensuelle.mois} ${selectedPaiement.CotisationMensuelle.annee}` : ""}`.trim()
-                      : selectedPaiement.DetteInitiale
-                        ? "Dette initiale"
-                        : selectedPaiement.Assistance
-                          ? "Assistance"
-                          : selectedPaiement.description || "—"}
+                    {getPaymentDestinationLabel(selectedPaiement)}
                   </p>
                 </div>
+                {selectedPaiement.description?.trim() ? (
+                  <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/40 p-3 space-y-1">
+                    <Label className="text-xs font-semibold text-slate-600 dark:text-slate-400 uppercase tracking-wide">
+                      Note / Historique
+                    </Label>
+                    <p className="text-xs text-slate-600 dark:text-slate-300 whitespace-pre-wrap">
+                      {selectedPaiement.description}
+                    </p>
+                  </div>
+                ) : null}
                 <div className="grid grid-cols-2 gap-3">
                   <div className="rounded-lg border border-green-200 dark:border-green-800 bg-green-50/50 dark:bg-green-950/30 p-3 space-y-1">
                     <Label className="text-xs font-semibold text-green-800 dark:text-green-300 uppercase tracking-wide flex items-center gap-1.5">

@@ -77,5 +77,24 @@ describe("getMyPayments", () => {
     expect(page.items[0].moyenPaiement).toBe("Wero");
     expect(findManyPaiement.mock.calls[0][0].take).toBe(20);
     expect(findManyPaiement.mock.calls[0][0].skip).toBe(0);
+    expect(findManyPaiement.mock.calls[0][0].where.inscriptionEvenementId).toBe(
+      null
+    );
+    expect(countPaiement.mock.calls[0][0].where.inscriptionEvenementId).toBe(
+      null
+    );
+  });
+
+  it("filtre serveur : jamais de paiement événement dans historique cotisations", async () => {
+    findUniqueAdherent.mockResolvedValue({ id: "adh-A" });
+    countPaiement.mockResolvedValue(0);
+    findManyPaiement.mockResolvedValue([]);
+
+    await getMyPayments(actor(), { annee: 2026 });
+
+    expect(findManyPaiement.mock.calls[0][0].where).toMatchObject({
+      adherentId: "adh-A",
+      inscriptionEvenementId: null,
+    });
   });
 });

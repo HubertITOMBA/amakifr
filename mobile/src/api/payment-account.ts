@@ -39,7 +39,8 @@ export type DeclarePaymentInput = {
     | "cotisation-mensuelle"
     | "dette-initiale"
     | "assistance"
-    | "obligation";
+    | "obligation"
+    | "inscription-evenement";
   targetId: string;
   amount: string;
   paymentMethod: "Virement" | "Wero";

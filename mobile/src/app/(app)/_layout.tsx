@@ -122,6 +122,14 @@ function AppTabs() {
         }}
       />
       <Tabs.Screen
+        name="evenements"
+        options={{
+          title: "Événements",
+          href: null,
+          headerShown: false,
+        }}
+      />
+      <Tabs.Screen
         name="sondages"
         options={{
           title: "Mes sondages",

@@ -8,6 +8,9 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useAuth } from "@/auth/auth-context";
 import { getMySurveysSummary } from "@/api/sondages";
 import { shouldShowHomeSurveyCta } from "@/api/sondages-state";
+import { getMyEventsSummary } from "@/api/evenements";
+import { shouldShowHomeEventsBanner } from "@/api/evenements-state";
+import { formatDateTimeFr } from "@/utils/profile-helpers";
 import { AmakiDarkBackground } from "@/components/ui/amaki-dark-background";
 import { useUnreadCount } from "@/hooks/unread-count";
 import {
@@ -27,6 +30,7 @@ const SERVICES: {
   { id: "passeport", label: "Passeport", hint: "Mon passeport", href: "/passeport" },
   { id: "taches", label: "Tâches", hint: "Mes tâches", href: "/taches" },
   { id: "reunions", label: "Réunions", hint: "Mes réunions", href: "/reunions" },
+  { id: "evenements", label: "Événements", hint: "Agenda", href: "/evenements" },
 ];
 
 /**
@@ -37,23 +41,42 @@ export default function AccueilScreen() {
   const { unreadCount } = useUnreadCount();
   const displayName = user?.name?.trim() || "adhérent";
   const [surveyCount, setSurveyCount] = useState(0);
+  const [eventsCount, setEventsCount] = useState(0);
+  const [nextEventTitle, setNextEventTitle] = useState<string | null>(null);
+  const [nextEventWhen, setNextEventWhen] = useState<string | null>(null);
   const showSurveyCta = shouldShowHomeSurveyCta(surveyCount);
+  const showEventsBanner = shouldShowHomeEventsBanner(eventsCount);
 
   const loadSurveySummary = useCallback(async () => {
     try {
-      // Source unique : GET /api/v1/me/sondages?summary=1
       const summary = await getMySurveysSummary();
       setSurveyCount(summary.aCompleterCount);
     } catch {
-      // Accueil non bloquant — masquer CTA en cas d'échec
       setSurveyCount(0);
+    }
+  }, []);
+
+  const loadEventsSummary = useCallback(async () => {
+    try {
+      const summary = await getMyEventsSummary();
+      setEventsCount(summary.upcomingCount);
+      if (summary.nextEvent) {
+        setNextEventTitle(summary.nextEvent.titre);
+        setNextEventWhen(formatDateTimeFr(summary.nextEvent.dateDebut));
+      } else {
+        setNextEventTitle(null);
+        setNextEventWhen(null);
+      }
+    } catch {
+      // conserver dernière valeur
     }
   }, []);
 
   useFocusEffect(
     useCallback(() => {
       void loadSurveySummary();
-    }, [loadSurveySummary])
+      void loadEventsSummary();
+    }, [loadSurveySummary, loadEventsSummary])
   );
 
   const serviceTiles = showSurveyCta
@@ -102,6 +125,23 @@ export default function AccueilScreen() {
               <Text style={styles.surveyHint}>
                 Vous avez {surveyCount} sondage
                 {surveyCount !== 1 ? "s" : ""} à compléter
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {showEventsBanner ? (
+            <Pressable
+              style={styles.eventsBanner}
+              onPress={() => router.push("/evenements")}
+              accessibilityRole="button"
+              accessibilityLabel={`Événements, ${eventsCount} à venir`}
+            >
+              <Text style={styles.surveyTitle}>Événements</Text>
+              <Text style={styles.surveyHint}>
+                {eventsCount} événement{eventsCount !== 1 ? "s" : ""} à venir
+                {nextEventTitle
+                  ? ` — prochain : ${nextEventTitle}${nextEventWhen ? ` (${nextEventWhen})` : ""}`
+                  : ""}
               </Text>
             </Pressable>
           ) : null}
@@ -226,6 +266,14 @@ const styles = StyleSheet.create({
     borderRadius: AmakiRadius.md,
     borderWidth: 1,
     borderColor: AmakiColors.primaryBorder,
+    padding: AmakiSpacing.md,
+    marginBottom: AmakiSpacing.lg,
+  },
+  eventsBanner: {
+    backgroundColor: "#ecfdf5",
+    borderRadius: AmakiRadius.md,
+    borderWidth: 1,
+    borderColor: "#a7f3d0",
     padding: AmakiSpacing.md,
     marginBottom: AmakiSpacing.lg,
   },

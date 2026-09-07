@@ -98,13 +98,47 @@ interface InscriptionVisiteurFormData {
   commentaires: string;
 }
 
+type MaInscriptionData = {
+  id: string;
+  nombrePersonnes: number;
+  statut: string;
+  montantAttendu: number;
+  montantPaye: number;
+  statutPaiement: string;
+};
+
+type EvenementDetailData = EvenementData & {
+  maInscription?: MaInscriptionData | null;
+  Inscriptions?: any[];
+};
+
+const getStatutPaiementEvenementLabel = (statut: string) => {
+  switch (statut) {
+    case "NonApplicable":
+      return "Non applicable";
+    case "APayer":
+      return "À payer";
+    case "PartiellementPaye":
+      return "Partiellement payé";
+    case "Paye":
+      return "Payé";
+    case "EnAttenteValidation":
+      return "En attente de validation";
+    default:
+      return statut || "—";
+  }
+};
+
+const formatEuroFr = (value: number) =>
+  `${Number(value).toFixed(2).replace(".", ",")} €`;
+
 export default function EvenementDetailPage() {
   const params = useParams();
   const router = useRouter();
   const { data: session } = useSession();
   const evenementId = params?.id as string;
 
-  const [evenement, setEvenement] = useState<EvenementData | null>(null);
+  const [evenement, setEvenement] = useState<EvenementDetailData | null>(null);
   const [loading, setLoading] = useState(true);
   const [showInscriptionModal, setShowInscriptionModal] = useState(false);
   const [inscriptionLoading, setInscriptionLoading] = useState(false);
@@ -158,7 +192,7 @@ export default function EvenementDetailPage() {
       setLoading(true);
       const result = await getEvenementById(evenementId);
       if (result.success && result.data) {
-        setEvenement(result.data as EvenementData);
+        setEvenement(result.data as EvenementDetailData);
       } else {
         toast.error(result.error || "Événement non trouvé");
         router.push("/evenements");
@@ -255,7 +289,14 @@ export default function EvenementDetailPage() {
         });
 
         if (result.success) {
-          toast.success("Inscription réussie !");
+          const payant =
+            evenement.prix != null &&
+            evenement.prix > 0;
+          toast.success(
+            payant
+              ? "Inscription réussie ! Consultez le statut de règlement ci-dessous."
+              : "Inscription réussie !"
+          );
           setShowInscriptionModal(false);
           setInscriptionData({ nombrePersonnes: 1, commentaires: "" });
           loadEvenement(); // Recharger pour mettre à jour les places
@@ -955,7 +996,60 @@ export default function EvenementDetailPage() {
                     </div>
                   )}
 
-                  {(!isInscriptionOpen && evenement.dateLimiteInscription) ? (
+                  {evenement.maInscription &&
+                    Number(evenement.maInscription.montantAttendu) > 0 && (
+                      <div className="p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg space-y-2">
+                        <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                          Règlement de votre inscription
+                        </p>
+                        <div className="grid grid-cols-2 gap-2 text-xs text-amber-900 dark:text-amber-100">
+                          <div>
+                            <span className="block text-amber-700/80 dark:text-amber-200/80 uppercase tracking-wide font-semibold">
+                              Montant attendu
+                            </span>
+                            {formatEuroFr(evenement.maInscription.montantAttendu)}
+                          </div>
+                          <div>
+                            <span className="block text-amber-700/80 dark:text-amber-200/80 uppercase tracking-wide font-semibold">
+                              Payé
+                            </span>
+                            {formatEuroFr(evenement.maInscription.montantPaye)}
+                          </div>
+                          <div>
+                            <span className="block text-amber-700/80 dark:text-amber-200/80 uppercase tracking-wide font-semibold">
+                              Reste
+                            </span>
+                            {formatEuroFr(
+                              Math.max(
+                                0,
+                                Number(evenement.maInscription.montantAttendu) -
+                                  Number(evenement.maInscription.montantPaye)
+                              )
+                            )}
+                          </div>
+                          <div>
+                            <span className="block text-amber-700/80 dark:text-amber-200/80 uppercase tracking-wide font-semibold">
+                              Statut paiement
+                            </span>
+                            {getStatutPaiementEvenementLabel(
+                              evenement.maInscription.statutPaiement
+                            )}
+                          </div>
+                        </div>
+                        {evenement.maInscription.statutPaiement !== "Paye" && (
+                          <p className="text-xs text-amber-800 dark:text-amber-200">
+                            Consultez votre espace adhérent (application) pour effectuer le règlement Wero/Virement.
+                          </p>
+                        )}
+                      </div>
+                    )}
+
+                  {evenement.maInscription ? (
+                    <Button disabled className="w-full" variant="outline">
+                      <CheckCircle2 className="h-4 w-4 mr-2" />
+                      Vous êtes inscrit
+                    </Button>
+                  ) : (!isInscriptionOpen && evenement.dateLimiteInscription) ? (
                     <Button
                       disabled
                       className="w-full"
@@ -1149,6 +1243,28 @@ export default function EvenementDetailPage() {
                                 {new Date(inscription.dateInscription).toLocaleDateString('fr-FR')}
                               </span>
                             </div>
+                            {inscription.statutPaiement && (
+                              <div className="mt-1 text-xs text-gray-600 dark:text-gray-400">
+                                {Number(inscription.montantAttendu) > 0 ? (
+                                  <>
+                                    Attendu {formatEuroFr(Number(inscription.montantAttendu))}
+                                    {" · "}Payé {formatEuroFr(Number(inscription.montantPaye ?? 0))}
+                                    {" · "}Reste{" "}
+                                    {formatEuroFr(
+                                      Math.max(
+                                        0,
+                                        Number(inscription.montantAttendu) -
+                                          Number(inscription.montantPaye ?? 0)
+                                      )
+                                    )}
+                                    {" · "}
+                                    {getStatutPaiementEvenementLabel(inscription.statutPaiement)}
+                                  </>
+                                ) : (
+                                  <>Statut paiement : Non applicable</>
+                                )}
+                              </div>
+                            )}
                             {inscription.commentaires && (
                               <p className="text-sm text-gray-500 dark:text-gray-500 mt-1 italic">
                                 "{inscription.commentaires}"
@@ -1350,6 +1466,23 @@ export default function EvenementDetailPage() {
                   placeholder="Ajoutez des commentaires ou des informations supplémentaires..."
                 />
               </div>
+
+              {evenement.prix && evenement.prix > 0 && (
+                <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-200 dark:border-amber-800 space-y-1">
+                  <p className="text-sm font-semibold text-amber-900 dark:text-amber-100">
+                    Montant attendu :{" "}
+                    {formatEuroFr(
+                      evenement.prix *
+                        (session
+                          ? inscriptionData.nombrePersonnes
+                          : inscriptionVisiteurData.nombrePersonnes)
+                    )}
+                  </p>
+                  <p className="text-xs text-amber-800 dark:text-amber-200">
+                    Consultez votre espace adhérent (application) pour effectuer le règlement Wero/Virement.
+                  </p>
+                </div>
+              )}
 
               <div className="flex gap-3">
                 <Button

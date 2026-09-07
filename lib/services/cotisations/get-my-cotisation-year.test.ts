@@ -218,6 +218,31 @@ describe("getMyCotisationYear", () => {
     expect(result.dettes).toHaveLength(1);
     expect(result.dettes[0].hasPendingPayment).toBe(false);
     expect(result).not.toHaveProperty("paiements");
+    expect(aggregatePaiement.mock.calls[0][0].where.inscriptionEvenementId).toBe(
+      null
+    );
+  });
+
+  it("totalPayeAnnee exclut les paiements événement (inscriptionEvenementId)", async () => {
+    findUniqueAdherent.mockResolvedValue({ id: "adh-A" });
+    findManyCotisation.mockResolvedValueOnce([]).mockResolvedValueOnce([]);
+    findManyDette.mockResolvedValue([]);
+    findManyAssistance.mockResolvedValue([]);
+    findManyPaiement.mockResolvedValue([]);
+    // Agrégat serveur : déjà filtré (mock = 100, pas 130)
+    aggregatePaiement.mockResolvedValue({
+      _sum: { montant: new Prisma.Decimal("100") },
+    });
+    findManyObligation.mockResolvedValue([]);
+    findManyAvoir.mockResolvedValue([]);
+
+    const result = await getMyCotisationYear(actor(), 2026);
+    expect(result.summary.totalPayeAnnee).toBe("100");
+    expect(aggregatePaiement.mock.calls[0][0].where).toMatchObject({
+      adherentId: "adh-A",
+      statut: "Valide",
+      inscriptionEvenementId: null,
+    });
   });
 
   it("paiement EnAttente → hasPendingPayment ; non compté dans totalPayeAnnee", async () => {
@@ -587,5 +612,46 @@ describe("buildPaymentDestinationLabel", () => {
         description: null,
       })
     ).toBe("Assistance Décès familial — Madame Henriette");
+  });
+
+  it("obligation de cotisation", () => {
+    expect(
+      buildPaymentDestinationLabel({
+        CotisationMensuelle: null,
+        DetteInitiale: null,
+        Assistance: null,
+        ObligationCotisation: { periode: "2026-01" },
+        description: "Validé par l'administration",
+      })
+    ).toBe("Obligation de cotisation (2026-01)");
+  });
+
+  it("événement — titre, notes techniques ignorées", () => {
+    expect(
+      buildPaymentDestinationLabel({
+        CotisationMensuelle: null,
+        DetteInitiale: null,
+        Assistance: null,
+        InscriptionEvenement: { Evenement: { titre: "Gala" } },
+        description:
+          "Déclaration Wero — en attente de validation | Validé par l'administration",
+      })
+    ).toBe("Événement — Gala");
+  });
+
+  it("note admin ne remplace jamais destination cotisation", () => {
+    expect(
+      buildPaymentDestinationLabel({
+        CotisationMensuelle: {
+          mois: 3,
+          annee: 2026,
+          TypeCotisation: { nom: "Cotisation forfaitaire" },
+        },
+        DetteInitiale: null,
+        Assistance: null,
+        description:
+          "Déclaration Wero — en attente de validation | Validé par l'administration | Annulation admin (crédit rétabli)",
+      })
+    ).toBe("Cotisation forfaitaire — mars 2026");
   });
 });

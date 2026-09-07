@@ -89,7 +89,11 @@ async function buildSummary(adherentId: string): Promise<MyCotisationYearSummary
       select: { montantRestant: true },
     }),
     db.paiementCotisation.aggregate({
-      where: { adherentId, statut: "Valide" },
+      where: {
+        adherentId,
+        statut: "Valide",
+        inscriptionEvenementId: null,
+      },
       _sum: { montant: true },
     }),
   ]);
@@ -200,7 +204,11 @@ export async function getMyCotisationLines(
           orderBy: [{ annee: "desc" }, { mois: "desc" }, { periode: "desc" }],
         }),
         db.paiementCotisation.findMany({
-          where: { adherentId, statut: "EnAttente" },
+          where: {
+            adherentId,
+            statut: "EnAttente",
+            inscriptionEvenementId: null,
+          },
           select: {
             cotisationMensuelleId: true,
             detteInitialeId: true,

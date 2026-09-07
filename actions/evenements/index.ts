@@ -2,6 +2,7 @@
 
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
+import { Prisma } from "@prisma/client";
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { writeFile, mkdirSync, existsSync } from "fs";
@@ -9,6 +10,11 @@ import { writeFile as writeFilePromise } from "fs/promises";
 import { join } from "path";
 import { sendVisiteurInscriptionEmail, sendAdherentInscriptionConfirmationEmail, sendVisiteurInscriptionConfirmationEmail } from "@/lib/mail";
 import { logCreation, logModification, logDeletion } from "@/lib/activity-logger";
+import {
+  canSelfWithdrawEventInscription,
+  computeInscriptionMontantAttendu,
+  initialStatutPaiementEvenement,
+} from "@/lib/services/evenements/inscription-payment";
 
 // Schémas de validation
 const EvenementSchema = z.object({
@@ -695,7 +701,7 @@ export async function getEvenementById(id: string) {
   try {
     const session = await auth();
     const isAdmin = session?.user?.role === "ADMIN";
-    
+
     const evenement = await prisma.evenement.findUnique({
       where: { id },
       include: {
@@ -706,24 +712,37 @@ export async function getEvenementById(id: string) {
             email: true,
           },
         },
-        Inscriptions: isAdmin ? {
-          include: {
-            Adherent: {
-              select: {
-                id: true,
-                firstname: true,
-                lastname: true,
-                civility: true,
+        Inscriptions: isAdmin
+          ? {
+              include: {
+                Adherent: {
+                  select: {
+                    id: true,
+                    firstname: true,
+                    lastname: true,
+                    civility: true,
+                    User: { select: { email: true } },
+                  },
+                },
               },
-            },
-          },
-        } : false,
+              orderBy: { dateInscription: "desc" },
+            }
+          : false,
       },
     });
 
     if (!evenement) {
       return { success: false, error: "Événement non trouvé" };
     }
+
+    let maInscription: {
+      id: string;
+      nombrePersonnes: number;
+      statut: string;
+      montantAttendu: number;
+      montantPaye: number;
+      statutPaiement: string;
+    } | null = null;
 
     // Vérifier que l'événement est accessible si l'utilisateur n'est pas admin
     if (!isAdmin) {
@@ -738,7 +757,6 @@ export async function getEvenementById(id: string) {
 
       // Si l'événement est privé, vérifier que l'utilisateur est un adhérent connecté
       if (!evenement.estPublic) {
-        const session = await auth();
         if (!session?.user?.id) {
           return { success: false, error: "Cet événement est réservé aux adhérents. Veuillez vous connecter." };
         }
@@ -751,6 +769,91 @@ export async function getEvenementById(id: string) {
           return { success: false, error: "Cet événement est réservé aux adhérents." };
         }
       }
+
+      if (session?.user?.id) {
+        const adherent = await prisma.adherent.findUnique({
+          where: { userId: session.user.id },
+          select: { id: true },
+        });
+        if (adherent) {
+          const insc = await prisma.inscriptionEvenement.findFirst({
+            where: { evenementId: id, adherentId: adherent.id },
+            select: {
+              id: true,
+              nombrePersonnes: true,
+              statut: true,
+              montantAttendu: true,
+              montantPaye: true,
+              statutPaiement: true,
+            },
+          });
+          if (insc) {
+            maInscription = {
+              id: insc.id,
+              nombrePersonnes: insc.nombrePersonnes,
+              statut: insc.statut,
+              montantAttendu: Number(insc.montantAttendu),
+              montantPaye: Number(insc.montantPaye),
+              statutPaiement: insc.statutPaiement,
+            };
+          }
+        }
+      }
+    }
+
+    const {
+      computeEventFinancialSummary,
+      computeEventParticipationSummary,
+    } = await import("@/lib/services/evenements/admin-event-stats");
+
+    const formatInscription = <
+      T extends {
+        montantAttendu: Prisma.Decimal | number;
+        montantPaye: Prisma.Decimal | number;
+      },
+    >(
+      insc: T
+    ) => ({
+      ...insc,
+      montantAttendu: Number(insc.montantAttendu),
+      montantPaye: Number(insc.montantPaye),
+    });
+
+    const inscriptionsFormatted = Array.isArray(evenement.Inscriptions)
+      ? evenement.Inscriptions.map(formatInscription)
+      : [];
+
+    let participationSummary = null;
+    let financialSummary = null;
+
+    if (isAdmin) {
+      // Agrégat unique EnAttente pour CET événement (pas de N+1)
+      const pendingAgg = await prisma.paiementCotisation.aggregate({
+        where: {
+          statut: "EnAttente",
+          InscriptionEvenement: { evenementId: id },
+        },
+        _sum: { montant: true },
+      });
+      const montantEnAttenteValidation = Number(pendingAgg._sum.montant ?? 0);
+
+      participationSummary = computeEventParticipationSummary(
+        inscriptionsFormatted.map((i) => ({
+          adherentId: i.adherentId,
+          nombrePersonnes: i.nombrePersonnes,
+          montantAttendu: i.montantAttendu,
+          montantPaye: i.montantPaye,
+        }))
+      );
+      financialSummary = computeEventFinancialSummary({
+        inscriptions: inscriptionsFormatted.map((i) => ({
+          adherentId: i.adherentId,
+          nombrePersonnes: i.nombrePersonnes,
+          montantAttendu: i.montantAttendu,
+          montantPaye: i.montantPaye,
+        })),
+        montantEnAttenteValidation,
+      });
     }
 
     // Conversion des données pour le client
@@ -759,6 +862,12 @@ export async function getEvenementById(id: string) {
       prix: evenement.prix ? Number(evenement.prix) : null,
       images: evenement.images ? JSON.parse(evenement.images) : null,
       tags: evenement.tags ? JSON.parse(evenement.tags) : null,
+      Inscriptions: Array.isArray(evenement.Inscriptions)
+        ? inscriptionsFormatted
+        : evenement.Inscriptions,
+      maInscription,
+      participationSummary,
+      financialSummary,
     };
 
     return { success: true, data: evenementFormatted };
@@ -831,6 +940,12 @@ export async function inscrireEvenement(data: z.infer<typeof InscriptionEvenemen
       return { success: false, error: "Vous êtes déjà inscrit à cet événement" };
     }
 
+    const montantAttendu = computeInscriptionMontantAttendu(
+      evenement.prix,
+      validatedData.nombrePersonnes
+    );
+    const statutPaiement = initialStatutPaiementEvenement(montantAttendu);
+
     // Créer l'inscription
     const inscription = await prisma.inscriptionEvenement.create({
       data: {
@@ -838,6 +953,9 @@ export async function inscrireEvenement(data: z.infer<typeof InscriptionEvenemen
         adherentId: adherent.id,
         nombrePersonnes: validatedData.nombrePersonnes,
         commentaires: validatedData.commentaires,
+        montantAttendu,
+        montantPaye: new Prisma.Decimal(0),
+        statutPaiement,
       },
     });
 
@@ -853,13 +971,20 @@ export async function inscrireEvenement(data: z.infer<typeof InscriptionEvenemen
 
     // Envoyer un email de confirmation à l'adhérent
     try {
+      const prixUnitaire = evenement.prix ? Number(evenement.prix) : 0;
       await sendAdherentInscriptionConfirmationEmail(
         adherent.User.email,
         `${adherent.civility || ''} ${adherent.firstname} ${adherent.lastname}`.trim(),
         evenement.titre,
         evenement.dateDebut,
         evenement.lieu,
-        validatedData.nombrePersonnes
+        validatedData.nombrePersonnes,
+        montantAttendu.gt(0)
+          ? {
+              prixUnitaire: prixUnitaire > 0 ? prixUnitaire : null,
+              montantAttendu: Number(montantAttendu),
+            }
+          : null
       );
     } catch (emailError) {
       console.error("Erreur lors de l'envoi de l'email de confirmation:", emailError);
@@ -869,7 +994,14 @@ export async function inscrireEvenement(data: z.infer<typeof InscriptionEvenemen
     revalidatePath("/evenements");
     revalidatePath("/user/profile");
 
-    return { success: true, data: inscription };
+    return {
+      success: true,
+      data: {
+        ...inscription,
+        montantAttendu: Number(inscription.montantAttendu),
+        montantPaye: Number(inscription.montantPaye),
+      },
+    };
   } catch (error) {
     console.error("Erreur lors de l'inscription à l'événement:", error);
     if (error instanceof z.ZodError) {
@@ -912,6 +1044,23 @@ export async function annulerInscriptionEvenement(inscriptionId: string) {
 
     if (inscription.adherentId !== adherent.id) {
       return { success: false, error: "Vous ne pouvez pas annuler cette inscription" };
+    }
+
+    const pending = await prisma.paiementCotisation.findFirst({
+      where: {
+        inscriptionEvenementId: inscription.id,
+        adherentId: adherent.id,
+        statut: "EnAttente",
+      },
+      select: { id: true },
+    });
+
+    const gate = canSelfWithdrawEventInscription({
+      montantPaye: inscription.montantPaye,
+      hasPendingPayment: Boolean(pending),
+    });
+    if (!gate.allowed) {
+      return { success: false, error: gate.reason ?? "Désinscription impossible" };
     }
 
     // Supprimer l'inscription
@@ -984,6 +1133,8 @@ export async function getInscriptionsAdherent() {
     // Conversion des données pour le client
     const inscriptionsFormatted = inscriptions.map(inscription => ({
       ...inscription,
+      montantAttendu: Number(inscription.montantAttendu),
+      montantPaye: Number(inscription.montantPaye),
       Evenement: {
         ...inscription.Evenement,
         prix: inscription.Evenement.prix ? Number(inscription.Evenement.prix) : null,
@@ -1089,6 +1240,12 @@ export async function addParticipantToEvent(
       return { success: false, error: "Cet adhérent est déjà inscrit à cet événement" };
     }
 
+    const montantAttendu = computeInscriptionMontantAttendu(
+      evenement.prix,
+      nombrePersonnes
+    );
+    const statutPaiement = initialStatutPaiementEvenement(montantAttendu);
+
     // Créer l'inscription
     const inscription = await prisma.inscriptionEvenement.create({
       data: {
@@ -1097,6 +1254,9 @@ export async function addParticipantToEvent(
         nombrePersonnes,
         commentaires: commentaires || null,
         statut: "Confirme", // Inscription confirmée par admin
+        montantAttendu,
+        montantPaye: new Prisma.Decimal(0),
+        statutPaiement,
       },
     });
 
@@ -1212,6 +1372,12 @@ export async function inscrireVisiteurEvenement(data: z.infer<typeof Inscription
       return { success: false, error: "Vous êtes déjà inscrit à cet événement avec cet email" };
     }
 
+    const montantAttendu = computeInscriptionMontantAttendu(
+      evenement.prix,
+      validatedData.nombrePersonnes
+    );
+    const statutPaiement = initialStatutPaiementEvenement(montantAttendu);
+
     // Créer l'inscription avec les informations du visiteur
     const inscription = await prisma.inscriptionEvenement.create({
       data: {
@@ -1224,6 +1390,9 @@ export async function inscrireVisiteurEvenement(data: z.infer<typeof Inscription
         nombrePersonnes: validatedData.nombrePersonnes,
         commentaires: validatedData.commentaires,
         statut: "EnAttente", // En attente de confirmation par l'admin
+        montantAttendu,
+        montantPaye: new Prisma.Decimal(0),
+        statutPaiement,
       },
     });
 

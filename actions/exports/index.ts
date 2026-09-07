@@ -286,15 +286,38 @@ export async function getInscriptionsEvenementsForExport() {
       },
     });
 
-    const exportData = inscriptions.map((inscription) => ({
-      "Événement": inscription.Evenement.titre,
-      "Date événement": format(new Date(inscription.Evenement.dateDebut), "dd/MM/yyyy HH:mm"),
-      "Adhérent": `${inscription.Adherent.firstname} ${inscription.Adherent.lastname}`,
-      "Email": inscription.Adherent.User?.email || "",
-      "Nombre de personnes": inscription.nombrePersonnes,
-      "Commentaires": inscription.commentaires || "",
-      "Date inscription": format(new Date(inscription.createdAt), "dd/MM/yyyy HH:mm"),
-    }));
+    const exportData = inscriptions.map((inscription) => {
+      const isAdherent = inscription.adherentId != null;
+      const nom = isAdherent
+        ? `${inscription.Adherent?.firstname ?? ""} ${inscription.Adherent?.lastname ?? ""}`.trim()
+        : inscription.visiteurNom || "Visiteur";
+      const email = isAdherent
+        ? inscription.Adherent?.User?.email || ""
+        : inscription.visiteurEmail || "";
+      const attendu = Number(inscription.montantAttendu ?? 0);
+      const paye = Number(inscription.montantPaye ?? 0);
+      return {
+        Événement: inscription.Evenement.titre,
+        "Date événement": format(
+          new Date(inscription.Evenement.dateDebut),
+          "dd/MM/yyyy HH:mm"
+        ),
+        Type: isAdherent ? "Adhérent" : "Visiteur",
+        Nom: nom,
+        Email: email,
+        "Nombre de personnes": inscription.nombrePersonnes,
+        "Montant attendu": attendu,
+        "Montant payé": paye,
+        Reste: Math.max(0, attendu - paye),
+        "Statut paiement": inscription.statutPaiement,
+        "Statut inscription": inscription.statut,
+        Commentaires: inscription.commentaires || "",
+        "Date inscription": format(
+          new Date(inscription.createdAt),
+          "dd/MM/yyyy HH:mm"
+        ),
+      };
+    });
 
     return { success: true, data: exportData };
   } catch (error) {

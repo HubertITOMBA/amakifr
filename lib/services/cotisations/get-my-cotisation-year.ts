@@ -14,6 +14,13 @@ import type {
   MyPaymentDto,
 } from "@/lib/services/cotisations/types";
 
+import {
+  buildPaymentDestinationLabel,
+  isTechnicalPaymentNote,
+} from "@/lib/services/cotisations/payment-destination-label";
+
+export { buildPaymentDestinationLabel, isTechnicalPaymentNote };
+
 const YearSchema = z.object({
   annee: z.number().int().min(2000).max(2100),
 });
@@ -32,14 +39,6 @@ const MOIS_LABELS = [
   "novembre",
   "décembre",
 ] as const;
-
-const ASSISTANCE_TYPE_LABELS: Record<string, string> = {
-  Naissance: "Naissance",
-  MariageEnfant: "Mariage d'enfant",
-  DecesFamille: "Décès familial",
-  AnniversaireSalle: "Anniversaire (salle)",
-  Autre: "Autre",
-};
 
 /**
  * Résout l'adhérent self-service depuis actor.userId (anti-IDOR).
@@ -125,94 +124,6 @@ function mapCotisationRow(row: {
       aBeneficiaire: row.TypeCotisation.aBeneficiaire,
     }),
   };
-}
-
-/**
- * Libellé de destination d'un paiement (historique / détail).
- * Ne jamais exposer la description technique « Déclaration Wero… » comme destination.
- *
- * Pour une CotisationMensuelle catégorie Assistance : même règle que
- * la section Assistances (`buildAssistanceDisplayLabel`) — pas le mois à la place
- * du bénéficiaire.
- */
-export function buildPaymentDestinationLabel(input: {
-  CotisationMensuelle: {
-    mois: number;
-    annee: number;
-    description?: string | null;
-    TypeCotisation: {
-      nom: string;
-      categorie?: string | null;
-      aBeneficiaire?: boolean | null;
-    };
-    AdherentBeneficiaire?: {
-      civility?: string | null;
-      firstname?: string | null;
-      lastname?: string | null;
-    } | null;
-    CotisationDuMois?: {
-      AdherentBeneficiaire?: {
-        civility?: string | null;
-        firstname?: string | null;
-        lastname?: string | null;
-      } | null;
-    } | null;
-  } | null;
-  DetteInitiale: { annee: number } | null;
-  Assistance: { type: string; description?: string | null } | null;
-  description: string | null;
-  detteInitialeId?: string | null;
-  cotisationMensuelleId?: string | null;
-  assistanceId?: string | null;
-}): string {
-  if (input.CotisationMensuelle) {
-    const cm = input.CotisationMensuelle;
-    const isAssistanceCategory =
-      cm.TypeCotisation.categorie === "Assistance" ||
-      cm.TypeCotisation.aBeneficiaire === true;
-
-    if (isAssistanceCategory) {
-      const benef =
-        cm.AdherentBeneficiaire ??
-        cm.CotisationDuMois?.AdherentBeneficiaire ??
-        null;
-      return buildAssistanceDisplayLabel({
-        typeNom: cm.TypeCotisation.nom,
-        description: cm.description,
-        beneficiaire: benef,
-      });
-    }
-
-    const moisLabel = MOIS_LABELS[cm.mois - 1] ?? String(cm.mois);
-    const nom = cm.TypeCotisation.nom.trim();
-    return `${nom} — ${moisLabel} ${cm.annee}`;
-  }
-  if (input.DetteInitiale) {
-    return `Dette antérieure ${input.DetteInitiale.annee}`;
-  }
-  if (input.detteInitialeId) {
-    return "Dette antérieure";
-  }
-  if (input.Assistance) {
-    const label =
-      ASSISTANCE_TYPE_LABELS[input.Assistance.type] ?? input.Assistance.type;
-    const detail = input.Assistance.description?.trim();
-    if (detail) {
-      return `Assistance ${label} — ${detail}`;
-    }
-    return `Assistance — ${label}`;
-  }
-  if (input.assistanceId) {
-    return "Assistance";
-  }
-  if (input.cotisationMensuelleId) {
-    return "Cotisation";
-  }
-  const desc = input.description?.trim();
-  if (desc && !/^Déclaration\s/i.test(desc) && !/\ben attente de validation\b/i.test(desc)) {
-    return desc;
-  }
-  return "Paiement";
 }
 
 const cotisationMensuelleForPaymentSelect = {
@@ -399,8 +310,13 @@ export async function getMyCotisationYear(
         orderBy: { annee: "desc" },
       }),
       // Une seule requête pour tous les EnAttente (pas de N+1 par carte)
+      // Exclure paiements événement (isolation cotisations)
       db.paiementCotisation.findMany({
-        where: { adherentId, statut: "EnAttente" },
+        where: {
+          adherentId,
+          statut: "EnAttente",
+          inscriptionEvenementId: null,
+        },
         select: {
           cotisationMensuelleId: true,
           detteInitialeId: true,
@@ -411,6 +327,7 @@ export async function getMyCotisationYear(
         where: {
           adherentId,
           statut: "Valide",
+          inscriptionEvenementId: null,
           datePaiement: { gte: yearStart, lt: yearEnd },
         },
         _sum: { montant: true },

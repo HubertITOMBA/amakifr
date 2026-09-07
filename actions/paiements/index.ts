@@ -1605,10 +1605,30 @@ export async function getAllPaiements() {
         },
         ObligationCotisation: true,
         CotisationMensuelle: {
-          include: { TypeCotisation: true },
+          include: {
+            TypeCotisation: true,
+            AdherentBeneficiaire: {
+              select: {
+                civility: true,
+                firstname: true,
+                lastname: true,
+              },
+            },
+          },
         },
         DetteInitiale: true,
         Assistance: true,
+        InscriptionEvenement: {
+          select: {
+            id: true,
+            adherentId: true,
+            visiteurNom: true,
+            visiteurEmail: true,
+            Evenement: {
+              select: { id: true, titre: true },
+            },
+          },
+        },
       },
       orderBy: {
         datePaiement: "desc",
@@ -1620,16 +1640,26 @@ export async function getAllPaiements() {
       data: paiements.map((p) => ({
         ...p,
         montant: Number(p.montant),
+        inscriptionEvenementId: p.inscriptionEvenementId,
         CotisationMensuelle: p.CotisationMensuelle
           ? {
               id: p.CotisationMensuelle.id,
               periode: p.CotisationMensuelle.periode,
               annee: p.CotisationMensuelle.annee,
               mois: p.CotisationMensuelle.mois,
+              description: p.CotisationMensuelle.description,
               montantAttendu: Number(p.CotisationMensuelle.montantAttendu),
               montantPaye: Number(p.CotisationMensuelle.montantPaye),
               montantRestant: Number(p.CotisationMensuelle.montantRestant),
               statut: p.CotisationMensuelle.statut,
+              AdherentBeneficiaire: p.CotisationMensuelle.AdherentBeneficiaire
+                ? {
+                    civility: p.CotisationMensuelle.AdherentBeneficiaire.civility,
+                    firstname:
+                      p.CotisationMensuelle.AdherentBeneficiaire.firstname,
+                    lastname: p.CotisationMensuelle.AdherentBeneficiaire.lastname,
+                  }
+                : null,
               TypeCotisation: p.CotisationMensuelle.TypeCotisation
                 ? {
                     id: p.CotisationMensuelle.TypeCotisation.id,
@@ -1674,11 +1704,26 @@ export async function getAllPaiements() {
         ObligationCotisation: p.ObligationCotisation
           ? {
               id: p.ObligationCotisation.id,
+              periode: p.ObligationCotisation.periode,
               montantAttendu: Number(p.ObligationCotisation.montantAttendu),
               montantPaye: Number(p.ObligationCotisation.montantPaye),
               montantRestant: Number(p.ObligationCotisation.montantRestant),
               statut: p.ObligationCotisation.statut,
               description: p.ObligationCotisation.description,
+            }
+          : null,
+        InscriptionEvenement: p.InscriptionEvenement
+          ? {
+              id: p.InscriptionEvenement.id,
+              adherentId: p.InscriptionEvenement.adherentId,
+              visiteurNom: p.InscriptionEvenement.visiteurNom,
+              visiteurEmail: p.InscriptionEvenement.visiteurEmail,
+              Evenement: p.InscriptionEvenement.Evenement
+                ? {
+                    id: p.InscriptionEvenement.Evenement.id,
+                    titre: p.InscriptionEvenement.Evenement.titre,
+                  }
+                : null,
             }
           : null,
       })),

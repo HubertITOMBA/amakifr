@@ -29,6 +29,8 @@ const {
   findManyAssistance,
   createNotification,
   transaction,
+  findFirstInscriptionEvenement,
+  updateInscriptionEvenement,
 } = vi.hoisted(() => ({
   findUniqueAdherent: vi.fn(),
   findFirstCotisation: vi.fn(),
@@ -56,6 +58,8 @@ const {
   findManyAssistance: vi.fn(),
   createNotification: vi.fn(),
   transaction: vi.fn(),
+  findFirstInscriptionEvenement: vi.fn(),
+  updateInscriptionEvenement: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -97,6 +101,10 @@ vi.mock("@/lib/db", () => ({
       deleteMany: deleteManyUtilisationAvoir,
     },
     notification: { create: createNotification },
+    inscriptionEvenement: {
+      findFirst: findFirstInscriptionEvenement,
+      update: updateInscriptionEvenement,
+    },
     $transaction: transaction,
   },
 }));
@@ -172,6 +180,10 @@ function mockTx() {
       create: createUtilisationAvoir,
       deleteMany: deleteManyUtilisationAvoir,
     },
+    inscriptionEvenement: {
+      findFirst: findFirstInscriptionEvenement,
+      update: updateInscriptionEvenement,
+    },
   };
 }
 
@@ -211,6 +223,8 @@ beforeEach(() => {
   findManyAssistance.mockReset();
   createNotification.mockReset();
   transaction.mockReset();
+  findFirstInscriptionEvenement.mockReset();
+  updateInscriptionEvenement.mockReset();
   findManyAvoir.mockResolvedValue([]);
   findUniqueAvoir.mockResolvedValue(null);
   findManyDette.mockResolvedValue([]);
@@ -383,6 +397,8 @@ describe("validatePendingPayment — ventilation excédent (createPaiement)", ()
       DetteInitiale: null,
       Assistance: null,
       ObligationCotisation: null,
+      inscriptionEvenementId: null,
+      InscriptionEvenement: null,
       ...overrides,
     };
   }
@@ -878,8 +894,132 @@ describe("libellés notification paiement", () => {
         DetteInitiale: { annee: 2025 },
         Assistance: null,
         ObligationCotisation: null,
+        InscriptionEvenement: null,
       })
     ).toBe("dette initiale 2025");
+  });
+
+  it("formatPaymentTargetLabel événement (EnAttente/Valide/Annule)", () => {
+    expect(
+      formatPaymentTargetLabel({
+        montant: new Prisma.Decimal("30"),
+        moyenPaiement: "Wero",
+        reference: "AMAKI-2026-EVT-XXXX",
+        Adherent: { userId: "u" },
+        CotisationMensuelle: null,
+        DetteInitiale: null,
+        Assistance: null,
+        ObligationCotisation: null,
+        InscriptionEvenement: {
+          id: "ins1",
+          evenementId: "e1",
+          Evenement: { titre: "Gala" },
+        },
+      })
+    ).toBe("événement « Gala »");
+  });
+});
+
+describe("isolation paiement événement / cotisations", () => {
+  function pendingEventPay(overrides: Record<string, unknown> = {}) {
+    return {
+      id: "pay-evt-1",
+      adherentId: "adh-A",
+      montant: new Prisma.Decimal("30"),
+      moyenPaiement: "Wero",
+      reference: "AMAKI-2026-EVT-XXXX",
+      statut: "EnAttente",
+      description: "Déclaration Wero — en attente de validation",
+      cotisationMensuelleId: null,
+      detteInitialeId: null,
+      assistanceId: null,
+      obligationCotisationId: null,
+      inscriptionEvenementId: "ins-evt-1",
+      Adherent: { userId: "user-A" },
+      CotisationMensuelle: null,
+      DetteInitiale: null,
+      Assistance: null,
+      ObligationCotisation: null,
+      InscriptionEvenement: {
+        id: "ins-evt-1",
+        evenementId: "e-gala",
+        Evenement: { titre: "Gala" },
+      },
+      ...overrides,
+    };
+  }
+
+  it("validation 30 € événement → crédite inscription seulement, pas cotisation/dette/avoir", async () => {
+    findUniquePaiement.mockResolvedValue(pendingEventPay());
+    updateManyPaiement.mockResolvedValue({ count: 1 });
+    findFirstInscriptionEvenement.mockResolvedValue({
+      id: "ins-evt-1",
+      adherentId: "adh-A",
+      montantAttendu: new Prisma.Decimal("30"),
+      montantPaye: new Prisma.Decimal("0"),
+      statutPaiement: "APayer",
+    });
+
+    const r = await validatePendingPayment(admin(), "pay-evt-1");
+    expect(r.statut).toBe("Valide");
+    expect(r.creditedToTarget).toBe("30");
+    expect(r.surplus).toBe("0");
+    expect(updateInscriptionEvenement).toHaveBeenCalled();
+    expect(updateCotisation).not.toHaveBeenCalled();
+    expect(updateDette).not.toHaveBeenCalled();
+    expect(updateAssistance).not.toHaveBeenCalled();
+    expect(createAvoir).not.toHaveBeenCalled();
+  });
+
+  it("rejet EnAttente événement → recalcule statut inscription, aucune dette/cotisation/avoir", async () => {
+    findUniquePaiement.mockResolvedValue(pendingEventPay());
+    updateManyPaiement.mockResolvedValue({ count: 1 });
+    findFirstInscriptionEvenement.mockResolvedValue({
+      id: "ins-evt-1",
+      montantAttendu: new Prisma.Decimal("30"),
+      montantPaye: new Prisma.Decimal("0"),
+    });
+
+    const r = await rejectPendingPayment(admin(), "pay-evt-1");
+    expect(r.statut).toBe("Annule");
+    expect(r.reversed).toBe(false);
+    expect(updateInscriptionEvenement).toHaveBeenCalled();
+    expect(updateCotisation).not.toHaveBeenCalled();
+    expect(updateDette).not.toHaveBeenCalled();
+    expect(createAvoir).not.toHaveBeenCalled();
+  });
+
+  it("paiement partiel événement 20/50 → PartiellementPaye, pas d'allocation cotisation", async () => {
+    const tx = mockTx();
+    findFirstInscriptionEvenement.mockResolvedValue({
+      id: "ins-evt-1",
+      adherentId: "adh-A",
+      montantAttendu: new Prisma.Decimal("50"),
+      montantPaye: new Prisma.Decimal("0"),
+    });
+
+    const r = await applyValidatedPaymentCredit(tx as never, {
+      id: "pay-part",
+      adherentId: "adh-A",
+      montant: new Prisma.Decimal("20"),
+      cotisationMensuelleId: null,
+      detteInitialeId: null,
+      assistanceId: null,
+      obligationCotisationId: null,
+      inscriptionEvenementId: "ins-evt-1",
+    });
+
+    expect(r.creditedToTarget).toBe("20");
+    expect(r.surplus).toBe("0");
+    expect(updateInscriptionEvenement.mock.calls[0][0].data.montantPaye.toString()).toBe(
+      "20"
+    );
+    expect(updateInscriptionEvenement.mock.calls[0][0].data.statutPaiement).toBe(
+      "PartiellementPaye"
+    );
+    expect(updateCotisation).not.toHaveBeenCalled();
+    expect(updateDette).not.toHaveBeenCalled();
+    expect(createAvoir).not.toHaveBeenCalled();
   });
 });
 
