@@ -15,6 +15,8 @@ import {
   shouldShowHomeCandidaciesHint,
   shouldShowHomeElectionsBanner,
 } from "@/api/elections-state";
+import { getMyChatUnreadCount } from "@/api/chat";
+import { shouldShowHomeChatBadge } from "@/api/chat-state";
 import { formatDateTimeFr } from "@/utils/profile-helpers";
 import { AmakiDarkBackground } from "@/components/ui/amaki-dark-background";
 import { useUnreadCount } from "@/hooks/unread-count";
@@ -37,6 +39,7 @@ const SERVICES: {
   { id: "reunions", label: "Réunions", hint: "Mes réunions", href: "/reunions" },
   { id: "evenements", label: "Événements", hint: "Agenda", href: "/evenements" },
   { id: "elections", label: "Élections", hint: "Votes", href: "/elections" as Href },
+  { id: "messages", label: "Messages", hint: "Chat", href: "/messages" as Href },
 ];
 
 /**
@@ -50,12 +53,14 @@ export default function AccueilScreen() {
   const [eventsCount, setEventsCount] = useState(0);
   const [electionsCount, setElectionsCount] = useState(0);
   const [candidaciesOpenCount, setCandidaciesOpenCount] = useState(0);
+  const [chatUnread, setChatUnread] = useState(0);
   const [nextEventTitle, setNextEventTitle] = useState<string | null>(null);
   const [nextEventWhen, setNextEventWhen] = useState<string | null>(null);
   const showSurveyCta = shouldShowHomeSurveyCta(surveyCount);
   const showEventsBanner = shouldShowHomeEventsBanner(eventsCount);
   const showElectionsBanner = shouldShowHomeElectionsBanner(electionsCount);
   const showCandidaciesHint = shouldShowHomeCandidaciesHint(candidaciesOpenCount);
+  const showChatBadge = shouldShowHomeChatBadge(chatUnread);
 
   const loadSurveySummary = useCallback(async () => {
     try {
@@ -93,19 +98,41 @@ export default function AccueilScreen() {
     }
   }, []);
 
+  const loadChatUnread = useCallback(async () => {
+    try {
+      const r = await getMyChatUnreadCount();
+      setChatUnread(r.count);
+    } catch {
+      setChatUnread(0);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void loadSurveySummary();
       void loadEventsSummary();
       void loadElectionsSummary();
-    }, [loadSurveySummary, loadEventsSummary, loadElectionsSummary])
+      void loadChatUnread();
+    }, [
+      loadSurveySummary,
+      loadEventsSummary,
+      loadElectionsSummary,
+      loadChatUnread,
+    ])
   );
 
-  const baseServices = SERVICES.map((s) =>
-    s.id === "elections" && showCandidaciesHint && !showElectionsBanner
-      ? { ...s, hint: "Candidatures ouvertes" }
-      : s
-  );
+  const baseServices = SERVICES.map((s) => {
+    if (s.id === "elections" && showCandidaciesHint && !showElectionsBanner) {
+      return { ...s, hint: "Candidatures ouvertes" };
+    }
+    if (s.id === "messages" && showChatBadge) {
+      return {
+        ...s,
+        hint: `${chatUnread} non lu${chatUnread > 1 ? "s" : ""}`,
+      };
+    }
+    return s;
+  });
 
   const serviceTiles = showSurveyCta
     ? [

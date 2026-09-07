@@ -145,6 +145,14 @@ function AppTabs() {
           headerShown: false,
         }}
       />
+      <Tabs.Screen
+        name="messages"
+        options={{
+          title: "Messages",
+          href: null,
+          headerShown: false,
+        }}
+      />
     </Tabs>
   );
 }
