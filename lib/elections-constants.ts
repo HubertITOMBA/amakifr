@@ -85,6 +85,7 @@ export const CODE_TO_POSITION_TYPE: Record<string, PositionType> = {
   'VICETR': PositionType.ViceTresorier,
   'COMCPT': PositionType.CommissaireComptes,
   'MEMCDI': PositionType.MembreComiteDirecteur,
+  'MEMBRE': PositionType.MembreComiteDirecteur,
   // Anciens codes (pour rétrocompatibilité avec données existantes)
   'president': PositionType.President,
   'vice_president': PositionType.VicePresident,

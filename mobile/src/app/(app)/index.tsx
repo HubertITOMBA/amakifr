@@ -10,6 +10,11 @@ import { getMySurveysSummary } from "@/api/sondages";
 import { shouldShowHomeSurveyCta } from "@/api/sondages-state";
 import { getMyEventsSummary } from "@/api/evenements";
 import { shouldShowHomeEventsBanner } from "@/api/evenements-state";
+import { getMyElectionsSummary } from "@/api/elections";
+import {
+  shouldShowHomeCandidaciesHint,
+  shouldShowHomeElectionsBanner,
+} from "@/api/elections-state";
 import { formatDateTimeFr } from "@/utils/profile-helpers";
 import { AmakiDarkBackground } from "@/components/ui/amaki-dark-background";
 import { useUnreadCount } from "@/hooks/unread-count";
@@ -31,6 +36,7 @@ const SERVICES: {
   { id: "taches", label: "Tâches", hint: "Mes tâches", href: "/taches" },
   { id: "reunions", label: "Réunions", hint: "Mes réunions", href: "/reunions" },
   { id: "evenements", label: "Événements", hint: "Agenda", href: "/evenements" },
+  { id: "elections", label: "Élections", hint: "Votes", href: "/elections" as Href },
 ];
 
 /**
@@ -42,10 +48,14 @@ export default function AccueilScreen() {
   const displayName = user?.name?.trim() || "adhérent";
   const [surveyCount, setSurveyCount] = useState(0);
   const [eventsCount, setEventsCount] = useState(0);
+  const [electionsCount, setElectionsCount] = useState(0);
+  const [candidaciesOpenCount, setCandidaciesOpenCount] = useState(0);
   const [nextEventTitle, setNextEventTitle] = useState<string | null>(null);
   const [nextEventWhen, setNextEventWhen] = useState<string | null>(null);
   const showSurveyCta = shouldShowHomeSurveyCta(surveyCount);
   const showEventsBanner = shouldShowHomeEventsBanner(eventsCount);
+  const showElectionsBanner = shouldShowHomeElectionsBanner(electionsCount);
+  const showCandidaciesHint = shouldShowHomeCandidaciesHint(candidaciesOpenCount);
 
   const loadSurveySummary = useCallback(async () => {
     try {
@@ -72,16 +82,34 @@ export default function AccueilScreen() {
     }
   }, []);
 
+  const loadElectionsSummary = useCallback(async () => {
+    try {
+      const summary = await getMyElectionsSummary();
+      setElectionsCount(summary.aVoterCount);
+      setCandidaciesOpenCount(summary.candidaciesOpenCount ?? 0);
+    } catch {
+      setElectionsCount(0);
+      setCandidaciesOpenCount(0);
+    }
+  }, []);
+
   useFocusEffect(
     useCallback(() => {
       void loadSurveySummary();
       void loadEventsSummary();
-    }, [loadSurveySummary, loadEventsSummary])
+      void loadElectionsSummary();
+    }, [loadSurveySummary, loadEventsSummary, loadElectionsSummary])
+  );
+
+  const baseServices = SERVICES.map((s) =>
+    s.id === "elections" && showCandidaciesHint && !showElectionsBanner
+      ? { ...s, hint: "Candidatures ouvertes" }
+      : s
   );
 
   const serviceTiles = showSurveyCta
     ? [
-        ...SERVICES,
+        ...baseServices,
         {
           id: "sondages",
           label: "Sondages",
@@ -89,7 +117,7 @@ export default function AccueilScreen() {
           href: "/sondages" as Href,
         },
       ]
-    : SERVICES;
+    : baseServices;
 
   return (
     <AmakiDarkBackground>
@@ -142,6 +170,21 @@ export default function AccueilScreen() {
                 {nextEventTitle
                   ? ` — prochain : ${nextEventTitle}${nextEventWhen ? ` (${nextEventWhen})` : ""}`
                   : ""}
+              </Text>
+            </Pressable>
+          ) : null}
+
+          {showElectionsBanner ? (
+            <Pressable
+              style={styles.electionsBanner}
+              onPress={() => router.push("/elections" as Href)}
+              accessibilityRole="button"
+              accessibilityLabel="Vous avez un vote à effectuer"
+            >
+              <Text style={styles.surveyTitle}>Élections</Text>
+              <Text style={styles.surveyHint}>
+                Vous avez un vote à effectuer
+                {electionsCount > 1 ? ` (${electionsCount} scrutins)` : ""}
               </Text>
             </Pressable>
           ) : null}
@@ -274,6 +317,14 @@ const styles = StyleSheet.create({
     borderRadius: AmakiRadius.md,
     borderWidth: 1,
     borderColor: "#a7f3d0",
+    padding: AmakiSpacing.md,
+    marginBottom: AmakiSpacing.lg,
+  },
+  electionsBanner: {
+    backgroundColor: "#fef3c7",
+    borderRadius: AmakiRadius.md,
+    borderWidth: 1,
+    borderColor: "#fcd34d",
     padding: AmakiSpacing.md,
     marginBottom: AmakiSpacing.lg,
   },

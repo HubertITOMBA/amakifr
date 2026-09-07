@@ -586,6 +586,111 @@ export type MyEventsSummaryDto = {
   } | null;
 };
 
+export type MyElectionListItemDto = {
+  id: string;
+  titre: string;
+  description: string | null;
+  dateOuverture: string;
+  dateCloture: string;
+  dateScrutin: string;
+  status: string;
+  statusLabel: string;
+  scope: "open" | "upcoming" | "closed";
+  canVote: boolean;
+  hasVoted: boolean;
+  resultsAvailable: boolean;
+  candidaciesOpen: boolean;
+  personalLabel: string;
+};
+
+export type MyElectionsListDto = {
+  items: MyElectionListItemDto[];
+  total: number;
+  limit: number;
+  offset: number;
+};
+
+export type MyElectionsSummaryDto = {
+  aVoterCount: number;
+  candidaciesOpenCount: number;
+};
+
+export type MyElectionCandidateDto = {
+  id: string;
+  displayName: string;
+  image: string | null;
+  motivation: string | null;
+  programme: string | null;
+};
+
+export type MyElectionPositionDto = {
+  id: string;
+  titre: string;
+  type: string;
+  description: string | null;
+  nombreMandats: number;
+  alreadyVoted: boolean;
+  myVote: {
+    candidacyId: string | null;
+    isBlanc: boolean;
+    status: string;
+    dateVote: string;
+  } | null;
+  candidates: MyElectionCandidateDto[];
+  canApply: boolean;
+  canWithdraw: boolean;
+  myCandidacyStatus: string | null;
+  myCandidacyStatusLabel: string | null;
+  myCandidacyId: string | null;
+};
+
+export type MyElectionDetailDto = MyElectionListItemDto & {
+  dateClotureCandidature: string;
+  nombreMandats: number;
+  quorumRequis: number | null;
+  majoriteRequis: string | null;
+  eligible: boolean;
+  eligibilityReason: string | null;
+  eligibleCandidate: boolean;
+  eligibilityCandidateReason: string | null;
+  candidaciesOpen: boolean;
+  voteIrrevocable: boolean;
+  positions: MyElectionPositionDto[];
+};
+
+export type SubmitMyVoteResultDto = {
+  recorded: number;
+  message: string;
+};
+
+export type SubmitMyCandidacyResultDto = {
+  id: string;
+  status: string;
+  message: string;
+};
+
+export type WithdrawMyCandidacyResultDto = {
+  withdrawn: boolean;
+  message: string;
+};
+
+export type MyElectionResultsDto = {
+  electionId: string;
+  titre: string;
+  positions: Array<{
+    positionId: string;
+    titre: string;
+    totalVotes: number;
+    blankVotes: number;
+    candidacies: Array<{
+      candidacyId: string;
+      displayName: string;
+      votesCount: number;
+      percentage: number;
+    }>;
+  }>;
+};
+
 export class ApiClientError extends Error {
   readonly status: number;
   readonly code: string;

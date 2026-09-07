@@ -137,6 +137,14 @@ function AppTabs() {
           headerShown: false,
         }}
       />
+      <Tabs.Screen
+        name="elections"
+        options={{
+          title: "Élections",
+          href: null,
+          headerShown: false,
+        }}
+      />
     </Tabs>
   );
 }

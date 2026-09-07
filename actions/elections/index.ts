@@ -3,6 +3,10 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { ElectionStatus, PositionType, CandidacyStatus } from "@prisma/client";
+import {
+  getCandidacyWithdrawalBlockReason,
+  isElectionVotingOpen,
+} from "@/lib/services/elections/election-helpers";
 
 // Types pour les données
 interface ElectionData {
@@ -24,6 +28,7 @@ interface PositionData {
   nombreMandats?: number;
   dureeMandat?: number;
   conditions?: string;
+  posteTemplateId?: string | null;
 }
 
 interface CandidacyData {
@@ -36,6 +41,32 @@ interface CandidacyData {
 
 import { POSTES_LABELS, getPosteLabel, POSITION_TYPE_TO_CODE } from "@/lib/elections-constants";
 import { getAllPostesTemplates } from "@/actions/postes";
+import { Prisma } from "@prisma/client";
+
+const ALL_POSITION_TYPES = Object.values(PositionType);
+
+/**
+ * Alloue un PositionType encore libre pour l'élection
+ * (contrainte DB @@unique([electionId, type])).
+ */
+async function allocateUnusedPositionType(
+  electionId: string,
+  preferred?: PositionType,
+  alreadyReserved: Set<PositionType> = new Set()
+): Promise<PositionType | null> {
+  const used = await prisma.position.findMany({
+    where: { electionId },
+    select: { type: true },
+  });
+  const usedSet = new Set<PositionType>([
+    ...used.map((u) => u.type),
+    ...alreadyReserved,
+  ]);
+  if (preferred && !usedSet.has(preferred)) {
+    return preferred;
+  }
+  return ALL_POSITION_TYPES.find((t) => !usedSet.has(t)) ?? null;
+}
 
 // Server Action pour créer une élection avec ses postes
 // Accepte soit des IDs de PosteTemplate (nouveau système) soit des PositionType (rétrocompatibilité)
@@ -217,6 +248,7 @@ export async function createElection(
 }
 
 // Server Action pour créer un poste personnalisé
+// Server Action pour créer un poste personnalisé
 export async function createCustomPosition(
   electionId: string,
   positionData: PositionData
@@ -246,18 +278,57 @@ export async function createCustomPosition(
       return { success: false, error: "Élection introuvable" };
     }
 
-    // Créer le poste personnalisé
+    const titre = (positionData.titre || "").trim();
+    if (!titre) {
+      return { success: false, error: "Le titre du poste est obligatoire" };
+    }
+
+    const duplicateTitle = await prisma.position.findFirst({
+      where: {
+        electionId,
+        titre: { equals: titre, mode: "insensitive" },
+      },
+      select: { id: true },
+    });
+    if (duplicateTitle) {
+      return { success: false, error: "Un poste avec ce titre existe déjà pour cette élection" };
+    }
+
+    // Allouer un type libre (contrainte unique electionId+type)
+    const type =
+      (await allocateUnusedPositionType(electionId, positionData.type)) ||
+      (await allocateUnusedPositionType(electionId));
+    if (!type) {
+      return {
+        success: false,
+        error:
+          "Impossible d'ajouter un poste : la limite technique de 8 types de postes est atteinte pour cette élection.",
+      };
+    }
+
     const position = await prisma.position.create({
       data: {
         electionId,
-        ...positionData
-      }
+        type,
+        titre,
+        description: positionData.description,
+        nombreMandats: positionData.nombreMandats ?? 1,
+        dureeMandat: positionData.dureeMandat,
+        conditions: positionData.conditions,
+        posteTemplateId: null,
+      },
     });
 
     return { success: true, position };
 
   } catch (error) {
     console.error("Erreur lors de la création du poste:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return {
+        success: false,
+        error: "Ce type de poste existe déjà pour cette élection",
+      };
+    }
     return { success: false, error: "Erreur lors de la création du poste" };
   }
 }
@@ -274,6 +345,13 @@ export async function addPositionsToElection(
       return { success: false, error: "Non autorisé" };
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+    });
+    if (!user || user.role !== "ADMIN") {
+      return { success: false, error: "Seuls les administrateurs peuvent ajouter des postes" };
+    }
+
     // Vérifier que l'élection existe
     const election = await prisma.election.findUnique({
       where: { id: electionId }
@@ -283,23 +361,74 @@ export async function addPositionsToElection(
       return { success: false, error: "Élection non trouvée" };
     }
 
-    // Créer les postes
-    const createdPositions = await Promise.all(
-      positions.map(position => 
-        prisma.position.create({
-          data: {
-            ...position,
-            electionId,
-            titre: position.titre || POSTES_LABELS[position.type]
-          }
-        })
-      )
-    );
+    if (!positions?.length) {
+      return { success: false, error: "Aucun poste à ajouter" };
+    }
+
+    const reservedTypes = new Set<PositionType>();
+    const createdPositions = [];
+
+    for (const position of positions) {
+      if (position.posteTemplateId) {
+        const already = await prisma.position.findFirst({
+          where: { electionId, posteTemplateId: position.posteTemplateId },
+          select: { id: true },
+        });
+        if (already) {
+          continue;
+        }
+      }
+
+      const preferred = position.type;
+      const type = await allocateUnusedPositionType(
+        electionId,
+        preferred,
+        reservedTypes
+      );
+      if (!type) {
+        return {
+          success: false,
+          error:
+            createdPositions.length > 0
+              ? `${createdPositions.length} poste(s) ajouté(s), puis limite de 8 types atteinte`
+              : "Impossible d'ajouter un poste : la limite technique de 8 types de postes est atteinte pour cette élection.",
+          positions: createdPositions,
+        };
+      }
+      reservedTypes.add(type);
+
+      const created = await prisma.position.create({
+        data: {
+          electionId,
+          type,
+          titre: position.titre || POSTES_LABELS[type] || type,
+          description: position.description,
+          nombreMandats: position.nombreMandats ?? 1,
+          dureeMandat: position.dureeMandat,
+          conditions: position.conditions,
+          posteTemplateId: position.posteTemplateId ?? null,
+        },
+      });
+      createdPositions.push(created);
+    }
+
+    if (createdPositions.length === 0) {
+      return {
+        success: false,
+        error: "Aucun nouveau poste à ajouter (déjà présents)",
+      };
+    }
 
     return { success: true, positions: createdPositions };
 
   } catch (error) {
     console.error("Erreur lors de l'ajout des postes:", error);
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2002") {
+      return {
+        success: false,
+        error: "Un des postes existe déjà pour cette élection (doublon de type ou de template)",
+      };
+    }
     return { success: false, error: "Erreur lors de l'ajout des postes" };
   }
 }
@@ -754,6 +883,33 @@ export async function updateCandidacyPositions(
     const positionsToAdd = selectedPositionIds.filter(id => !currentPositionIds.includes(id));
     const positionsToRemove = currentPositionIds.filter(id => !selectedPositionIds.includes(id));
 
+    // Verrou retrait : même règle que mobile (dateScrutin + votes)
+    if (positionsToRemove.length > 0) {
+      const toRemove = existingCandidacies.filter((c) =>
+        positionsToRemove.includes(c.positionId)
+      );
+      const votesOnRemoved = await prisma.vote.findMany({
+        where: { candidacyId: { in: toRemove.map((c) => c.id) } },
+        select: { candidacyId: true },
+        distinct: ["candidacyId"],
+      });
+      const votedIds = new Set(
+        votesOnRemoved.map((v) => v.candidacyId).filter(Boolean) as string[]
+      );
+      const electionMeta = existingCandidacy.position.election;
+      for (const c of toRemove) {
+        const reason = getCandidacyWithdrawalBlockReason({
+          electionStatus: electionMeta.status,
+          myCandidacyStatus: c.status,
+          dateScrutin: electionMeta.dateScrutin,
+          hasVotesOnCandidacy: votedIds.has(c.id),
+        });
+        if (reason) {
+          return { success: false, error: reason };
+        }
+      }
+    }
+
     // Vérifier qu'il n'y a pas de conflits pour les nouveaux postes
     for (const positionId of positionsToAdd) {
       const existingCandidacyForPosition = await prisma.candidacy.findFirst({
@@ -773,15 +929,29 @@ export async function updateCandidacyPositions(
     const results = await prisma.$transaction(async (tx) => {
       const updatedCandidacies = [];
 
-      // Supprimer les candidatures pour les postes non sélectionnés
+      // Supprimer les candidatures pour les postes non sélectionnés (avec re-contrôle concurrence)
       if (positionsToRemove.length > 0) {
-        await tx.candidacy.deleteMany({
-          where: {
-            adherentId: adherent.id,
-            electionId: existingCandidacy.position.electionId,
-            positionId: { in: positionsToRemove }
+        const toRemove = existingCandidacies.filter((c) =>
+          positionsToRemove.includes(c.positionId)
+        );
+        for (const c of toRemove) {
+          await tx.$queryRaw`
+            SELECT id FROM candidacies WHERE id = ${c.id} FOR UPDATE
+          `;
+          const voteCount = await tx.vote.count({
+            where: { candidacyId: c.id },
+          });
+          const reason = getCandidacyWithdrawalBlockReason({
+            electionStatus: existingCandidacy.position.election.status,
+            myCandidacyStatus: c.status,
+            dateScrutin: existingCandidacy.position.election.dateScrutin,
+            hasVotesOnCandidacy: voteCount > 0,
+          });
+          if (reason) {
+            throw new Error(reason);
           }
-        });
+          await tx.candidacy.delete({ where: { id: c.id } });
+        }
       }
 
       // Mettre à jour la candidature existante (motivation et programme)
@@ -838,6 +1008,16 @@ export async function updateCandidacyPositions(
     return { success: true, candidacies: results };
 
   } catch (error) {
+    if (error instanceof Error) {
+      const msg = error.message;
+      if (
+        msg.startsWith("Impossible de retirer") ||
+        msg.startsWith("L'élection n'est plus") ||
+        msg.startsWith("Cette candidature")
+      ) {
+        return { success: false, error: msg };
+      }
+    }
     console.error("Erreur lors de la modification des postes de candidature:", error);
     return { success: false, error: "Erreur lors de la modification des postes de candidature" };
   }
@@ -1426,12 +1606,12 @@ export async function vote(
       };
     }
 
-    // Vérifier que l'élection est ouverte au vote
+    // Vérifier que l'élection est ouverte au vote (statut + fenêtre dateScrutin → dateCloture)
     const election = await prisma.election.findUnique({
       where: { id: electionId }
     });
 
-    if (!election || election.status !== ElectionStatus.Ouverte) {
+    if (!election || !isElectionVotingOpen(election)) {
       return { success: false, error: "L'élection n'est pas ouverte au vote" };
     }
 
@@ -2210,8 +2390,22 @@ export async function adminDeleteCandidacy(candidacyId: string) {
     const user = await prisma.user.findUnique({ where: { id: session.user.id } });
     if (!user || user.role !== "ADMIN") return { success: false, error: "Admin requis" };
 
-    await prisma.candidacy.delete({ where: { id: candidacyId } });
-    return { success: true };
+    // Intégrité votes (ON DELETE SET NULL) — service partagé.
+    // Privilège admin : dateScrutin non bloquante si aucun vote
+    // (différent du self-service withdrawMyCandidacy).
+    const { hardDeleteCandidacyGuardingVotes } = await import(
+      "@/lib/services/elections/hard-delete-candidacy"
+    );
+    const { isServiceError } = await import("@/lib/service-error");
+    try {
+      await hardDeleteCandidacyGuardingVotes(candidacyId);
+      return { success: true };
+    } catch (err) {
+      if (isServiceError(err)) {
+        return { success: false, error: err.message };
+      }
+      throw err;
+    }
   } catch (e) {
     console.error("Erreur adminDeleteCandidacy:", e);
     return { success: false, error: "Erreur lors de la suppression" };

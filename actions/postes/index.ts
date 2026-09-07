@@ -405,3 +405,117 @@ export async function togglePosteTemplateStatus(id: string, actif: boolean) {
   }
 }
 
+const BUREAU_POSTE_TEMPLATES = [
+  {
+    code: "PRESID",
+    libelle: "Président",
+    description: "Responsable de la direction de l'association",
+    ordre: 1,
+    nombreMandatsDefaut: 1,
+    dureeMandatDefaut: 24,
+  },
+  {
+    code: "VICEPR",
+    libelle: "Vice-Président",
+    description: "Assiste le président dans ses fonctions",
+    ordre: 2,
+    nombreMandatsDefaut: 1,
+    dureeMandatDefaut: 24,
+  },
+  {
+    code: "SECRET",
+    libelle: "Secrétaire",
+    description: "Gère l'administration et la communication de l'association",
+    ordre: 3,
+    nombreMandatsDefaut: 1,
+    dureeMandatDefaut: 24,
+  },
+  {
+    code: "VICESE",
+    libelle: "Vice-Secrétaire",
+    description: "Assiste le secrétaire dans ses fonctions",
+    ordre: 4,
+    nombreMandatsDefaut: 1,
+    dureeMandatDefaut: 24,
+  },
+  {
+    code: "TRESOR",
+    libelle: "Trésorier",
+    description: "Gère les finances de l'association",
+    ordre: 5,
+    nombreMandatsDefaut: 1,
+    dureeMandatDefaut: 24,
+  },
+  {
+    code: "VICETR",
+    libelle: "Vice-Trésorier",
+    description: "Assiste le trésorier dans ses fonctions",
+    ordre: 6,
+    nombreMandatsDefaut: 1,
+    dureeMandatDefaut: 24,
+  },
+  {
+    code: "COMCPT",
+    libelle: "Commissaire aux comptes",
+    description: "Contrôle les comptes de l'association",
+    ordre: 7,
+    nombreMandatsDefaut: 1,
+    dureeMandatDefaut: 24,
+  },
+  {
+    code: "MEMCDI",
+    libelle: "Membre du comité directeur",
+    description: "Membre du comité directeur de l'association",
+    ordre: 8,
+    nombreMandatsDefaut: 1,
+    dureeMandatDefaut: 24,
+  },
+] as const;
+
+/**
+ * Garantit la présence des templates de postes électoraux (bureau).
+ * Idempotent : crée uniquement les codes absents.
+ */
+export async function ensureElectoralPosteTemplates(): Promise<{
+  success: boolean;
+  created?: number;
+  error?: string;
+}> {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const adminId = session.user.id;
+    let created = 0;
+
+    for (const poste of BUREAU_POSTE_TEMPLATES) {
+      const existing = await prisma.posteTemplate.findUnique({
+        where: { code: poste.code },
+        select: { id: true },
+      });
+      if (existing) continue;
+
+      await prisma.posteTemplate.create({
+        data: {
+          ...poste,
+          actif: true,
+          createdBy: adminId,
+        },
+      });
+      created += 1;
+    }
+
+    if (created > 0) {
+      revalidatePath("/admin/postes");
+      revalidatePath("/admin/elections");
+    }
+
+    return { success: true, created };
+  } catch (error) {
+    console.error("Erreur ensureElectoralPosteTemplates:", error);
+    return { success: false, error: "Erreur lors de la préparation des postes" };
+  }
+}
+
