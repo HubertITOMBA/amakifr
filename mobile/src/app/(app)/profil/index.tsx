@@ -22,6 +22,7 @@ import { ApiClientError } from "@/api/types";
 import { Card } from "@/components/ui/card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { LoadingState } from "@/components/ui/loading-state";
+import { useUnreadCount } from "@/hooks/unread-count";
 import {
   AMAKI_PRIVACY_LABEL,
   AMAKI_PRIVACY_URL,
@@ -39,6 +40,7 @@ import { getInitials } from "@/utils/profile-helpers";
  */
 export default function ProfilHubScreen() {
   const { user, signOut } = useAuth();
+  const { resetUnreadCount } = useUnreadCount();
   const [summary, setSummary] = useState<MeProfileSummaryDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -77,6 +79,9 @@ export default function ProfilHubScreen() {
   async function onSignOut() {
     setSigningOut(true);
     try {
+      // Évite flash badge compte précédent (A → logout → B)
+      resetUnreadCount();
+      setSummary(null);
       await signOut();
     } finally {
       setSigningOut(false);

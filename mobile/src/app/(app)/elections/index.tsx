@@ -120,7 +120,7 @@ export default function ElectionsListScreen() {
               <Pressable
                 key={election.id}
                 onPress={() =>
-                  router.push(`/(app)/elections/${election.id}` as never)
+                  router.push(`/elections/${election.id}` as never)
                 }
               >
                 <Card style={styles.card}>

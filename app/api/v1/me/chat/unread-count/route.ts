@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { resolveApiActor } from "@/lib/api/auth-resolve";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/errors";
+import { rejectMeIdorSearchParams } from "@/lib/api/reject-me-idor";
 import { getMyChatUnreadCount } from "@/lib/services/chat/get-my-conversations";
 
 export const dynamic = "force-dynamic";
@@ -13,6 +14,7 @@ export async function GET(request: NextRequest) {
   try {
     const actor = await resolveApiActor(request);
     if (!actor) return apiError("UNAUTHENTICATED", "Non authentifié", 401);
+    rejectMeIdorSearchParams(request.nextUrl.searchParams);
     const data = await getMyChatUnreadCount(actor);
     return apiSuccess(data);
   } catch (error) {

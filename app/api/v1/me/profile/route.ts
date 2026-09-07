@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { resolveApiActor } from "@/lib/api/auth-resolve";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/errors";
+import { rejectMeIdorSearchParams } from "@/lib/api/reject-me-idor";
 import {
   getMyProfileSection,
   parseProfileSection,
@@ -19,6 +20,7 @@ export async function GET(request: NextRequest) {
     if (!actor) {
       return apiError("UNAUTHENTICATED", "Non authentifié", 401);
     }
+    rejectMeIdorSearchParams(request.nextUrl.searchParams);
 
     const section = parseProfileSection(
       request.nextUrl.searchParams.get("section")

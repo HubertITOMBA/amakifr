@@ -2,6 +2,7 @@ import type { NextRequest } from "next/server";
 import { resolveApiActor } from "@/lib/api/auth-resolve";
 import { apiSuccess, apiError } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/errors";
+import { rejectMeIdorSearchParams } from "@/lib/api/reject-me-idor";
 import {
   getMyElections,
   getMyElectionsSummary,
@@ -18,6 +19,7 @@ export async function GET(request: NextRequest) {
   try {
     const actor = await resolveApiActor(request);
     if (!actor) return apiError("UNAUTHENTICATED", "Non authentifié", 401);
+    rejectMeIdorSearchParams(request.nextUrl.searchParams);
 
     if (request.nextUrl.searchParams.get("summary") === "1") {
       const data = await getMyElectionsSummary(actor);
