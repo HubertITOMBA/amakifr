@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canMemberMessage,
+  chatContactIdentityMatches,
   chatDisplayName,
   chatNotificationLien,
   clampConversationsPagination,
@@ -43,6 +44,48 @@ describe("chat-helpers", () => {
     ).toBe("Ada Lovelace");
     expect(chatDisplayName({ name: "User" })).toBe("User");
     expect(chatDisplayName({})).toBe("Membre");
+  });
+
+  it("chatContactIdentityMatches — prénom/nom, casse, accents", () => {
+    expect(
+      chatContactIdentityMatches(
+        { firstname: "Thomas", lastname: "Dupont" },
+        "th"
+      )
+    ).toBe(true);
+    expect(
+      chatContactIdentityMatches(
+        { firstname: "Thérèse", lastname: "Martin" },
+        "th"
+      )
+    ).toBe(true);
+    expect(
+      chatContactIdentityMatches(
+        { firstname: "Thérèse", lastname: "Martin" },
+        "therese"
+      )
+    ).toBe(true);
+    expect(
+      chatContactIdentityMatches(
+        { firstname: "Sidonie", lastname: "Bernard" },
+        "th"
+      )
+    ).toBe(false);
+    expect(
+      chatContactIdentityMatches(
+        { firstname: "Sidonie", lastname: "Authier" },
+        "th"
+      )
+    ).toBe(true);
+    expect(
+      chatContactIdentityMatches(
+        { firstname: "Alice", lastname: "Martin" },
+        "MARTIN"
+      )
+    ).toBe(true);
+    expect(
+      chatContactIdentityMatches({ firstname: null, lastname: null }, "th")
+    ).toBe(false);
   });
 
   it("conversationDisplayTitle 1:1 / groupe", () => {

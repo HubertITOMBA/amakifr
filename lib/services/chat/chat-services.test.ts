@@ -350,15 +350,107 @@ describe("chat services", () => {
         name: "Bob",
         status: "Actif",
         image: null,
-        adherent: null,
+        adherent: { firstname: "Bob", lastname: "Martin" },
       },
     ]);
     const r = await searchMyChatContacts(actor(), "bo");
     expect(r.items[0]).toEqual({
       id: "u2",
-      displayName: "Bob",
+      displayName: "Bob Martin",
       image: null,
     });
     expect(r.items[0]).not.toHaveProperty("email");
+  });
+
+  it("search contacts th → Thomas + Thérèse, pas Sidonie (ignore User.name)", async () => {
+    findManyUser.mockResolvedValue([
+      {
+        id: "u-thomas",
+        name: "Thomas",
+        status: "Actif",
+        image: null,
+        adherent: { firstname: "Thomas", lastname: "Dupont" },
+      },
+      {
+        id: "u-therese",
+        name: "Therese",
+        status: "Actif",
+        image: null,
+        adherent: { firstname: "Thérèse", lastname: "Martin" },
+      },
+      {
+        id: "u-sidonie",
+        // User.name contient "th" → ne doit PAS matcher (champ non affiché)
+        name: "sidonie.auth@example.com",
+        status: "Actif",
+        image: null,
+        adherent: { firstname: "Sidonie", lastname: "Bernard" },
+      },
+    ]);
+    const r = await searchMyChatContacts(actor(), "th");
+    expect(r.items.map((i) => i.displayName)).toEqual([
+      "Thomas Dupont",
+      "Thérèse Martin",
+    ]);
+    expect(r.items.map((i) => i.id)).not.toContain("u-sidonie");
+  });
+
+  it("search contacts accents therese → Thérèse + recherche nom + casse", async () => {
+    findManyUser.mockResolvedValue([
+      {
+        id: "u-therese",
+        name: "x",
+        status: "Actif",
+        image: null,
+        adherent: { firstname: "Thérèse", lastname: "Martin" },
+      },
+      {
+        id: "u-alice",
+        name: "x",
+        status: "Actif",
+        image: null,
+        adherent: { firstname: "Alice", lastname: "Martin" },
+      },
+    ]);
+    const byAccent = await searchMyChatContacts(actor(), "therese");
+    expect(byAccent.items.map((i) => i.id)).toEqual(["u-therese"]);
+
+    const byLast = await searchMyChatContacts(actor(), "MARTIN");
+    expect(byLast.items.map((i) => i.id).sort()).toEqual([
+      "u-alice",
+      "u-therese",
+    ]);
+  });
+
+  it("search contacts exclut self / inactif et respecte la limite", async () => {
+    findManyUser.mockResolvedValue([
+      {
+        id: "u1",
+        name: "Moi",
+        status: "Actif",
+        image: null,
+        adherent: { firstname: "Thomas", lastname: "Self" },
+      },
+      {
+        id: "u-inactif",
+        name: "Inactif",
+        status: "Inactif",
+        image: null,
+        adherent: { firstname: "Thomas", lastname: "Inactif" },
+      },
+      ...Array.from({ length: 25 }, (_, i) => ({
+        id: `u-t${i}`,
+        name: `T${i}`,
+        status: "Actif",
+        image: null,
+        adherent: { firstname: "Thomas", lastname: `Num${i}` },
+      })),
+    ]);
+    // self déjà exclu par where Prisma ; inactif filtré canMemberMessage
+    // (ici status Inactif arrive quand même si where rate — filtre JS)
+    const r = await searchMyChatContacts(actor(), "th");
+    expect(r.items.every((i) => i.id !== "u1")).toBe(true);
+    expect(r.items.every((i) => i.id !== "u-inactif")).toBe(true);
+    expect(r.items.length).toBe(20);
   });
 });

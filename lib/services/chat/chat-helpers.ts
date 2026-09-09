@@ -2,6 +2,8 @@
  * Helpers messagerie — règles Web `actions/chat`.
  */
 
+import { normalizeString } from "@/lib/utils";
+
 export const CHAT_MESSAGE_MAX_LENGTH = 10_000;
 export const CHAT_CONTACTS_MIN_QUERY = 2;
 export const CHAT_CONTACTS_MAX = 20;
@@ -41,6 +43,26 @@ export function chatDisplayName(user: {
   const n = user.name?.trim();
   if (n) return n;
   return "Membre";
+}
+
+/**
+ * Recherche contacts Chat : match sur prénom + nom uniquement
+ * (insensible casse / accents). Pas d'email, téléphone, ni User.name.
+ */
+export function chatContactIdentityMatches(
+  identity: {
+    firstname?: string | null;
+    lastname?: string | null;
+  },
+  query: string
+): boolean {
+  const foldedQ = normalizeString(query.trim());
+  if (!foldedQ) return false;
+  const first = identity.firstname?.trim() ?? "";
+  const last = identity.lastname?.trim() ?? "";
+  if (!first && !last) return false;
+  const haystack = normalizeString(`${first} ${last}`.trim());
+  return haystack.includes(foldedQ);
 }
 
 /**

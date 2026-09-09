@@ -5,14 +5,15 @@ import {
   CHAT_CONTACTS_MAX,
   CHAT_CONTACTS_MIN_QUERY,
   canMemberMessage,
+  chatContactIdentityMatches,
   chatDisplayName,
 } from "@/lib/services/chat/chat-helpers";
 import type { MyChatContactDto } from "@/lib/services/chat/types";
 
 /**
  * Recherche contacts pour nouvelle conversation (lazy, max 20).
- * Miroir Web getUsersForConversation + filtre q serveur.
- * N'expose pas email / téléphone.
+ * Match uniquement prénom + nom adhérent (casse / accents).
+ * N'utilise pas User.name, email ni téléphone (non affichés).
  */
 export async function searchMyChatContacts(
   actor: AuthContext,
@@ -30,21 +31,13 @@ export async function searchMyChatContacts(
     );
   }
 
+  // Candidats Actifs (hors self) — filtre identité en mémoire pour accents.
+  // Association : volume limité ; pas de User.name (faux positifs type Sidonie).
   const users = await db.user.findMany({
     where: {
       status: "Actif",
       id: { not: actor.userId },
-      OR: [
-        { name: { contains: q, mode: "insensitive" } },
-        {
-          adherent: {
-            OR: [
-              { firstname: { contains: q, mode: "insensitive" } },
-              { lastname: { contains: q, mode: "insensitive" } },
-            ],
-          },
-        },
-      ],
+      adherent: { isNot: null },
     },
     select: {
       id: true,
@@ -54,22 +47,37 @@ export async function searchMyChatContacts(
       adherent: { select: { firstname: true, lastname: true } },
     },
     orderBy: [{ name: "asc" }],
-    take: CHAT_CONTACTS_MAX,
   });
 
-  const items = users
-    .filter((u) =>
-      canMemberMessage({
+  const items: MyChatContactDto[] = [];
+  for (const u of users) {
+    if (
+      !canMemberMessage({
         actorUserId: actor.userId,
         targetUserId: u.id,
         targetStatus: u.status,
       })
-    )
-    .map((u) => ({
+    ) {
+      continue;
+    }
+    if (
+      !chatContactIdentityMatches(
+        {
+          firstname: u.adherent?.firstname,
+          lastname: u.adherent?.lastname,
+        },
+        q
+      )
+    ) {
+      continue;
+    }
+    items.push({
       id: u.id,
       displayName: chatDisplayName(u),
       image: u.image,
-    }));
+    });
+    if (items.length >= CHAT_CONTACTS_MAX) break;
+  }
 
   return { items };
 }
