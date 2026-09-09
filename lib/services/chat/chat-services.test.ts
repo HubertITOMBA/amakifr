@@ -70,12 +70,28 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
+vi.mock("@/lib/services/push/send-push", () => ({
+  sendPushToUsers: vi.fn().mockResolvedValue({
+    attempted: 0,
+    ok: 0,
+    errors: 0,
+    disabled: 0,
+  }),
+  sendPushToUser: vi.fn().mockResolvedValue({
+    attempted: 0,
+    ok: 0,
+    errors: 0,
+    disabled: 0,
+  }),
+}));
+
 import { getMyConversations, getMyChatUnreadCount } from "@/lib/services/chat/get-my-conversations";
 import { getMyConversation } from "@/lib/services/chat/get-my-conversation";
 import { sendMyMessage } from "@/lib/services/chat/send-my-message";
 import { createMyConversation } from "@/lib/services/chat/create-my-conversation";
 import { markMyConversationRead } from "@/lib/services/chat/mark-my-conversation-read";
 import { searchMyChatContacts } from "@/lib/services/chat/search-my-chat-contacts";
+import { sendPushToUsers } from "@/lib/services/push/send-push";
 
 const actor = (): AuthContext =>
   ({
@@ -226,6 +242,20 @@ describe("chat services", () => {
     const r = await sendMyMessage(actor(), "c1", { content: "Hi" });
     expect(r.message.content).toBe("Hi");
     expect(createManyNotification).toHaveBeenCalled();
+    // laisser microtask push
+    await Promise.resolve();
+    expect(sendPushToUsers).toHaveBeenCalledWith(
+      ["u2"],
+      expect.objectContaining({
+        title: expect.stringContaining("Nouveau message"),
+        body: "Vous avez reçu un nouveau message.",
+        data: { url: "/chat/c1" },
+      })
+    );
+    // pas de push au sender
+    const pushedUsers = (sendPushToUsers as ReturnType<typeof vi.fn>).mock
+      .calls[0][0] as string[];
+    expect(pushedUsers).not.toContain("u1");
   });
 
   it("createMyConversation refuse destinataire inactif", async () => {

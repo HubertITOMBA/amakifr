@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Image } from "expo-image";
 import { router, type Href, useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
@@ -17,6 +17,7 @@ import {
 } from "@/api/elections-state";
 import { getMyChatUnreadCount } from "@/api/chat";
 import { shouldShowHomeChatBadge } from "@/api/chat-state";
+import { subscribeChatPushRefresh } from "@/api/push-events";
 import { formatDateTimeFr } from "@/utils/profile-helpers";
 import { AmakiDarkBackground } from "@/components/ui/amaki-dark-background";
 import { useUnreadCount } from "@/hooks/unread-count";
@@ -120,6 +121,12 @@ export default function AccueilScreen() {
       loadChatUnread,
     ])
   );
+
+  useEffect(() => {
+    return subscribeChatPushRefresh(() => {
+      void loadChatUnread();
+    });
+  }, [loadChatUnread]);
 
   const baseServices = SERVICES.map((s) => {
     if (s.id === "elections" && showCandidaciesHint && !showElectionsBanner) {

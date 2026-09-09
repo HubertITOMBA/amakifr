@@ -113,6 +113,21 @@ vi.mock("@/lib/authorize", () => ({
   authorize: vi.fn().mockResolvedValue(undefined),
 }));
 
+vi.mock("@/lib/services/push/send-push", () => ({
+  sendPushToUser: vi.fn().mockResolvedValue({
+    attempted: 0,
+    ok: 0,
+    errors: 0,
+    disabled: 0,
+  }),
+  sendPushToUsers: vi.fn().mockResolvedValue({
+    attempted: 0,
+    ok: 0,
+    errors: 0,
+    disabled: 0,
+  }),
+}));
+
 import {
   declareBankOrWeroPayment,
   validatePendingPayment,

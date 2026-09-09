@@ -23,6 +23,7 @@ import { Card } from "@/components/ui/card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { LoadingState } from "@/components/ui/loading-state";
 import { useUnreadCount } from "@/hooks/unread-count";
+import { unregisterCurrentPushToken } from "@/api/push-notifications";
 import {
   AMAKI_PRIVACY_LABEL,
   AMAKI_PRIVACY_URL,
@@ -79,7 +80,8 @@ export default function ProfilHubScreen() {
   async function onSignOut() {
     setSigningOut(true);
     try {
-      // Évite flash badge compte précédent (A → logout → B)
+      // Détache token appareil avant reset local (cross-compte A → B)
+      await unregisterCurrentPushToken();
       resetUnreadCount();
       setSummary(null);
       await signOut();

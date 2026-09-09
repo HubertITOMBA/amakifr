@@ -891,6 +891,8 @@ export async function notifyAdherentPaymentDecision(params: {
       ? `/evenements/${evenementId}`
       : "/evenements";
 
+    const lien = isEvent ? eventLien : "/paiement";
+
     if (params.decision === "valide") {
       await db.notification.create({
         data: {
@@ -912,9 +914,17 @@ export async function notifyAdherentPaymentDecision(params: {
               ]
                 .filter(Boolean)
                 .join(" "),
-          lien: isEvent ? eventLien : "/paiement",
+          lien,
           lue: false,
         },
+      });
+      const { sendPushToUser } = await import("@/lib/services/push/send-push");
+      void sendPushToUser(userId, {
+        title: "Paiement validé",
+        body: "Votre paiement a été validé.",
+        data: { url: lien },
+      }).catch((error) => {
+        console.error("[payment] push after validation failed:", error);
       });
       return;
     }
@@ -941,9 +951,17 @@ export async function notifyAdherentPaymentDecision(params: {
             ]
               .filter(Boolean)
               .join(" "),
-        lien: isEvent ? eventLien : "/paiement",
+        lien,
         lue: false,
       },
+    });
+    const { sendPushToUser } = await import("@/lib/services/push/send-push");
+    void sendPushToUser(userId, {
+      title: "Paiement rejeté",
+      body: "Votre paiement a été rejeté.",
+      data: { url: lien },
+    }).catch((error) => {
+      console.error("[payment] push after rejection failed:", error);
     });
   } catch (error) {
     console.error(

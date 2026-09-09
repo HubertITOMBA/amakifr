@@ -4,6 +4,7 @@ import { TabBarIcon } from "@/components/tab-bar-icon";
 import { formatTabUnreadBadge } from "@/api/notifications-state";
 import { AmakiColors } from "@/constants/theme";
 import { UnreadCountProvider, useUnreadCount } from "@/hooks/unread-count";
+import { PushNotificationsBootstrap } from "@/hooks/push-notifications-bootstrap";
 
 function AppTabs() {
   const insets = useSafeAreaInsets();
@@ -163,7 +164,9 @@ function AppTabs() {
 export default function AppLayout() {
   return (
     <UnreadCountProvider>
-      <AppTabs />
+      <PushNotificationsBootstrap>
+        <AppTabs />
+      </PushNotificationsBootstrap>
     </UnreadCountProvider>
   );
 }

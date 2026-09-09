@@ -25,6 +25,11 @@
 .DS_Store
 *.pem
 
+# Firebase Admin / Service Account — JAMAIS committer
+*firebase-adminsdk*.json
+*-firebase-adminsdk-*.json
+**/amaki-firebase-adminsdk*.json
+
 # debug
 npm-debug.log*
 yarn-debug.log*

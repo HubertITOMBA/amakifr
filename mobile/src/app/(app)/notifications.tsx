@@ -1,13 +1,6 @@
 import { useCallback, useRef, useState } from "react";
-import {
-  Alert,
-  FlatList,
-  RefreshControl,
-  StyleSheet,
-  Text,
-  View,
-} from "react-native";
-import { useFocusEffect } from "expo-router";
+import { Alert, FlatList, RefreshControl, StyleSheet, Text, View } from "react-native";
+import { router, useFocusEffect, type Href } from "expo-router";
 import {
   deleteNotification,
   getNotifications,
@@ -20,6 +13,7 @@ import {
   nextUnreadAfterMarkRead,
   notificationErrorMessage,
 } from "@/api/notifications-state";
+import { notificationLinkToMobileRoute } from "@/api/notification-link";
 import {
   beginLoad,
   createLoadGuard,
@@ -103,17 +97,22 @@ export default function NotificationsScreen() {
     }, [load])
   );
 
-  async function onMarkRead(n: NotificationDto) {
-    if (n.lue) return;
+  async function onOpenNotification(n: NotificationDto) {
     setBusyId(n.id);
     try {
-      await markNotificationAsRead(n.id);
-      bumpAfterMutation();
-      setItems((prev) =>
-        prev.map((x) => (x.id === n.id ? { ...x, lue: true } : x))
-      );
-      setUnreadCountLocal((c) => nextUnreadAfterMarkRead(c, true));
-      await refreshUnreadCount();
+      if (!n.lue) {
+        await markNotificationAsRead(n.id);
+        bumpAfterMutation();
+        setItems((prev) =>
+          prev.map((x) => (x.id === n.id ? { ...x, lue: true } : x))
+        );
+        setUnreadCountLocal((c) => nextUnreadAfterMarkRead(c, true));
+        await refreshUnreadCount();
+      }
+      const route = notificationLinkToMobileRoute(n.lien);
+      if (route) {
+        router.push(route as Href);
+      }
     } catch (e) {
       if (e instanceof ApiClientError && e.status === 404) {
         bumpAfterMutation();
@@ -124,7 +123,7 @@ export default function NotificationsScreen() {
       } else if (e instanceof ApiClientError) {
         setError(notificationErrorMessage(e));
       } else {
-        setError("Impossible de mettre à jour la notification");
+        setError("Impossible d'ouvrir la notification");
       }
     } finally {
       setBusyId(null);
@@ -229,7 +228,7 @@ export default function NotificationsScreen() {
         renderItem={({ item }) => (
           <NotificationItem
             notification={item}
-            onPress={onMarkRead}
+            onPress={onOpenNotification}
             onDelete={confirmDelete}
             busy={busyId === item.id}
           />

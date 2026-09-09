@@ -1,4 +1,4 @@
-import { getApiBaseUrl } from "@/config/api";
+import { buildApiUrl } from "@/config/api";
 import {
   ApiClientError,
   type ApiResponse,
@@ -22,7 +22,7 @@ type FetchOptions = {
   accept?: string;
   /** Fetch injectable (ex. expo/fetch pour multipart). Défaut : fetch global. */
   fetchImpl?: typeof fetch;
-  /** Timeout diagnostic (ms). Uniquement si > 0. */
+  /** Timeout (ms). Uniquement si > 0. */
   timeoutMs?: number;
 };
 
@@ -84,6 +84,10 @@ async function parseApiJsonResponse<T>(response: Response): Promise<T> {
   return json.data as T;
 }
 
+function detailIsTimeout(error: unknown): boolean {
+  return error instanceof Error && error.message === "REQUEST_TIMEOUT";
+}
+
 /**
  * Requête HTTP brute vers /api/v1 (sans parsing JSON).
  */
@@ -91,8 +95,7 @@ export async function fetchApiResponse(
   path: string,
   options: FetchOptions = {}
 ): Promise<Response> {
-  const base = getApiBaseUrl();
-  const url = `${base}${path.startsWith("/") ? path : `/${path}`}`;
+  const url = buildApiUrl(path);
   const headers: Record<string, string> = {
     Accept: options.accept ?? "application/json",
   };
@@ -142,10 +145,6 @@ export async function fetchApiResponse(
         error instanceof Error ? error.message : String(error ?? "unknown");
       // eslint-disable-next-line no-console
       console.warn("[MOBILE_HTTP] request failed", path, detail);
-      if (detail === "REQUEST_TIMEOUT") {
-        // eslint-disable-next-line no-console
-        console.warn("[MOBILE_PAYMENT] request timeout");
-      }
     }
     throw new ApiClientError(
       0,
@@ -155,10 +154,6 @@ export async function fetchApiResponse(
         : "Serveur injoignable. Vérifiez EXPO_PUBLIC_API_URL et le réseau."
     );
   }
-}
-
-function detailIsTimeout(error: unknown): boolean {
-  return error instanceof Error && error.message === "REQUEST_TIMEOUT";
 }
 
 /**

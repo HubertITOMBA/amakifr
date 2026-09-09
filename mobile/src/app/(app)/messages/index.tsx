@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import {
   FlatList,
   Pressable,
@@ -10,6 +10,7 @@ import {
 import { router, useFocusEffect } from "expo-router";
 import { getMyChatUnreadCount, getMyConversations } from "@/api/chat";
 import { chatErrorMessage, formatChatListWhen } from "@/api/chat-state";
+import { subscribeChatPushRefresh } from "@/api/push-events";
 import {
   beginLoad,
   createLoadGuard,
@@ -94,6 +95,13 @@ export default function MessagesListScreen() {
       void loadPage({ currentLength: 0 });
     }, [loadPage])
   );
+
+  // Push Chat reçu / retour foreground pendant que la liste est montée
+  useEffect(() => {
+    return subscribeChatPushRefresh(() => {
+      void loadPage({ refresh: true, currentLength: 0 });
+    });
+  }, [loadPage]);
 
   if (loading && items.length === 0) {
     return <LoadingState />;

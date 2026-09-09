@@ -127,6 +127,19 @@ export async function sendMyMessage(
         lue: false,
       })),
     });
+
+    // Push après commit DB — best-effort, jamais de rollback métier
+    const { sendPushToUsers } = await import("@/lib/services/push/send-push");
+    void sendPushToUsers(
+      others.map((p) => p.userId),
+      {
+        title: `Nouveau message de ${senderName}`,
+        body: "Vous avez reçu un nouveau message.",
+        data: { url: chatNotificationLien(conversationId) },
+      }
+    ).catch((error) => {
+      console.error("[chat] push after message failed:", error);
+    });
   }
 
   return { message: mapMessage(created, actor.userId) };

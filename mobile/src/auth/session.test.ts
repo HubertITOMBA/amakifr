@@ -463,4 +463,22 @@ describe("fetchApiResponse FormData vs JSON", () => {
     expect(init.body).toBe(rnForm);
     expect(typeof init.body).not.toBe("string");
   });
+
+  it("NETWORK_ERROR → message UX propre (sans diagnostic host)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        throw new TypeError("Network request failed");
+      })
+    );
+
+    await expect(
+      fetchApiResponse("/api/v1/auth/login", { method: "POST" })
+    ).rejects.toMatchObject({
+      code: "NETWORK_ERROR",
+      status: 0,
+      message:
+        "Serveur injoignable. Vérifiez EXPO_PUBLIC_API_URL et le réseau.",
+    });
+  });
 });

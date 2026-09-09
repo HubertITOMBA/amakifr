@@ -276,6 +276,7 @@ model User {
   adminRoles                    UserAdminRole[]              @relation("UserAdminRoles") // Rôles d'administration de l'utilisateur
   adminRolesAttributed          UserAdminRole[]              @relation("UserAdminRoleCreator") // Rôles d'administration attribués par cet utilisateur
   notifications                 Notification[] // Notifications reçues
+  mobilePushTokens              MobilePushToken[] // Tokens Expo Push (multi-appareils)
   emailsReceived                Email[]                      @relation("EmailRecipient") // Emails reçus
   emailsSent                    Email[]                      @relation("EmailCreatedBy") // Emails envoyés
   mailingCampaignsCreated       MailingCampaign[]            @relation("MailingCampaignCreatedBy")
@@ -1473,6 +1474,28 @@ model Notification {
   @@index([lue])
   @@index([createdAt])
   @@map("notifications")
+}
+
+/**
+ * Token Expo Push par appareil (self-service mobile).
+ * Un User peut avoir plusieurs appareils ; un token unique est rattache au user courant.
+ */
+model MobilePushToken {
+  id         String    @id @default(cuid())
+  userId     String
+  token      String    @unique
+  platform   String    @db.VarChar(16)
+  deviceName String?   @db.VarChar(120)
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  lastSeenAt DateTime  @default(now())
+  disabledAt DateTime?
+
+  User User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([disabledAt])
+  @@map("mobile_push_tokens")
 }
 
 // Modèle pour l'historique des emails envoyés aux adhérents
