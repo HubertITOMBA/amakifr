@@ -20,6 +20,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "fr.amaki.mobile",
+      "versionCode": 1,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]
