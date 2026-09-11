@@ -129,7 +129,7 @@ export default function AdminSettingsPage() {
   // Paramètres généraux
   const [generalSettings, setGeneralSettings] = useState({
     associationName: "AMAKI France",
-    contactEmail: "asso.amaki@gmail.com",
+    contactEmail: "contact@amaki.fr",
     websiteUrl: typeof window !== "undefined" ? window.location.origin : "",
   });
 
@@ -138,7 +138,7 @@ export default function AdminSettingsPage() {
     provider: (process.env.EMAIL_PROVIDER || 'resend') as EmailProvider,
     fromNoreply: "noreply@amaki.fr",
     fromWebmaster: "webmaster@amaki.fr",
-    adminNotificationEmail: "asso.amaki@gmail.com",
+    adminNotificationEmail: "contact@amaki.fr",
     enableNotifications: true,
     enableStatusChangeEmails: true,
     enableCandidacyEmails: true,
@@ -761,7 +761,7 @@ export default function AdminSettingsPage() {
                   type="email"
                   value={generalSettings.contactEmail}
                   onChange={(e) => setGeneralSettings({ ...generalSettings, contactEmail: e.target.value })}
-                  placeholder="asso.amaki@gmail.com"
+                  placeholder="contact@amaki.fr"
                 />
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Email utilisé pour recevoir les notifications administratives
@@ -881,7 +881,7 @@ export default function AdminSettingsPage() {
                     type="email"
                     value={emailSettings.adminNotificationEmail}
                     onChange={(e) => setEmailSettings({ ...emailSettings, adminNotificationEmail: e.target.value })}
-                    placeholder="asso.amaki@gmail.com"
+                    placeholder="contact@amaki.fr"
                   />
                   <p className="text-sm text-gray-500 dark:text-gray-400">
                     Email qui reçoit les notifications administratives

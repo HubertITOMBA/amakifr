@@ -98,7 +98,7 @@ export function NewsletterSection() {
                   </div>
                   <div>
                     <p className="text-white font-semibold">Email</p>
-                    <p className="text-white/80">asso.amaki@gmail.com</p>
+                    <p className="text-white/80">contact@amaki.fr</p>
                   </div>
                 </div>
                 

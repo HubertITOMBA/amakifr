@@ -266,10 +266,10 @@ export default function SuppressionDonneesPage() {
               <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
                 <Mail className="h-5 w-5 text-blue-600" />
                 <a 
-                  href="mailto:asso.amaki@gmail.com?subject=Demande de suppression de données" 
+                  href="mailto:contact@amaki.fr?subject=Demande de suppression de données"
                   className="text-blue-600 dark:text-blue-400 hover:underline font-semibold"
                 >
-                  asso.amaki@gmail.com
+                  contact@amaki.fr
                 </a>
               </div>
             </div>

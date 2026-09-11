@@ -447,7 +447,7 @@ ${message}
   
   await sendEmail({
       from: 'webmaster@amaki.fr',
-      to: "asso.amaki@gmail.com",
+      to: "contact@amaki.fr",
       subject: `${goal}`,
       html: wrapEmailContent(content)
     });
@@ -1224,7 +1224,7 @@ export const sendNewUserNotificationEmail = async(
   `;
 
   // Envoyer à plusieurs destinataires
-  const recipients = ["asso.amaki@gmail.com", "hubert.itomba@orange.fr","f3sbtevry@gmail.com"];
+  const recipients = ["contact@amaki.fr", "asso.amaki@gmail.com", "hubert.itomba@orange.fr","f3sbtevry@gmail.com"];
   
   for (let i = 0; i < recipients.length; i++) {
     const recipient = recipients[i];
@@ -1308,7 +1308,7 @@ export const sendUserRegistrationThankYouEmail = async(
     </div>
     
     <p style="margin-top: 30px; color: #666; font-size: 14px;">
-      Pour toute question, n'hésitez pas à nous contacter à <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>.
+      Pour toute question, n'hésitez pas à nous contacter à <a href="mailto:contact@amaki.fr" style="color: #4a90e2;">contact@amaki.fr</a>.
     </p>
     
     <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
@@ -1411,7 +1411,7 @@ export const sendAdminCreatedAccountEmail = async(
       <h3 style="color: #333; margin-top: 0; font-size: 18px;">💡 Besoin d'aide ?</h3>
       <p style="color: #666; margin: 10px 0;">Si vous rencontrez des difficultés pour vous connecter ou si vous avez des questions, n'hésitez pas à contacter l'administration :</p>
       <p style="margin: 10px 0;">
-        📧 Email : <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>
+        📧 Email : <a href="mailto:contact@amaki.fr" style="color: #4a90e2;">contact@amaki.fr</a>
       </p>
     </div>
     
@@ -1503,7 +1503,7 @@ export const sendAccountDeletionEmail = async(
       <h3 style="color: #333; margin-top: 20px; font-size: 18px;">💬 Questions ou réclamations ?</h3>
       <p style="color: #666; margin: 10px 0;">Si vous pensez que cette suppression est une erreur ou si vous avez des questions, veuillez contacter l'administration :</p>
       <p style="color: #666; margin: 10px 0;">
-        <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2; text-decoration: none; font-weight: 500;">asso.amaki@gmail.com</a>
+        <a href="mailto:contact@amaki.fr" style="color: #4a90e2; text-decoration: none; font-weight: 500;">contact@amaki.fr</a>
       </p>
     </div>
     
@@ -1598,7 +1598,7 @@ export const sendPasswordResetByAdminEmail = async(
     </div>
     
     <p style="margin-top: 30px; color: #666; font-size: 14px;">
-      Si vous rencontrez des difficultés, n'hésitez pas à nous contacter à <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>.
+      Si vous rencontrez des difficultés, n'hésitez pas à nous contacter à <a href="mailto:contact@amaki.fr" style="color: #4a90e2;">contact@amaki.fr</a>.
     </p>
     
     <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
@@ -1669,7 +1669,7 @@ export const sendPasseportEmail = async(
     </div>
     
     <p style="margin-top: 30px; color: #666; font-size: 14px;">
-      Pour toute question, n'hésitez pas à nous contacter à <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>.
+      Pour toute question, n'hésitez pas à nous contacter à <a href="mailto:contact@amaki.fr" style="color: #4a90e2;">contact@amaki.fr</a>.
     </p>
     
     <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
@@ -1744,7 +1744,7 @@ export const sendAdminPasswordResetEmail = async(
     </div>
     
     <p style="margin-top: 30px; color: #666; font-size: 14px;">
-      Pour toute question, n'hésitez pas à nous contacter à <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>.
+      Pour toute question, n'hésitez pas à nous contacter à <a href="mailto:contact@amaki.fr" style="color: #4a90e2;">contact@amaki.fr</a>.
     </p>
     
     <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">
@@ -1845,7 +1845,7 @@ export async function sendMerchOrderConfirmationEmail(params: {
       Le bureau de l'association vous contactera pour la suite (paiement et livraison).
     </p>
     <p style="margin: 10px 0; color: #666; font-size: 14px;">
-      Pour toute question : <a href="mailto:asso.amaki@gmail.com" style="color: #4a90e2;">asso.amaki@gmail.com</a>
+      Pour toute question : <a href="mailto:contact@amaki.fr" style="color: #4a90e2;">contact@amaki.fr</a>
     </p>
 
     <p style="margin-top: 20px; color: #999; font-size: 12px; border-top: 1px solid #eee; padding-top: 20px;">

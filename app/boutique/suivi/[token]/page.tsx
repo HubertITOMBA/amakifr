@@ -304,7 +304,7 @@ export default function BoutiqueSuiviPage() {
                   Pour toute question concernant le paiement, la livraison ou une modification, contactez l’association.
                 </p>
                 <div className="flex flex-col sm:flex-row gap-2">
-                  <a href="mailto:asso.amaki@gmail.com" className="inline-flex">
+                  <a href="mailto:contact@amaki.fr" className="inline-flex">
                     <Button variant="outline" className="border-blue-300 w-full sm:w-auto">
                       Écrire à l’association
                     </Button>

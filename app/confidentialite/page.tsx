@@ -169,7 +169,7 @@ export default function ConfidentialitePage() {
                 </p>
                 <ul className="list-disc list-inside text-slate-700 dark:text-slate-300 space-y-1 ml-4">
                   <li>Utiliser notre <Link href="/suppression-donnees" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold">formulaire de demande de suppression des données</Link></li>
-                  <li>Nous contacter par email à <a href="mailto:asso.amaki@gmail.com" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold">asso.amaki@gmail.com</a></li>
+                  <li>Nous contacter par email à <a href="mailto:contact@amaki.fr" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold">contact@amaki.fr</a></li>
                 </ul>
               </div>
             </section>
@@ -236,12 +236,12 @@ export default function ConfidentialitePage() {
               <div className="bg-slate-50 dark:bg-slate-800 p-6 rounded-lg border border-slate-200 dark:border-slate-700">
                 <p className="text-slate-900 dark:text-slate-100 font-semibold mb-2">AMAKI France</p>
                 <p className="text-slate-700 dark:text-slate-300">119 rue des Grands Champs</p>
-                <p className="text-slate-700 dark:text-slate-300">77000 Lieusaint, France</p>
+                <p className="text-slate-700 dark:text-slate-300">77127 Lieusaint, France</p>
                 <p className="text-slate-700 dark:text-slate-300 mt-2">
-                  Email : <a href="mailto:asso.amaki@gmail.com" className="text-blue-600 dark:text-blue-400 hover:underline">asso.amaki@gmail.com</a>
+                  Email : <a href="mailto:contact@amaki.fr" className="text-blue-600 dark:text-blue-400 hover:underline">contact@amaki.fr</a>
                 </p>
                 <p className="text-slate-700 dark:text-slate-300">
-                  Téléphone : <a href="tel:+33751066264" className="text-blue-600 dark:text-blue-400 hover:underline">+33 7 51 06 62 64</a>
+                  Téléphone : <a href="tel:+33607034364" className="text-blue-600 dark:text-blue-400 hover:underline">+33 6 07 03 43 64</a>
                 </p>
               </div>
             </section>

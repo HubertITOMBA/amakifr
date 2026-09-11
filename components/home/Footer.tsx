@@ -78,8 +78,8 @@ export function Footer() {
   ];
 
   const contactPhones = [
-    { label: "Contact association", raw: "+33 6 51 99 82 44" },
-    { label: "Admin / Webmaster", raw: "+33 7 51 06 62 64" },
+    { label: "Contact association", raw: "+33 6 07 03 43 64" },
+    { label: "Admin / Webmaster", raw: "+33 6 07 03 43 64" },
   ];
 
   const stats = [
@@ -271,7 +271,7 @@ export function Footer() {
                       <Mail className="h-5 w-5 text-white" />
                     </div>
                     <div>
-                      <p className="text-white font-medium">asso.amaki@gmail.com</p>
+                      <p className="text-white font-medium">contact@amaki.fr</p>
                       <p className="text-sm text-gray-400">Email principal</p>
                     </div>
                   </div>

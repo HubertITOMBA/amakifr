@@ -557,7 +557,7 @@ export default function AmicalePage() {
                 Email
               </h3>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mb-3 sm:mb-4">
-                asso.amaki@gmail.com
+                contact@amaki.fr
               </p>
               <Button variant="outline" className="w-full text-xs sm:text-sm">
                 <Mail className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
@@ -575,7 +575,7 @@ export default function AmicalePage() {
                 Téléphone
               </h3>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mb-3 sm:mb-4">
-                +33 7 58 43 47 28
+                +33 6 07 03 43 64
               </p>
               <Button variant="outline" className="w-full text-xs sm:text-sm">
                 <Phone className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
@@ -594,7 +594,7 @@ export default function AmicalePage() {
               </h3>
               <p className="text-xs sm:text-sm text-gray-600 dark:text-gray-300 mb-3 sm:mb-4">
                 119 rue des Grands Champs<br />
-                77000 Lieusaint
+                77127 Lieusaint
               </p>
               <Button variant="outline" className="w-full text-xs sm:text-sm">
                 <MapPin className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
