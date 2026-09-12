@@ -165,10 +165,21 @@ export default function ConfidentialitePage() {
               </ul>
               <div className="mt-6 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
                 <p className="text-slate-700 dark:text-slate-300 mb-2">
-                  <strong>Pour exercer vos droits</strong>, vous pouvez :
+                  <strong>Pour exercer vos droits</strong> (y compris depuis l&apos;application mobile AMAKI / Google Play), vous pouvez :
                 </p>
                 <ul className="list-disc list-inside text-slate-700 dark:text-slate-300 space-y-1 ml-4">
-                  <li>Utiliser notre <Link href="/suppression-donnees" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold">formulaire de demande de suppression des données</Link></li>
+                  <li>
+                    Utiliser notre{" "}
+                    <Link
+                      href="/suppression-donnees"
+                      className="text-blue-600 dark:text-blue-400 hover:underline font-semibold"
+                    >
+                      page publique de demande de suppression des données
+                    </Link>{" "}
+                    (<span className="text-slate-600 dark:text-slate-400">
+                      (https://www.amaki.fr/suppression-donnees)
+                    </span>
+                  </li>
                   <li>Nous contacter par email à <a href="mailto:contact@amaki.fr" className="text-blue-600 dark:text-blue-400 hover:underline font-semibold">contact@amaki.fr</a></li>
                 </ul>
               </div>

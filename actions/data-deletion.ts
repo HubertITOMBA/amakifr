@@ -2,110 +2,125 @@
 
 import { db } from "@/lib/db";
 import { sendEmail } from "@/lib/mail";
+import { normalizeEmail } from "@/lib/utils";
 import { z } from "zod";
 
 /**
- * Schéma de validation pour les demandes de suppression de données
+ * Schéma de validation pour les demandes publiques de suppression de données.
+ * Ne déclenche jamais une suppression automatique.
  */
 const DataDeletionRequestSchema = z.object({
   email: z.string().email("L'adresse email n'est pas valide"),
-  message: z.string().optional(),
+  message: z
+    .string()
+    .max(2000, "Le message ne peut pas dépasser 2000 caractères")
+    .optional()
+    .nullable(),
 });
 
+const GENERIC_SUCCESS_MESSAGE =
+  "Si un compte correspondant à cette adresse existe, votre demande a été prise en compte. Vous recevrez un e-mail de confirmation. Aucune suppression n'est effectuée immédiatement : une vérification d'identité par l'équipe AMAKI est obligatoire.";
+
 /**
- * Soumet une demande de suppression de données
- * 
- * @param formData - Les données du formulaire contenant l'email et un message optionnel
- * @returns Un objet avec success (boolean) et message (string) ou error (string)
+ * Enregistre une demande de suppression (statut EnAttente) pour un e-mail donné.
+ * - Accès public (Play Store / RGPD)
+ * - N'efface aucune donnée
+ * - Réponse générique (anti-énumération de comptes)
+ * - Vérification d'identité = e-mail de confirmation + traitement admin
+ *
+ * @param formData - email (requis) + message (optionnel)
  */
 export async function submitDataDeletionRequest(formData: FormData) {
   try {
     const rawData = {
       email: formData.get("email") as string,
-      message: formData.get("message") as string | undefined,
+      message: (formData.get("message") as string | null) || null,
     };
 
     const validatedData = DataDeletionRequestSchema.parse(rawData);
+    const email = normalizeEmail(validatedData.email);
+    const message = validatedData.message?.trim() || null;
 
-    // Vérifier si l'utilisateur existe
     const user = await db.user.findUnique({
-      where: { email: validatedData.email },
-      include: {
-        adherent: true,
+      where: { email },
+      select: {
+        id: true,
+        email: true,
+        name: true,
+        adherent: {
+          select: { firstname: true, lastname: true },
+        },
       },
     });
 
-    if (!user) {
+    // Compte inconnu : succès générique, aucune écriture (anti-énumération).
+    if (!user?.email) {
       return {
-        success: false,
-        error: "Aucun compte trouvé avec cette adresse email. Veuillez vérifier votre adresse email.",
+        success: true,
+        message: GENERIC_SUCCESS_MESSAGE,
+        deleted: false as const,
       };
     }
 
-    // Vérifier s'il existe déjà une demande en attente pour cet utilisateur
-    let existingRequest = null;
-    if ('dataDeletionRequest' in db) {
-      existingRequest = await (db as any).dataDeletionRequest.findFirst({
+    const existingRequest = await db.dataDeletionRequest.findFirst({
       where: {
         userId: user.id,
         statut: {
-          in: ['EnAttente', 'EnVerification', 'Approuvee'],
+          in: ["EnAttente", "EnVerification", "Approuvee"],
         },
       },
-      });
-    }
+      select: { id: true },
+    });
 
     if (existingRequest) {
       return {
-        success: false,
-        error: "Une demande de suppression est déjà en cours pour ce compte. Veuillez attendre le traitement de votre demande précédente.",
+        success: true,
+        message: GENERIC_SUCCESS_MESSAGE,
+        deleted: false as const,
       };
     }
 
-    // Créer la demande de suppression dans la base de données
-    // Vérifier que le modèle existe dans le client Prisma
-    let deletionRequest;
-    if ('dataDeletionRequest' in db) {
-      deletionRequest = await (db as any).dataDeletionRequest.create({
-        data: {
-          userId: user.id,
-          userEmail: validatedData.email,
-          userName: user.name || (user.adherent ? `${user.adherent.firstname} ${user.adherent.lastname}` : null),
-          message: validatedData.message || null,
-          statut: 'EnAttente',
-        },
-      });
-    } else {
-      console.warn("⚠️ Le modèle dataDeletionRequest n'est pas disponible. Veuillez redémarrer le serveur après la migration.");
-      // On continue quand même pour ne pas bloquer la demande
-    }
+    const userName =
+      user.name ||
+      (user.adherent
+        ? `${user.adherent.firstname} ${user.adherent.lastname}`
+        : null);
 
-    // Envoyer un email de confirmation à l'utilisateur
+    const deletionRequest = await db.dataDeletionRequest.create({
+      data: {
+        userId: user.id,
+        userEmail: user.email,
+        userName,
+        message,
+        statut: "EnAttente",
+      },
+      select: { id: true },
+    });
+
     try {
       await sendEmail({
-        to: validatedData.email,
+        to: user.email,
         subject: "Demande de suppression de données - AMAKI France",
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #1e40af;">Demande de suppression de données reçue</h2>
             <p>Bonjour,</p>
-            <p>Nous avons bien reçu votre demande de suppression de vos données personnelles associées à votre compte AMAKI France.</p>
-            <p><strong>Email du compte :</strong> ${validatedData.email}</p>
-            ${validatedData.message ? `<p><strong>Votre message :</strong><br>${validatedData.message}</p>` : ''}
+            <p>Nous avons bien reçu une demande de suppression des données personnelles associées à un compte AMAKI (site et application mobile).</p>
+            <p><strong>Important :</strong> aucune donnée n'a été supprimée pour l'instant. Une vérification d'identité est requise avant toute suppression.</p>
             <h3 style="color: #1e40af; margin-top: 30px;">Prochaines étapes :</h3>
             <ol>
-              <li>Nous allons vérifier votre identité (sous 48 heures)</li>
-              <li>Vous recevrez un email de confirmation une fois la vérification effectuée</li>
-              <li>Nous procéderons à la suppression de vos données (sous 30 jours)</li>
-              <li>Vous recevrez une notification une fois la suppression terminée</li>
+              <li>Vérification d'identité par l'équipe AMAKI (sous 48 heures indicatives)</li>
+              <li>Validation administrative de la demande</li>
+              <li>Suppression des données éligibles (sous 30 jours après validation)</li>
+              <li>Notification une fois le traitement terminé</li>
             </ol>
             <p style="margin-top: 30px; padding: 15px; background-color: #fef3c7; border-left: 4px solid #f59e0b;">
-              <strong>Important :</strong> Certaines données peuvent être conservées plus longtemps si la loi l'exige 
-              (par exemple, données financières pour les obligations comptables sur 10 ans).
+              <strong>Important :</strong> certaines données peuvent être conservées plus longtemps si la loi l'exige
+              (notamment données financières / comptables).
             </p>
             <p style="margin-top: 20px;">
-              Si vous n'avez pas fait cette demande, veuillez nous contacter immédiatement à 
-              <a href="mailto:asso.amaki@gmail.com" style="color: #1e40af;">asso.amaki@gmail.com</a>.
+              Si vous n'êtes pas à l'origine de cette demande, contactez immédiatement
+              <a href="mailto:contact@amaki.fr" style="color: #1e40af;">contact@amaki.fr</a>.
             </p>
             <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
               Cordialement,<br>
@@ -115,58 +130,63 @@ export async function submitDataDeletionRequest(formData: FormData) {
         `,
       });
     } catch (emailError) {
-      console.error("Erreur lors de l'envoi de l'email de confirmation:", emailError);
-      // Ne pas bloquer la demande si l'email échoue
+      console.error(
+        "Erreur lors de l'envoi de l'email de confirmation (demande suppression)"
+      );
+      if (process.env.NODE_ENV !== "production") {
+        console.error(emailError);
+      }
     }
 
-    // Envoyer une notification à l'administrateur
     try {
       await sendEmail({
         to: process.env.ADMIN_EMAIL || "asso.amaki@gmail.com",
-        subject: `[AMAKI] Nouvelle demande de suppression de données - ${validatedData.email}`,
+        subject: `[AMAKI] Nouvelle demande de suppression de données`,
         html: `
           <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
             <h2 style="color: #dc2626;">Nouvelle demande de suppression de données</h2>
-            <p><strong>Email du compte :</strong> ${validatedData.email}</p>
-            <p><strong>ID utilisateur :</strong> ${user.id}</p>
-            <p><strong>Nom :</strong> ${user.name || "Non renseigné"}</p>
-            ${user.adherent ? `<p><strong>Adhérent :</strong> ${user.adherent.firstname} ${user.adherent.lastname}</p>` : ''}
-            ${validatedData.message ? `<p><strong>Message de l'utilisateur :</strong><br>${validatedData.message}</p>` : ''}
+            <p>Une demande publique a été enregistrée (statut EnAttente). Vérifiez l'identité avant toute suppression.</p>
+            <p><strong>ID demande :</strong> ${deletionRequest.id}</p>
             <p style="margin-top: 20px; padding: 15px; background-color: #fee2e2; border-left: 4px solid #dc2626;">
-              <strong>Action requise :</strong> Vérifier l'identité de l'utilisateur et procéder à la suppression des données dans les 30 jours.
+              <strong>Action requise :</strong> vérifier l'identité, puis traiter via l'administration RGPD.
+              Aucune suppression automatique n'a eu lieu.
             </p>
-            ${deletionRequest ? `
             <p style="margin-top: 15px;">
-              <strong>ID de la demande :</strong> ${deletionRequest.id}<br>
-              <a href="${process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'}/admin/rgpd/demandes" style="color: #1e40af; text-decoration: underline;">
-                Gérer cette demande
+              <a href="${process.env.NEXT_PUBLIC_APP_URL || "https://www.amaki.fr"}/admin/rgpd/demandes" style="color: #1e40af; text-decoration: underline;">
+                Gérer les demandes RGPD
               </a>
             </p>
-            ` : ''}
           </div>
         `,
       });
-    } catch (adminEmailError) {
-      console.error("Erreur lors de l'envoi de l'email à l'administrateur:", adminEmailError);
-      // Ne pas bloquer la demande si l'email admin échoue
+    } catch {
+      console.error(
+        "Erreur lors de l'envoi de l'email administrateur (demande suppression)"
+      );
     }
 
     return {
       success: true,
-      message: "Votre demande a été enregistrée avec succès. Vous allez recevoir un email de confirmation.",
+      message: GENERIC_SUCCESS_MESSAGE,
+      deleted: false as const,
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
       return {
         success: false,
-        error: error.errors[0].message,
+        error: error.errors[0]?.message || "Données invalides",
+        deleted: false as const,
       };
     }
-    console.error("Erreur lors de la soumission de la demande de suppression:", error);
+    console.error("Erreur lors de la soumission d'une demande de suppression");
+    if (process.env.NODE_ENV !== "production") {
+      console.error(error);
+    }
     return {
       success: false,
-      error: "Une erreur est survenue lors de l'envoi de votre demande. Veuillez réessayer ou nous contacter directement.",
+      error:
+        "Une erreur est survenue lors de l'envoi de votre demande. Veuillez réessayer ou nous contacter directement.",
+      deleted: false as const,
     };
   }
 }
-

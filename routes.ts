@@ -12,6 +12,7 @@ export const publicRoutes = [
     "/amicale/president-mastor-interview",
     "/contact",
     "/confidentialite",
+    "/suppression-donnees",
     "/evenements",
     "/galerie",
     "/upload",

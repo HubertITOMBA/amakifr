@@ -24,8 +24,12 @@ describe("routes publiques — confidentialité", () => {
   });
 
   it("route privée voisine → toujours protégée", () => {
-    expect(isPublicRoute("/suppression-donnees")).toBe(false);
     expect(isPublicRoute("/user/profile")).toBe(false);
+  });
+
+  it("/suppression-donnees est publique (Play Store / RGPD)", () => {
+    expect(publicRoutes).toContain("/suppression-donnees");
+    expect(isPublicRoute("/suppression-donnees")).toBe(true);
   });
 
   it("admin → inchangé (non public)", () => {
