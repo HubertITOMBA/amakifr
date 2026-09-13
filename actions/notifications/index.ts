@@ -72,6 +72,18 @@ export async function createNotification(data: z.infer<typeof CreateNotification
       },
     });
 
+    // Push après commit DB — best-effort (chat/paiements n'utilisent pas cette action)
+    const { pushAfterInternalNotification } = await import(
+      "@/lib/services/notifications/push-after-internal-notification"
+    );
+    void pushAfterInternalNotification(validatedData.userId, {
+      titre: validatedData.titre,
+      message: validatedData.message,
+      lien: validatedData.lien,
+    }).catch(() => {
+      // déjà journalisé dans pushAfterInternalNotification
+    });
+
     revalidatePath("/notifications");
     revalidatePath("/");
 
@@ -144,6 +156,18 @@ export async function createNotifications(data: z.infer<typeof CreateNotificatio
         lue: false,
       })),
       skipDuplicates: true, // Ignorer les doublons si nécessaire
+    });
+
+    // Push groupé après commit — best-effort, une fois par userId valide
+    const { pushAfterInternalNotifications } = await import(
+      "@/lib/services/notifications/push-after-internal-notification"
+    );
+    void pushAfterInternalNotifications(validUserIds, {
+      titre: validatedData.titre,
+      message: validatedData.message,
+      lien: validatedData.lien,
+    }).catch(() => {
+      // déjà journalisé dans pushAfterInternalNotifications
     });
 
     revalidatePath("/notifications");
