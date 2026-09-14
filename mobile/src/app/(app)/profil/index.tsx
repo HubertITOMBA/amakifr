@@ -25,6 +25,8 @@ import { LoadingState } from "@/components/ui/loading-state";
 import { useUnreadCount } from "@/hooks/unread-count";
 import { unregisterCurrentPushToken } from "@/api/push-notifications";
 import {
+  AMAKI_DATA_DELETION_LABEL,
+  AMAKI_DATA_DELETION_URL,
   AMAKI_PRIVACY_LABEL,
   AMAKI_PRIVACY_URL,
 } from "@/constants/amaki-links";
@@ -37,7 +39,18 @@ import {
 import { getInitials } from "@/utils/profile-helpers";
 
 /**
- * Hub Profil — cards uniquement, pas de détails inline ni CTA RGPD.
+ * Ouvre une URL publique dans le navigateur in-app, avec fallback système.
+ */
+async function openExternalUrl(url: string): Promise<void> {
+  try {
+    await WebBrowser.openBrowserAsync(url);
+  } catch {
+    await Linking.openURL(url);
+  }
+}
+
+/**
+ * Hub Profil — cards + liens publics RGPD (navigateur), pas d’API data-deletion.
  */
 export default function ProfilHubScreen() {
   const { user, signOut } = useAuth();
@@ -68,14 +81,6 @@ export default function ProfilHubScreen() {
       void loadSummary();
     }, [loadSummary])
   );
-
-  async function openPrivacy() {
-    try {
-      await WebBrowser.openBrowserAsync(AMAKI_PRIVACY_URL);
-    } catch {
-      await Linking.openURL(AMAKI_PRIVACY_URL);
-    }
-  }
 
   async function onSignOut() {
     setSigningOut(true);
@@ -154,19 +159,30 @@ export default function ProfilHubScreen() {
           </Pressable>
         ))}
 
-        <Pressable
-          style={styles.privacyBlock}
-          onPress={() => void openPrivacy()}
-          accessibilityRole="link"
-          accessibilityLabel={AMAKI_PRIVACY_LABEL}
-        >
-          <Text style={styles.privacyTitle}>{AMAKI_PRIVACY_LABEL}</Text>
-          <Text style={styles.privacyBody}>
-            Pour consulter vos droits et gérer vos données personnelles,
-            rendez-vous sur www.amaki.fr, rubrique Protection des données
-            personnelles.
-          </Text>
-        </Pressable>
+        <View style={styles.legalLinks}>
+          <Pressable
+            style={styles.legalLinkRow}
+            onPress={() => void openExternalUrl(AMAKI_PRIVACY_URL)}
+            accessibilityRole="link"
+            accessibilityLabel={AMAKI_PRIVACY_LABEL}
+          >
+            <Text style={styles.legalLinkTitle}>{AMAKI_PRIVACY_LABEL}</Text>
+            <Text style={styles.chevron} accessibilityElementsHidden>
+              ›
+            </Text>
+          </Pressable>
+          <Pressable
+            style={[styles.legalLinkRow, styles.legalLinkRowLast]}
+            onPress={() => void openExternalUrl(AMAKI_DATA_DELETION_URL)}
+            accessibilityRole="link"
+            accessibilityLabel={AMAKI_DATA_DELETION_LABEL}
+          >
+            <Text style={styles.legalLinkTitle}>{AMAKI_DATA_DELETION_LABEL}</Text>
+            <Text style={styles.chevron} accessibilityElementsHidden>
+              ›
+            </Text>
+          </Pressable>
+        </View>
 
         <Pressable
           style={styles.logoutRow}
@@ -287,22 +303,30 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     paddingLeft: AmakiSpacing.sm,
   },
-  privacyBlock: {
+  legalLinks: {
     marginTop: AmakiSpacing.xl,
-    padding: AmakiSpacing.md,
     borderRadius: AmakiRadius.sm,
     backgroundColor: AmakiColors.surfaceMuted,
+    overflow: "hidden",
   },
-  privacyTitle: {
+  legalLinkRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingVertical: AmakiSpacing.md,
+    paddingHorizontal: AmakiSpacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: AmakiColors.border,
+  },
+  legalLinkRowLast: {
+    borderBottomWidth: 0,
+  },
+  legalLinkTitle: {
     ...AmakiTypography.caption,
     color: AmakiColors.textSecondary,
     fontWeight: "700",
-    marginBottom: AmakiSpacing.xs,
-  },
-  privacyBody: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.textMuted,
-    lineHeight: 18,
+    flex: 1,
+    paddingRight: AmakiSpacing.sm,
   },
   logoutRow: {
     marginTop: AmakiSpacing.xl,
