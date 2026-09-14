@@ -1,31 +1,41 @@
 "use client"
 
-import { useRouter, usePathname } from "next/navigation";
+import { usePathname } from "next/navigation";
 import Link from "next/link";
-import { 
-    Dialog, 
+import {
+    Dialog,
     DialogContent,
+    DialogDescription,
     DialogTitle,
-    DialogTrigger } from "@/components/ui/dialog"
+    DialogTrigger,
+} from "@/components/ui/dialog"
 import LoginForm from "@/components/auth/login-form";
 
 
 interface LoginButtonProps {
-    children: React.ReactNode;
-    mode?: "modal" | "redirect",
+    children?: React.ReactNode;
+    mode?: "modal" | "redirect";
     asChild?: boolean;
+    /** Contrôle externe de la Dialog (ex. ouverture depuis UserButton hors dropdown). */
+    open?: boolean;
+    onOpenChange?: (open: boolean) => void;
 };
 
-
+/**
+ * Bouton de connexion : redirection vers /auth/sign-in, ou Dialog modale.
+ *
+ * En mode modal, peut être non contrôlé (trigger via children, ex. Hero)
+ * ou contrôlé via open/onOpenChange sans trigger (ex. sœur du DropdownMenu avatar).
+ */
 export const LoginButton = ({
         children,
         mode = "redirect",
-        asChild
+        open,
+        onOpenChange,
     } : LoginButtonProps) => {
 
         const pathname = usePathname();
 
-        // Utiliser Link au lieu de router.push pour éviter les problèmes de navigation
         const getHref = () => {
             const callbackUrl = encodeURIComponent(pathname || "/");
             return `/auth/sign-in?callbackUrl=${callbackUrl}`;
@@ -33,16 +43,20 @@ export const LoginButton = ({
 
          if (mode === "modal") {
             return (
-                <Dialog>
-                    <DialogTrigger asChild={true}>
-                        {children}
-                    </DialogTrigger>
+                <Dialog open={open} onOpenChange={onOpenChange}>
+                    {children != null ? (
+                        <DialogTrigger asChild={true}>
+                            {children}
+                        </DialogTrigger>
+                    ) : null}
                     <DialogContent
-                        onOpenAutoFocus={(e) => e.preventDefault()}
                         onCloseAutoFocus={(e) => e.preventDefault()}
                         className="p-0 w-auto bg-transparent border-none max-w-[95vw] sm:max-w-md backdrop-blur-none"
                     >
                         <DialogTitle className="sr-only">Connexion</DialogTitle>
+                        <DialogDescription className="sr-only">
+                            Connectez-vous à votre compte AMAKI avec votre adresse e-mail et votre mot de passe.
+                        </DialogDescription>
                         <div className="bg-transparent">
                             <LoginForm />
                         </div>
@@ -56,6 +70,4 @@ export const LoginButton = ({
             {children}
         </Link>
     )
-   
-
 }

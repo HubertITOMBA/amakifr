@@ -21,17 +21,28 @@ import { UserRole } from "@prisma/client";
 
 interface ChangePasswordDialogProps {
   trigger?: React.ReactNode;
+  /** Contrôle externe (ex. ouverture depuis UserButton hors dropdown). */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 /**
  * Composant modal pour changer le mot de passe de l'utilisateur connecté
  * 
  * @param trigger - Élément déclencheur optionnel pour ouvrir le modal
+ * @param open - État contrôlé optionnel
+ * @param onOpenChange - Callback contrôlé optionnel
  */
-export function ChangePasswordDialog({ trigger }: ChangePasswordDialogProps) {
+export function ChangePasswordDialog({
+  trigger,
+  open: openProp,
+  onOpenChange: onOpenChangeProp,
+}: ChangePasswordDialogProps) {
   const user = useCurrentUser();
   const isMembre = user?.role === UserRole.MEMBRE;
-  const [open, setOpen] = useState(false);
+  const [uncontrolledOpen, setUncontrolledOpen] = useState(false);
+  const isControlled = openProp !== undefined;
+  const open = isControlled ? openProp : uncontrolledOpen;
   const [loading, setLoading] = useState(false);
   const [showCurrentPassword, setShowCurrentPassword] = useState(false);
   const [showNewPassword, setShowNewPassword] = useState(false);
@@ -87,7 +98,7 @@ export function ChangePasswordDialog({ trigger }: ChangePasswordDialogProps) {
           newPassword: "",
           confirmPassword: "",
         });
-        setOpen(false);
+        handleOpenChange(false);
       } else {
         toast.error(result.error || "Erreur lors du changement de mot de passe");
         // Afficher l'erreur dans le champ approprié si possible
@@ -108,30 +119,33 @@ export function ChangePasswordDialog({ trigger }: ChangePasswordDialogProps) {
   };
 
   const handleOpenChange = (newOpen: boolean) => {
-    if (!loading) {
-      setOpen(newOpen);
-      if (!newOpen) {
-        // Réinitialiser le formulaire quand le modal se ferme
-        setFormData({
-          currentPassword: "",
-          newPassword: "",
-          confirmPassword: "",
-        });
-        setErrors({});
-      }
+    if (loading) return;
+    if (!isControlled) {
+      setUncontrolledOpen(newOpen);
+    }
+    onOpenChangeProp?.(newOpen);
+    if (!newOpen) {
+      setFormData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+      setErrors({});
     }
   };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogTrigger asChild>
-        {trigger || (
-          <Button variant="outline" size="sm">
-            <Lock className="h-4 w-4 mr-2" />
-            Changer le mot de passe
-          </Button>
-        )}
-      </DialogTrigger>
+      {trigger !== undefined || !isControlled ? (
+        <DialogTrigger asChild>
+          {trigger || (
+            <Button variant="outline" size="sm">
+              <Lock className="h-4 w-4 mr-2" />
+              Changer le mot de passe
+            </Button>
+          )}
+        </DialogTrigger>
+      ) : null}
       <DialogContent className="sm:max-w-[500px]">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">

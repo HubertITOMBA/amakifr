@@ -1,5 +1,5 @@
 "use client"
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { 
     DropdownMenu,
     DropdownMenuContent,
@@ -23,12 +23,22 @@ import { Download, FileText, Lock, LogIn, LogOut, Shield, User } from "lucide-re
 import { usePwaInstallPrompt } from "@/components/pwa/usePwaInstallPrompt";
 
 
+/**
+ * Bouton avatar : menu utilisateur + Dialogs (connexion / mot de passe)
+ * rendues en sœurs du DropdownMenu pour éviter le conflit de focus Radix.
+ */
 export const UserButton = () => {
     const { data: session, status, update } = useSession();
     const { forceUpdate } = useSessionUpdate();
     const { userProfile } = useUserProfile();
     const user = session?.user;
     const { canInstall, isInstalled, isIOS, install } = usePwaInstallPrompt();
+
+    const [menuOpen, setMenuOpen] = useState(false);
+    const [loginOpen, setLoginOpen] = useState(false);
+    const [pendingLoginOpen, setPendingLoginOpen] = useState(false);
+    const [changePasswordOpen, setChangePasswordOpen] = useState(false);
+    const [pendingChangePasswordOpen, setPendingChangePasswordOpen] = useState(false);
 
     const normalizedRole = user?.role?.toString().trim().toUpperCase();
     const canSeeAdministration =
@@ -37,13 +47,9 @@ export const UserButton = () => {
         normalizedRole === "VICEPR" ||
         normalizedRole === "SECRET";
     
-    // Récupérer l'image de l'utilisateur (priorité à userProfile, puis session)
     const userImage = userProfile?.image || user?.image;
-    
-    // Déterminer les initiales pour l'avatar
     const firstInitial = user?.name?.charAt(0).toUpperCase() ?? 'U';
 
-    // Debug logs (seulement en développement)
     if (process.env.NODE_ENV === 'development') {
         console.log("UserButton - Status:", status);
         console.log("UserButton - Session:", session);
@@ -51,12 +57,27 @@ export const UserButton = () => {
         console.log("UserButton - UserProfile:", userProfile);
         console.log("UserButton - UserImage:", userImage);
     }
+
+    /**
+     * Ferme le menu, puis ouvre la Dialog demandée seulement après
+     * onOpenChange(false) du Dropdown — jamais les deux actifs ensemble.
+     */
+    const handleMenuOpenChange = (open: boolean) => {
+        setMenuOpen(open);
+        if (!open) {
+            if (pendingLoginOpen) {
+                setPendingLoginOpen(false);
+                setLoginOpen(true);
+            }
+            if (pendingChangePasswordOpen) {
+                setPendingChangePasswordOpen(false);
+                setChangePasswordOpen(true);
+            }
+        }
+    };
     
-    // Forcer la mise à jour de la session si on est sur une page après connexion
-    // et que la session n'est pas encore chargée
     useEffect(() => {
         if (status === "loading" && typeof window !== "undefined") {
-            // Attendre un peu puis forcer la mise à jour si nécessaire
             const timer = setTimeout(async () => {
                 if (status === "loading") {
                     await update();
@@ -66,7 +87,6 @@ export const UserButton = () => {
         }
     }, [status, update]);
 
-    // Gestion des états de chargement
     if (status === "loading") {
         return (
             <div className="flex gap-2 items-center">
@@ -75,11 +95,13 @@ export const UserButton = () => {
         );
     }
 
+    const isAuthenticated = status === "authenticated" && user;
+
     return (
        <div className="flex gap-2 items-center">
-        <DropdownMenu>
+        <DropdownMenu open={menuOpen} onOpenChange={handleMenuOpenChange}>
             <DropdownMenuTrigger asChild>
-            <div className='flex items-center cursor-pointer'>
+            <div className='flex items-center cursor-pointer' aria-label="Menu utilisateur">
                 <Avatar className="w-10 h-10 border-2 border-slate-600 dark:border-slate-400 shadow-md">
                     <AvatarImage 
                         src={userImage || undefined} 
@@ -95,8 +117,7 @@ export const UserButton = () => {
             </DropdownMenuTrigger>
              
         <DropdownMenuContent className='w-56 ' align='end'>
-          {status === "authenticated" && user ? (
-            // Menu pour utilisateur connecté
+          {isAuthenticated ? (
             <>
               <DropdownMenuLabel className='font-normal'>
                 <div className='flex flex-col space-y-1'>
@@ -132,15 +153,16 @@ export const UserButton = () => {
                 </Link>
               </DropdownMenuItem>
 
-              <DropdownMenuItem onSelect={(e) => e.preventDefault()} className="p-0">
-                <ChangePasswordDialog
-                  trigger={
-                    <button type="button" className='w-full flex items-center hover:bg-orange-300 py-2 px-2 text-left'>
-                      <Lock className="h-4 w-4 mr-2" />
-                      Changer le mot de passe
-                    </button>
-                  }
-                />
+              <DropdownMenuItem
+                className="hover:bg-orange-300"
+                onSelect={() => {
+                  setPendingChangePasswordOpen(true);
+                }}
+              >
+                <span className="flex items-center w-full">
+                  <Lock className="h-4 w-4 mr-2" />
+                  Changer le mot de passe
+                </span>
               </DropdownMenuItem>
 
               {!isInstalled && (
@@ -165,7 +187,6 @@ export const UserButton = () => {
               </DropdownMenuItem>
             </>
           ) : (
-            // Menu pour utilisateur non connecté
             <>
               <DropdownMenuLabel className='font-normal'>
                 <div className='flex flex-col space-y-1'>
@@ -178,18 +199,35 @@ export const UserButton = () => {
                 </div>
               </DropdownMenuLabel>
 
-              <DropdownMenuItem className="hover:bg-orange-300" onSelect={(e) => e.preventDefault()}>
-                <LoginButton mode="modal">
-                  <button type="button" className="w-full text-left flex items-center">
-                    <LogIn className="h-4 w-4 mr-2" />
-                    Connexion
-                  </button>
-                </LoginButton>    
+              <DropdownMenuItem
+                className="hover:bg-orange-300"
+                onSelect={() => {
+                  setPendingLoginOpen(true);
+                }}
+              >
+                <span className="flex items-center w-full">
+                  <LogIn className="h-4 w-4 mr-2" />
+                  Connexion
+                </span>
               </DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
       </DropdownMenu>
+
+      {/* Dialogs en sœurs du menu : jamais imbriquées dans DropdownMenuContent */}
+      {!isAuthenticated ? (
+        <LoginButton
+          mode="modal"
+          open={loginOpen}
+          onOpenChange={setLoginOpen}
+        />
+      ) : (
+        <ChangePasswordDialog
+          open={changePasswordOpen}
+          onOpenChange={setChangePasswordOpen}
+        />
+      )}
     </div>  
     )
 

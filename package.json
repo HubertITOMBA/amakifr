@@ -161,6 +161,9 @@
   "devDependencies": {
     "@eslint/eslintrc": "^3",
     "@tailwindcss/postcss": "^4",
+    "@testing-library/dom": "^10.4.2",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.7",
     "@types/node": "^20.19.25",
     "@types/nodemailer": "^6.4.14",
     "@types/qrcode.react": "^1.0.5",
@@ -171,6 +174,7 @@
     "baseline-browser-mapping": "^2.9.17",
     "eslint": "^9",
     "eslint-config-next": "15.2.4",
+    "jsdom": "27.2.0",
     "next-pwa": "^5.6.0",
     "prisma": "6.19.0",
     "tailwindcss": "^4",
