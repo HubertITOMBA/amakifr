@@ -317,146 +317,182 @@ export default function AdminNotificationsPage() {
                   Créer une notification
                 </Button>
               </DialogTrigger>
-              <DialogContent className="w-[95vw] sm:w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-                <DialogHeader className="pb-4 border-b border-gray-200 dark:border-gray-700">
-                  <DialogTitle className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-                    <div className="p-2 bg-blue-100 dark:bg-blue-900/30 rounded-lg">
-                      <Bell className="h-5 w-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    Créer une nouvelle notification
+              <DialogContent
+                className="w-[95vw] sm:w-full max-w-2xl max-h-[min(90vh,720px)] overflow-y-auto p-0 overflow-x-hidden"
+                showCloseButton={false}
+              >
+                <DialogHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 dark:from-blue-700/50 dark:via-blue-600/40 dark:to-blue-700/50 text-white px-4 sm:px-5 pt-3 pb-2.5 rounded-t-lg">
+                  <DialogTitle className="text-white text-base sm:text-lg font-bold flex items-center gap-2">
+                    <Bell className="h-4 w-4 sm:h-5 sm:w-5 text-white shrink-0" />
+                    Créer une notification
                   </DialogTitle>
-                  <DialogDescription className="text-xs sm:text-sm text-gray-600 dark:text-gray-400 mt-2">
-                    Envoyez une notification à un ou plusieurs adhérents, ou à tous les adhérents
+                  <DialogDescription className="text-blue-50 dark:text-blue-100 text-xs sm:text-sm mt-1">
+                    Envoyez la notification à un ou plusieurs adhérents.
                   </DialogDescription>
                 </DialogHeader>
-                <div className="space-y-4 mt-4">
-                  <div>
-                    <Label htmlFor="userIds" className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
-                      Adhérent(s) * <span className="text-gray-500 font-normal">(qui recevront la notification)</span>
+
+                <div className="px-4 sm:px-5 py-3 bg-white dark:bg-gray-900 space-y-3">
+                  <section
+                    className="rounded-lg border border-blue-200 dark:border-blue-800 bg-blue-50/60 dark:bg-blue-950/20 p-2.5 sm:p-3 space-y-1.5"
+                    data-testid="create-notification-recipients"
+                  >
+                    <Label
+                      htmlFor="userIds"
+                      className="text-xs font-semibold text-blue-800 dark:text-blue-200 uppercase tracking-wide"
+                    >
+                      Destinataires *
                     </Label>
-                    <div className="mt-1.5">
-                      <UserMultiSelectComboboxWithFilters
-                        users={users}
-                        value={formData.userIds}
+                    <p
+                      id="create-notification-recipients-help"
+                      className="text-xs text-slate-600 dark:text-slate-400"
+                    >
+                      Recherchez et sélectionnez les adhérents.
+                    </p>
+                    <UserMultiSelectComboboxWithFilters
+                      users={users}
+                      value={formData.userIds}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, userIds: value })
+                      }
+                      placeholder="Rechercher et sélectionner des adhérents..."
+                      disabled={creating}
+                      showAllOption={true}
+                    />
+                    {formData.userIds.length > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="bg-blue-100 text-blue-800 dark:bg-blue-900/40 dark:text-blue-200 text-xs"
+                        data-testid="create-notification-recipient-count"
+                      >
+                        {formData.userIds.length === users.length
+                          ? `Tous les adhérents (${formData.userIds.length})`
+                          : `${formData.userIds.length} adhérent(s) sélectionné(s)`}
+                      </Badge>
+                    )}
+                  </section>
+
+                  <section
+                    className="rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-900/40 p-2.5 sm:p-3 space-y-2.5"
+                    data-testid="create-notification-content"
+                  >
+                    <p className="text-xs font-semibold text-slate-700 dark:text-slate-200 uppercase tracking-wide">
+                      Contenu
+                    </p>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="type" className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                        Type *
+                      </Label>
+                      <Select
+                        value={formData.type}
                         onValueChange={(value) =>
-                          setFormData({ ...formData, userIds: value })
+                          setFormData({
+                            ...formData,
+                            type: value as TypeNotification,
+                          })
                         }
-                        placeholder="Rechercher et sélectionner des adhérents..."
-                        disabled={creating}
-                        showAllOption={true}
+                      >
+                        <SelectTrigger className="text-sm h-9 border-slate-300 dark:border-slate-600">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value={TypeNotification.Systeme}>Système</SelectItem>
+                          <SelectItem value={TypeNotification.Email}>Email</SelectItem>
+                          <SelectItem value={TypeNotification.Action}>Action</SelectItem>
+                          <SelectItem value={TypeNotification.Cotisation}>Cotisation</SelectItem>
+                          <SelectItem value={TypeNotification.Idee}>Idée</SelectItem>
+                          <SelectItem value={TypeNotification.Election}>Élection</SelectItem>
+                          <SelectItem value={TypeNotification.Evenement}>Événement</SelectItem>
+                          <SelectItem value={TypeNotification.Autre}>Autre</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="titre" className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                        Titre * <span className="text-slate-500 font-normal">(255 car. max)</span>
+                      </Label>
+                      <Input
+                        id="titre"
+                        value={formData.titre}
+                        onChange={(e) =>
+                          setFormData({ ...formData, titre: e.target.value })
+                        }
+                        placeholder="Ex: Votre idée a été validée"
+                        maxLength={255}
+                        className="text-sm h-9"
                       />
                     </div>
-                    {formData.userIds.length > 0 && (
-                      <p className="text-xs text-gray-500 mt-1.5">
-                        {formData.userIds.length === users.length
-                          ? `Tous les adhérents sélectionnés (${formData.userIds.length})`
-                          : `${formData.userIds.length} adhérent(s) sélectionné(s)`}
+
+                    <div className="space-y-1">
+                      <Label
+                        htmlFor="message"
+                        className="text-xs font-semibold text-slate-700 dark:text-slate-200"
+                      >
+                        Message *
+                      </Label>
+                      <Textarea
+                        id="message"
+                        value={formData.message}
+                        onChange={(e) =>
+                          setFormData({ ...formData, message: e.target.value })
+                        }
+                        placeholder="Ex: Félicitations ! Votre idée a été validée."
+                        rows={3}
+                        className="text-sm min-h-[4.5rem]"
+                      />
+                    </div>
+
+                    <div className="space-y-1">
+                      <Label htmlFor="lien" className="text-xs font-semibold text-slate-700 dark:text-slate-200">
+                        Lien
+                      </Label>
+                      <Input
+                        id="lien"
+                        value={formData.lien}
+                        onChange={(e) =>
+                          setFormData({ ...formData, lien: e.target.value })
+                        }
+                        placeholder="Ex: /idees/123"
+                        maxLength={500}
+                        aria-describedby="create-notification-lien-help"
+                        className="text-sm h-9"
+                      />
+                      <p
+                        id="create-notification-lien-help"
+                        className="text-xs text-slate-500"
+                      >
+                        Facultatif — route interne ou URL HTTPS.
                       </p>
-                    )}
-                  </div>
+                    </div>
+                  </section>
 
-                  <div>
-                    <Label htmlFor="type" className="text-xs sm:text-sm">
-                      Type de notification *
-                    </Label>
-                    <Select
-                      value={formData.type}
-                      onValueChange={(value) =>
-                        setFormData({
-                          ...formData,
-                          type: value as TypeNotification,
-                        })
-                      }
-                    >
-                      <SelectTrigger className="mt-1 text-sm h-9 sm:h-10">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value={TypeNotification.Systeme}>Système</SelectItem>
-                        <SelectItem value={TypeNotification.Email}>Email</SelectItem>
-                        <SelectItem value={TypeNotification.Action}>Action</SelectItem>
-                        <SelectItem value={TypeNotification.Cotisation}>Cotisation</SelectItem>
-                        <SelectItem value={TypeNotification.Idee}>Idée</SelectItem>
-                        <SelectItem value={TypeNotification.Election}>Élection</SelectItem>
-                        <SelectItem value={TypeNotification.Evenement}>Événement</SelectItem>
-                        <SelectItem value={TypeNotification.Autre}>Autre</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div>
-                    <Label htmlFor="titre" className="text-xs sm:text-sm">
-                      Titre * <span className="text-gray-500">(max 255 caractères)</span>
-                    </Label>
-                    <Input
-                      id="titre"
-                      value={formData.titre}
-                      onChange={(e) =>
-                        setFormData({ ...formData, titre: e.target.value })
-                      }
-                      placeholder="Ex: Votre idée a été validée"
-                      maxLength={255}
-                      className="mt-1 text-sm h-9 sm:h-10"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="message" className="text-xs sm:text-sm">
-                      Message * <span className="text-gray-500">(détails de la notification)</span>
-                    </Label>
-                    <Textarea
-                      id="message"
-                      value={formData.message}
-                      onChange={(e) =>
-                        setFormData({ ...formData, message: e.target.value })
-                      }
-                      placeholder="Ex: Félicitations ! Votre idée a été validée par l'administration."
-                      rows={4}
-                      className="mt-1 text-sm"
-                    />
-                  </div>
-
-                  <div>
-                    <Label htmlFor="lien" className="text-xs sm:text-sm">
-                      Lien de redirection <span className="text-gray-500">(optionnel)</span>
-                    </Label>
-                    <Input
-                      id="lien"
-                      value={formData.lien}
-                      onChange={(e) =>
-                        setFormData({ ...formData, lien: e.target.value })
-                      }
-                      placeholder="Ex: /idees/123"
-                      maxLength={500}
-                      className="mt-1 text-sm h-9 sm:h-10"
-                    />
-                    <p className="text-xs text-gray-500 mt-1">
-                      URL vers laquelle rediriger l&apos;utilisateur quand il clique sur la notification
-                    </p>
-                  </div>
-
-                  <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-2 pt-2">
+                  <div
+                    className="flex flex-col-reverse sm:flex-row justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700"
+                    data-testid="create-notification-footer"
+                  >
                     <Button
                       variant="outline"
                       onClick={() => setShowCreateDialog(false)}
-                      className="w-full sm:w-auto text-sm h-9 sm:h-10"
+                      disabled={creating}
+                      className="w-full sm:w-auto text-sm h-8 sm:h-9 border-slate-300 dark:border-slate-600"
                     >
                       Annuler
                     </Button>
                     <Button
                       onClick={handleCreateNotification}
                       disabled={creating}
-                      className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white text-sm h-9 sm:h-10"
+                      className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-500 hover:from-blue-700 hover:to-blue-600 text-white text-sm h-8 sm:h-9"
                     >
                       {creating ? (
                         <>
-                          <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
-                          Création...
+                          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                          Envoi...
                         </>
                       ) : (
                         <>
                           <Send className="h-4 w-4 mr-2" />
-                          Créer la notification
+                          Envoyer
                         </>
                       )}
                     </Button>

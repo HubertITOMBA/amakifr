@@ -107,13 +107,19 @@ export function UserMultiSelectComboboxWithFilters({
     return filtered.slice(0, 100); // Limiter à 100 résultats
   }, [users, searchTerm, statusFilter, roleFilter]);
 
-  const isAllSelected = value.length === filteredUsers.length && filteredUsers.length > 0;
+  const isAllSelected =
+    filteredUsers.length > 0 &&
+    filteredUsers.every((user) => value.includes(user.id));
 
   const handleSelectAll = () => {
     if (isAllSelected) {
-      onValueChange(value.filter(id => !filteredUsers.some(u => u.id === id)));
+      // Retirer uniquement les IDs actuellement filtrés
+      onValueChange(value.filter((id) => !filteredUsers.some((u) => u.id === id)));
     } else {
-      const newIds = filteredUsers.map((u) => u.id).filter(id => !value.includes(id));
+      // Union sans doublon : conserver les sélections hors filtre
+      const newIds = filteredUsers
+        .map((u) => u.id)
+        .filter((id) => !value.includes(id));
       onValueChange([...value, ...newIds]);
     }
   };
@@ -202,7 +208,7 @@ export function UserMultiSelectComboboxWithFilters({
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-full p-0" align="start" style={{ width: 'var(--radix-popover-trigger-width)' }}>
-        <Command>
+        <Command shouldFilter={false}>
           <div className="flex items-center border-b px-3">
             <Search className="mr-2 h-4 w-4 shrink-0 opacity-50" />
             <CommandInput
