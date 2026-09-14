@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   resolveBuildProfile,
+  resolveNativeIdentity,
   resolveUsesCleartextTraffic,
 } from "../../app.config";
 
@@ -38,5 +39,34 @@ describe("cleartext traffic by build profile", () => {
       if (prevApp === undefined) delete process.env.APP_ENV;
       else process.env.APP_ENV = prevApp;
     }
+  });
+});
+
+describe("native identity by build profile", () => {
+  it("development → fr.amaki.mobile, AMAKI Dev, amaki-dev", () => {
+    expect(resolveNativeIdentity("development")).toEqual({
+      name: "AMAKI Dev",
+      scheme: "amaki-dev",
+      androidPackage: "fr.amaki.mobile",
+      iosBundleIdentifier: "fr.amaki.mobile",
+    });
+  });
+
+  it("production → fr.amaki.app, AMAKI, amaki (inchangé)", () => {
+    expect(resolveNativeIdentity("production")).toEqual({
+      name: "AMAKI",
+      scheme: "amaki",
+      androidPackage: "fr.amaki.app",
+      iosBundleIdentifier: "fr.amaki.app",
+    });
+  });
+
+  it("preview → identité production (pas de variante .mobile)", () => {
+    expect(resolveNativeIdentity("preview")).toEqual({
+      name: "AMAKI",
+      scheme: "amaki",
+      androidPackage: "fr.amaki.app",
+      iosBundleIdentifier: "fr.amaki.app",
+    });
   });
 });

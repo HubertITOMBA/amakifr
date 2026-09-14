@@ -26,6 +26,34 @@ export function resolveUsesCleartextTraffic(profile: string): boolean {
   return profile === "development" || profile === "preview";
 }
 
+/**
+ * Identité native distincte pour le client de développement uniquement.
+ * Réutilise le package Firebase existant `fr.amaki.mobile`.
+ * Preview et production conservent les valeurs de `app.json` (`fr.amaki.app`).
+ */
+export function resolveNativeIdentity(profile: string): {
+  name: string;
+  scheme: string;
+  androidPackage: string;
+  iosBundleIdentifier: string;
+} {
+  if (profile === "development") {
+    return {
+      name: "AMAKI Dev",
+      scheme: "amaki-dev",
+      androidPackage: "fr.amaki.mobile",
+      iosBundleIdentifier: "fr.amaki.mobile",
+    };
+  }
+
+  return {
+    name: "AMAKI",
+    scheme: "amaki",
+    androidPackage: "fr.amaki.app",
+    iosBundleIdentifier: "fr.amaki.app",
+  };
+}
+
 function withBuildPropertiesPlugin(
   plugins: ExpoConfig["plugins"] | undefined,
   usesCleartextTraffic: boolean
@@ -49,18 +77,26 @@ function withBuildPropertiesPlugin(
 }
 
 /**
- * Config Expo dynamique — base = app.json, cleartext selon profil.
+ * Config Expo dynamique — base = app.json, cleartext + identité selon profil.
  */
 export default ({ config }: ConfigContext): ExpoConfig => {
   const base = appJson.expo as ExpoConfig;
   const profile = resolveBuildProfile();
   const usesCleartextTraffic = resolveUsesCleartextTraffic(profile);
+  const identity = resolveNativeIdentity(profile);
 
   return {
     ...config,
     ...base,
+    name: identity.name,
+    scheme: identity.scheme,
+    ios: {
+      ...base.ios,
+      bundleIdentifier: identity.iosBundleIdentifier,
+    },
     android: {
       ...base.android,
+      package: identity.androidPackage,
       // Champ supporté par Expo / prebuild ; typings ExpoConfig parfois incomplets.
       usesCleartextTraffic,
     } as ExpoConfig["android"],
