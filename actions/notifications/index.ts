@@ -14,6 +14,31 @@ import { mapNotificationDtoForWebAction } from "@/lib/services/notifications/map
 import { markMyNotificationAsRead } from "@/lib/services/notifications/mark-my-notification-as-read";
 import { markAllMyNotificationsAsRead } from "@/lib/services/notifications/mark-all-my-notifications-as-read";
 import { deleteMyNotification } from "@/lib/services/notifications/delete-my-notification";
+import {
+  getAdminNotificationsPage as getAdminNotificationsPageImpl,
+  getAdminNotificationDetails as getAdminNotificationDetailsImpl,
+} from "@/actions/notifications/admin-read";
+
+export type {
+  AdminNotificationListItem,
+  AdminNotificationDetails,
+} from "@/actions/notifications/admin-read";
+
+/**
+ * Liste paginée ADMIN (délègue à admin-read — contrat dédié, hors getAllNotifications).
+ */
+export async function getAdminNotificationsPage(
+  options?: Parameters<typeof getAdminNotificationsPageImpl>[0]
+) {
+  return getAdminNotificationsPageImpl(options);
+}
+
+/**
+ * Détail ADMIN lecture seule (délègue à admin-read).
+ */
+export async function getAdminNotificationDetails(id: string) {
+  return getAdminNotificationDetailsImpl(id);
+}
 
 const CreateNotificationSchema = z.object({
   userId: z.string().min(1, "ID utilisateur requis"),
