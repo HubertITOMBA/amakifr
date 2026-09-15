@@ -400,6 +400,44 @@ export const SERVER_ACTIONS_CONFIG: ServerActionConfig[] = [
     category: "Dépenses",
   },
 
+  // ========== FRAIS AVANCÉS (étape 1) ==========
+  {
+    action: "createMyNoteFrais",
+    label: "Créer une note de frais (membre)",
+    description: "Déposer un brouillon de frais avancés",
+    resource: "frais-avances",
+    defaultType: "WRITE",
+    route: "/user/frais-avances",
+    category: "Frais avancés",
+  },
+  {
+    action: "submitMyNoteFrais",
+    label: "Soumettre une note de frais",
+    description: "Soumettre une note de frais avec justificatifs",
+    resource: "frais-avances",
+    defaultType: "WRITE",
+    route: "/user/frais-avances",
+    category: "Frais avancés",
+  },
+  {
+    action: "readNoteFrais",
+    label: "Consulter les notes de frais soumises",
+    description: "Lecture des notes soumises (hors brouillons d'autrui)",
+    resource: "frais-avances",
+    defaultType: "READ",
+    route: "/admin/frais-avances",
+    category: "Frais avancés",
+  },
+  {
+    action: "readNoteFraisArchive",
+    label: "Consulter les archives notes de frais",
+    description: "Archives post-RGPD (TRESOR/ADMIN/COMCPT) — non activé tant que politique ouverte",
+    resource: "frais-avances",
+    defaultType: "READ",
+    route: "/admin/frais-avances/archives",
+    category: "Frais avancés",
+  },
+
   // ========== EMAILS ==========
   {
     action: "sendEmails",

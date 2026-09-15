@@ -53,9 +53,11 @@ mobile/dist/
 POMPE_Dev_Master.pl
 PROMPTEUR.txt
 data/geonames/*
+data/notes-frais/
 *.md
 !docs/interview.md
 !docs/interview_Mastor.md
+!docs/frais-avances/**/*.md
 .cursorrules
 
 # vercel

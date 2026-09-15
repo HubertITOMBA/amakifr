@@ -306,6 +306,9 @@ model User {
   merchProductsCrees            MerchProduct[]               @relation("MerchProductCreatedBy")
   merchOrders                   MerchOrder[]                 @relation("MerchOrderUser")
   merchStockMovements           MerchStockMovement[]         @relation("MerchStockMovementCreatedBy")
+  notesFraisDemandeur           NoteFrais[]                  @relation("NoteFraisDemandeur")
+  justificatifsNoteFraisUploades JustificatifNoteFrais[]     @relation("JustificatifNoteFraisUploader")
+  notesFraisArchiveAccessLogs   NoteFraisArchiveAccessLog[]  @relation("NoteFraisArchiveAccessActor")
 
   lastLogin  DateTime? @updatedAt
   loginCount Int       @default(0) // Nombre de connexions au portail
@@ -412,6 +415,7 @@ model Adherent {
   RelancesAbsenteisme              RelanceAbsenteisme[]
   mailingCampaignRecipients        MailingCampaignRecipient[]
   sondageReponses                  SondageReponse[]
+  notesFrais                       NoteFrais[]
   created_at                        DateTime?                    @db.Timestamp(0)
   updated_at                        DateTime?                    @db.Timestamp(0)
   userId                            String                       @unique
@@ -2646,4 +2650,189 @@ model SondageReponseItem {
   @@index([optionId])
   @@index([ligneMatriceId])
   @@map("sondage_reponse_items")
+}
+
+// ========== FRAIS AVANCÉS (étape 1 — dépôt / soumission / lecture) ==========
+
+enum StatutNoteFrais {
+  BROUILLON
+  SOUMISE
+}
+
+enum StatutJustificatifNoteFrais {
+  PENDING
+  READY
+  FAILED
+}
+
+enum StatutNoteFraisOutbox {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+enum StatutNoteFraisFileJob {
+  PENDING
+  PROCESSING
+  DONE
+  FAILED
+}
+
+enum NoteFraisFileJobOperation {
+  MOVE
+  UNLINK
+}
+
+/// Note de frais avancés par un adhérent (étape 1 : brouillon + soumission).
+model NoteFrais {
+  id                     String         @id @default(cuid())
+  adherentId             String
+  demandeurUserId        String
+  libelle                String         @db.VarChar(200)
+  description            String?        @db.Text
+  dateDepense            DateTime
+  montantDemande         Decimal        @db.Decimal(10, 2)
+  statut                 StatutNoteFrais @default(BROUILLON)
+  soumiseAt              DateTime?
+  submitIdempotencyKey   String?        @unique @db.VarChar(64)
+  version                Int            @default(1)
+  alerteSansDestinataire Boolean        @default(false)
+  alerteSansDestinataireAt DateTime?
+  createdAt              DateTime       @default(now())
+  updatedAt              DateTime       @updatedAt
+
+  Adherent      Adherent                 @relation(fields: [adherentId], references: [id], onDelete: Restrict)
+  Demandeur     User                     @relation("NoteFraisDemandeur", fields: [demandeurUserId], references: [id], onDelete: Restrict)
+  Justificatifs JustificatifNoteFrais[]
+  OutboxEvents  NoteFraisOutboxEvent[]
+
+  @@index([adherentId, statut])
+  @@index([demandeurUserId])
+  @@index([statut, soumiseAt])
+  @@index([alerteSansDestinataire])
+  @@map("notes_frais")
+}
+
+model JustificatifNoteFrais {
+  id             String                     @id @default(cuid())
+  noteFraisId    String
+  nomFichierOrig String                     @db.VarChar(255)
+  cheminRelatif  String                     @db.VarChar(500)
+  typeMime       String                     @db.VarChar(100)
+  taille         Int
+  statut         StatutJustificatifNoteFrais @default(PENDING)
+  uploadedBy     String
+  createdAt      DateTime                   @default(now())
+  updatedAt      DateTime                   @updatedAt
+
+  NoteFrais  NoteFrais @relation(fields: [noteFraisId], references: [id], onDelete: Cascade)
+  UploadedBy User      @relation("JustificatifNoteFraisUploader", fields: [uploadedBy], references: [id], onDelete: Restrict)
+
+  @@index([noteFraisId, statut])
+  @@map("justificatifs_note_frais")
+}
+
+model NoteFraisOutboxEvent {
+  id            String               @id @default(cuid())
+  noteFraisId   String?
+  eventKey      String               @unique @db.VarChar(120)
+  kind          String               @db.VarChar(40)
+  payload       Json
+  status        StatutNoteFraisOutbox @default(PENDING)
+  attempts      Int                  @default(0)
+  maxAttempts   Int                  @default(8)
+  lockedAt      DateTime?
+  lockedBy      String?              @db.VarChar(64)
+  lastError     String?              @db.VarChar(500)
+  nextAttemptAt DateTime?
+  processedAt   DateTime?
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  NoteFrais NoteFrais? @relation(fields: [noteFraisId], references: [id], onDelete: SetNull)
+
+  @@index([status, nextAttemptAt])
+  @@index([lockedAt])
+  @@map("notes_frais_outbox_events")
+}
+
+/// Jobs FS durables (survivent à la suppression de note / compte).
+model NoteFraisFileJob {
+  id                     String                   @id @default(cuid())
+  noteFraisId            String?                  @db.VarChar(64)
+  archiveJustificatifId  String?                  @db.VarChar(64)
+  operation              NoteFraisFileJobOperation
+  sourcePath             String?                  @db.VarChar(500)
+  targetPath             String?                  @db.VarChar(500)
+  status                 StatutNoteFraisFileJob   @default(PENDING)
+  attempts               Int                      @default(0)
+  maxAttempts            Int                      @default(8)
+  lockedAt               DateTime?
+  lockedBy               String?                  @db.VarChar(64)
+  lastError              String?                  @db.VarChar(500)
+  nextAttemptAt          DateTime?
+  processedAt            DateTime?
+  createdAt              DateTime                 @default(now())
+  updatedAt              DateTime                 @updatedAt
+
+  @@index([status, nextAttemptAt])
+  @@index([lockedAt])
+  @@index([archiveJustificatifId])
+  @@map("notes_frais_file_jobs")
+}
+
+/// Archive privée des notes SOUMISES après suppression de compte.
+/// Données potentiellement personnelles — ne pas qualifier d'« anonyme ».
+model NoteFraisArchive {
+  id                        String   @id @default(cuid())
+  dateDepense               DateTime
+  montantDemande            Decimal  @db.Decimal(10, 2)
+  soumiseAt                 DateTime
+  archivedAt                DateTime
+  retentionEndsAt           DateTime
+  /// Notice figée — date+montant potentiellement réidentifiables.
+  reidentifiabilityNotice   String   @db.VarChar(80)
+  createdAt                 DateTime @default(now())
+  updatedAt                 DateTime @updatedAt
+
+  Justificatifs JustificatifNoteFraisArchive[]
+  AccessLogs    NoteFraisArchiveAccessLog[]
+
+  @@index([retentionEndsAt])
+  @@index([archivedAt])
+  @@map("notes_frais_archives")
+}
+
+model JustificatifNoteFraisArchive {
+  id             String                      @id @default(cuid())
+  archiveId      String
+  nomFichierOrig String                      @db.VarChar(255)
+  cheminRelatif  String                      @db.VarChar(500)
+  typeMime       String                      @db.VarChar(100)
+  taille         Int
+  statut         StatutJustificatifNoteFrais @default(PENDING)
+  createdAt      DateTime                    @default(now())
+  updatedAt      DateTime                    @updatedAt
+
+  Archive NoteFraisArchive @relation(fields: [archiveId], references: [id], onDelete: Cascade)
+
+  @@index([archiveId, statut])
+  @@map("justificatifs_note_frais_archives")
+}
+
+/// Journaux d'accès archive — actorUserId SetNull pour ne pas bloquer la suppression d'un admin.
+model NoteFraisArchiveAccessLog {
+  id          String   @id @default(cuid())
+  archiveId   String
+  actorUserId String?
+  action      String   @db.VarChar(40)
+  createdAt   DateTime @default(now())
+
+  Archive NoteFraisArchive @relation(fields: [archiveId], references: [id], onDelete: Cascade)
+  Actor   User?            @relation("NoteFraisArchiveAccessActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([archiveId, createdAt])
+  @@index([actorUserId])
+  @@map("notes_frais_archive_access_logs")
 }

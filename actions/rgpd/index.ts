@@ -589,7 +589,8 @@ export async function completeDataDeletionRequest(requestId: string) {
       };
     }
 
-    // Supprimer l'utilisateur et toutes ses données
+    // Supprimer l'utilisateur et toutes ses données (atomique avec notes frais).
+    // En cas d'échec (ex. notes SOUMISES sans politique), ne pas marquer Completee.
     const deleteResult = await adminDeleteAdherent(
       request.userId,
       `Demande RGPD - Droit à l'oubli (Demande #${requestId})`,
@@ -600,6 +601,7 @@ export async function completeDataDeletionRequest(requestId: string) {
       return {
         success: false,
         error: deleteResult.error || "Erreur lors de la suppression des données.",
+        code: "code" in deleteResult ? deleteResult.code : undefined,
       };
     }
 

@@ -42,6 +42,41 @@ export type ExpoPushSendResult = {
   disabled: number;
 };
 
+/** Classification d'une erreur push (ne pas déduire des seuls compteurs). */
+export type PushErrorClass = "temporary" | "definitive";
+
+export type PushDeliveryDetail =
+  | { kind: "ok"; tokenRedacted: string }
+  | {
+      kind: "ticket_error";
+      tokenRedacted: string;
+      errorClass: PushErrorClass;
+      code?: string;
+      message?: string;
+    }
+  | {
+      kind: "batch_transport_error";
+      errorClass: "temporary";
+      message: string;
+      batchSize: number;
+    };
+
+export type DetailedPushSendResult = {
+  /** Synthèse exploitable par un worker outbox. */
+  summary:
+    | "no_user_ids"
+    | "no_tokens"
+    | "success"
+    | "partial"
+    | "all_failed_definitive"
+    | "all_failed_temporary"
+    | "transport_failed";
+  attempted: number;
+  ok: number;
+  disabled: number;
+  details: PushDeliveryDetail[];
+};
+
 /**
  * Client HTTP injectable pour l'API Expo Push (tests sans réseau).
  */

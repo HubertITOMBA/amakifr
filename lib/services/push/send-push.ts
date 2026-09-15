@@ -1,9 +1,12 @@
 import { db } from "@/lib/db";
 import type {
+  DetailedPushSendResult,
   ExpoPushHttpClient,
   ExpoPushMessage,
   ExpoPushSendResult,
   ExpoPushTicket,
+  PushDeliveryDetail,
+  PushErrorClass,
   PushMessagePayload,
 } from "@/lib/services/push/types";
 
@@ -99,6 +102,19 @@ function isNodeDev(): boolean {
 }
 
 /**
+ * Classe une erreur ticket Expo via le code d'erreur (pas via des compteurs).
+ */
+export function classifyExpoTicketError(code?: string): PushErrorClass {
+  if (code === "DeviceNotRegistered" || code === "InvalidCredentials") {
+    return "definitive";
+  }
+  if (code === "MessageTooBig") {
+    return "definitive";
+  }
+  return "temporary";
+}
+
+/**
  * Désactive les tokens définitivement invalides (DeviceNotRegistered).
  */
 export async function disablePushTokens(tokens: string[]): Promise<number> {
@@ -112,6 +128,149 @@ export async function disablePushTokens(tokens: string[]): Promise<number> {
     data: { disabledAt: now },
   });
   return result.count;
+}
+
+function summarizeDetailed(result: {
+  attempted: number;
+  ok: number;
+  details: PushDeliveryDetail[];
+}): DetailedPushSendResult["summary"] {
+  if (result.attempted === 0) return "no_tokens";
+  const hasTemp = result.details.some(
+    (d) =>
+      (d.kind === "ticket_error" && d.errorClass === "temporary") ||
+      d.kind === "batch_transport_error"
+  );
+  const hasDef = result.details.some(
+    (d) => d.kind === "ticket_error" && d.errorClass === "definitive"
+  );
+  if (result.ok === result.attempted) return "success";
+  if (result.ok === 0 && hasTemp) return "all_failed_temporary";
+  if (result.ok === 0 && hasDef && !hasTemp) return "all_failed_definitive";
+  return "partial";
+}
+
+/**
+ * Envoi push avec détails d'erreur classifiés (outbox notes-frais).
+ * Ne remplace pas {@link sendPushToUsers}.
+ */
+export async function sendPushToUsersDetailed(
+  userIds: string[],
+  payload: PushMessagePayload,
+  client: ExpoPushHttpClient = createDefaultExpoPushHttpClient()
+): Promise<DetailedPushSendResult> {
+  const uniqueIds = [...new Set(userIds.filter(Boolean))];
+  if (uniqueIds.length === 0) {
+    return {
+      summary: "no_user_ids",
+      attempted: 0,
+      ok: 0,
+      disabled: 0,
+      details: [],
+    };
+  }
+
+  const rows = await db.mobilePushToken.findMany({
+    where: {
+      userId: { in: uniqueIds },
+      disabledAt: null,
+    },
+    select: { token: true, platform: true },
+  });
+
+  if (rows.length === 0) {
+    return {
+      summary: "no_tokens",
+      attempted: 0,
+      ok: 0,
+      disabled: 0,
+      details: [],
+    };
+  }
+
+  const messages: ExpoPushMessage[] = rows.map((r) => ({
+    to: r.token,
+    title: payload.title,
+    body: payload.body,
+    data: payload.data,
+    sound: "default",
+    channelId: r.platform === "android" ? "amaki_alerts" : undefined,
+    priority: "high",
+  }));
+
+  const details: PushDeliveryDetail[] = [];
+  let ok = 0;
+  const toDisable: string[] = [];
+
+  for (const batch of chunk(messages, BATCH_SIZE)) {
+    let tickets: ExpoPushTicket[];
+    try {
+      tickets = await client.send(batch);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message.slice(0, 200) : "transport_error";
+      details.push({
+        kind: "batch_transport_error",
+        errorClass: "temporary",
+        message,
+        batchSize: batch.length,
+      });
+      continue;
+    }
+
+    for (let i = 0; i < batch.length; i++) {
+      const ticket = tickets[i];
+      const tokenRedacted = redactExpoToken(batch[i].to);
+      if (!ticket) {
+        details.push({
+          kind: "ticket_error",
+          tokenRedacted,
+          errorClass: "temporary",
+          message: "missing_ticket",
+        });
+        continue;
+      }
+      if (ticket.status === "ok") {
+        ok += 1;
+        details.push({ kind: "ok", tokenRedacted });
+        continue;
+      }
+      const code = ticket.details?.error;
+      const errorClass = classifyExpoTicketError(code);
+      if (code === "DeviceNotRegistered") {
+        toDisable.push(batch[i].to);
+      }
+      details.push({
+        kind: "ticket_error",
+        tokenRedacted,
+        errorClass,
+        code,
+        message: ticket.message?.slice(0, 160),
+      });
+    }
+  }
+
+  let disabled = 0;
+  try {
+    disabled = await disablePushTokens(toDisable);
+  } catch {
+    // best-effort
+  }
+
+  const onlyTransport =
+    details.length > 0 &&
+    details.every((d) => d.kind === "batch_transport_error") &&
+    ok === 0;
+
+  return {
+    summary: onlyTransport
+      ? "transport_failed"
+      : summarizeDetailed({ attempted: messages.length, ok, details }),
+    attempted: messages.length,
+    ok,
+    disabled,
+    details,
+  };
 }
 
 /**
@@ -128,6 +287,7 @@ export async function sendPushToUser(
 
 /**
  * Envoie un push aux tokens actifs de plusieurs users.
+ * Comportement historique conservé (y compris outer catch → compteurs à 0).
  */
 export async function sendPushToUsers(
   userIds: string[],
@@ -161,7 +321,6 @@ export async function sendPushToUsers(
       data: payload.data,
       sound: "default",
       channelId: r.platform === "android" ? "amaki_alerts" : undefined,
-      // Priorité livraison FCM — indépendante de l'importance du channel Android
       priority: "high",
     }));
 
