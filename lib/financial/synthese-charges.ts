@@ -97,3 +97,21 @@ export function withCompensationsNotesFrais(
     compensationsNotesFrais: Number.isFinite(v) ? Number(v.toFixed(2)) : 0,
   };
 }
+
+/**
+ * Injecte les décaissements notes (remboursements EXECUTE, lot 4.2+).
+ * Impacte `soldeBancaireEstime` via `computeSoldeBancaireEstime`.
+ *
+ * @param indicators - Indicateurs
+ * @param decaissementsNotesFrais - Σ règlements REMBOURSEMENT EXECUTE
+ */
+export function withDecaissementsNotesFrais(
+  indicators: ChargesSyntheseIndicators,
+  decaissementsNotesFrais: number
+): ChargesSyntheseIndicators {
+  const v = Number(decaissementsNotesFrais);
+  return {
+    ...indicators,
+    decaissementsNotesFrais: Number.isFinite(v) ? Number(v.toFixed(2)) : 0,
+  };
+}

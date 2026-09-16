@@ -423,6 +423,26 @@ export async function actionGetNoteFrais(noteId: string) {
 }
 
 /**
+ * Vue financière comptable (ADMIN|TRESOR|COMCPT) : règlements + référence.
+ * Sans justificatifs ni description. Ne remplace pas le détail live.
+ */
+export async function actionGetNoteFraisFinancialView(noteId: string) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    const { getNoteFraisFinancialView } = await import(
+      "@/lib/services/frais-avances/note-frais-financial-view-service"
+    );
+    return await getNoteFraisFinancialView({ userId, noteId });
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
  * Liste archive privée (ADMIN|TRESOR|COMCPT). Indépendant du flag pour la lecture
  * des données déjà archivées — mais on garde le flag module pour cohérence UI locale.
  */
@@ -494,6 +514,59 @@ export async function actionExecuteNoteFraisCompensation(form: {
       expectedNoteVersion: form.expectedNoteVersion,
       idempotencyKey: form.idempotencyKey,
       lignes: form.lignes,
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath("/admin/frais-avances");
+      revalidatePath(`/user/frais-avances/${form.noteId}`);
+      revalidatePath(`/admin/frais-avances/${form.noteId}`);
+      revalidatePath("/admin/finances/synthese");
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
+ * Exécute un remboursement (partiel) sur le choix ACTIF REMBOURSEMENT|MIXTE.
+ * Montant en chaîne décimale ; aucune horloge/now acceptée du client.
+ */
+export async function actionExecuteNoteFraisRemboursement(form: {
+  noteId: string;
+  expectedNoteVersion: number;
+  idempotencyKey: string;
+  montant: string;
+  moyen: "VIREMENT" | "ESPECES";
+  reference: string;
+  executeAt: string;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    if (!form.idempotencyKey?.trim()) {
+      return {
+        success: false as const,
+        error: "Clé d'idempotence requise",
+        code: "IDEMPOTENCY_REQUIRED",
+      };
+    }
+    const { executeNoteFraisRemboursement } = await import(
+      "@/lib/services/frais-avances/note-frais-remboursement-service"
+    );
+    const result = await executeNoteFraisRemboursement({
+      actorUserId: userId,
+      noteId: form.noteId,
+      expectedNoteVersion: form.expectedNoteVersion,
+      idempotencyKey: form.idempotencyKey,
+      montant: form.montant,
+      moyen: form.moyen,
+      reference: form.reference,
+      executeAt: form.executeAt,
+      // clock / now volontairement absents — horloge serveur uniquement
     });
     if (result.success) {
       revalidatePath("/user/frais-avances");

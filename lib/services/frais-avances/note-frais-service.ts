@@ -6,9 +6,13 @@ import {
   NotesFraisDisabledError,
   assertNotesFraisEnabled,
 } from "@/lib/frais-avances/feature-flag";
-import { canUserReadSubmittedNotesFrais } from "@/lib/frais-avances/authz";
+import {
+  canUserReadSubmittedNotesFrais,
+  canUserReadNoteFraisRemboursementReference,
+} from "@/lib/frais-avances/authz";
 import {
   toNoteFraisPublicDto,
+  enrichNoteFraisFinancierDto,
   type NoteFraisPublicDto,
 } from "@/lib/frais-avances/dto";
 import { resolveSubmissionRecipientUserIds } from "@/lib/frais-avances/recipients";
@@ -24,6 +28,7 @@ import {
 import { assertAllowedJustificatifBuffer } from "@/lib/frais-avances/justificatif-validation";
 import { sendPushToUsersDetailed } from "@/lib/services/push/send-push";
 import { lockUserRowForNotesFrais } from "@/lib/services/frais-avances/rgpd-account-deletion";
+import { NOTES_FRAIS_FINANCIAL_STATE_INCONSISTENT } from "@/lib/services/frais-avances/note-frais-remboursement-service";
 
 export type NotesFraisActionResult<T = unknown> =
   | { success: true; data: T; message?: string }
@@ -43,13 +48,16 @@ function disabledResult(): NotesFraisActionResult<never> {
 function mapError(error: unknown): NotesFraisActionResult<never> {
   if (error instanceof NotesFraisDisabledError) return disabledResult();
   if (error instanceof Error) {
+    let code: string | undefined;
+    if (error.message === NOTES_FRAIS_VERSION_CONFLICT) {
+      code = "VERSION_CONFLICT";
+    } else if (error.message === NOTES_FRAIS_FINANCIAL_STATE_INCONSISTENT) {
+      code = NOTES_FRAIS_FINANCIAL_STATE_INCONSISTENT;
+    }
     return {
       success: false,
       error: error.message,
-      code:
-        error.message === NOTES_FRAIS_VERSION_CONFLICT
-          ? "VERSION_CONFLICT"
-          : undefined,
+      code,
     };
   }
   return { success: false, error: "Erreur inattendue" };
@@ -778,15 +786,40 @@ export async function getNoteFraisForUser(input: {
     if (!note) throw new Error("Note introuvable");
 
     const isOwner = note.demandeurUserId === input.userId;
+    const remboursements = await db.noteFraisReglement.findMany({
+      where: {
+        noteFraisId: input.noteId,
+        type: "REMBOURSEMENT",
+        statut: "EXECUTE",
+      },
+      orderBy: { executeAt: "asc" },
+      select: {
+        id: true,
+        montantTotal: true,
+        moyen: true,
+        reference: true,
+        executeAt: true,
+      },
+    });
+
+    // Membre propriétaire : jamais la référence (même si double casquette).
+    const includeReference =
+      !isOwner &&
+      (await canUserReadNoteFraisRemboursementReference(input.userId));
+    const data = enrichNoteFraisFinancierDto(toNoteFraisPublicDto(note), {
+      includeReference,
+      remboursements,
+    });
+
     if (isOwner) {
-      return { success: true, data: toNoteFraisPublicDto(note) };
+      return { success: true, data };
     }
 
     const asAdmin = await canUserReadSubmittedNotesFrais(input.userId);
     if (!asAdmin || note.statut === "BROUILLON") {
       throw new Error("Note introuvable");
     }
-    return { success: true, data: toNoteFraisPublicDto(note) };
+    return { success: true, data };
   } catch (error) {
     return mapError(error);
   }

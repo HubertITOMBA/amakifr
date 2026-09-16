@@ -449,6 +449,26 @@ export const SERVER_ACTIONS_CONFIG: ServerActionConfig[] = [
     category: "Frais avancés",
   },
   {
+    action: "executeNoteFraisRemboursement",
+    label: "Exécuter un remboursement de note de frais",
+    description:
+      "Décaisser la part remboursement d'un choix ACTIF (REMBOURSEMENT|MIXTE) — TRESOR/ADMIN ; baisse solde bancaire estimé",
+    resource: "frais-avances",
+    defaultType: "WRITE",
+    route: "/admin/frais-avances",
+    category: "Frais avancés",
+  },
+  {
+    action: "readNoteFraisFinancialView",
+    label: "Consulter la vue financière d'une note de frais",
+    description:
+      "Agrégats et règlements avec référence (ADMIN/TRESOR/COMCPT) — sans justificatifs ni description",
+    resource: "frais-avances",
+    defaultType: "READ",
+    route: "/admin/frais-avances",
+    category: "Frais avancés",
+  },
+  {
     action: "chooseNoteFraisReglement",
     label: "Choisir le mode de règlement d'une note validée",
     description:

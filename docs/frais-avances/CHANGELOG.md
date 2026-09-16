@@ -1,5 +1,25 @@
 # Changelog — frais avancés
 
+## 0.4.2-remboursement — 2026-09-16
+
+### Ajouté (lot 4.2 — local, flag off, **pas de migration dépôt**)
+- Exécution remboursement : `TypeNoteFraisReglement.REMBOURSEMENT` + ligne dédiée.
+- Traçabilité : `moyen` (VIREMENT|ESPECES), `reference` / `referenceNormalisee`, `executeAt` saisi.
+- Modes choix `REMBOURSEMENT` et `MIXTE` (part remboursement seulement) ; partiels + complément.
+- Permission `executeNoteFraisRemboursement` ; authz avant replay ; P2002 ciblé.
+- Horloge injectable en options internes de service uniquement (jamais via l’action).
+- Vue financière dédiée `readNoteFraisFinancialView` (ADMIN|TRESOR|COMCPT) : règlements + référence, sans justificatifs ni description ; `canUserReadSubmittedNotesFrais` **non** élargi à COMCPT.
+- État financier calculé ; incohérence compteurs → `NOTES_FRAIS_FINANCIAL_STATE_INCONSISTENT` (pas de clamp).
+- Montant transmis en chaîne décimale ; normalisation `Prisma.Decimal` serveur.
+- Synthèse : `decaissementsNotesFrais` = Σ remboursements EXECUTE ; solde bancaire ↓ ; charge inchangée.
+- UI admin minimale `ExecuteRemboursementDialog` (datetime-local → ISO UTC strict).
+- CHECK SQL polymorphes **documentés** (futurs) : COMPENSATION cibles non null ; REMBOURSEMENT cibles null.
+- **Aucune** notif/outbox ; **aucun** PaiementCotisation / Avoir / 2ᵉ Depense.
+
+### Non inclus
+- MIXTE une TX (4.3), correction, restitution, annulation, polish UI (4.4), notif règlement (4.5).
+- Migration dépôt ; activation permanente.
+
 ## 0.4.1-compensation — 2026-09-16
 
 ### Ajouté (lot 4.1 — local, flag off, **pas de migration dépôt**)

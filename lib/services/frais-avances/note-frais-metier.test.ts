@@ -23,6 +23,7 @@ const {
   fileJobFindMany,
   notificationCreateMany,
   userFindUnique,
+  reglementFindMany,
   $transaction,
   $executeRaw,
 } = vi.hoisted(() => ({
@@ -48,6 +49,7 @@ const {
   fileJobFindMany: vi.fn(),
   notificationCreateMany: vi.fn(),
   userFindUnique: vi.fn(),
+  reglementFindMany: vi.fn(),
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
 }));
@@ -93,6 +95,9 @@ vi.mock("@/lib/db", () => ({
     userAdminRole: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    noteFraisReglement: {
+      findMany: (...a: unknown[]) => reglementFindMany(...a),
+    },
     $transaction: (...a: unknown[]) => $transaction(...a),
     $executeRaw: (...a: unknown[]) => $executeRaw(...a),
   },
@@ -100,6 +105,7 @@ vi.mock("@/lib/db", () => ({
 
 vi.mock("@/lib/frais-avances/authz", () => ({
   canUserReadSubmittedNotesFrais: vi.fn(),
+  canUserReadNoteFraisRemboursementReference: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("@/lib/frais-avances/recipients", () => ({
@@ -180,6 +186,7 @@ describe("métier notes-frais (mocks)", () => {
     vi.clearAllMocks();
     vi.mocked(canUserReadSubmittedNotesFrais).mockResolvedValue(false);
     vi.mocked(resolveSubmissionRecipientUserIds).mockResolvedValue(["admin1"]);
+    reglementFindMany.mockResolvedValue([]);
     $executeRaw.mockResolvedValue(undefined);
     $transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => {
       const tx = {

@@ -1,12 +1,16 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Gavel } from "lucide-react";
+import { Banknote, Gavel } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { actionGetNoteFrais } from "@/actions/frais-avances";
+import {
+  actionGetNoteFrais,
+  actionGetNoteFraisFinancialView,
+} from "@/actions/frais-avances";
 import { DecideNoteFraisDialog } from "@/components/frais-avances/DecideNoteFraisDialog";
+import { ExecuteRemboursementDialog } from "@/components/frais-avances/ExecuteRemboursementDialog";
 import {
   NoteFraisModeBadge,
   NoteFraisMontantBadge,
@@ -24,6 +28,8 @@ type NoteDetail = {
   decideeAt?: string | Date | null;
   alerteSansDestinataire?: boolean;
   description?: string | null;
+  etatFinancier?: string;
+  restantDu?: string;
   Justificatifs?: { id: string; nomFichierOrig: string; statut: string }[];
   Decision?: {
     statutFinal: string;
@@ -35,6 +41,8 @@ type NoteDetail = {
     mode: string;
     montantRemboursement: string | number;
     montantCompensation: string | number;
+    montantRembourseUtilise: string | number;
+    montantCompensationUtilise: string | number;
     Cibles: Array<{
       typeCible: string;
       cibleId: string;
@@ -43,31 +51,90 @@ type NoteDetail = {
       rang: number;
     }>;
   } | null;
+  Remboursements?: Array<{
+    id: string;
+    montantTotal: string;
+    moyen: string;
+    executeAt: string | Date;
+    reference?: string;
+  }>;
+};
+
+type FinancialView = {
+  noteId: string;
+  statut: string;
+  version: number;
+  montantAccepte: string | null;
+  modeChoix: string | null;
+  montantRemboursement: string | null;
+  montantCompensation: string | null;
+  montantRembourseUtilise: string | null;
+  montantCompensationUtilise: string | null;
+  etatFinancier: string;
+  restantDu: string;
+  consomme: string;
+  remboursements: Array<{
+    id: string;
+    montantTotal: string;
+    moyen: string;
+    reference: string;
+    executeAt: string;
+  }>;
 };
 
 /**
  * Consultation / décision admin d'une note soumise.
+ * COMCPT : fallback vue financière (référence) sans détail live / justificatifs.
  */
 export default function AdminNoteFraisDetailPage() {
   const params = useParams();
   const noteId = String(params.id || "");
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<NoteDetail | null>(null);
+  const [financial, setFinancial] = useState<FinancialView | null>(null);
   const [decideOpen, setDecideOpen] = useState(false);
+  const [rembOpen, setRembOpen] = useState(false);
   const [idempotencyKey] = useState(
     () => `decide-${noteId}-${Date.now()}`
   );
+  const [rembIdempotencyKey, setRembIdempotencyKey] = useState(
+    () => `remb-${noteId}-${Date.now()}`
+  );
+
+  const plafondRemb = useMemo(() => {
+    const c = note?.ChoixReglementActif;
+    if (!c) return 0;
+    return Math.max(
+      0,
+      Number(c.montantRemboursement) - Number(c.montantRembourseUtilise)
+    );
+  }, [note]);
+
+  const canExecuteRemb =
+    note?.statut === "VALIDEE" &&
+    note.ChoixReglementActif &&
+    (note.ChoixReglementActif.mode === "REMBOURSEMENT" ||
+      note.ChoixReglementActif.mode === "MIXTE") &&
+    plafondRemb > 0;
 
   const reload = useCallback(async () => {
     const res = await actionGetNoteFrais(noteId);
-    if (!res.success) {
-      setError(res.error);
-      setNote(null);
+    if (res.success) {
+      setNote(res.data as NoteDetail);
+      setFinancial(null);
+      setError(null);
       return;
     }
-    const data = res.data as NoteDetail;
-    setNote(data);
-    setError(null);
+    const fin = await actionGetNoteFraisFinancialView(noteId);
+    if (fin.success) {
+      setNote(null);
+      setFinancial(fin.data as FinancialView);
+      setError(null);
+      return;
+    }
+    setNote(null);
+    setFinancial(null);
+    setError(res.error || fin.error || "Erreur");
   }, [noteId]);
 
   useEffect(() => {
@@ -81,13 +148,54 @@ export default function AdminNoteFraisDetailPage() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4 sm:p-8">
       <Card className="mx-auto max-w-2xl border-blue-200 shadow-lg">
         <CardHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 text-white rounded-t-lg pt-4 sm:pt-5">
-          <CardTitle className="text-white">{note?.libelle || "Note de frais"}</CardTitle>
+          <CardTitle className="text-white">
+            {note?.libelle || "Note de frais"}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 p-4 sm:p-6">
           {error ? (
             <p className="text-sm text-red-700" role="alert">
               {error}
             </p>
+          ) : null}
+          {financial && !note ? (
+            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3 space-y-2 text-sm">
+              <p className="text-xs font-semibold uppercase tracking-wide text-emerald-800">
+                Vue financière (comptable)
+              </p>
+              <div className="flex flex-wrap gap-2 items-center">
+                <NoteFraisStatutBadge statut={financial.statut} />
+                {financial.modeChoix ? (
+                  <NoteFraisModeBadge mode={financial.modeChoix} />
+                ) : null}
+                {financial.montantAccepte != null ? (
+                  <NoteFraisMontantBadge
+                    label="Accepté"
+                    value={financial.montantAccepte}
+                  />
+                ) : null}
+                <NoteFraisMontantBadge
+                  label="Restant dû"
+                  value={financial.restantDu}
+                />
+                <span className="text-xs font-medium text-slate-700">
+                  {financial.etatFinancier}
+                </span>
+              </div>
+              {financial.remboursements.length ? (
+                <ul className="text-xs space-y-1 border-t border-emerald-100 pt-2">
+                  {financial.remboursements.map((r) => (
+                    <li key={r.id}>
+                      {r.moyen} — {r.montantTotal} € —{" "}
+                      {new Date(r.executeAt).toLocaleString("fr-FR")}
+                      {r.reference ? ` — réf. ${r.reference}` : ""}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-xs text-slate-600">Aucun remboursement.</p>
+              )}
+            </div>
           ) : null}
           {note ? (
             <>
@@ -138,6 +246,21 @@ export default function AdminNoteFraisDetailPage() {
                       label="Compensation"
                       value={note.ChoixReglementActif.montantCompensation}
                     />
+                    <NoteFraisMontantBadge
+                      label="Remboursé"
+                      value={note.ChoixReglementActif.montantRembourseUtilise}
+                    />
+                    {note.restantDu != null ? (
+                      <NoteFraisMontantBadge
+                        label="Restant dû"
+                        value={note.restantDu}
+                      />
+                    ) : null}
+                    {note.etatFinancier ? (
+                      <span className="text-xs font-medium text-slate-700">
+                        {note.etatFinancier}
+                      </span>
+                    ) : null}
                   </div>
                   {note.ChoixReglementActif.Cibles?.length ? (
                     <ul className="text-xs space-y-1 list-disc pl-4">
@@ -149,9 +272,33 @@ export default function AdminNoteFraisDetailPage() {
                       ))}
                     </ul>
                   ) : null}
-                  <p className="text-xs text-slate-600">
-                    Lecture seule — aucun règlement exécuté à ce stade.
-                  </p>
+                  {note.Remboursements?.length ? (
+                    <ul className="text-xs space-y-1 border-t border-blue-100 pt-2">
+                      {note.Remboursements.map((r) => (
+                        <li key={r.id}>
+                          {r.moyen} — {r.montantTotal} € —{" "}
+                          {new Date(r.executeAt).toLocaleString("fr-FR")}
+                          {r.reference ? ` — réf. ${r.reference}` : ""}
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  {canExecuteRemb ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      className="mt-1"
+                      onClick={() => {
+                        setRembIdempotencyKey(
+                          `remb-${noteId}-${Date.now()}`
+                        );
+                        setRembOpen(true);
+                      }}
+                    >
+                      <Banknote className="h-4 w-4 mr-1" />
+                      Exécuter un remboursement
+                    </Button>
+                  ) : null}
                 </div>
               ) : note.statut === "VALIDEE" ? (
                 <p className="text-sm text-slate-600">
@@ -211,6 +358,17 @@ export default function AdminNoteFraisDetailPage() {
           idempotencyKey={idempotencyKey}
           libelle={note.libelle}
           montantDemande={note.montantDemande}
+          onDone={reload}
+        />
+      ) : null}
+      {note && canExecuteRemb ? (
+        <ExecuteRemboursementDialog
+          open={rembOpen}
+          onOpenChange={setRembOpen}
+          noteId={noteId}
+          expectedVersion={note.version}
+          idempotencyKey={rembIdempotencyKey}
+          plafondRestant={plafondRemb}
           onDone={reload}
         />
       ) : null}

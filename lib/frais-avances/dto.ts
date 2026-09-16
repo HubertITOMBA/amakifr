@@ -2,6 +2,8 @@
  * DTO publics notes de frais — jamais de cheminRelatif / cheminStockage.
  */
 
+import { computeEtatFinancierNoteFrais } from "@/lib/services/frais-avances/note-frais-remboursement-service";
+
 export type JustificatifNoteFraisPublicDto = {
   id: string;
   nomFichierOrig: string;
@@ -44,6 +46,15 @@ export type NoteFraisChoixReglementPublicDto = {
   Cibles: NoteFraisChoixReglementCiblePublicDto[];
 };
 
+export type NoteFraisRemboursementPublicDto = {
+  id: string;
+  montantTotal: string;
+  moyen: string;
+  executeAt: Date | string;
+  /** Présent uniquement pour Actif ADMIN|TRESOR|COMCPT. */
+  reference?: string;
+};
+
 export type NoteFraisPublicDto = {
   id: string;
   libelle: string;
@@ -64,6 +75,11 @@ export type NoteFraisPublicDto = {
   Justificatifs: JustificatifNoteFraisPublicDto[];
   Decision?: NoteFraisDecisionPublicDto | null;
   ChoixReglementActif?: NoteFraisChoixReglementPublicDto | null;
+  /** État financier calculé (lot 4.2) — absent si pas de montant accepté / choix. */
+  etatFinancier?: "NON_REGLEE" | "PARTIELLEMENT_REGLEE" | "REGLEE";
+  restantDu?: string;
+  consomme?: string;
+  Remboursements?: NoteFraisRemboursementPublicDto[];
   Demandeur?: { id: string; email: string | null; name: string | null };
   Adherent?: { id: string; firstname: string; lastname: string };
 };
@@ -260,6 +276,60 @@ export function toNoteFraisPublicDto(note: NoteRow): NoteFraisPublicDto {
     ...(note.Demandeur ? { Demandeur: note.Demandeur } : {}),
     ...(note.Adherent ? { Adherent: note.Adherent } : {}),
   };
+}
+
+/**
+ * Enrichit le DTO avec état financier et remboursements (référence selon droit).
+ *
+ * @param dto - DTO de base
+ * @param opts.includeReference - true pour ADMIN|TRESOR|COMCPT
+ * @param opts.remboursements - règlements REMBOURSEMENT EXECUTE
+ */
+export function enrichNoteFraisFinancierDto(
+  dto: NoteFraisPublicDto,
+  opts: {
+    includeReference: boolean;
+    remboursements?: Array<{
+      id: string;
+      montantTotal: { toString(): string } | number | string;
+      moyen: string | null;
+      reference: string | null;
+      executeAt: Date;
+    }>;
+  }
+): NoteFraisPublicDto {
+  const choix = dto.ChoixReglementActif;
+  if (dto.montantAccepte != null && choix) {
+    const etat = computeEtatFinancierNoteFrais({
+      montantAccepte: dto.montantAccepte,
+      montantRembourseUtilise: choix.montantRembourseUtilise,
+      montantCompensationUtilise: choix.montantCompensationUtilise,
+    });
+    dto = {
+      ...dto,
+      etatFinancier: etat.etatFinancier,
+      restantDu: etat.restantDu,
+      consomme: etat.consomme,
+    };
+  }
+  if (opts.remboursements && opts.remboursements.length > 0) {
+    dto = {
+      ...dto,
+      Remboursements: opts.remboursements.map((r) => {
+        const base: NoteFraisRemboursementPublicDto = {
+          id: r.id,
+          montantTotal: decimalToString(r.montantTotal) ?? "0",
+          moyen: r.moyen ?? "",
+          executeAt: r.executeAt,
+        };
+        if (opts.includeReference && r.reference) {
+          base.reference = r.reference;
+        }
+        return base;
+      }),
+    };
+  }
+  return dto;
 }
 
 /** DTO archive privée — sans chemins ; notice de non-anonymat. */

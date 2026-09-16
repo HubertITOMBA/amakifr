@@ -7,6 +7,7 @@ import {
   computeChargesFromDepensesValides,
   computeSoldeBancaireEstime,
   withCompensationsNotesFrais,
+  withDecaissementsNotesFrais,
 } from "@/lib/financial/synthese-charges";
 
 /**
@@ -76,9 +77,16 @@ export async function getFinancialSynthese() {
       where: { type: "COMPENSATION", statut: "EXECUTE" },
       _sum: { montantTotal: true },
     });
-    const chargesIndicators = withCompensationsNotesFrais(
-      chargesIndicatorsBase,
-      Number(compensationsAgg._sum.montantTotal ?? 0)
+    const remboursementsAgg = await prisma.noteFraisReglement.aggregate({
+      where: { type: "REMBOURSEMENT", statut: "EXECUTE" },
+      _sum: { montantTotal: true },
+    });
+    const chargesIndicators = withDecaissementsNotesFrais(
+      withCompensationsNotesFrais(
+        chargesIndicatorsBase,
+        Number(compensationsAgg._sum.montantTotal ?? 0)
+      ),
+      Number(remboursementsAgg._sum.montantTotal ?? 0)
     );
     const totalCharges = chargesIndicators.totalCharges;
     const depensesOrdinairesDecaissees =

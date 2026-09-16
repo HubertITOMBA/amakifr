@@ -40,6 +40,18 @@
   - `soldeBancaireEstime` = recettes − ORDINAIRE (− décaissements notes + restitutions, encore 0).
 - RGPD : Restrict + refus sans politique restent sûrs ; détachement FK futur (4.9) conservera `origine=FRAIS_AVANCE`.
 
+### Remboursement exécuté (lot 4.2 — local, flag off)
+- Choix ACTIF `REMBOURSEMENT` ou `MIXTE` (part remboursement uniquement).
+- Traçabilité : moyen `VIREMENT|ESPECES`, référence 1–64 (brute + normalisée), `executeAt` ISO **avec fuseau** (≥ decideeAt, ≤ now+5 min ; horloge injectable tests uniquement).
+- Vue financière dédiée (ADMIN|TRESOR|COMCPT) : agrégats + référence ; **pas** d’élargissement du détail live à COMCPT.
+- État financier calculé ; dépassement compteurs → erreur `NOTES_FRAIS_FINANCIAL_STATE_INCONSISTENT`.
+- Montant en chaîne décimale côté action ; `Prisma.Decimal` serveur.
+- Futurs CHECK SQL (non créés) : COMPENSATION ⇒ cibles/snapshots NOT NULL ; REMBOURSEMENT ⇒ tous NULL.
+- TX : demandeur → note → choix ; OCC ; compteur `montantRembourseUtilise` ; une ligne sans cible/Avoir.
+- Synthèse : `decaissementsNotesFrais` ↑ ; **solde bancaire ↓** ; `totalCharges` inchangé (pas de double soustraction FRAIS_AVANCE).
+- État financier calculé (non stocké) : remboursé + compensé vs accepté.
+- Pas de notif/outbox (→ 4.5).
+
 ### Compensation exécutée (lot 4.1 — local, flag off)
 - Choix ACTIF `COMPENSATION` ou `MIXTE` (part compensation uniquement).
 - TX : verrous demandeur → note → choix → cibles → dettes/CM ; OCC version note.
@@ -114,12 +126,14 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
     lib/services/frais-avances/note-frais-decision.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-choix-reglement.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-compensation.pg.integration.test.ts \
+    lib/services/frais-avances/note-frais-remboursement.pg.integration.test.ts \
     lib/frais-avances/pg-test-allowlist.test.ts
 ```
 
 ## Non livré / futur
-- Lots **4.2+** : remboursement, mixte complet, outbox/notif règlement (4.5), corrections, restitutions, annulation (`EXPIREE` 30 j), détachement RGPD FK.
+- Lots **4.3+** : mixte une TX, outbox/notif règlement (4.5), corrections, restitutions, annulation (`EXPIREE` 30 j), détachement RGPD FK.
 - Index partiel unique choix ACTIF.
+- CHECK SQL polymorphes sur `notes_frais_reglement_lignes` (COMPENSATION / REMBOURSEMENT).
 - API v1, mobile.
 - Validation trésorier de la durée / point de départ + activation politique env.
 - Migration Prisma dépôt ; activation prod permanente.

@@ -2863,6 +2863,7 @@ model NoteFraisChoixReglementCible {
 /// Type d'exécution financière d'un règlement note (lot 4.1+).
 enum TypeNoteFraisReglement {
   COMPENSATION
+  REMBOURSEMENT
 }
 
 enum StatutNoteFraisReglement {
@@ -2871,20 +2872,31 @@ enum StatutNoteFraisReglement {
 
 enum TypeLigneNoteFraisReglement {
   COMPENSATION
+  REMBOURSEMENT
 }
 
-/// Exécution financière (compensation 4.1 ; remboursement 4.2+).
+/// Moyen de décaissement note (remboursement) — distinct de MoyenPaiement cotisations.
+enum MoyenReglementNoteFrais {
+  VIREMENT
+  ESPECES
+}
+
+/// Exécution financière (compensation 4.1 ; remboursement 4.2).
 model NoteFraisReglement {
-  id              String                   @id @default(cuid())
-  noteFraisId     String
-  choixId         String
-  type            TypeNoteFraisReglement
-  statut          StatutNoteFraisReglement @default(EXECUTE)
-  montantTotal    Decimal                  @db.Decimal(10, 2)
-  idempotencyKey  String                   @unique @db.VarChar(64)
-  executeurUserId String
-  executeAt       DateTime
-  createdAt       DateTime                 @default(now())
+  id                   String                    @id @default(cuid())
+  noteFraisId          String
+  choixId              String
+  type                 TypeNoteFraisReglement
+  statut               StatutNoteFraisReglement  @default(EXECUTE)
+  montantTotal         Decimal                   @db.Decimal(10, 2)
+  /// Traçabilité remboursement uniquement (null si COMPENSATION).
+  moyen                MoyenReglementNoteFrais?
+  reference            String?                   @db.VarChar(64)
+  referenceNormalisee  String?                   @db.VarChar(64)
+  idempotencyKey       String                    @unique @db.VarChar(64)
+  executeurUserId      String
+  executeAt            DateTime
+  createdAt            DateTime                  @default(now())
 
   NoteFrais NoteFrais               @relation(fields: [noteFraisId], references: [id], onDelete: Restrict)
   Choix     NoteFraisChoixReglement @relation(fields: [choixId], references: [id], onDelete: Restrict)
@@ -2897,25 +2909,29 @@ model NoteFraisReglement {
   @@map("notes_frais_reglements")
 }
 
-/// Ligne d'exécution — pas de FK miroir vers Avoir/Utilisation (FK côté Avoir/Utilisation).
+/// Ligne d'exécution — cibles nullables pour REMBOURSEMENT ; FK Avoir/Utilisation côté Avoir.
+/// Validations applicatives obligatoires tant que les CHECK SQL ne sont pas en place.
+/// Futurs CHECK SQL (migration ultérieure, pas maintenant) :
+///   COMPENSATION  => typeCible, cibleId et snapshots tous NON NULL
+///   REMBOURSEMENT => typeCible, cibleId et snapshots tous NULL
 model NoteFraisReglementLigne {
-  id                          String                        @id @default(cuid())
+  id                          String                         @id @default(cuid())
   reglementId                 String
   typeLigne                   TypeLigneNoteFraisReglement
-  typeCible                   TypeCibleCompensationNoteFrais
-  cibleId                     String
+  typeCible                   TypeCibleCompensationNoteFrais?
+  cibleId                     String?
   rang                        Int
-  montant                     Decimal                       @db.Decimal(10, 2)
-  montantRestantCibleAvant    Decimal                       @db.Decimal(10, 2)
-  montantRestantCibleApres    Decimal                       @db.Decimal(10, 2)
-  montantAutoriseRestantAvant Decimal                       @db.Decimal(10, 2)
-  createdAt                   DateTime                      @default(now())
+  montant                     Decimal                        @db.Decimal(10, 2)
+  montantRestantCibleAvant    Decimal?                       @db.Decimal(10, 2)
+  montantRestantCibleApres    Decimal?                       @db.Decimal(10, 2)
+  montantAutoriseRestantAvant Decimal?                       @db.Decimal(10, 2)
+  createdAt                   DateTime                       @default(now())
 
   Reglement        NoteFraisReglement @relation(fields: [reglementId], references: [id], onDelete: Cascade)
   Avoir            Avoir?             @relation("AvoirFromNoteFraisLigne")
   UtilisationAvoir UtilisationAvoir?  @relation("UtilisationFromNoteFraisLigne")
 
-  @@unique([reglementId, typeCible, cibleId])
+  @@unique([reglementId, rang])
   @@index([cibleId, typeCible])
   @@map("notes_frais_reglement_lignes")
 }
