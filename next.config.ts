@@ -113,7 +113,23 @@ const nextConfig: NextConfig = {
   productionBrowserSourceMaps: false,
   
   // Optimiser le cache Webpack + ignorer le sous-projet Expo en watch (dev)
-  webpack: (config, { dev, isServer }) => {
+  // Edge : stubber instrumentation-node pour ne pas tirer Prisma/fs dans le bundle Edge.
+  // Node : conserve l'import bundlé réel (évite webpackIgnore relatif cassé sous .next/server/).
+  webpack: (config, { dev, isServer, nextRuntime }) => {
+    if (nextRuntime === "edge") {
+      config.resolve = config.resolve ?? {};
+      config.resolve.alias = {
+        ...(config.resolve.alias as Record<string, string | false | string[]>),
+        [path.resolve(__dirname, "instrumentation-node")]: path.resolve(
+          __dirname,
+          "instrumentation-node-edge-stub.ts"
+        ),
+        [path.resolve(__dirname, "instrumentation-node.ts")]: path.resolve(
+          __dirname,
+          "instrumentation-node-edge-stub.ts"
+        ),
+      };
+    }
     if (dev) {
       const ignored = [
         "**/mobile/**",
