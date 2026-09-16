@@ -7,6 +7,10 @@ import { z } from "zod";
 import { UserRole } from "@prisma/client";
 import { revalidatePath } from "next/cache";
 import { logCreation, logModification } from "@/lib/activity-logger";
+import {
+  TYPE_DEPENSE_FRAIS_AVANCE_PROTECTED,
+  isTypeDepenseFraisAvanceCode,
+} from "@/lib/frais-avances/type-depense-frais-avance";
 
 // Schémas de validation
 const CreateTypeDepenseSchema = z.object({
@@ -122,13 +126,43 @@ export async function updateTypeDepense(data: z.infer<typeof UpdateTypeDepenseSc
 
     const validatedData = UpdateTypeDepenseSchema.parse(data);
 
+    const existing = await prisma.typeDepense.findUnique({
+      where: { id: validatedData.id },
+      select: { id: true, code: true },
+    });
+    if (!existing) {
+      return { success: false, error: "Type de dépense non trouvé" };
+    }
+
+    // Type technique FRAIS_AVANCE : identification par code uniquement.
+    // Autorisé : titre / description. Interdit : actif=false (et tout code).
+    const isProtected = isTypeDepenseFraisAvanceCode(existing.code);
+    if (isProtected && validatedData.actif === false) {
+      return { success: false, error: TYPE_DEPENSE_FRAIS_AVANCE_PROTECTED };
+    }
+
+    const updateData: {
+      titre?: string;
+      description?: string | null;
+      actif?: boolean;
+    } = {};
+    if (validatedData.titre !== undefined) {
+      updateData.titre = validatedData.titre;
+    }
+    if (validatedData.description !== undefined) {
+      updateData.description = validatedData.description;
+    }
+    if (!isProtected && validatedData.actif !== undefined) {
+      updateData.actif = validatedData.actif;
+    }
+    // actif=true sur FRAIS_AVANCE : no-op silencieux (déjà actif ou réactivation sans danger)
+    if (isProtected && validatedData.actif === true) {
+      // ne pas écrire le code ; actif déjà garanti côté seed — ignore
+    }
+
     const typeDepense = await prisma.typeDepense.update({
       where: { id: validatedData.id },
-      data: {
-        titre: validatedData.titre,
-        description: validatedData.description,
-        actif: validatedData.actif,
-      },
+      data: updateData,
       include: {
         CreatedBy: {
           select: {
@@ -151,7 +185,7 @@ export async function updateTypeDepense(data: z.infer<typeof UpdateTypeDepenseSc
         "TypeDepense",
         validatedData.id,
         {
-          fieldsUpdated: Object.keys(validatedData).filter(key => key !== 'id'),
+          fieldsUpdated: Object.keys(updateData),
           actif: validatedData.actif,
         }
       );
@@ -185,6 +219,19 @@ export async function deleteTypeDepense(id: string) {
     const session = await auth();
     if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
+    }
+
+    const existing = await prisma.typeDepense.findUnique({
+      where: { id },
+      select: { id: true, code: true },
+    });
+    if (!existing) {
+      return { success: false, error: "Type de dépense non trouvé" };
+    }
+
+    // Protection par code technique uniquement (jamais par titre).
+    if (isTypeDepenseFraisAvanceCode(existing.code)) {
+      return { success: false, error: TYPE_DEPENSE_FRAIS_AVANCE_PROTECTED };
     }
 
     // Vérifier si le type est utilisé dans des dépenses

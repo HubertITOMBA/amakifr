@@ -21,13 +21,24 @@
 - Auto-décision interdite si `actorUserId === demandeurUserId` (pas de rapprochement nom/email).
 - **Limite inter-comptes** : deux comptes distincts pour une même personne physique ne sont pas corrélés techniquement.
 - Journal métier `notes_frais_decisions` (1 / note) + champs décision sur `notes_frais`.
-- Atomique dans la TX : note + journal + notification demandeur + outbox `DECIDED`.
+- Atomique dans la TX : note + journal + notification demandeur + outbox `DECIDED` (+ `Depense` si VALIDEE, lot 4.0).
 - Verrouillage : **demandeur** puis **note** (même ordre que RGPD).
 - Idempotence : même clé + même contenu → succès sans doublon ; même clé + contenu différent → conflit.
 - Note `REJETEE` immuable ; `createCorrectedNoteFraisDraft` (même propriétaire, `corrigeNoteFraisId`).
 - Lien de correction : `onDelete: SetNull` — compatible archivage RGPD de la note d’origine.
-- **Pas** de `dateReconnaissanceCharge` ; validation ≠ écriture comptable ≠ décaissement.
-- **Pas** de `Depense` / Avoir / remboursement.
+- **Charge (lot 4.0)** : `Depense` `origine=FRAIS_AVANCE` créée à la validation ; `dateDepense` = date économique de la note ; `decideeAt` = date de reconnaissance.
+- **Charge ≠ décaissement** : solde bancaire estimé ne soustrait que les `ORDINAIRE` jusqu’aux lots 4.1+.
+
+### Charge reconnue (lot 4.0 — local, flag off)
+- Schéma : `OrigineDepense`, `TypeDepense.code`, `Depense.noteFraisId` → Note Restrict.
+- Resolve-only `TypeDepense` `code=FRAIS_AVANCE` actif ; sinon rollback TX.
+- Fixture tests : `ensureTypeDepenseFraisAvanceForTests` (jamais runtime métier).
+- Synthèse par **origine** uniquement (jamais par `noteFraisId`) :
+  - `totalCharges` = Σ Valide ;
+  - `depensesOrdinairesDecaissees` = Σ Valide ORDINAIRE ;
+  - indicateurs règlement notes exposés à 0 ;
+  - `soldeBancaireEstime` = recettes − ORDINAIRE (− décaissements notes + restitutions, encore 0).
+- RGPD : Restrict + refus sans politique restent sûrs ; détachement FK futur (4.9) conservera `origine=FRAIS_AVANCE`.
 
 ### Choix de règlement (lot 3 — local, flag off)
 - Après `VALIDEE` uniquement ; propriétaire seul (`demandeurUserId`).
@@ -99,12 +110,11 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
 ```
 
 ## Non livré / futur
-- Exécution du règlement (lot 4) : Avoir / UtilisationAvoir / remboursement effectif.
-- `Depense`, synthèse financière, `dateReconnaissanceCharge`.
+- Lots **4.1+** : compensation, remboursement, mixte, permissions exécution, outbox règlement, corrections, restitutions, annulation (`EXPIREE` 30 j), détachement RGPD FK.
 - Index partiel unique choix ACTIF.
 - API v1, mobile.
 - Validation trésorier de la durée / point de départ + activation politique env.
-- Migration Prisma / activation prod.
+- Migration Prisma dépôt ; activation prod permanente.
 
 ## Variables
 

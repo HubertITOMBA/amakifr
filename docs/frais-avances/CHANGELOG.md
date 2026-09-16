@@ -1,5 +1,27 @@
 # Changelog — frais avancés
 
+## 0.4.0-charge — 2026-09-16
+
+### Ajouté (lot 4.0 — local, flag off, **pas de migration dépôt**)
+- Enum `OrigineDepense` (`ORDINAIRE` | `FRAIS_AVANCE`) ; `Depense.origine` défaut `ORDINAIRE`.
+- `TypeDepense.code` nullable unique ; résolution métier par `code=FRAIS_AVANCE` (aucune création runtime).
+- `Depense.noteFraisId` unique → `NoteFrais` Restrict ; relation inverse `DepenseCharge` ; **aucun** `NoteFrais.depenseId`.
+- Dans la TX `SOUMISE → VALIDEE` : création atomique d’**une** `Depense` :
+  - `origine=FRAIS_AVANCE`, `montant=montantAccepte`, `dateDepense=NoteFrais.dateDepense`,
+  - `statut=Valide`, `createdBy`/`validatedBy` = décideur ;
+  - TypeDepense absent/inactif → erreur `TYPE_DEPENSE_FRAIS_AVANCE_ABSENT` + rollback complet.
+- Rejet : zéro Depense ; replay / concurrence : unicité `noteFraisId` + OCC.
+- Synthèse : `totalCharges` = toutes Valide ; `depensesOrdinairesDecaissees` = ORDINAIRE ;
+  `soldeBancaireEstime` = recettes − ORDINAIRE (FRAIS_AVANCE n’abaisse pas encore la banque) ;
+  indicateurs notes (`decaissements*`, `compensations*`, `restitutions*`, `restantDu*`) exposés à **0**.
+- Fixture tests `ensureTypeDepenseFraisAvanceForTests` (idempotente).
+- RGPD : Restrict conserve le blocage ; détachement archive (`noteFraisId→null`, `origine` inchangée) = **lot 4.9**.
+
+### Non inclus
+- Modèles / exécution remboursement, compensation, mixte, restitution, annulation (4.1–4.8).
+- Détachement FK à l’archivage (4.9).
+- Migration Prisma dépôt ; activation permanente ; commit / push / déploiement.
+
 ## 0.3.0-choix-reglement — 2026-09-16
 
 ### Ajouté

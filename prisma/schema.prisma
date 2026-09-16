@@ -718,10 +718,18 @@ model Vote {
   @@map("votes")
 }
 
+/// Origine comptable d'une Depense (immuable ; classification synthèse — pas la FK note).
+enum OrigineDepense {
+  ORDINAIRE
+  FRAIS_AVANCE
+}
+
 model TypeDepense {
   id          String   @id @default(cuid())
   titre       String   @db.VarChar(200)
   description String?  @db.Text
+  /// Code technique stable (nullable pour historiques). FRAIS_AVANCE = type notes de frais.
+  code        String?  @unique @db.VarChar(32)
   actif       Boolean  @default(true)
   createdBy   String // ID de l'admin qui a créé le type
   createdAt   DateTime @default(now())
@@ -735,15 +743,19 @@ model TypeDepense {
 }
 
 model Depense {
-  id            String   @id @default(cuid())
-  libelle       String   @db.VarChar(200)
-  montant       Decimal  @db.Decimal(10, 2)
+  id            String         @id @default(cuid())
+  libelle       String         @db.VarChar(200)
+  montant       Decimal        @db.Decimal(10, 2)
   dateDepense   DateTime
   typeDepenseId String? // Référence au type de dépense (remplace categorie)
-  categorie     String?  @db.VarChar(100) // Conservé pour compatibilité, sera remplacé par typeDepenseId
-  description   String?  @db.Text
-  justificatif  String?  @db.VarChar(500) // URL du fichier uploadé (conservé pour compatibilité)
-  statut        String   @default("EnAttente") // EnAttente, Valide, Rejete
+  categorie     String?        @db.VarChar(100) // Conservé pour compatibilité, sera remplacé par typeDepenseId
+  description   String?        @db.Text
+  justificatif  String?        @db.VarChar(500) // URL du fichier uploadé (conservé pour compatibilité)
+  statut        String         @default("EnAttente") // EnAttente, Valide, Rejete
+  /// Classification permanente (synthèse). Inchangée si noteFraisId détaché (RGPD futur).
+  origine       OrigineDepense @default(ORDINAIRE)
+  /// Lien 1–1 note VALIDEE → charge. Restrict : pas de delete Depense tant que note live.
+  noteFraisId   String?        @unique
   createdBy     String // ID de l'admin qui a créé la dépense
   validatedBy   String? // ID de l'admin qui a validé la dépense (null si non validée)
 
@@ -751,12 +763,14 @@ model Depense {
   CreatedBy     User                  @relation("DepenseCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
   ValidatedBy   User?                 @relation("DepenseValidatedBy", fields: [validatedBy], references: [id], onDelete: SetNull)
   TypeDepense   TypeDepense?          @relation(fields: [typeDepenseId], references: [id], onDelete: SetNull)
+  NoteFrais     NoteFrais?            @relation("NoteFraisCharge", fields: [noteFraisId], references: [id], onDelete: Restrict)
   Justificatifs JustificatifDepense[] // Justificatifs de la dépense
 
   // Métadonnées
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  @@index([origine, statut])
   @@map("depenses")
 }
 
@@ -2724,6 +2738,8 @@ model NoteFrais {
   OutboxEvents  NoteFraisOutboxEvent[]
   Decision      NoteFraisDecision?
   ChoixReglements NoteFraisChoixReglement[]
+  /// Charge reconnue (lot 4.0) — FK sur Depense.noteFraisId uniquement.
+  DepenseCharge Depense? @relation("NoteFraisCharge")
 
   @@index([adherentId, statut])
   @@index([demandeurUserId])

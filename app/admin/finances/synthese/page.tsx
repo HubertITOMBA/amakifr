@@ -409,7 +409,11 @@ export default function SyntheseFinancierePage() {
       const stats = data.stats;
       const statsData = [
         ["Recettes totales", `${stats.totalRecettes.toFixed(2)} €`],
-        ["Dépenses totales", `${stats.totalDepenses.toFixed(2)} €`],
+        ["Charges validées", `${stats.totalDepenses.toFixed(2)} €`],
+        [
+          "Dépenses ordinaires décaissées (estimées)",
+          `${Number(stats.depensesOrdinairesDecaissees ?? 0).toFixed(2)} €`,
+        ],
         ["Solde bancaire estimé", `${stats.soldeBancaireEstime.toFixed(2)} €`],
         ["Créances à recevoir", `${stats.totalCreances.toFixed(2)} €`],
         ["Dettes initiales", `${stats.totalDettesInitiales.toFixed(2)} €`],
@@ -432,11 +436,21 @@ export default function SyntheseFinancierePage() {
 
         doc.text(label + " :", xPos, yPos);
         doc.setFont(undefined, "bold");
-        doc.text(value, xPos + 60, yPos);
+        doc.text(value, xPos + 70, yPos);
         doc.setFont(undefined, "normal");
       });
 
-      yPos += 15;
+      yPos += 10;
+      doc.setFontSize(8);
+      doc.setTextColor(100, 116, 139);
+      doc.text(
+        "Note : le solde bancaire estimé = recettes − dépenses ordinaires. Les frais avancés reconnus (charges) ne diminuent le solde qu'au remboursement effectif.",
+        20,
+        yPos,
+        { maxWidth: pageWidth - 40 }
+      );
+      doc.setTextColor(0, 0, 0);
+      yPos += 12;
 
       // Tableau des adhérents
       if (yPos > pageHeight - 60) {
@@ -636,7 +650,7 @@ export default function SyntheseFinancierePage() {
             <CardHeader className="bg-gradient-to-r from-rose-100 to-rose-50 dark:from-rose-900/30 dark:to-rose-800/20 rounded-t-lg pb-3 pt-3 px-4 gap-0">
               <CardTitle className="flex items-center gap-2 text-base text-gray-700 dark:text-gray-200">
                 <TrendingDown className="h-4 w-4 text-rose-500 dark:text-rose-400" />
-                Dépenses
+                Charges validées
               </CardTitle>
             </CardHeader>
             <CardContent className="pt-4 pb-4 px-4">
@@ -644,7 +658,11 @@ export default function SyntheseFinancierePage() {
                 {stats.totalDepenses.toFixed(2)} €
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                {stats.nombreDepenses} dépense(s)
+                Ordinaires + frais avancés reconnus ({stats.nombreDepenses})
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Dont ordinaires décaissées (estimées) :{" "}
+                {Number(stats.depensesOrdinairesDecaissees ?? 0).toFixed(2)} €
               </p>
             </CardContent>
           </Card>
@@ -667,7 +685,11 @@ export default function SyntheseFinancierePage() {
                 {stats.soldeBancaireEstime.toFixed(2)} €
               </p>
               <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">
-                Recettes - Dépenses
+                Recettes − dépenses ordinaires
+              </p>
+              <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                Les frais avancés reconnus ne diminuent le solde qu&apos;au
+                remboursement effectif.
               </p>
             </CardContent>
           </Card>

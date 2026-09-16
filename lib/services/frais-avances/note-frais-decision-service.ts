@@ -1,6 +1,7 @@
 /**
- * Décision sur une note de frais SOUMISE (lot 2).
- * VALIDEE / REJETEE — hors périmètre : écriture comptable, reconnaissance de charge, décaissement.
+ * Décision sur une note de frais SOUMISE (lots 2 + 4.0).
+ * VALIDEE : reconnaissance de charge atomique (Depense origine FRAIS_AVANCE).
+ * REJETEE : aucune Depense. Décaissement / remboursement = lots 4.1+.
  */
 import { Prisma, TypeNotification } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -14,6 +15,10 @@ import {
   type NoteFraisPublicDto,
 } from "@/lib/frais-avances/dto";
 import { hashIdForLog } from "@/lib/frais-avances/storage";
+import {
+  NOTES_FRAIS_TYPE_DEPENSE_ABSENT,
+  findActiveTypeDepenseFraisAvance,
+} from "@/lib/frais-avances/type-depense-frais-avance";
 import { lockUserRowForNotesFrais } from "@/lib/services/frais-avances/rgpd-account-deletion";
 
 export type NotesFraisDecisionActionResult<T = unknown> =
@@ -26,6 +31,7 @@ export const NOTES_FRAIS_VERSION_CONFLICT =
 export const NOTES_FRAIS_DECISION_IDEMPOTENCY_CONFLICT =
   "Clé d'idempotence déjà utilisée avec un contenu de décision différent";
 
+export { NOTES_FRAIS_TYPE_DEPENSE_ABSENT };
 export type DecideNoteFraisOutcome = "VALIDEE" | "REJETEE";
 
 export type DecideNoteFraisInput = {
@@ -59,6 +65,9 @@ function mapError(error: unknown): NotesFraisDecisionActionResult<never> {
     if (error.message === NOTES_FRAIS_VERSION_CONFLICT) code = "VERSION_CONFLICT";
     if (error.message === NOTES_FRAIS_DECISION_IDEMPOTENCY_CONFLICT) {
       code = "IDEMPOTENCY_CONFLICT";
+    }
+    if (error.message === NOTES_FRAIS_TYPE_DEPENSE_ABSENT) {
+      code = "TYPE_DEPENSE_FRAIS_AVANCE_ABSENT";
     }
     if (error.message.includes("Non autorisé")) code = "FORBIDDEN";
     if (error.message.includes("Auto-décision")) code = "AUTO_DECISION_FORBIDDEN";
@@ -189,7 +198,7 @@ async function loadNoteDto(
 /**
  * Décide une note SOUMISE (VALIDEE ou REJETEE).
  * Verrouillage : demandeur puis note (aligné RGPD).
- * Atomique : note + journal + notification demandeur + outbox.
+ * Atomique : note + journal + (Depense FRAIS_AVANCE si VALIDEE) + notif + outbox.
  */
 export async function decideNoteFrais(
   input: DecideNoteFraisInput
@@ -355,6 +364,16 @@ export async function decideNoteFrais(
         throw new Error(NOTES_FRAIS_VERSION_CONFLICT);
       }
 
+      // Resolve-only avant claim : TypeDepense absent → rollback TX (aucune écriture).
+      let typeFraisAvanceId: string | null = null;
+      if (content.statutFinal === "VALIDEE") {
+        const typeFa = await findActiveTypeDepenseFraisAvance(tx);
+        if (!typeFa) {
+          throw new Error(NOTES_FRAIS_TYPE_DEPENSE_ABSENT);
+        }
+        typeFraisAvanceId = typeFa.id;
+      }
+
       const decideeAt = new Date();
       const claimed = await tx.noteFrais.updateMany({
         where: {
@@ -394,6 +413,30 @@ export async function decideNoteFrais(
           decideeAt,
         },
       });
+
+      // Charge reconnue (lot 4.0) : une Depense FRAIS_AVANCE / note (unicité noteFraisId).
+      if (content.statutFinal === "VALIDEE" && typeFraisAvanceId) {
+        const existingCharge = await tx.depense.findUnique({
+          where: { noteFraisId: input.noteId },
+          select: { id: true },
+        });
+        if (!existingCharge) {
+          await tx.depense.create({
+            data: {
+              libelle: current.libelle.slice(0, 200),
+              montant: new Prisma.Decimal(content.montantAccepte!),
+              dateDepense: current.dateDepense,
+              typeDepenseId: typeFraisAvanceId,
+              description: current.description,
+              statut: "Valide",
+              origine: "FRAIS_AVANCE",
+              noteFraisId: input.noteId,
+              createdBy: input.actorUserId,
+              validatedBy: input.actorUserId,
+            },
+          });
+        }
+      }
 
       const titre =
         content.statutFinal === "VALIDEE"

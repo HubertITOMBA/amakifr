@@ -15,6 +15,9 @@ const {
   userAdminRoleFindMany,
   canWrite,
   resolveActionPermissionConfig,
+  typeDepenseFindFirst,
+  depenseFindUnique,
+  depenseCreate,
 } = vi.hoisted(() => ({
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
@@ -29,6 +32,9 @@ const {
   userAdminRoleFindMany: vi.fn(),
   canWrite: vi.fn(),
   resolveActionPermissionConfig: vi.fn(),
+  typeDepenseFindFirst: vi.fn(),
+  depenseFindUnique: vi.fn(),
+  depenseCreate: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -48,6 +54,13 @@ vi.mock("@/lib/db", () => ({
     noteFraisOutboxEvent: { create: (...a: unknown[]) => outboxCreate(...a) },
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     userAdminRole: { findMany: (...a: unknown[]) => userAdminRoleFindMany(...a) },
+    typeDepense: {
+      findFirst: (...a: unknown[]) => typeDepenseFindFirst(...a),
+    },
+    depense: {
+      findUnique: (...a: unknown[]) => depenseFindUnique(...a),
+      create: (...a: unknown[]) => depenseCreate(...a),
+    },
   },
 }));
 
@@ -79,6 +92,44 @@ import {
   validateAndNormalizeDecisionContent,
 } from "@/lib/services/frais-avances/note-frais-decision-service";
 import { canUserDecideNoteFrais } from "@/lib/frais-avances/authz";
+import { NOTES_FRAIS_TYPE_DEPENSE_ABSENT } from "@/lib/frais-avances/type-depense-frais-avance";
+
+function baseSoumise(overrides: Record<string, unknown> = {}) {
+  return {
+    id: "n1",
+    demandeurUserId: "dem",
+    statut: "SOUMISE",
+    version: 2,
+    montantDemande: new Prisma.Decimal(100),
+    libelle: "Note test",
+    description: "desc",
+    dateDepense: new Date("2026-03-01T00:00:00.000Z"),
+    Decision: null,
+    decisionIdempotencyKey: null,
+    ...overrides,
+  };
+}
+
+function mockTxHappyPath() {
+  $transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => {
+    const tx = {
+      $executeRaw,
+      noteFrais: {
+        findUnique: noteFindUnique,
+        updateMany: noteUpdateMany,
+      },
+      noteFraisDecision: { create: decisionCreate },
+      notification: { create: notifCreate },
+      noteFraisOutboxEvent: { create: outboxCreate },
+      typeDepense: { findFirst: typeDepenseFindFirst },
+      depense: {
+        findUnique: depenseFindUnique,
+        create: depenseCreate,
+      },
+    };
+    return fn(tx);
+  });
+}
 
 describe("validateAndNormalizeDecisionContent", () => {
   it("accepte total sans motif", () => {
@@ -130,7 +181,6 @@ describe("canUserDecideNoteFrais", () => {
   beforeEach(() => {
     canWrite.mockResolvedValue(false);
     userAdminRoleFindMany.mockResolvedValue([]);
-    // Permission non configurée par défaut → rôle métier suffit.
     resolveActionPermissionConfig.mockResolvedValue({ status: "absent" });
   });
 
@@ -206,23 +256,26 @@ describe("decideNoteFrais", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     canWrite.mockResolvedValue(false);
-    // Permission non configurée : TRESOR Actif autorisé (rôle métier).
     resolveActionPermissionConfig.mockResolvedValue({ status: "absent" });
     userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
     userAdminRoleFindMany.mockResolvedValue([]);
     noteFindFirst.mockResolvedValue(null);
     $executeRaw.mockResolvedValue(undefined);
+    typeDepenseFindFirst.mockResolvedValue({
+      id: "td-fa",
+      code: "FRAIS_AVANCE",
+      actif: true,
+    });
+    depenseFindUnique.mockResolvedValue(null);
+    depenseCreate.mockResolvedValue({ id: "dep1" });
+    decisionCreate.mockResolvedValue({});
+    notifCreate.mockResolvedValue({});
+    outboxCreate.mockResolvedValue({});
+    noteUpdateMany.mockResolvedValue({ count: 1 });
   });
 
   it("refuse auto-décision", async () => {
-    noteFindUnique.mockResolvedValue({
-      id: "n1",
-      demandeurUserId: "actor",
-      statut: "SOUMISE",
-      version: 2,
-      montantDemande: new Prisma.Decimal(40),
-      Decision: null,
-    });
+    noteFindUnique.mockResolvedValue(baseSoumise({ demandeurUserId: "actor" }));
     const res = await decideNoteFrais({
       actorUserId: "actor",
       noteId: "n1",
@@ -239,12 +292,13 @@ describe("decideNoteFrais", () => {
 
   it("idempotence même contenu = succès sans doublon", async () => {
     const decided = {
-      id: "n1",
-      demandeurUserId: "dem",
-      statut: "VALIDEE",
-      version: 3,
-      montantDemande: new Prisma.Decimal(40),
-      decisionIdempotencyKey: "decide-key-01",
+      ...baseSoumise({
+        statut: "VALIDEE",
+        version: 3,
+        decisionIdempotencyKey: "decide-key-01",
+        montantAccepte: new Prisma.Decimal(40),
+        montantDemande: new Prisma.Decimal(40),
+      }),
       Decision: {
         statutFinal: "VALIDEE",
         montantAccepte: new Prisma.Decimal(40),
@@ -253,12 +307,8 @@ describe("decideNoteFrais", () => {
       Justificatifs: [],
       Demandeur: null,
       Adherent: null,
-      libelle: "x",
-      description: null,
-      dateDepense: new Date(),
       soumiseAt: new Date(),
       alerteSansDestinataire: false,
-      montantAccepte: new Prisma.Decimal(40),
       motifDecision: null,
       decideeAt: new Date(),
       decideurUserId: "tres",
@@ -281,6 +331,7 @@ describe("decideNoteFrais", () => {
       expect(res.data.alreadyDecided).toBe(true);
     }
     expect($transaction).not.toHaveBeenCalled();
+    expect(depenseCreate).not.toHaveBeenCalled();
   });
 
   it("idempotence contenu différent = conflit", async () => {
@@ -321,6 +372,174 @@ describe("decideNoteFrais", () => {
     if (!res.success) {
       expect(res.code).toBe("IDEMPOTENCY_CONFLICT");
     }
+  });
+
+  it("VALIDEE totale : crée une Depense FRAIS_AVANCE atomique", async () => {
+    const soumise = baseSoumise();
+    noteFindUnique
+      .mockResolvedValueOnce(soumise)
+      .mockResolvedValueOnce(soumise)
+      .mockResolvedValueOnce({
+        ...soumise,
+        statut: "VALIDEE",
+        version: 3,
+        montantAccepte: new Prisma.Decimal(100),
+        Decision: {
+          statutFinal: "VALIDEE",
+          montantAccepte: new Prisma.Decimal(100),
+          motif: null,
+        },
+        Justificatifs: [],
+        Demandeur: null,
+        Adherent: null,
+        soumiseAt: new Date(),
+        alerteSansDestinataire: false,
+        motifDecision: null,
+        decideeAt: new Date(),
+        decideurUserId: "tres",
+        corrigeNoteFraisId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    mockTxHappyPath();
+
+    const res = await decideNoteFrais({
+      actorUserId: "tres",
+      noteId: "n1",
+      expectedVersion: 2,
+      idempotencyKey: "decide-val-total",
+      outcome: "VALIDEE",
+      montantAccepte: 100,
+    });
+    expect(res.success).toBe(true);
+    expect(depenseCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          origine: "FRAIS_AVANCE",
+          noteFraisId: "n1",
+          typeDepenseId: "td-fa",
+          statut: "Valide",
+          createdBy: "tres",
+          validatedBy: "tres",
+          montant: expect.any(Prisma.Decimal),
+        }),
+      })
+    );
+    expect(decisionCreate).toHaveBeenCalled();
+    expect(notifCreate).toHaveBeenCalled();
+    expect(outboxCreate).toHaveBeenCalled();
+  });
+
+  it("VALIDEE partielle : Depense au montantAccepte", async () => {
+    const soumise = baseSoumise();
+    noteFindUnique
+      .mockResolvedValueOnce(soumise)
+      .mockResolvedValueOnce(soumise)
+      .mockResolvedValueOnce({
+        ...soumise,
+        statut: "VALIDEE",
+        version: 3,
+        montantAccepte: new Prisma.Decimal(60),
+        Decision: {
+          statutFinal: "VALIDEE",
+          montantAccepte: new Prisma.Decimal(60),
+          motif: "partiel",
+        },
+        Justificatifs: [],
+        Demandeur: null,
+        Adherent: null,
+        soumiseAt: new Date(),
+        alerteSansDestinataire: false,
+        motifDecision: "partiel",
+        decideeAt: new Date(),
+        decideurUserId: "tres",
+        corrigeNoteFraisId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    mockTxHappyPath();
+
+    const res = await decideNoteFrais({
+      actorUserId: "tres",
+      noteId: "n1",
+      expectedVersion: 2,
+      idempotencyKey: "decide-val-part",
+      outcome: "VALIDEE",
+      montantAccepte: 60,
+      motif: "partiel",
+    });
+    expect(res.success).toBe(true);
+    const arg = depenseCreate.mock.calls[0]?.[0] as {
+      data: { montant: Prisma.Decimal };
+    };
+    expect(arg.data.montant.toFixed(2)).toBe("60.00");
+  });
+
+  it("REJETEE : aucune Depense", async () => {
+    const soumise = baseSoumise();
+    noteFindUnique
+      .mockResolvedValueOnce(soumise)
+      .mockResolvedValueOnce(soumise)
+      .mockResolvedValueOnce({
+        ...soumise,
+        statut: "REJETEE",
+        version: 3,
+        Decision: {
+          statutFinal: "REJETEE",
+          montantAccepte: null,
+          motif: "illisible",
+        },
+        Justificatifs: [],
+        Demandeur: null,
+        Adherent: null,
+        soumiseAt: new Date(),
+        alerteSansDestinataire: false,
+        motifDecision: "illisible",
+        decideeAt: new Date(),
+        decideurUserId: "tres",
+        corrigeNoteFraisId: null,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+    mockTxHappyPath();
+
+    const res = await decideNoteFrais({
+      actorUserId: "tres",
+      noteId: "n1",
+      expectedVersion: 2,
+      idempotencyKey: "decide-rej",
+      outcome: "REJETEE",
+      motif: "illisible",
+    });
+    expect(res.success).toBe(true);
+    expect(typeDepenseFindFirst).not.toHaveBeenCalled();
+    expect(depenseCreate).not.toHaveBeenCalled();
+  });
+
+  it("TypeDepense absent : rollback (pas de claim/écritures)", async () => {
+    const soumise = baseSoumise();
+    noteFindUnique.mockResolvedValue(soumise);
+    typeDepenseFindFirst.mockResolvedValue(null);
+    mockTxHappyPath();
+
+    const res = await decideNoteFrais({
+      actorUserId: "tres",
+      noteId: "n1",
+      expectedVersion: 2,
+      idempotencyKey: "decide-no-type",
+      outcome: "VALIDEE",
+      montantAccepte: 100,
+    });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.code).toBe("TYPE_DEPENSE_FRAIS_AVANCE_ABSENT");
+      expect(res.error).toBe(NOTES_FRAIS_TYPE_DEPENSE_ABSENT);
+    }
+    expect(noteUpdateMany).not.toHaveBeenCalled();
+    expect(decisionCreate).not.toHaveBeenCalled();
+    expect(depenseCreate).not.toHaveBeenCalled();
+    expect(notifCreate).not.toHaveBeenCalled();
+    expect(outboxCreate).not.toHaveBeenCalled();
   });
 });
 

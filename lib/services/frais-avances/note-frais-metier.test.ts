@@ -451,7 +451,7 @@ describe("métier notes-frais (mocks)", () => {
     );
   });
 
-  it("aucune dépendance Depense/Avoir/PaiementCotisation dans le module", async () => {
+  it("lot 4.0 : Depense charge OK à la décision ; pas d'Avoir/Paiement/exécution", async () => {
     const { readFile } = await import("node:fs/promises");
     const serviceSrc = await readFile(
       "/soft/dev/nextjs/amakifr/lib/services/frais-avances/note-frais-service.ts",
@@ -465,8 +465,12 @@ describe("métier notes-frais (mocks)", () => {
       "/soft/dev/nextjs/amakifr/lib/services/frais-avances/note-frais-choix-reglement-service.ts",
       "utf8"
     );
+    // Soumission / service : toujours hors Depense / Avoir / Paiement
     expect(serviceSrc).not.toMatch(/\bDepense\b|\bAvoir\b|PaiementCotisation/);
-    expect(decisionSrc).not.toMatch(/\bDepense\b|\bAvoir\b|PaiementCotisation/);
+    // Décision lot 4.0 : Depense charge autorisée ; pas d'exécution trésorerie
+    expect(decisionSrc).toMatch(/depense\.create|origine:\s*"FRAIS_AVANCE"/);
+    expect(decisionSrc).not.toMatch(/\bAvoir\b|UtilisationAvoir|PaiementCotisation/);
+    // Choix : toujours hors Depense / Avoir / Paiement (accord seul)
     expect(choixSrc).not.toMatch(
       /\bDepense\b|\bAvoir\b|UtilisationAvoir|PaiementCotisation/
     );

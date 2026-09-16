@@ -27,6 +27,7 @@ describe("intégration PG choix règlement notes-frais", () => {
   });
 
   async function wipe() {
+    await prisma.depense.deleteMany({ where: { noteFraisId: { not: null } } });
     await prisma.noteFraisChoixReglementCible.deleteMany({});
     await prisma.noteFraisChoixReglement.deleteMany({});
     await prisma.noteFraisDecision.deleteMany({});

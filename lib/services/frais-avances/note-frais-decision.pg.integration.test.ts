@@ -1,5 +1,5 @@
 /**
- * Tests PG — décision notes de frais (lot 2).
+ * Tests PG — décision notes de frais (lots 2 + 4.0 charge).
  * Allowlist : 127.0.0.1:55432 / amaki_notes_frais_test / amaki_test.
  */
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
@@ -8,6 +8,11 @@ import { randomUUID } from "node:crypto";
 import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resolveAuthorizedNotesFraisPgTestUrl } from "@/lib/frais-avances/pg-test-allowlist";
+import { ensureTypeDepenseFraisAvanceForTests } from "@/lib/frais-avances/type-depense-frais-avance";
+import {
+  computeChargesFromDepensesValides,
+  computeSoldeBancaireEstime,
+} from "@/lib/financial/synthese-charges";
 
 const STORAGE = "/tmp/amaki-notes-frais-pg-decision-storage";
 const FIXTURE_EMAIL_SUFFIX = "@notes-frais-test.local";
@@ -15,6 +20,7 @@ const FIXTURE_EMAIL_SUFFIX = "@notes-frais-test.local";
 describe("intégration PG décision notes-frais", () => {
   let prisma: PrismaClient;
   let url: string;
+  let typeSeedUserId: string;
 
   beforeAll(async () => {
     process.env.NOTES_FRAIS_ENABLED = "true";
@@ -32,10 +38,16 @@ describe("intégration PG décision notes-frais", () => {
   });
 
   async function wipe() {
+    // Restrict : Depense.noteFraisId → NoteFrais — supprimer charges d'abord.
+    await prisma.depense.deleteMany({
+      where: { noteFraisId: { not: null } },
+    });
     await prisma.noteFraisFileJob.deleteMany({});
     await prisma.noteFraisArchiveAccessLog.deleteMany({});
     await prisma.justificatifNoteFraisArchive.deleteMany({});
     await prisma.noteFraisArchive.deleteMany({});
+    await prisma.noteFraisChoixReglementCible.deleteMany({});
+    await prisma.noteFraisChoixReglement.deleteMany({});
     await prisma.noteFraisDecision.deleteMany({});
     await prisma.noteFraisOutboxEvent.deleteMany({});
     await prisma.justificatifNoteFrais.deleteMany({});
@@ -83,6 +95,12 @@ describe("intégration PG décision notes-frais", () => {
     });
   }
 
+  async function ensureTypeFa() {
+    const seed = await createUser("typeseed", "ADMIN");
+    typeSeedUserId = seed.id;
+    return ensureTypeDepenseFraisAvanceForTests(prisma, seed.id);
+  }
+
   async function createSubmittedNote(
     user: Awaited<ReturnType<typeof createUser>>,
     montant = 80
@@ -118,8 +136,9 @@ describe("intégration PG décision notes-frais", () => {
     return note;
   }
 
-  it("validation totale : journal + notif + outbox atomiques", async () => {
+  it("validation totale : journal + Depense FRAIS_AVANCE + notif + outbox", async () => {
     await wipe();
+    const typeFa = await ensureTypeFa();
     const dem = await createUser("dem", "MEMBRE");
     const tres = await createUser("tres", "TRESOR");
     const note = await createSubmittedNote(dem, 80);
@@ -140,11 +159,27 @@ describe("intégration PG décision notes-frais", () => {
 
     const updated = await prisma.noteFrais.findUniqueOrThrow({
       where: { id: note.id },
-      include: { Decision: true },
+      include: { Decision: true, DepenseCharge: true },
     });
     expect(updated.statut).toBe("VALIDEE");
     expect(updated.Decision?.statutFinal).toBe("VALIDEE");
     expect(Number(updated.montantAccepte)).toBe(80);
+
+    expect(updated.DepenseCharge).not.toBeNull();
+    expect(updated.DepenseCharge!.origine).toBe("FRAIS_AVANCE");
+    expect(updated.DepenseCharge!.noteFraisId).toBe(note.id);
+    expect(updated.DepenseCharge!.typeDepenseId).toBe(typeFa.id);
+    expect(Number(updated.DepenseCharge!.montant)).toBe(80);
+    expect(updated.DepenseCharge!.statut).toBe("Valide");
+    expect(updated.DepenseCharge!.createdBy).toBe(tres.id);
+    expect(updated.DepenseCharge!.validatedBy).toBe(tres.id);
+    expect(updated.DepenseCharge!.dateDepense.toISOString()).toBe(
+      note.dateDepense.toISOString()
+    );
+
+    expect(
+      await prisma.depense.count({ where: { noteFraisId: note.id } })
+    ).toBe(1);
 
     const notifs = await prisma.notification.findMany({
       where: { userId: dem.id, lien: `/user/frais-avances/${note.id}` },
@@ -156,10 +191,163 @@ describe("intégration PG décision notes-frais", () => {
     });
     expect(outbox).toHaveLength(1);
     expect(outbox[0]?.kind).toBe("DECIDED");
+
+    // Aucune écriture Avoir / UtilisationAvoir / PaiementCotisation
+    expect(await prisma.avoir.count({ where: { adherentId: dem.adherent!.id } })).toBe(0);
+    expect(
+      await prisma.paiementCotisation.count({
+        where: { adherentId: dem.adherent!.id },
+      })
+    ).toBe(0);
   });
 
-  it("deux décisions concurrentes : une seule effective", async () => {
+  it("validation partielle : Depense = montantAccepte", async () => {
     await wipe();
+    await ensureTypeFa();
+    const dem = await createUser("demp", "MEMBRE");
+    const tres = await createUser("tresp", "TRESOR");
+    const note = await createSubmittedNote(dem, 100);
+
+    const { decideNoteFrais } = await import(
+      "@/lib/services/frais-avances/note-frais-decision-service"
+    );
+    const res = await decideNoteFrais({
+      actorUserId: tres.id,
+      noteId: note.id,
+      expectedVersion: 2,
+      idempotencyKey: "decide-partiel-01",
+      outcome: "VALIDEE",
+      montantAccepte: 55.5,
+      motif: "Partiel justifié",
+      client: prisma,
+    });
+    expect(res.success).toBe(true);
+    const dep = await prisma.depense.findUniqueOrThrow({
+      where: { noteFraisId: note.id },
+    });
+    expect(Number(dep.montant)).toBe(55.5);
+    expect(dep.origine).toBe("FRAIS_AVANCE");
+  });
+
+  it("rejet : zéro Depense", async () => {
+    await wipe();
+    await ensureTypeFa();
+    const dem = await createUser("demrej0", "MEMBRE");
+    const tres = await createUser("tresrej0", "TRESOR");
+    const note = await createSubmittedNote(dem, 40);
+
+    const { decideNoteFrais } = await import(
+      "@/lib/services/frais-avances/note-frais-decision-service"
+    );
+    const res = await decideNoteFrais({
+      actorUserId: tres.id,
+      noteId: note.id,
+      expectedVersion: 2,
+      idempotencyKey: "decide-rej-zero",
+      outcome: "REJETEE",
+      motif: "Illisible",
+      client: prisma,
+    });
+    expect(res.success).toBe(true);
+    expect(await prisma.depense.count({ where: { noteFraisId: note.id } })).toBe(
+      0
+    );
+  });
+
+  it("TypeDepense absent/inactif : rollback note, décision, notif, outbox, Depense", async () => {
+    await wipe();
+    const dem = await createUser("demnotype", "MEMBRE");
+    const tres = await createUser("tresnotype", "TRESOR");
+    const note = await createSubmittedNote(dem, 25);
+
+    // Désactive tout TypeDepense FRAIS_AVANCE s'il existe
+    await prisma.typeDepense.updateMany({
+      where: { code: "FRAIS_AVANCE" },
+      data: { actif: false },
+    });
+
+    const { decideNoteFrais } = await import(
+      "@/lib/services/frais-avances/note-frais-decision-service"
+    );
+    const res = await decideNoteFrais({
+      actorUserId: tres.id,
+      noteId: note.id,
+      expectedVersion: 2,
+      idempotencyKey: "decide-no-type-pg",
+      outcome: "VALIDEE",
+      montantAccepte: 25,
+      client: prisma,
+    });
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.code).toBe("TYPE_DEPENSE_FRAIS_AVANCE_ABSENT");
+    }
+
+    const still = await prisma.noteFrais.findUniqueOrThrow({
+      where: { id: note.id },
+    });
+    expect(still.statut).toBe("SOUMISE");
+    expect(
+      await prisma.noteFraisDecision.count({ where: { noteFraisId: note.id } })
+    ).toBe(0);
+    expect(await prisma.depense.count({ where: { noteFraisId: note.id } })).toBe(
+      0
+    );
+    expect(
+      await prisma.notification.count({
+        where: { userId: dem.id, lien: `/user/frais-avances/${note.id}` },
+      })
+    ).toBe(0);
+    expect(
+      await prisma.noteFraisOutboxEvent.count({
+        where: { eventKey: `note:${note.id}:decided` },
+      })
+    ).toBe(0);
+
+    // Restaure type pour les autres tests
+    await ensureTypeDepenseFraisAvanceForTests(prisma, tres.id);
+  });
+
+  it("replay idempotent : une seule Depense", async () => {
+    await wipe();
+    await ensureTypeFa();
+    const dem = await createUser("demid", "MEMBRE");
+    const tres = await createUser("tresid", "TRESOR");
+    const note = await createSubmittedNote(dem, 33);
+
+    const { decideNoteFrais } = await import(
+      "@/lib/services/frais-avances/note-frais-decision-service"
+    );
+    const first = await decideNoteFrais({
+      actorUserId: tres.id,
+      noteId: note.id,
+      expectedVersion: 2,
+      idempotencyKey: "decide-idem-dep",
+      outcome: "VALIDEE",
+      montantAccepte: 33,
+      client: prisma,
+    });
+    expect(first.success).toBe(true);
+
+    const second = await decideNoteFrais({
+      actorUserId: tres.id,
+      noteId: note.id,
+      expectedVersion: 2,
+      idempotencyKey: "decide-idem-dep",
+      outcome: "VALIDEE",
+      montantAccepte: 33,
+      client: prisma,
+    });
+    expect(second.success).toBe(true);
+    if (second.success) expect(second.data.alreadyDecided).toBe(true);
+    expect(await prisma.depense.count({ where: { noteFraisId: note.id } })).toBe(
+      1
+    );
+  });
+
+  it("deux décisions concurrentes : une seule Depense", async () => {
+    await wipe();
+    await ensureTypeFa();
     const dem = await createUser("demc", "MEMBRE");
     const t1 = await createUser("t1", "TRESOR");
     const t2 = await createUser("t2", "ADMIN");
@@ -207,10 +395,112 @@ describe("intégration PG décision notes-frais", () => {
         where: { eventKey: `note:${note.id}:decided` },
       })
     ).toBe(1);
+
+    const depCount = await prisma.depense.count({
+      where: { noteFraisId: note.id },
+    });
+    if (final.statut === "VALIDEE") {
+      expect(depCount).toBe(1);
+    } else {
+      expect(depCount).toBe(0);
+    }
+  });
+
+  it("synthèse : charge FRAIS_AVANCE ↑ ; solde inchangé ; ORDINAIRE ↓ solde", async () => {
+    await wipe();
+    await ensureTypeFa();
+    const dem = await createUser("demsyn", "MEMBRE");
+    const tres = await createUser("tressyn", "TRESOR");
+    const note = await createSubmittedNote(dem, 70);
+
+    const { decideNoteFrais } = await import(
+      "@/lib/services/frais-avances/note-frais-decision-service"
+    );
+    await decideNoteFrais({
+      actorUserId: tres.id,
+      noteId: note.id,
+      expectedVersion: 2,
+      idempotencyKey: "decide-syn-fa",
+      outcome: "VALIDEE",
+      montantAccepte: 70,
+      client: prisma,
+    });
+
+    const ord = await prisma.depense.create({
+      data: {
+        libelle: "Ordinaire test",
+        montant: 20,
+        dateDepense: new Date("2026-01-15"),
+        statut: "Valide",
+        origine: "ORDINAIRE",
+        createdBy: tres.id,
+        validatedBy: tres.id,
+      },
+    });
+
+    const all = await prisma.depense.findMany({
+      where: {
+        OR: [{ id: ord.id }, { noteFraisId: note.id }],
+        statut: "Valide",
+      },
+    });
+    // Classification par origine uniquement (pas noteFraisId)
+    const ind = computeChargesFromDepensesValides(
+      all.map((d) => ({ montant: Number(d.montant), origine: d.origine }))
+    );
+    expect(ind.totalCharges).toBe(90);
+    expect(ind.depensesOrdinairesDecaissees).toBe(20);
+    expect(computeSoldeBancaireEstime(100, ind)).toBe(80);
+
+    await prisma.depense.delete({ where: { id: ord.id } });
+  });
+
+  it("historique : Depense sans origine explicite = ORDINAIRE (défaut)", async () => {
+    await wipe();
+    const tres = await createUser("tresdef", "TRESOR");
+    const d = await prisma.depense.create({
+      data: {
+        libelle: "Sans origine explicite",
+        montant: 5,
+        dateDepense: new Date(),
+        statut: "Valide",
+        createdBy: tres.id,
+      },
+    });
+    const loaded = await prisma.depense.findUniqueOrThrow({ where: { id: d.id } });
+    expect(loaded.origine).toBe("ORDINAIRE");
+    expect(loaded.noteFraisId).toBeNull();
+    await prisma.depense.delete({ where: { id: d.id } });
+  });
+
+  it("Restrict : suppression note bloquée tant que Depense liée", async () => {
+    await wipe();
+    await ensureTypeFa();
+    const dem = await createUser("demrest", "MEMBRE");
+    const tres = await createUser("tresrest", "TRESOR");
+    const note = await createSubmittedNote(dem, 12);
+
+    const { decideNoteFrais } = await import(
+      "@/lib/services/frais-avances/note-frais-decision-service"
+    );
+    await decideNoteFrais({
+      actorUserId: tres.id,
+      noteId: note.id,
+      expectedVersion: 2,
+      idempotencyKey: "decide-restrict",
+      outcome: "VALIDEE",
+      montantAccepte: 12,
+      client: prisma,
+    });
+
+    await expect(
+      prisma.noteFrais.delete({ where: { id: note.id } })
+    ).rejects.toThrow();
   });
 
   it("rollback TX si échec après claim : note reste SOUMISE", async () => {
     await wipe();
+    await ensureTypeFa();
     const dem = await createUser("demr", "MEMBRE");
     const tres = await createUser("tresr", "TRESOR");
     const note = await createSubmittedNote(dem, 30);
@@ -219,10 +509,6 @@ describe("intégration PG décision notes-frais", () => {
       "@/lib/services/frais-avances/note-frais-decision-service"
     );
 
-    // Force échec en injectant un client dont noteFraisDecision.create throw
-    // après updateMany — via proxy sur $transaction interne impossible ;
-    // on simule via motif invalide post-lock n'est pas possible.
-    // Approche : outbox eventKey unique pré-insérée pour faire échouer create outbox.
     await prisma.noteFraisOutboxEvent.create({
       data: {
         noteFraisId: note.id,
@@ -249,6 +535,9 @@ describe("intégration PG décision notes-frais", () => {
     });
     expect(still.statut).toBe("SOUMISE");
     expect(await prisma.noteFraisDecision.count({ where: { noteFraisId: note.id } })).toBe(0);
+    expect(await prisma.depense.count({ where: { noteFraisId: note.id } })).toBe(
+      0
+    );
     expect(
       await prisma.notification.count({
         where: { userId: dem.id, lien: `/user/frais-avances/${note.id}` },
@@ -258,6 +547,7 @@ describe("intégration PG décision notes-frais", () => {
 
   it("rôles : additionnel TRESOR OK ; PRESID/inactif/auto refusés", async () => {
     await wipe();
+    await ensureTypeFa();
     const dem = await createUser("demrole", "MEMBRE");
     const membre = await createUser("membrole", "MEMBRE");
     await prisma.userAdminRole.create({
@@ -281,6 +571,9 @@ describe("intégration PG décision notes-frais", () => {
       client: prisma,
     });
     expect(ok.success).toBe(true);
+    expect(await prisma.depense.count({ where: { noteFraisId: note.id } })).toBe(
+      1
+    );
 
     const note2 = await createSubmittedNote(dem, 21);
     const badPres = await decideNoteFrais({
@@ -320,6 +613,7 @@ describe("intégration PG décision notes-frais", () => {
 
   it("REJETEE immuable + correction + RGPD refuse sans politique", async () => {
     await wipe();
+    await ensureTypeFa();
     const dem = await createUser("demrej", "MEMBRE");
     const tres = await createUser("tresrej", "TRESOR");
     const note = await createSubmittedNote(dem, 15);
@@ -344,6 +638,9 @@ describe("intégration PG décision notes-frais", () => {
       client: prisma,
     });
     expect(rej.success).toBe(true);
+    expect(await prisma.depense.count({ where: { noteFraisId: note.id } })).toBe(
+      0
+    );
 
     const corr = await createCorrectedNoteFraisDraft({
       userId: dem.id,
@@ -363,7 +660,6 @@ describe("intégration PG décision notes-frais", () => {
       deleteUserAtomicallyWithNotesFraisRgpd(dem.id, prisma)
     ).rejects.toMatchObject({ code: "NOTES_FRAIS_SUBMITTED_RETENTION_REQUIRED" });
 
-    // Avec politique injectée : archive REJETEE + purge brouillon correction
     await deleteUserAtomicallyWithNotesFraisRgpd(dem.id, prisma, {
       injectedRetention: { durationMs: 60_000, startsAt: "archivedAt" },
     });
@@ -374,4 +670,7 @@ describe("intégration PG décision notes-frais", () => {
     expect(arch).not.toBeNull();
     expect(await prisma.user.findUnique({ where: { id: dem.id } })).toBeNull();
   });
+
+  // silence unused
+  void typeSeedUserId;
 });

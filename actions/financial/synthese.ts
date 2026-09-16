@@ -3,11 +3,14 @@
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
 import { UserRole } from "@prisma/client";
-import { Decimal } from "@prisma/client/runtime/library";
+import {
+  computeChargesFromDepensesValides,
+  computeSoldeBancaireEstime,
+} from "@/lib/financial/synthese-charges";
 
 /**
  * Récupère la synthèse financière complète de l'association
- * 
+ *
  * @returns Un objet avec success (boolean), data (synthèse complète) en cas de succès, ou error (string) en cas d'échec
  */
 export async function getFinancialSynthese() {
@@ -28,38 +31,51 @@ export async function getFinancialSynthese() {
             lastname: true,
             User: {
               select: {
-                email: true
-              }
-            }
-          }
-        }
+                email: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
-        datePaiement: 'desc'
-      }
+        datePaiement: "desc",
+      },
     });
-    const totalRecettes = paiementsValides.reduce((sum, p) => sum + Number(p.montant), 0);
+    const totalRecettes = paiementsValides.reduce(
+      (sum, p) => sum + Number(p.montant),
+      0
+    );
 
-    // 2. DÉPENSES (Dépenses validées)
+    // 2. DÉPENSES / CHARGES (Valide) — classement par origine uniquement (lot 4.0)
     const depensesValides = await prisma.depense.findMany({
       where: { statut: "Valide" },
       include: {
         CreatedBy: {
           select: {
-            email: true
-          }
+            email: true,
+          },
         },
         TypeDepense: {
           select: {
-            titre: true
-          }
-        }
+            titre: true,
+          },
+        },
       },
       orderBy: {
-        dateDepense: 'desc'
-      }
+        dateDepense: "desc",
+      },
     });
-    const totalDepenses = depensesValides.reduce((sum, d) => sum + Number(d.montant), 0);
+    const chargesIndicators = computeChargesFromDepensesValides(
+      depensesValides.map((d) => ({
+        montant: Number(d.montant),
+        origine: d.origine,
+      }))
+    );
+    const totalCharges = chargesIndicators.totalCharges;
+    const depensesOrdinairesDecaissees =
+      chargesIndicators.depensesOrdinairesDecaissees;
+    // Alias historique UI : totalDepenses = totalCharges (pas le solde banque).
+    const totalDepenses = totalCharges;
 
     // 3. DETTES INITIALES (montants restants)
     const dettesInitiales = await prisma.detteInitiale.findMany({
@@ -71,23 +87,23 @@ export async function getFinancialSynthese() {
             lastname: true,
             User: {
               select: {
-                email: true
-              }
-            }
-          }
-        }
+                email: true,
+              },
+            },
+          },
+        },
       },
-      orderBy: [
-        { annee: 'desc' },
-        { adherentId: 'asc' }
-      ]
+      orderBy: [{ annee: "desc" }, { adherentId: "asc" }],
     });
-    const totalDettesInitiales = dettesInitiales.reduce((sum, d) => sum + Number(d.montantRestant), 0);
+    const totalDettesInitiales = dettesInitiales.reduce(
+      (sum, d) => sum + Number(d.montantRestant),
+      0
+    );
 
     // 4. COTISATIONS MENSUELLES (montants restants)
     const cotisationsMensuelles = await prisma.cotisationMensuelle.findMany({
       where: {
-        statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] }
+        statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] },
       },
       include: {
         Adherent: {
@@ -97,30 +113,29 @@ export async function getFinancialSynthese() {
             lastname: true,
             User: {
               select: {
-                email: true
-              }
-            }
-          }
+                email: true,
+              },
+            },
+          },
         },
         TypeCotisation: {
           select: {
             nom: true,
-            montant: true
-          }
-        }
+            montant: true,
+          },
+        },
       },
-      orderBy: [
-        { annee: 'desc' },
-        { mois: 'desc' },
-        { adherentId: 'asc' }
-      ]
+      orderBy: [{ annee: "desc" }, { mois: "desc" }, { adherentId: "asc" }],
     });
-    const totalCotisationsMensuelles = cotisationsMensuelles.reduce((sum, c) => sum + Number(c.montantRestant), 0);
+    const totalCotisationsMensuelles = cotisationsMensuelles.reduce(
+      (sum, c) => sum + Number(c.montantRestant),
+      0
+    );
 
     // 5. ASSISTANCES (montants restants)
     const assistances = await prisma.assistance.findMany({
       where: {
-        statut: { not: "Annule" }
+        statut: { not: "Annule" },
       },
       include: {
         Adherent: {
@@ -130,23 +145,26 @@ export async function getFinancialSynthese() {
             lastname: true,
             User: {
               select: {
-                email: true
-              }
-            }
-          }
-        }
+                email: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
-        dateEvenement: 'desc'
-      }
+        dateEvenement: "desc",
+      },
     });
-    const totalAssistances = assistances.reduce((sum, a) => sum + Number(a.montantRestant), 0);
+    const totalAssistances = assistances.reduce(
+      (sum, a) => sum + Number(a.montantRestant),
+      0
+    );
 
     // 6. AVOIRS (crédits disponibles)
     const avoirs = await prisma.avoir.findMany({
       where: {
         statut: "Disponible",
-        montantRestant: { gt: 0 }
+        montantRestant: { gt: 0 },
       },
       include: {
         Adherent: {
@@ -156,26 +174,34 @@ export async function getFinancialSynthese() {
             lastname: true,
             User: {
               select: {
-                email: true
-              }
-            }
-          }
-        }
+                email: true,
+              },
+            },
+          },
+        },
       },
       orderBy: {
-        createdAt: 'desc'
-      }
+        createdAt: "desc",
+      },
     });
-    const totalAvoirs = avoirs.reduce((sum, a) => sum + Number(a.montantRestant), 0);
+    const totalAvoirs = avoirs.reduce(
+      (sum, a) => sum + Number(a.montantRestant),
+      0
+    );
 
-    // 7. CALCUL DU SOLDE BANCAIRE ESTIMÉ
-    // Solde = Recettes - Dépenses - Dettes à recevoir (négatif si on doit de l'argent)
-    // Mais en réalité : Solde = Recettes - Dépenses (ce qu'on a vraiment en banque)
-    // Les dettes sont ce qu'on doit recevoir, pas ce qu'on a déjà
-    const soldeBancaireEstime = totalRecettes - totalDepenses;
+    // 7. SOLDE BANCAIRE ESTIMÉ (lot 4.0) : recettes − ORDINAIRE seulement
+    // FRAIS_AVANCE ∈ charges mais ∉ décaissement tant que remboursement non exécuté.
+    const soldeBancaireEstime = computeSoldeBancaireEstime(
+      totalRecettes,
+      chargesIndicators
+    );
 
     // 8. CRÉANCES (ce qu'on doit recevoir des adhérents)
-    const totalCreances = totalDettesInitiales + totalCotisationsMensuelles + totalAssistances - totalAvoirs;
+    const totalCreances =
+      totalDettesInitiales +
+      totalCotisationsMensuelles +
+      totalAssistances -
+      totalAvoirs;
 
     // 9. SYNTHÈSE PAR ADHÉRENT
     const adherents = await prisma.adherent.findMany({
@@ -183,106 +209,121 @@ export async function getFinancialSynthese() {
         User: {
           select: {
             email: true,
-            status: true
-          }
+            status: true,
+          },
         },
         DettesInitiales: {
-          orderBy: { annee: 'desc' }
+          orderBy: { annee: "desc" },
         },
         CotisationsMensuelles: {
           where: {
-            statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] }
+            statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] },
           },
-          orderBy: [
-            { annee: 'desc' },
-            { mois: 'desc' }
-          ],
+          orderBy: [{ annee: "desc" }, { mois: "desc" }],
           include: {
             TypeCotisation: {
               select: {
-                nom: true
-              }
-            }
-          }
+                nom: true,
+              },
+            },
+          },
         },
         Assistances: {
           where: {
-            statut: { not: "Annule" }
+            statut: { not: "Annule" },
           },
-          orderBy: { dateEvenement: 'desc' }
+          orderBy: { dateEvenement: "desc" },
         },
         Avoirs: {
           where: {
             statut: "Disponible",
-            montantRestant: { gt: 0 }
+            montantRestant: { gt: 0 },
           },
-          orderBy: { createdAt: 'desc' }
+          orderBy: { createdAt: "desc" },
         },
         Paiements: {
           where: {
-            statut: "Valide"
+            statut: "Valide",
           },
-          orderBy: { datePaiement: 'desc' }
-        }
+          orderBy: { datePaiement: "desc" },
+        },
       },
-      orderBy: [
-        { lastname: 'asc' },
-        { firstname: 'asc' }
-      ]
+      orderBy: [{ lastname: "asc" }, { firstname: "asc" }],
     });
 
-    const syntheseParAdherent = adherents.map(adherent => {
-      // Dettes initiales
-      const dettesInitialesAdherent = adherent.DettesInitiales.reduce((sum, d) => sum + Number(d.montantRestant), 0);
-      
-      // Cotisations mensuelles en cours (du mois actuel)
+    const syntheseParAdherent = adherents.map((adherent) => {
+      const dettesInitialesAdherent = adherent.DettesInitiales.reduce(
+        (sum, d) => sum + Number(d.montantRestant),
+        0
+      );
+
       const moisCourant = new Date().getMonth() + 1;
       const anneeCourante = new Date().getFullYear();
       const cotisationMoisCourant = adherent.CotisationsMensuelles.find(
-        cm => cm.mois === moisCourant && cm.annee === anneeCourante
+        (cm) => cm.mois === moisCourant && cm.annee === anneeCourante
       );
-      const cotisationMoisCourantMontant = cotisationMoisCourant ? Number(cotisationMoisCourant.montantRestant) : 0;
-      
-      // Toutes les cotisations mensuelles en attente
-      const totalCotisationsMensuellesAdherent = adherent.CotisationsMensuelles.reduce(
-        (sum, c) => sum + Number(c.montantRestant), 0
-      );
-      
-      // Assistances en attente
-      const assistancesAdherent = adherent.Assistances.filter(a => {
+      const cotisationMoisCourantMontant = cotisationMoisCourant
+        ? Number(cotisationMoisCourant.montantRestant)
+        : 0;
+
+      const totalCotisationsMensuellesAdherent =
+        adherent.CotisationsMensuelles.reduce(
+          (sum, c) => sum + Number(c.montantRestant),
+          0
+        );
+
+      const assistancesAdherent = adherent.Assistances.filter((a) => {
         const dateAss = new Date(a.dateEvenement);
-        return dateAss.getMonth() + 1 === moisCourant && dateAss.getFullYear() === anneeCourante;
+        return (
+          dateAss.getMonth() + 1 === moisCourant &&
+          dateAss.getFullYear() === anneeCourante
+        );
       });
-      const totalAssistancesMoisCourant = assistancesAdherent.reduce((sum, a) => sum + Number(a.montantRestant), 0);
-      
-      // Avoirs disponibles
-      const totalAvoirsAdherent = adherent.Avoirs.reduce((sum, a) => sum + Number(a.montantRestant), 0);
-      
-      // Total payé
-      const totalPaye = adherent.Paiements.reduce((sum, p) => sum + Number(p.montant), 0);
-      
-      // Dette totale
-      const detteTotale = dettesInitialesAdherent + totalCotisationsMensuellesAdherent + 
-        assistancesAdherent.reduce((sum, a) => sum + Number(a.montantRestant), 0);
-      
-      // Dette nette (après avoirs)
+      const totalAssistancesMoisCourant = assistancesAdherent.reduce(
+        (sum, a) => sum + Number(a.montantRestant),
+        0
+      );
+
+      const totalAvoirsAdherent = adherent.Avoirs.reduce(
+        (sum, a) => sum + Number(a.montantRestant),
+        0
+      );
+
+      const totalPaye = adherent.Paiements.reduce(
+        (sum, p) => sum + Number(p.montant),
+        0
+      );
+
+      const detteTotale =
+        dettesInitialesAdherent +
+        totalCotisationsMensuellesAdherent +
+        assistancesAdherent.reduce(
+          (sum, a) => sum + Number(a.montantRestant),
+          0
+        );
+
       const detteNette = Math.max(0, detteTotale - totalAvoirsAdherent);
-      
+
       return {
         id: adherent.id,
-        nom: `${adherent.firstname || ''} ${adherent.lastname || ''}`.trim() || 'Non renseigné',
-        email: adherent.User?.email || '',
-        statut: adherent.User?.status || 'Inactif',
+        nom:
+          `${adherent.firstname || ""} ${adherent.lastname || ""}`.trim() ||
+          "Non renseigné",
+        email: adherent.User?.email || "",
+        statut: adherent.User?.status || "Inactif",
         dettesInitiales: dettesInitialesAdherent,
         cotisationMoisCourant: cotisationMoisCourantMontant,
         assistanceMoisCourant: totalAssistancesMoisCourant,
         totalCotisationsMensuelles: totalCotisationsMensuellesAdherent,
-        totalAssistances: assistancesAdherent.reduce((sum, a) => sum + Number(a.montantRestant), 0),
+        totalAssistances: assistancesAdherent.reduce(
+          (sum, a) => sum + Number(a.montantRestant),
+          0
+        ),
         totalAvoirs: totalAvoirsAdherent,
         totalPaye: totalPaye,
         detteTotale: detteTotale,
         detteNette: detteNette,
-        solde: totalPaye - detteTotale + totalAvoirsAdherent // Ce que l'adhérent a payé en trop ou en moins
+        solde: totalPaye - detteTotale + totalAvoirsAdherent,
       };
     });
 
@@ -290,6 +331,14 @@ export async function getFinancialSynthese() {
     const stats = {
       totalRecettes: Number(totalRecettes.toFixed(2)),
       totalDepenses: Number(totalDepenses.toFixed(2)),
+      totalCharges: Number(totalCharges.toFixed(2)),
+      depensesOrdinairesDecaissees: Number(
+        depensesOrdinairesDecaissees.toFixed(2)
+      ),
+      decaissementsNotesFrais: chargesIndicators.decaissementsNotesFrais,
+      compensationsNotesFrais: chargesIndicators.compensationsNotesFrais,
+      restitutionsNotesFrais: chargesIndicators.restitutionsNotesFrais,
+      restantDuNotesFrais: chargesIndicators.restantDuNotesFrais,
       totalDettesInitiales: Number(totalDettesInitiales.toFixed(2)),
       totalCotisationsMensuelles: Number(totalCotisationsMensuelles.toFixed(2)),
       totalAssistances: Number(totalAssistances.toFixed(2)),
@@ -297,10 +346,14 @@ export async function getFinancialSynthese() {
       totalCreances: Number(totalCreances.toFixed(2)),
       soldeBancaireEstime: Number(soldeBancaireEstime.toFixed(2)),
       nombreAdherents: adherents.length,
-      nombreAdherentsAvecDette: syntheseParAdherent.filter(a => a.detteNette > 0).length,
-      nombreAdherentsAvecAvoir: syntheseParAdherent.filter(a => a.totalAvoirs > 0).length,
+      nombreAdherentsAvecDette: syntheseParAdherent.filter(
+        (a) => a.detteNette > 0
+      ).length,
+      nombreAdherentsAvecAvoir: syntheseParAdherent.filter(
+        (a) => a.totalAvoirs > 0
+      ).length,
       nombrePaiements: paiementsValides.length,
-      nombreDepenses: depensesValides.length
+      nombreDepenses: depensesValides.length,
     };
 
     return {
@@ -308,29 +361,33 @@ export async function getFinancialSynthese() {
       data: {
         stats,
         syntheseParAdherent,
-        paiements: paiementsValides.map(p => ({
+        paiements: paiementsValides.map((p) => ({
           id: p.id,
           date: p.datePaiement.toISOString(),
-          adherent: `${p.Adherent?.firstname || ''} ${p.Adherent?.lastname || ''}`.trim() || 'Non renseigné',
+          adherent:
+            `${p.Adherent?.firstname || ""} ${p.Adherent?.lastname || ""}`.trim() ||
+            "Non renseigné",
           montant: Number(p.montant),
           moyenPaiement: p.moyenPaiement,
-          reference: p.reference || ''
+          reference: p.reference || "",
         })),
-        depenses: depensesValides.map(d => ({
+        depenses: depensesValides.map((d) => ({
           id: d.id,
           date: d.dateDepense.toISOString(),
           libelle: d.libelle,
           montant: Number(d.montant),
-          type: d.TypeDepense?.titre || d.categorie || 'Non spécifié',
-          createdBy: d.CreatedBy?.email || ''
+          origine: d.origine,
+          type: d.TypeDepense?.titre || d.categorie || "Non spécifié",
+          createdBy: d.CreatedBy?.email || "",
         })),
-        dateGeneration: new Date().toISOString()
-      }
+        dateGeneration: new Date().toISOString(),
+      },
     };
-
   } catch (error) {
-    console.error("Erreur lors de la récupération de la synthèse financière:", error);
+    console.error(
+      "Erreur lors de la récupération de la synthèse financière:",
+      error
+    );
     return { success: false, error: "Erreur interne du serveur" };
   }
 }
-
