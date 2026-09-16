@@ -125,11 +125,17 @@ describePg("intégration PG notes-frais RGPD (base Docker allowlistée)", () => 
     await client.noteFraisArchiveAccessLog.deleteMany({});
     await client.justificatifNoteFraisArchive.deleteMany({});
     await client.noteFraisArchive.deleteMany({});
+    await client.noteFraisDecision.deleteMany({});
     await client.noteFraisOutboxEvent.deleteMany({});
     await client.justificatifNoteFrais.deleteMany({});
     await client.noteFrais.deleteMany({});
     await client.notification.deleteMany({
-      where: { lien: { contains: "/admin/frais-avances/" } },
+      where: {
+        OR: [
+          { lien: { contains: "/admin/frais-avances/" } },
+          { lien: { contains: "/user/frais-avances/" } },
+        ],
+      },
     });
     await client.userAdminRole.deleteMany({
       where: { user: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },

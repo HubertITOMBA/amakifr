@@ -121,11 +121,17 @@ describePg("intégration PG archive privée notes-frais", () => {
     await prisma.noteFraisArchiveAccessLog.deleteMany({});
     await prisma.justificatifNoteFraisArchive.deleteMany({});
     await prisma.noteFraisArchive.deleteMany({});
+    await prisma.noteFraisDecision.deleteMany({});
     await prisma.noteFraisOutboxEvent.deleteMany({});
     await prisma.justificatifNoteFrais.deleteMany({});
     await prisma.noteFrais.deleteMany({});
     await prisma.notification.deleteMany({
-      where: { lien: { contains: "/admin/frais-avances/" } },
+      where: {
+        OR: [
+          { lien: { contains: "/admin/frais-avances/" } },
+          { lien: { contains: "/user/frais-avances/" } },
+        ],
+      },
     });
     await prisma.userAdminRole.deleteMany({
       where: { user: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },
@@ -336,6 +342,7 @@ describePg("intégration PG archive privée notes-frais", () => {
         dateDepense: new Date(),
         montantDemande: 1,
         soumiseAt: new Date(),
+        statutFinal: "SOUMISE",
         archivedAt: new Date(),
         retentionEndsAt: new Date(Date.now() + 60_000),
         reidentifiabilityNotice: ARCHIVE_REIDENTIFIABILITY_NOTICE,
@@ -464,6 +471,7 @@ describePg("intégration PG archive privée notes-frais", () => {
         dateDepense: new Date(),
         montantDemande: 9,
         soumiseAt: new Date(),
+        statutFinal: "SOUMISE",
         archivedAt: new Date(),
         retentionEndsAt: new Date(Date.now() - 1000),
         reidentifiabilityNotice: ARCHIVE_REIDENTIFIABILITY_NOTICE,
@@ -551,6 +559,7 @@ describePg("intégration PG archive privée notes-frais", () => {
         dateDepense: new Date(),
         montantDemande: 5,
         soumiseAt: new Date(),
+        statutFinal: "SOUMISE",
         archivedAt: new Date(),
         retentionEndsAt: new Date(Date.now() + 3600_000),
         reidentifiabilityNotice: ARCHIVE_REIDENTIFIABILITY_NOTICE,

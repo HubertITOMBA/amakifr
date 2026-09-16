@@ -1,5 +1,20 @@
 # Changelog — frais avancés
 
+## 0.2.0-decision — 2026-09-15
+
+### Ajouté
+- Décision sur note `SOUMISE` → `VALIDEE` | `REJETEE` (montant accepté, motif, journal métier).
+- Permission `decideNoteFrais` : comptes **Actif** `TRESOR` | `ADMIN` (principal ou additionnel) — filtre rôle non contournable par permission dynamique. Ensuite : config WRITE **absente** → rôle suffit ; **disabled** / rôle hors liste → refus explicite ; **ADMIN** principal bypass.
+- PRESID/SECRET : lecture + notifs soumission uniquement ; COMCPT : archive uniquement.
+- Auto-décision interdite (`decideurUserId !== demandeurUserId`).
+- Note rejetée immuable ; brouillon de correction lié (`corrigeNoteFraisId`, SetNull à l’archivage).
+- Notif interne + outbox `DECIDED` atomiques avec la décision ; push après commit.
+- RGPD : `VALIDEE`/`REJETEE` protégées comme `SOUMISE` sans politique réelle.
+- Tests unitaires + PG (concurrence, rollback, idempotence, rôles, auto-décision, RGPD).
+
+### Non inclus
+- `Depense`, remboursement, Avoir, synthèse, `dateReconnaissanceCharge`, API v1, mobile, migration, activation.
+
 ## 0.1.6-archive-privee — 2026-09-15
 
 ### Ajouté

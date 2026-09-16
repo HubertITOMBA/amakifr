@@ -12,6 +12,9 @@ type ArchiveDetail = {
   dateDepense: string | Date;
   montantDemande: string | number;
   soumiseAt: string | Date;
+  statutFinal?: string;
+  montantAccepte?: string | number | null;
+  decideeAt?: string | Date | null;
   archivedAt: string | Date;
   retentionEndsAt: string | Date;
   reidentifiabilityNotice: string;
@@ -68,6 +71,18 @@ export default function AdminFraisAvancesArchiveDetailPage() {
                 <span className="font-semibold">Montant :</span>{" "}
                 {String(data.montantDemande)} €
               </p>
+              {data.statutFinal ? (
+                <p>
+                  <span className="font-semibold">Statut final :</span>{" "}
+                  {data.statutFinal}
+                </p>
+              ) : null}
+              {data.montantAccepte != null ? (
+                <p>
+                  <span className="font-semibold">Montant accepté :</span>{" "}
+                  {String(data.montantAccepte)} €
+                </p>
+              ) : null}
               <p>
                 <span className="font-semibold">Date dépense :</span>{" "}
                 {new Date(data.dateDepense).toLocaleDateString("fr-FR")}

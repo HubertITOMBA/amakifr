@@ -39,8 +39,9 @@ function extFromFilename(name: string): string {
 }
 
 /**
- * Archive atomique des notes SOUMISES dans la TX de suppression compte.
+ * Archive atomique des notes SOUMISE|VALIDEE|REJETEE dans la TX de suppression compte.
  * Crée des PJ archive en PENDING + jobs MOVE durables (READY après déplacement réel).
+ * Liens de correction : SetNull via FK avant suppression de la note d'origine.
  */
 export async function archiveSubmittedNotesInTransaction(
   tx: NotesFraisArchiveDbClient,
@@ -62,7 +63,10 @@ export async function archiveSubmittedNotesInTransaction(
 
   for (const noteId of noteIds) {
     const note = await tx.noteFrais.findFirst({
-      where: { id: noteId, statut: "SOUMISE" },
+      where: {
+        id: noteId,
+        statut: { in: ["SOUMISE", "VALIDEE", "REJETEE"] },
+      },
       include: {
         Justificatifs: {
           where: { statut: "READY" },
@@ -73,11 +77,20 @@ export async function archiveSubmittedNotesInTransaction(
 
     await cancelPendingMovesAndEnqueueUnlinks(tx as never, [noteId]);
 
+    // Détache les corrections pointant vers cette note (FK SetNull + explicite).
+    await tx.noteFrais.updateMany({
+      where: { corrigeNoteFraisId: noteId },
+      data: { corrigeNoteFraisId: null },
+    });
+
     const archive = await tx.noteFraisArchive.create({
       data: {
         dateDepense: note.dateDepense,
         montantDemande: note.montantDemande,
         soumiseAt: note.soumiseAt,
+        statutFinal: note.statut,
+        montantAccepte: note.montantAccepte,
+        decideeAt: note.decideeAt,
         archivedAt,
         retentionEndsAt,
         reidentifiabilityNotice: ARCHIVE_REIDENTIFIABILITY_NOTICE,
@@ -122,8 +135,11 @@ export async function archiveSubmittedNotesInTransaction(
       moveJobsEnqueued += 1;
     }
 
-    const lien = `/admin/frais-avances/${noteId}`;
-    await tx.notification.deleteMany({ where: { lien } });
+    const liens = [
+      `/admin/frais-avances/${noteId}`,
+      `/user/frais-avances/${noteId}`,
+    ];
+    await tx.notification.deleteMany({ where: { lien: { in: liens } } });
     await tx.noteFraisOutboxEvent.updateMany({
       where: {
         noteFraisId: noteId,
@@ -138,9 +154,13 @@ export async function archiveSubmittedNotesInTransaction(
       },
     });
 
+    // Journal décision : Cascade via delete note.
     await tx.justificatifNoteFrais.deleteMany({ where: { noteFraisId: noteId } });
     await tx.noteFrais.deleteMany({
-      where: { id: noteId, statut: "SOUMISE" },
+      where: {
+        id: noteId,
+        statut: { in: ["SOUMISE", "VALIDEE", "REJETEE"] },
+      },
     });
   }
 

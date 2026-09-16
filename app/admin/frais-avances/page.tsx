@@ -9,8 +9,10 @@ import { actionListAdminNotesFrais } from "@/actions/frais-avances";
 type AdminNote = {
   id: string;
   libelle: string;
+  statut: string;
   alerteSansDestinataire: boolean;
   soumiseAt: string | Date | null;
+  montantAccepte?: string | number | null;
   Adherent?: { firstname: string; lastname: string };
 };
 
@@ -73,13 +75,16 @@ export default function AdminFraisAvancesPage() {
                 >
                   <span>
                     <span className="font-medium">{n.libelle}</span>
+                    <span className="ml-2 text-xs font-semibold text-slate-600">
+                      {n.statut}
+                    </span>
                     {n.Adherent ? (
                       <span className="ml-2 text-xs text-slate-500">
                         {n.Adherent.firstname} {n.Adherent.lastname}
                       </span>
                     ) : null}
                   </span>
-                  {n.alerteSansDestinataire ? (
+                  {n.alerteSansDestinataire && n.statut === "SOUMISE" ? (
                     <span className="rounded bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-900">
                       Sans destinataire
                     </span>

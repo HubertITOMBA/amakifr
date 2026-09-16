@@ -100,6 +100,9 @@ export type NoteFraisArchiveStructuredFields = {
   dateDepense: Date;
   montantDemande: string;
   soumiseAt: Date;
+  statutFinal: string;
+  montantAccepte: string | null;
+  decideeAt: Date | null;
   archivedAt: Date;
   retentionEndsAt: Date;
   reidentifiabilityNotice: typeof ARCHIVE_REIDENTIFIABILITY_NOTICE;

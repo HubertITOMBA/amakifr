@@ -676,6 +676,7 @@ export async function listMyNotesFrais(
       where: { demandeurUserId: userId },
       orderBy: { updatedAt: "desc" },
       include: {
+        Decision: true,
         Justificatifs: {
           select: {
             id: true,
@@ -698,7 +699,7 @@ export async function listMyNotesFrais(
 }
 
 /**
- * Liste admin des notes soumises uniquement (authz dans le service).
+ * Liste admin des notes soumises et décidées (authz dans le service).
  */
 export async function listAdminNotesFrais(input: {
   actorUserId: string;
@@ -712,16 +713,14 @@ export async function listAdminNotesFrais(input: {
     }
 
     const rows = await db.noteFrais.findMany({
-      where: {
-        statut: "SOUMISE",
-        ...(input.onlyAlerteSansDestinataire
-          ? { alerteSansDestinataire: true }
-          : {}),
-      },
-      orderBy: { soumiseAt: "desc" },
+      where: input.onlyAlerteSansDestinataire
+        ? { statut: "SOUMISE", alerteSansDestinataire: true }
+        : { statut: { in: ["SOUMISE", "VALIDEE", "REJETEE"] } },
+      orderBy: [{ soumiseAt: "desc" }],
       include: {
         Demandeur: { select: { id: true, email: true, name: true } },
         Adherent: { select: { id: true, firstname: true, lastname: true } },
+        Decision: true,
         Justificatifs: {
           where: { statut: "READY" },
           select: {
@@ -745,7 +744,7 @@ export async function listAdminNotesFrais(input: {
 }
 
 /**
- * Détail note : propriétaire (tout statut) ou responsable (SOUMISE uniquement).
+ * Détail note : propriétaire (tout statut) ou responsable (hors BROUILLON).
  */
 export async function getNoteFraisForUser(input: {
   userId: string;
@@ -766,6 +765,7 @@ export async function getNoteFraisForUser(input: {
             createdAt: true,
           },
         },
+        Decision: true,
         Demandeur: { select: { id: true, email: true, name: true } },
         Adherent: { select: { id: true, firstname: true, lastname: true } },
       },

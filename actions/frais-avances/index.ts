@@ -194,6 +194,91 @@ export async function actionSubmitNoteFrais(form: {
   }
 }
 
+/**
+ * Décision TRESOR/ADMIN sur une note SOUMISE.
+ */
+export async function actionDecideNoteFrais(form: {
+  noteId: string;
+  expectedVersion: number;
+  idempotencyKey: string;
+  outcome: "VALIDEE" | "REJETEE";
+  montantAccepte?: number | null;
+  motif?: string | null;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    if (!form.idempotencyKey?.trim()) {
+      return {
+        success: false as const,
+        error: "Clé d'idempotence requise",
+        code: "IDEMPOTENCY_REQUIRED",
+      };
+    }
+    const { decideNoteFrais } = await import(
+      "@/lib/services/frais-avances/note-frais-decision-service"
+    );
+    const result = await decideNoteFrais({
+      actorUserId: userId,
+      noteId: form.noteId,
+      expectedVersion: form.expectedVersion,
+      idempotencyKey: form.idempotencyKey,
+      outcome: form.outcome,
+      montantAccepte: form.montantAccepte,
+      motif: form.motif,
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath("/admin/frais-avances");
+      revalidatePath(`/user/frais-avances/${form.noteId}`);
+      revalidatePath(`/admin/frais-avances/${form.noteId}`);
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
+ * Brouillon de correction lié à une note REJETEE du même propriétaire.
+ */
+export async function actionCreateCorrectedNoteFraisDraft(form: {
+  corrigeNoteFraisId: string;
+  libelle?: string;
+  description?: string | null;
+  dateDepense?: string;
+  montantDemande?: number;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    const { createCorrectedNoteFraisDraft } = await import(
+      "@/lib/services/frais-avances/note-frais-decision-service"
+    );
+    const result = await createCorrectedNoteFraisDraft({
+      userId,
+      corrigeNoteFraisId: form.corrigeNoteFraisId,
+      libelle: form.libelle,
+      description: form.description,
+      dateDepense: form.dateDepense ? new Date(form.dateDepense) : undefined,
+      montantDemande: form.montantDemande,
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath(`/user/frais-avances/${result.data.id}`);
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
 export async function actionListMyNotesFrais() {
   if (!isNotesFraisEnabled()) return disabled();
   try {

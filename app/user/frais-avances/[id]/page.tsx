@@ -1,11 +1,12 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { useParams } from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
+  actionCreateCorrectedNoteFraisDraft,
   actionDeleteNoteFraisJustificatif,
   actionGetNoteFrais,
   actionSubmitNoteFrais,
@@ -20,16 +21,22 @@ type Justificatif = {
 };
 
 /**
- * Détail / dépôt PJ / soumission d'une note membre.
+ * Détail / dépôt PJ / soumission / affichage décision d'une note membre.
  */
 export default function UserNoteFraisDetailPage() {
   const params = useParams();
+  const router = useRouter();
   const noteId = String(params.id || "");
   const [note, setNote] = useState<{
     id: string;
     libelle: string;
     statut: string;
     version: number;
+    montantDemande?: string | number;
+    montantAccepte?: string | number | null;
+    motifDecision?: string | null;
+    decideeAt?: string | Date | null;
+    corrigeNoteFraisId?: string | null;
     Justificatifs: Justificatif[];
   } | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -101,6 +108,19 @@ export default function UserNoteFraisDetailPage() {
     await reload();
   }
 
+  async function onCorrect() {
+    if (!note) return;
+    const res = await actionCreateCorrectedNoteFraisDraft({
+      corrigeNoteFraisId: note.id,
+    });
+    if (!res.success) {
+      toast.error(res.error);
+      return;
+    }
+    toast.success(res.message || "Brouillon de correction créé");
+    router.push(`/user/frais-avances/${res.data.id}`);
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4 sm:p-8">
       <Card className="mx-auto max-w-2xl border-blue-200 shadow-lg">
@@ -118,6 +138,31 @@ export default function UserNoteFraisDetailPage() {
               <p className="text-sm">
                 Statut : <strong>{note.statut}</strong>
               </p>
+              {note.montantDemande != null ? (
+                <p className="text-sm">
+                  Montant demandé : {String(note.montantDemande)} €
+                </p>
+              ) : null}
+              {note.corrigeNoteFraisId ? (
+                <p className="text-xs text-slate-600">
+                  Demande corrigée liée à une note rejetée précédente.
+                </p>
+              ) : null}
+              {note.statut === "VALIDEE" || note.statut === "REJETEE" ? (
+                <div className="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-1 text-sm">
+                  <p>
+                    Décision : <strong>{note.statut}</strong>
+                  </p>
+                  {note.montantAccepte != null ? (
+                    <p>Montant accepté : {String(note.montantAccepte)} €</p>
+                  ) : null}
+                  {note.motifDecision ? (
+                    <p className="whitespace-pre-wrap">
+                      Motif : {note.motifDecision}
+                    </p>
+                  ) : null}
+                </div>
+              ) : null}
               <ul className="text-sm space-y-2">
                 {note.Justificatifs?.map((j) => (
                   <li
@@ -167,6 +212,11 @@ export default function UserNoteFraisDetailPage() {
                     Soumettre
                   </Button>
                 </div>
+              ) : null}
+              {note.statut === "REJETEE" ? (
+                <Button type="button" onClick={() => void onCorrect()}>
+                  Nouvelle demande corrigée
+                </Button>
               ) : null}
             </>
           ) : null}

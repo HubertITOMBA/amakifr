@@ -281,7 +281,9 @@ describe("métier notes-frais (mocks)", () => {
     await listAdminNotesFrais({ actorUserId: "admin" });
     expect(noteFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ statut: "SOUMISE" }),
+        where: expect.objectContaining({
+          statut: { in: ["SOUMISE", "VALIDEE", "REJETEE"] },
+        }),
       })
     );
   });
@@ -451,10 +453,15 @@ describe("métier notes-frais (mocks)", () => {
 
   it("aucune dépendance Depense/Avoir/PaiementCotisation dans le module", async () => {
     const { readFile } = await import("node:fs/promises");
-    const src = await readFile(
+    const serviceSrc = await readFile(
       "/soft/dev/nextjs/amakifr/lib/services/frais-avances/note-frais-service.ts",
       "utf8"
     );
-    expect(src).not.toMatch(/\bDepense\b|\bAvoir\b|PaiementCotisation/);
+    const decisionSrc = await readFile(
+      "/soft/dev/nextjs/amakifr/lib/services/frais-avances/note-frais-decision-service.ts",
+      "utf8"
+    );
+    expect(serviceSrc).not.toMatch(/\bDepense\b|\bAvoir\b|PaiementCotisation/);
+    expect(decisionSrc).not.toMatch(/\bDepense\b|\bAvoir\b|PaiementCotisation/);
   });
 });

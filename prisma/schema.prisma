@@ -307,6 +307,8 @@ model User {
   merchOrders                   MerchOrder[]                 @relation("MerchOrderUser")
   merchStockMovements           MerchStockMovement[]         @relation("MerchStockMovementCreatedBy")
   notesFraisDemandeur           NoteFrais[]                  @relation("NoteFraisDemandeur")
+  notesFraisDecideur            NoteFrais[]                  @relation("NoteFraisDecideur")
+  notesFraisDecisions           NoteFraisDecision[]          @relation("NoteFraisDecisionDecideur")
   justificatifsNoteFraisUploades JustificatifNoteFrais[]     @relation("JustificatifNoteFraisUploader")
   notesFraisArchiveAccessLogs   NoteFraisArchiveAccessLog[]  @relation("NoteFraisArchiveAccessActor")
 
@@ -2657,6 +2659,8 @@ model SondageReponseItem {
 enum StatutNoteFrais {
   BROUILLON
   SOUMISE
+  VALIDEE
+  REJETEE
 }
 
 enum StatutJustificatifNoteFrais {
@@ -2684,7 +2688,7 @@ enum NoteFraisFileJobOperation {
   UNLINK
 }
 
-/// Note de frais avancés par un adhérent (étape 1 : brouillon + soumission).
+/// Note de frais avancés par un adhérent (brouillon, soumission, décision).
 model NoteFrais {
   id                     String         @id @default(cuid())
   adherentId             String
@@ -2699,19 +2703,56 @@ model NoteFrais {
   version                Int            @default(1)
   alerteSansDestinataire Boolean        @default(false)
   alerteSansDestinataireAt DateTime?
+  /// Décision : null tant que SOUMISE / BROUILLON.
+  montantAccepte         Decimal?       @db.Decimal(10, 2)
+  motifDecision          String?        @db.Text
+  decideeAt              DateTime?
+  decideurUserId         String?
+  decisionIdempotencyKey String?        @unique @db.VarChar(64)
+  /// Note REJETEE immuable corrigée par cette demande (même propriétaire).
+  /// SetNull à l'archivage/suppression RGPD de la note d'origine.
+  corrigeNoteFraisId     String?
   createdAt              DateTime       @default(now())
   updatedAt              DateTime       @updatedAt
 
   Adherent      Adherent                 @relation(fields: [adherentId], references: [id], onDelete: Restrict)
   Demandeur     User                     @relation("NoteFraisDemandeur", fields: [demandeurUserId], references: [id], onDelete: Restrict)
+  Decideur      User?                    @relation("NoteFraisDecideur", fields: [decideurUserId], references: [id], onDelete: SetNull)
+  CorrigeNote   NoteFrais?               @relation("NoteFraisCorrection", fields: [corrigeNoteFraisId], references: [id], onDelete: SetNull)
+  Corrections   NoteFrais[]              @relation("NoteFraisCorrection")
   Justificatifs JustificatifNoteFrais[]
   OutboxEvents  NoteFraisOutboxEvent[]
+  Decision      NoteFraisDecision?
 
   @@index([adherentId, statut])
   @@index([demandeurUserId])
   @@index([statut, soumiseAt])
+  @@index([statut, decideeAt])
+  @@index([decideurUserId])
+  @@index([corrigeNoteFraisId])
   @@index([alerteSansDestinataire])
   @@map("notes_frais")
+}
+
+/// Journal métier de la décision effective (1 ligne / note). Atomique avec la décision.
+model NoteFraisDecision {
+  id                     String          @id @default(cuid())
+  noteFraisId            String          @unique
+  decisionIdempotencyKey String          @unique @db.VarChar(64)
+  statutFinal            StatutNoteFrais
+  montantDemande         Decimal         @db.Decimal(10, 2)
+  montantAccepte         Decimal?        @db.Decimal(10, 2)
+  motif                  String?         @db.Text
+  decideurUserId         String?
+  decideeAt              DateTime
+  createdAt              DateTime        @default(now())
+
+  NoteFrais NoteFrais @relation(fields: [noteFraisId], references: [id], onDelete: Cascade)
+  Decideur  User?     @relation("NoteFraisDecisionDecideur", fields: [decideurUserId], references: [id], onDelete: SetNull)
+
+  @@index([decideurUserId])
+  @@index([decideeAt])
+  @@map("notes_frais_decisions")
 }
 
 model JustificatifNoteFrais {
@@ -2782,25 +2823,30 @@ model NoteFraisFileJob {
   @@map("notes_frais_file_jobs")
 }
 
-/// Archive privée des notes SOUMISES après suppression de compte.
+/// Archive privée des notes SOUMISE|VALIDEE|REJETEE après suppression de compte.
 /// Données potentiellement personnelles — ne pas qualifier d'« anonyme ».
 model NoteFraisArchive {
-  id                        String   @id @default(cuid())
+  id                        String    @id @default(cuid())
   dateDepense               DateTime
-  montantDemande            Decimal  @db.Decimal(10, 2)
+  montantDemande            Decimal   @db.Decimal(10, 2)
   soumiseAt                 DateTime
+  /// Statut au moment de l'archivage (SOUMISE|VALIDEE|REJETEE) — sans décideur.
+  statutFinal               String    @db.VarChar(20)
+  montantAccepte            Decimal?  @db.Decimal(10, 2)
+  decideeAt                 DateTime?
   archivedAt                DateTime
   retentionEndsAt           DateTime
   /// Notice figée — date+montant potentiellement réidentifiables.
-  reidentifiabilityNotice   String   @db.VarChar(80)
-  createdAt                 DateTime @default(now())
-  updatedAt                 DateTime @updatedAt
+  reidentifiabilityNotice   String    @db.VarChar(80)
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
 
   Justificatifs JustificatifNoteFraisArchive[]
   AccessLogs    NoteFraisArchiveAccessLog[]
 
   @@index([retentionEndsAt])
   @@index([archivedAt])
+  @@index([statutFinal])
   @@map("notes_frais_archives")
 }
 

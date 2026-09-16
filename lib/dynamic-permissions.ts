@@ -136,6 +136,66 @@ export async function canWrite(
 }
 
 /**
+ * Résolution de la config permission (sans évaluer un utilisateur).
+ * Distingue absence, désactivation explicite et liste de rôles configurée —
+ * ce que `canWrite`/`hasPermission` fusionnent en un booléen.
+ */
+export type ActionPermissionConfig =
+  | { status: "absent" }
+  | { status: "disabled" }
+  | { status: "configured"; roles: string[] };
+
+/**
+ * Lit la ligne `permissions` pour (action, type).
+ * - absent : aucune ligne
+ * - disabled : ligne présente avec `enabled=false` (refus explicite global)
+ * - configured : ligne active + rôles autorisés
+ */
+export async function resolveActionPermissionConfig(
+  action: string,
+  type: PermissionType = PermissionType.WRITE
+): Promise<ActionPermissionConfig> {
+  try {
+    if (!("permission" in db)) {
+      return { status: "absent" };
+    }
+    const permission = await (
+      db as {
+        permission: {
+          findUnique: (args: unknown) => Promise<{
+            enabled: boolean;
+            roles: string[];
+          } | null>;
+        };
+      }
+    ).permission.findUnique({
+      where: {
+        action_type: {
+          action,
+          type,
+        },
+      },
+      select: { enabled: true, roles: true },
+    });
+    if (!permission) return { status: "absent" };
+    if (!permission.enabled) return { status: "disabled" };
+    return {
+      status: "configured",
+      roles: (permission.roles ?? []).map((r) =>
+        r.toString().trim().toUpperCase()
+      ),
+    };
+  } catch (error) {
+    console.error(
+      `[resolveActionPermissionConfig] Erreur pour ${action}/${type}:`,
+      error
+    );
+    // Fail closed côté config : traiter comme refus explicite désactivé
+    return { status: "disabled" };
+  }
+}
+
+/**
  * Vérifie si un utilisateur peut supprimer une ressource (permission DELETE)
  * 
  * @param userId - ID de l'utilisateur

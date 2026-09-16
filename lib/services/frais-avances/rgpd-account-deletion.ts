@@ -25,7 +25,7 @@ export class NotesFraisRgpdBlockError extends Error {
   readonly code = "NOTES_FRAIS_SUBMITTED_RETENTION_REQUIRED" as const;
 
   constructor(
-    message = "Suppression impossible : des notes de frais soumises existent et aucune politique de conservation/destruction des justificatifs originaux n'est validée."
+    message = "Suppression impossible : des notes de frais soumises ou décidées existent et aucune politique de conservation/destruction des justificatifs originaux n'est validée."
   ) {
     super(message);
     this.name = "NotesFraisRgpdBlockError";
@@ -158,8 +158,8 @@ export type PrepareNotesFraisResult = {
 
 /**
  * Prépare le périmètre notes dans une TX où `notes_frais` existe déjà.
- * SOUMISE sans politique validée/injectée → refus.
- * SOUMISE avec politique → archive privée atomique.
+ * SOUMISE|VALIDEE|REJETEE sans politique validée/injectée → refus.
+ * Avec politique → archive privée atomique.
  * BROUILLON → purge sans archive.
  */
 export async function prepareNotesFraisForAccountDeletion(
@@ -200,7 +200,9 @@ export async function prepareNotesFraisForAccountDeletion(
     select: { id: true, statut: true },
   });
 
-  const soumises = notes.filter((n) => n.statut === "SOUMISE");
+  const protegees = notes.filter((n) =>
+    n.statut === "SOUMISE" || n.statut === "VALIDEE" || n.statut === "REJETEE"
+  );
   const retention = resolveEffectiveArchiveRetention({
     injected: options?.injectedRetention,
   });
@@ -211,7 +213,7 @@ export async function prepareNotesFraisForAccountDeletion(
   let archivesCreated = 0;
   let archiveMoveJobs = 0;
 
-  if (soumises.length > 0) {
+  if (protegees.length > 0) {
     if (!canArchive) {
       throw new NotesFraisRgpdBlockError();
     }
@@ -223,7 +225,7 @@ export async function prepareNotesFraisForAccountDeletion(
     }
     const archived = await archiveSubmittedNotesInTransaction(
       tx as never,
-      soumises.map((s) => s.id),
+      protegees.map((s) => s.id),
       retention
     );
     archivesCreated = archived.archivesCreated;

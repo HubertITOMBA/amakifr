@@ -429,6 +429,16 @@ export const SERVER_ACTIONS_CONFIG: ServerActionConfig[] = [
     category: "Frais avancés",
   },
   {
+    action: "decideNoteFrais",
+    label: "Décider une note de frais",
+    description:
+      "Valider (total/partiel) ou rejeter une note SOUMISE — TRESOR/ADMIN uniquement",
+    resource: "frais-avances",
+    defaultType: "WRITE",
+    route: "/admin/frais-avances",
+    category: "Frais avancés",
+  },
+  {
     action: "readNoteFraisArchive",
     label: "Consulter les archives notes de frais",
     description: "Archives post-RGPD (TRESOR/ADMIN/COMCPT) — non activé tant que politique ouverte",
