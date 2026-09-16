@@ -2723,6 +2723,7 @@ model NoteFrais {
   Justificatifs JustificatifNoteFrais[]
   OutboxEvents  NoteFraisOutboxEvent[]
   Decision      NoteFraisDecision?
+  ChoixReglements NoteFraisChoixReglement[]
 
   @@index([adherentId, statut])
   @@index([demandeurUserId])
@@ -2753,6 +2754,74 @@ model NoteFraisDecision {
   @@index([decideurUserId])
   @@index([decideeAt])
   @@map("notes_frais_decisions")
+}
+
+/// Mode de règlement choisi par l'adhérent après VALIDEE (lot 3 — accord seul, aucun effet financier).
+enum ModeReglementNoteFrais {
+  REMBOURSEMENT
+  COMPENSATION
+  MIXTE
+}
+
+enum StatutChoixReglementNoteFrais {
+  ACTIF
+  REMPLACE
+}
+
+enum TypeCibleCompensationNoteFrais {
+  COTISATION_MENSUELLE
+  DETTE_INITIALE
+}
+
+/// Choix de règlement propriétaire — ownership via NoteFrais (pas de duplication adherentId/demandeurUserId).
+/// Index partiel futur recommandé : UNIQUE(note_frais_id) WHERE statut = 'ACTIF' (pas de @@unique statut).
+model NoteFraisChoixReglement {
+  id                         String                        @id @default(cuid())
+  noteFraisId                String
+  mode                       ModeReglementNoteFrais
+  statut                     StatutChoixReglementNoteFrais @default(ACTIF)
+  /// = NoteFrais.montantAccepte figé au choix.
+  montantReference           Decimal                       @db.Decimal(10, 2)
+  montantRemboursement       Decimal                       @default(0) @db.Decimal(10, 2)
+  montantCompensation        Decimal                       @default(0) @db.Decimal(10, 2)
+  /// Consommation future (lot 4+) — toujours 0 en lot 3.
+  montantRembourseUtilise    Decimal                       @default(0) @db.Decimal(10, 2)
+  montantCompensationUtilise Decimal                       @default(0) @db.Decimal(10, 2)
+  remplaceChoixId            String?
+  idempotencyKey             String                        @unique @db.VarChar(64)
+  choisiAt                   DateTime
+  createdAt                  DateTime                      @default(now())
+  updatedAt                  DateTime                      @updatedAt
+
+  NoteFrais   NoteFrais                    @relation(fields: [noteFraisId], references: [id], onDelete: Cascade)
+  Remplace    NoteFraisChoixReglement?     @relation("ChoixReglementRemplacement", fields: [remplaceChoixId], references: [id], onDelete: SetNull)
+  Remplacants NoteFraisChoixReglement[]    @relation("ChoixReglementRemplacement")
+  Cibles      NoteFraisChoixReglementCible[]
+
+  @@index([noteFraisId, statut])
+  @@index([noteFraisId])
+  @@index([remplaceChoixId])
+  @@map("notes_frais_choix_reglement")
+}
+
+model NoteFraisChoixReglementCible {
+  id                     String                         @id @default(cuid())
+  choixId                String
+  typeCible              TypeCibleCompensationNoteFrais
+  cibleId                String
+  montantAutorise        Decimal                        @db.Decimal(10, 2)
+  montantUtilise         Decimal                        @default(0) @db.Decimal(10, 2)
+  /// Snapshot audit au moment du choix (pas source d'exécution lot 4).
+  montantRestantSnapshot Decimal                        @db.Decimal(10, 2)
+  libelleSnapshot        String?                        @db.VarChar(120)
+  rang                   Int
+  createdAt              DateTime                       @default(now())
+
+  Choix NoteFraisChoixReglement @relation(fields: [choixId], references: [id], onDelete: Cascade)
+
+  @@unique([choixId, typeCible, cibleId])
+  @@index([cibleId, typeCible])
+  @@map("notes_frais_choix_reglement_cibles")
 }
 
 model JustificatifNoteFrais {
@@ -2834,6 +2903,10 @@ model NoteFraisArchive {
   statutFinal               String    @db.VarChar(20)
   montantAccepte            Decimal?  @db.Decimal(10, 2)
   decideeAt                 DateTime?
+  /// Résumé choix règlement (lot 3+) — sans IDs de cibles ni libellés libres.
+  modeReglement             String?   @db.VarChar(20)
+  montantRemboursementChoix Decimal?  @db.Decimal(10, 2)
+  montantCompensationChoix  Decimal?  @db.Decimal(10, 2)
   archivedAt                DateTime
   retentionEndsAt           DateTime
   /// Notice figée — date+montant potentiellement réidentifiables.

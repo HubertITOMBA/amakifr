@@ -461,7 +461,14 @@ describe("métier notes-frais (mocks)", () => {
       "/soft/dev/nextjs/amakifr/lib/services/frais-avances/note-frais-decision-service.ts",
       "utf8"
     );
+    const choixSrc = await readFile(
+      "/soft/dev/nextjs/amakifr/lib/services/frais-avances/note-frais-choix-reglement-service.ts",
+      "utf8"
+    );
     expect(serviceSrc).not.toMatch(/\bDepense\b|\bAvoir\b|PaiementCotisation/);
     expect(decisionSrc).not.toMatch(/\bDepense\b|\bAvoir\b|PaiementCotisation/);
+    expect(choixSrc).not.toMatch(
+      /\bDepense\b|\bAvoir\b|UtilisationAvoir|PaiementCotisation/
+    );
   });
 });

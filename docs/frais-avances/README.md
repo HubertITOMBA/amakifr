@@ -2,6 +2,7 @@
 
 | Version | Date | Contenu |
 |---------|------|---------|
+| 0.3.0-choix-reglement | 2026-09-16 | Choix règlement adhérent (lot 3 local, flag off) |
 | 0.2.0-decision | 2026-09-15 | Décision VALIDEE/REJETEE (lot 2 local, flag off) |
 | 0.1.6-archive-privee | 2026-09-15 | Archive privée locale ; politique réelle non activée |
 | 0.1.5-pg-submit-delete-races | 2026-09-15 | Courses 6a/6b déterministes soumission/suppression |
@@ -17,3 +18,4 @@ Voir [GUIDE.md](./GUIDE.md) et [CHANGELOG.md](./CHANGELOG.md).
 **Politique de conservation** : à valider par le trésorier — sans elle, refus de suppression si notes SOUMISE|VALIDEE|REJETEE.
 **Archive** : privée, non anonyme.
 **Décision** ≠ reconnaissance de charge ≠ décaissement ≠ `Depense`.
+**Choix de règlement** ≠ exécution financière ≠ création d'`Avoir`.

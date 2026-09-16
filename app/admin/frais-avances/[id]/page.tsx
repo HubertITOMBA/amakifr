@@ -29,6 +29,18 @@ type NoteDetail = {
     motif: string | null;
     decideeAt: string | Date;
   } | null;
+  ChoixReglementActif?: {
+    mode: string;
+    montantRemboursement: string | number;
+    montantCompensation: string | number;
+    Cibles: Array<{
+      typeCible: string;
+      cibleId: string;
+      montantAutorise: string | number;
+      libelleSnapshot: string | null;
+      rang: number;
+    }>;
+  } | null;
 };
 
 /**
@@ -132,6 +144,39 @@ export default function AdminNoteFraisDetailPage() {
                     </p>
                   ) : null}
                 </div>
+              ) : null}
+              {note.ChoixReglementActif ? (
+                <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-1 text-sm">
+                  <p>
+                    Choix adhérent :{" "}
+                    <strong>{note.ChoixReglementActif.mode}</strong>
+                  </p>
+                  <p>
+                    Remboursement :{" "}
+                    {String(note.ChoixReglementActif.montantRemboursement)} €
+                  </p>
+                  <p>
+                    Compensation :{" "}
+                    {String(note.ChoixReglementActif.montantCompensation)} €
+                  </p>
+                  {note.ChoixReglementActif.Cibles?.length ? (
+                    <ul className="text-xs space-y-1 list-disc pl-4">
+                      {note.ChoixReglementActif.Cibles.map((c) => (
+                        <li key={`${c.typeCible}:${c.cibleId}`}>
+                          {c.libelleSnapshot || c.cibleId} —{" "}
+                          {String(c.montantAutorise)} €
+                        </li>
+                      ))}
+                    </ul>
+                  ) : null}
+                  <p className="text-xs text-slate-600">
+                    Lecture seule — aucun règlement exécuté à ce stade.
+                  </p>
+                </div>
+              ) : note.statut === "VALIDEE" ? (
+                <p className="text-sm text-slate-600">
+                  Aucun choix de règlement enregistré par l&apos;adhérent.
+                </p>
               ) : null}
               <p className="text-sm whitespace-pre-wrap">{note.description}</p>
               <ul className="text-sm space-y-1">

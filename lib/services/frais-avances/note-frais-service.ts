@@ -766,6 +766,11 @@ export async function getNoteFraisForUser(input: {
           },
         },
         Decision: true,
+        ChoixReglements: {
+          where: { statut: "ACTIF" },
+          include: { Cibles: true },
+          take: 1,
+        },
         Demandeur: { select: { id: true, email: true, name: true } },
         Adherent: { select: { id: true, firstname: true, lastname: true } },
       },

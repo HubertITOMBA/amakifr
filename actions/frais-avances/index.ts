@@ -279,6 +279,105 @@ export async function actionCreateCorrectedNoteFraisDraft(form: {
   }
 }
 
+/**
+ * Cibles V1 éligibles pour compensation (owner, note VALIDEE).
+ */
+export async function actionListCiblesCompensationNoteFrais(noteId: string) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    const { listCiblesCompensationEligibles } = await import(
+      "@/lib/services/frais-avances/note-frais-choix-reglement-service"
+    );
+    return await listCiblesCompensationEligibles({
+      actorUserId: userId,
+      noteId,
+    });
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
+ * Lecture du choix ACTIF (owner ou responsable).
+ */
+export async function actionGetChoixReglementNoteFrais(noteId: string) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    const { getChoixReglementActif } = await import(
+      "@/lib/services/frais-avances/note-frais-choix-reglement-service"
+    );
+    return await getChoixReglementActif({
+      actorUserId: userId,
+      noteId,
+    });
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
+ * Enregistre ou remplace le choix de règlement (owner, sans effet financier).
+ */
+export async function actionSetChoixReglementNoteFrais(form: {
+  noteId: string;
+  expectedNoteVersion: number;
+  idempotencyKey: string;
+  mode: "REMBOURSEMENT" | "COMPENSATION" | "MIXTE";
+  montantRemboursement: number;
+  montantCompensation: number;
+  cibles: Array<{
+    typeCible: "COTISATION_MENSUELLE" | "DETTE_INITIALE";
+    cibleId: string;
+    montantAutorise: number;
+    rang: number;
+  }>;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    if (!form.idempotencyKey?.trim()) {
+      return {
+        success: false as const,
+        error: "Clé d'idempotence requise",
+        code: "IDEMPOTENCY_REQUIRED",
+      };
+    }
+    const { setChoixReglement } = await import(
+      "@/lib/services/frais-avances/note-frais-choix-reglement-service"
+    );
+    const result = await setChoixReglement({
+      actorUserId: userId,
+      noteId: form.noteId,
+      expectedNoteVersion: form.expectedNoteVersion,
+      idempotencyKey: form.idempotencyKey,
+      mode: form.mode,
+      montantRemboursement: form.montantRemboursement,
+      montantCompensation: form.montantCompensation,
+      cibles: form.cibles,
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath(`/user/frais-avances/${form.noteId}`);
+      revalidatePath("/admin/frais-avances");
+      revalidatePath(`/admin/frais-avances/${form.noteId}`);
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
 export async function actionListMyNotesFrais() {
   if (!isNotesFraisEnabled()) return disabled();
   try {

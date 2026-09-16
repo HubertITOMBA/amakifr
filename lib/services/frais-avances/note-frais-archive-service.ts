@@ -71,6 +71,15 @@ export async function archiveSubmittedNotesInTransaction(
         Justificatifs: {
           where: { statut: "READY" },
         },
+        ChoixReglements: {
+          where: { statut: "ACTIF" },
+          take: 1,
+          select: {
+            mode: true,
+            montantRemboursement: true,
+            montantCompensation: true,
+          },
+        },
       },
     });
     if (!note || !note.soumiseAt) continue;
@@ -83,6 +92,8 @@ export async function archiveSubmittedNotesInTransaction(
       data: { corrigeNoteFraisId: null },
     });
 
+    const choixActif = note.ChoixReglements[0] ?? null;
+
     const archive = await tx.noteFraisArchive.create({
       data: {
         dateDepense: note.dateDepense,
@@ -91,6 +102,9 @@ export async function archiveSubmittedNotesInTransaction(
         statutFinal: note.statut,
         montantAccepte: note.montantAccepte,
         decideeAt: note.decideeAt,
+        modeReglement: choixActif?.mode ?? null,
+        montantRemboursementChoix: choixActif?.montantRemboursement ?? null,
+        montantCompensationChoix: choixActif?.montantCompensation ?? null,
         archivedAt,
         retentionEndsAt,
         reidentifiabilityNotice: ARCHIVE_REIDENTIFIABILITY_NOTICE,

@@ -439,6 +439,16 @@ export const SERVER_ACTIONS_CONFIG: ServerActionConfig[] = [
     category: "Frais avancés",
   },
   {
+    action: "chooseNoteFraisReglement",
+    label: "Choisir le mode de règlement d'une note validée",
+    description:
+      "Accord adhérent : remboursement / compensation / mixte (aucun effet financier en lot 3)",
+    resource: "frais-avances",
+    defaultType: "WRITE",
+    route: "/user/frais-avances",
+    category: "Frais avancés",
+  },
+  {
     action: "readNoteFraisArchive",
     label: "Consulter les archives notes de frais",
     description: "Archives post-RGPD (TRESOR/ADMIN/COMCPT) — non activé tant que politique ouverte",

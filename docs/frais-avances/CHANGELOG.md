@@ -1,5 +1,22 @@
 # Changelog — frais avancés
 
+## 0.3.0-choix-reglement — 2026-09-16
+
+### Ajouté
+- Choix de règlement adhérent après `VALIDEE` : `REMBOURSEMENT` | `COMPENSATION` | `MIXTE`.
+- Affectation manuelle exacte des cibles (dette initiale + cotisations mensuelles ordinaires du même adhérent).
+- Exclusion assistances et cotisations avec bénéficiaire ; refus si montant > restant live (pas de `min` silencieux).
+- Un seul choix `ACTIF` (contrôle TX) ; historique `REMPLACE` ; remplacement si `utilise = 0`.
+- Idempotence clé+contenu ; verrou demandeur → note ; ownership via `NoteFrais` (pas de duplication IDs).
+- Archive : résumé `modeReglement` + montants (sans IDs cibles / libellés libres).
+- UI membre choix/remplacement ; UI responsable lecture seule.
+- **Aucune** notif/push ; **aucun** `Avoir` / `UtilisationAvoir` / `PaiementCotisation` / `Depense`.
+- Tests unitaires + PG (IDOR, modes, sommes, cibles exclues, remplacement, concurrence, divergence restants).
+
+### Non inclus
+- Exécution du règlement, Avoir, remboursement effectif, lot 4, API v1, mobile, migration, activation.
+- Index SQL partiel `UNIQUE(note_frais_id) WHERE statut = 'ACTIF'` (prévu, non créé).
+
 ## 0.2.0-decision — 2026-09-15
 
 ### Ajouté

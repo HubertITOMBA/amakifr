@@ -29,6 +29,24 @@
 - **Pas** de `dateReconnaissanceCharge` ; validation ≠ écriture comptable ≠ décaissement.
 - **Pas** de `Depense` / Avoir / remboursement.
 
+### Choix de règlement (lot 3 — local, flag off)
+- Après `VALIDEE` uniquement ; propriétaire seul (`demandeurUserId`).
+- Modes : `REMBOURSEMENT` | `COMPENSATION` | `MIXTE`.
+- `montantRemboursement + montantCompensation = montantAccepte` (égalité exacte).
+- Compensation V1 : dette initiale + cotisations mensuelles **ordinaires** du même adhérent.
+  - Exclut catégorie `Assistance` et lignes avec `adherentBeneficiaireId`.
+  - Affectation manuelle : chaque cible + montant + rang ; Σ cibles = compensation.
+  - Si montant demandé > restant live → refus `REFRESH_REQUIRED` (pas de `min` silencieux).
+- Un seul choix `ACTIF` (contrôle TX) ; plusieurs `REMPLACE` possibles (historique).
+  - Index partiel SQL futur `WHERE statut = 'ACTIF'` — **non créé** dans ce lot.
+- Remplacement autorisé seulement si aucune utilisation (`utilise = 0`).
+- Idempotence : même clé + contenu → succès ; clé + contenu différent → conflit.
+- Verrouillage : **demandeur** puis **note**.
+- **Aucune** notification / push après choix.
+- **Aucun** effet sur soldes ; lot 4 revérifiera les restants sans réduction silencieuse.
+- Archive : résumé `modeReglement` + montants (sans IDs cibles ni libellés libres).
+- Choix sans effet financier : notes `VALIDEE` protégées comme avant sans politique RGPD réelle.
+
 ### Parcours RGPD compte (hook)
 - Branché dans `adminDeleteAdherent` → `completeDataDeletionRequest`.
 - **Probe schéma hors TX** : `to_regclass('public.notes_frais')`.
@@ -42,6 +60,7 @@
 ### Archive privée (livrée localement, **politique réelle non activée**)
 - Tables : `notes_frais_archives`, `justificatifs_note_frais_archives`, `notes_frais_archive_access_logs`.
 - Contenu structuré minimal + `statutFinal` / `montantAccepte` / `decideeAt` si décision.
+- Résumé choix éventuel : `modeReglement` / montants remboursement & compensation — **sans** IDs de cibles ni libellés libres.
 - **Pas** de libelle / description / id source / rattachement User|Adherent / décideur.
 - **Ne pas qualifier d’anonyme** : date + montant potentiellement réidentifiables ; le **`nomFichierOrig`** des justificatifs archivés reste une donnée **potentiellement personnelle** (nom de fichier choisi par l’adhérent).
 - Accès : comptes **Actif** `ADMIN|TRESOR|COMCPT` (rôle principal **ou** additionnel).
@@ -75,12 +94,14 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
     lib/services/frais-avances/rgpd-account-deletion.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-archive.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-decision.pg.integration.test.ts \
+    lib/services/frais-avances/note-frais-choix-reglement.pg.integration.test.ts \
     lib/frais-avances/pg-test-allowlist.test.ts
 ```
 
 ## Non livré / futur
-- `Depense`, `Avoir`, remboursement, compensation, synthèses financières.
-- Date de reconnaissance de charge.
+- Exécution du règlement (lot 4) : Avoir / UtilisationAvoir / remboursement effectif.
+- `Depense`, synthèse financière, `dateReconnaissanceCharge`.
+- Index partiel unique choix ACTIF.
 - API v1, mobile.
 - Validation trésorier de la durée / point de départ + activation politique env.
 - Migration Prisma / activation prod.
