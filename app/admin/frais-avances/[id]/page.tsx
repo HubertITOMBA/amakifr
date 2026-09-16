@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { Gavel } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { actionGetNoteFrais } from "@/actions/frais-avances";
+import { DecideNoteFraisDialog } from "@/components/frais-avances/DecideNoteFraisDialog";
 import {
-  actionDecideNoteFrais,
-  actionGetNoteFrais,
-} from "@/actions/frais-avances";
-import { toast } from "react-toastify";
+  NoteFraisModeBadge,
+  NoteFraisMontantBadge,
+  NoteFraisStatutBadge,
+} from "@/components/frais-avances/note-frais-badges";
 
 type NoteDetail = {
   id: string;
@@ -51,10 +53,7 @@ export default function AdminNoteFraisDetailPage() {
   const noteId = String(params.id || "");
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<NoteDetail | null>(null);
-  const [outcome, setOutcome] = useState<"VALIDEE" | "REJETEE">("VALIDEE");
-  const [montantAccepte, setMontantAccepte] = useState("");
-  const [motif, setMotif] = useState("");
-  const [submitting, setSubmitting] = useState(false);
+  const [decideOpen, setDecideOpen] = useState(false);
   const [idempotencyKey] = useState(
     () => `decide-${noteId}-${Date.now()}`
   );
@@ -68,7 +67,6 @@ export default function AdminNoteFraisDetailPage() {
     }
     const data = res.data as NoteDetail;
     setNote(data);
-    setMontantAccepte(String(data.montantDemande ?? ""));
     setError(null);
   }, [noteId]);
 
@@ -76,38 +74,14 @@ export default function AdminNoteFraisDetailPage() {
     void reload();
   }, [reload]);
 
-  async function onDecide() {
-    if (!note) return;
-    setSubmitting(true);
-    try {
-      const res = await actionDecideNoteFrais({
-        noteId,
-        expectedVersion: note.version,
-        idempotencyKey,
-        outcome,
-        montantAccepte:
-          outcome === "VALIDEE" ? Number(montantAccepte) : null,
-        motif: motif.trim() || null,
-      });
-      if (!res.success) {
-        toast.error(res.error);
-        return;
-      }
-      toast.success(res.message || "Décision enregistrée");
-      await reload();
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
   const decided =
     note?.statut === "VALIDEE" || note?.statut === "REJETEE";
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4 sm:p-8">
       <Card className="mx-auto max-w-2xl border-blue-200 shadow-lg">
-        <CardHeader className="bg-gradient-to-r from-blue-500/90 to-blue-600/90 text-white rounded-t-lg">
-          <CardTitle>{note?.libelle || "Note de frais"}</CardTitle>
+        <CardHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 text-white rounded-t-lg pt-4 sm:pt-5">
+          <CardTitle className="text-white">{note?.libelle || "Note de frais"}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3 p-4 sm:p-6">
           {error ? (
@@ -117,12 +91,13 @@ export default function AdminNoteFraisDetailPage() {
           ) : null}
           {note ? (
             <>
-              <p className="text-sm">
-                Statut : <strong>{note.statut}</strong>
-              </p>
-              <p className="text-sm">
-                Montant demandé : {String(note.montantDemande)} €
-              </p>
+              <div className="flex flex-wrap gap-2 items-center">
+                <NoteFraisStatutBadge statut={note.statut} />
+                <NoteFraisMontantBadge
+                  label="Demandé"
+                  value={note.montantDemande}
+                />
+              </div>
               {note.alerteSansDestinataire ? (
                 <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded p-2">
                   Alerte : aucun destinataire habilité au moment de la
@@ -131,13 +106,19 @@ export default function AdminNoteFraisDetailPage() {
                 </p>
               ) : null}
               {decided ? (
-                <div className="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-1 text-sm">
-                  <p>
-                    Décision : <strong>{note.statut}</strong>
+                <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2 text-sm">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+                    Décision
                   </p>
-                  {note.montantAccepte != null ? (
-                    <p>Montant accepté : {String(note.montantAccepte)} €</p>
-                  ) : null}
+                  <div className="flex flex-wrap gap-2">
+                    <NoteFraisStatutBadge statut={note.statut} />
+                    {note.montantAccepte != null ? (
+                      <NoteFraisMontantBadge
+                        label="Accepté"
+                        value={note.montantAccepte}
+                      />
+                    ) : null}
+                  </div>
                   {note.motifDecision ? (
                     <p className="whitespace-pre-wrap">
                       Motif : {note.motifDecision}
@@ -146,19 +127,18 @@ export default function AdminNoteFraisDetailPage() {
                 </div>
               ) : null}
               {note.ChoixReglementActif ? (
-                <div className="rounded-md border border-blue-200 bg-blue-50 p-3 space-y-1 text-sm">
-                  <p>
-                    Choix adhérent :{" "}
-                    <strong>{note.ChoixReglementActif.mode}</strong>
-                  </p>
-                  <p>
-                    Remboursement :{" "}
-                    {String(note.ChoixReglementActif.montantRemboursement)} €
-                  </p>
-                  <p>
-                    Compensation :{" "}
-                    {String(note.ChoixReglementActif.montantCompensation)} €
-                  </p>
+                <div className="rounded-lg border border-blue-200 bg-blue-50/70 p-3 space-y-2 text-sm">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <NoteFraisModeBadge mode={note.ChoixReglementActif.mode} />
+                    <NoteFraisMontantBadge
+                      label="Remboursement"
+                      value={note.ChoixReglementActif.montantRemboursement}
+                    />
+                    <NoteFraisMontantBadge
+                      label="Compensation"
+                      value={note.ChoixReglementActif.montantCompensation}
+                    />
+                  </div>
                   {note.ChoixReglementActif.Cibles?.length ? (
                     <ul className="text-xs space-y-1 list-disc pl-4">
                       {note.ChoixReglementActif.Cibles.map((c) => (
@@ -178,14 +158,24 @@ export default function AdminNoteFraisDetailPage() {
                   Aucun choix de règlement enregistré par l&apos;adhérent.
                 </p>
               ) : null}
-              <p className="text-sm whitespace-pre-wrap">{note.description}</p>
+              {note.description ? (
+                <div className="rounded-lg border border-slate-200 bg-white p-3">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 mb-1">
+                    Description
+                  </p>
+                  <p className="text-sm whitespace-pre-wrap">{note.description}</p>
+                </div>
+              ) : null}
               <ul className="text-sm space-y-1">
                 {note.Justificatifs?.filter((j) => j.statut === "READY").map(
                   (j) => (
-                    <li key={j.id}>
-                      {j.nomFichierOrig}{" "}
+                    <li
+                      key={j.id}
+                      className="flex flex-wrap items-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-2.5 py-2"
+                    >
+                      <span className="min-w-0 break-all">{j.nomFichierOrig}</span>
                       <a
-                        className="text-blue-700 underline text-xs"
+                        className="text-blue-700 underline text-xs shrink-0"
                         href={`/api/frais-avances/justificatifs/${j.id}/file`}
                         target="_blank"
                         rel="noreferrer"
@@ -197,72 +187,33 @@ export default function AdminNoteFraisDetailPage() {
                 )}
               </ul>
               {note.statut === "SOUMISE" ? (
-                <div className="space-y-3 border-t border-slate-200 pt-4">
-                  <p className="text-xs font-semibold uppercase text-slate-700">
-                    Décision (TRESOR / ADMIN)
-                  </p>
-                  <div className="flex gap-2">
-                    <Button
-                      type="button"
-                      variant={outcome === "VALIDEE" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setOutcome("VALIDEE")}
-                    >
-                      Valider
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={outcome === "REJETEE" ? "default" : "outline"}
-                      size="sm"
-                      onClick={() => setOutcome("REJETEE")}
-                    >
-                      Rejeter
-                    </Button>
-                  </div>
-                  {outcome === "VALIDEE" ? (
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-semibold text-slate-700 uppercase tracking-wide bg-slate-100 px-2 py-1 rounded-t-md block">
-                        Montant accepté (€)
-                      </label>
-                      <Input
-                        type="number"
-                        step="0.01"
-                        min="0.01"
-                        value={montantAccepte}
-                        onChange={(e) => setMontantAccepte(e.target.value)}
-                        className="bg-blue-50 border-blue-200"
-                      />
-                    </div>
-                  ) : null}
-                  <div className="space-y-1">
-                    <label className="text-[10px] font-semibold text-slate-700 uppercase tracking-wide bg-slate-100 px-2 py-1 rounded-t-md block">
-                      Motif
-                      {outcome === "REJETEE" ||
-                      (outcome === "VALIDEE" &&
-                        Number(montantAccepte) <
-                          Number(note.montantDemande))
-                        ? " (obligatoire)"
-                        : " (optionnel si acceptation totale)"}
-                    </label>
-                    <textarea
-                      className="w-full min-h-[80px] rounded-md rounded-tl-none border border-blue-200 bg-blue-50 p-2 text-sm"
-                      value={motif}
-                      onChange={(e) => setMotif(e.target.value)}
-                    />
-                  </div>
-                  <Button
-                    type="button"
-                    disabled={submitting}
-                    onClick={() => void onDecide()}
-                  >
-                    {submitting ? "Enregistrement…" : "Enregistrer la décision"}
-                  </Button>
-                </div>
+                <Button
+                  type="button"
+                  onClick={() => setDecideOpen(true)}
+                  className="bg-gradient-to-r from-blue-600 to-blue-500 text-white"
+                  data-testid="open-decide-note-frais"
+                >
+                  <Gavel className="h-4 w-4 mr-2" />
+                  Décider
+                </Button>
               ) : null}
             </>
           ) : null}
         </CardContent>
       </Card>
+
+      {note ? (
+        <DecideNoteFraisDialog
+          open={decideOpen}
+          onOpenChange={setDecideOpen}
+          noteId={noteId}
+          expectedVersion={note.version}
+          idempotencyKey={idempotencyKey}
+          libelle={note.libelle}
+          montantDemande={note.montantDemande}
+          onDone={reload}
+        />
+      ) : null}
     </div>
   );
 }
