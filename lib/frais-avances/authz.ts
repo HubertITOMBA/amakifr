@@ -125,6 +125,62 @@ export async function canUserDecideNoteFrais(
 }
 
 /**
+ * Exécution d'une compensation de note VALIDEE (lot 4.1).
+ * Même filtre dur TRESOR|ADMIN + dynamique restrictive que decideNoteFrais.
+ * Action distincte : `executeNoteFraisCompensation`.
+ *
+ * @param userId - Identifiant du compte à autoriser
+ * @param client - Client Prisma (ou TX)
+ * @returns true si autorisé
+ */
+export async function canUserExecuteNoteFraisCompensation(
+  userId: string,
+  client: {
+    user: { findUnique: typeof db.user.findUnique };
+    userAdminRole: { findMany: typeof db.userAdminRole.findMany };
+  } = db
+): Promise<boolean> {
+  if (!userId) return false;
+
+  const user = await client.user.findUnique({
+    where: { id: userId },
+    select: { role: true, status: true },
+  });
+  if (!user || user.status !== UserStatus.Actif) return false;
+
+  const primaryRole = user.role?.toString().trim().toUpperCase() || "";
+
+  const extras = await client.userAdminRole.findMany({
+    where: {
+      userId,
+      role: { in: [AdminRole.ADMIN, AdminRole.TRESOR] },
+    },
+    select: { role: true },
+  });
+
+  const hasExecutorRole =
+    DECIDER_ROLES.has(user.role) || extras.length > 0;
+
+  if (!hasExecutorRole) return false;
+  if (primaryRole === "ADMIN") return true;
+
+  const config = await resolveActionPermissionConfig(
+    "executeNoteFraisCompensation"
+  );
+  if (config.status === "absent") return true;
+  if (config.status === "disabled") return false;
+
+  const userRoles: string[] = [];
+  if (isAdminRole(primaryRole)) userRoles.push(primaryRole);
+  for (const extra of extras) {
+    const r = extra.role.toString().trim().toUpperCase();
+    if (!userRoles.includes(r)) userRoles.push(r);
+  }
+
+  return userRoles.some((role) => config.roles.includes(role));
+}
+
+/**
  * Lecture archive privée : Actif ADMIN|TRESOR|COMCPT (principal ou additionnel).
  * Droits distincts des notes live (COMCPT inclus ; PRESID/SECRET exclus).
  */

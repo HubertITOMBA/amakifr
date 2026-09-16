@@ -309,6 +309,7 @@ model User {
   notesFraisDemandeur           NoteFrais[]                  @relation("NoteFraisDemandeur")
   notesFraisDecideur            NoteFrais[]                  @relation("NoteFraisDecideur")
   notesFraisDecisions           NoteFraisDecision[]          @relation("NoteFraisDecisionDecideur")
+  notesFraisReglementsExecuteur NoteFraisReglement[]         @relation("NoteFraisReglementExecuteur")
   justificatifsNoteFraisUploades JustificatifNoteFrais[]     @relation("JustificatifNoteFraisUploader")
   notesFraisArchiveAccessLogs   NoteFraisArchiveAccessLog[]  @relation("NoteFraisArchiveAccessActor")
 
@@ -1017,6 +1018,12 @@ model ComptePaiementAssociation {
   @@map("comptes_paiement_association")
 }
 
+/// Origine comptable d'un Avoir (immuable). FIFO n'applique que EXCEDENT + Disponible.
+enum OrigineAvoir {
+  EXCEDENT_PAIEMENT
+  COMPENSATION_NOTE_FRAIS
+}
+
 // Modèle pour les avoirs (excédents de paiement)
 model Avoir {
   id             String  @id @default(cuid())
@@ -1028,14 +1035,20 @@ model Avoir {
   // Origine de l'avoir
   paiementId  String? @unique // ID du paiement qui a créé cet avoir (si applicable) - unique car un paiement ne peut créer qu'un seul avoir
   description String? @db.Text // Description de l'origine de l'avoir
+  /// Classification permanente — compensation note hors FIFO (jamais Disponible).
+  origine     OrigineAvoir @default(EXCEDENT_PAIEMENT)
 
   // Utilisation de l'avoir
   statut String @default("Disponible") // Disponible, Utilise, Expire
+
+  /// Lien 1–1 vers ligne de règlement compensation (FK côté Avoir uniquement).
+  noteFraisReglementLigneId String? @unique
 
   // Relations
   Adherent     Adherent            @relation(fields: [adherentId], references: [id], onDelete: Cascade)
   Paiement     PaiementCotisation? @relation("AvoirFromPaiement", fields: [paiementId], references: [id], onDelete: SetNull)
   Utilisations UtilisationAvoir[] // Utilisations de cet avoir
+  NoteFraisReglementLigne NoteFraisReglementLigne? @relation("AvoirFromNoteFraisLigne", fields: [noteFraisReglementLigneId], references: [id], onDelete: Restrict)
 
   // Métadonnées
   createdAt      DateTime  @default(now())
@@ -1044,6 +1057,7 @@ model Avoir {
 
   @@index([adherentId])
   @@index([statut])
+  @@index([origine, statut])
   @@map("avoirs")
 }
 
@@ -1062,12 +1076,16 @@ model UtilisationAvoir {
   description     String?  @db.Text
   dateUtilisation DateTime @default(now())
 
+  /// Lien 1–1 vers ligne règlement (FK côté Utilisation uniquement).
+  noteFraisReglementLigneId String? @unique
+
   // Relations
   Avoir                Avoir                 @relation(fields: [avoirId], references: [id], onDelete: Cascade)
   CotisationMensuelle  CotisationMensuelle?  @relation(fields: [cotisationMensuelleId], references: [id], onDelete: SetNull)
   ObligationCotisation ObligationCotisation? @relation(fields: [obligationCotisationId], references: [id], onDelete: SetNull)
   DetteInitiale        DetteInitiale?        @relation(fields: [detteInitialeId], references: [id], onDelete: SetNull)
   Assistance           Assistance?           @relation(fields: [assistanceId], references: [id], onDelete: SetNull)
+  NoteFraisReglementLigne NoteFraisReglementLigne? @relation("UtilisationFromNoteFraisLigne", fields: [noteFraisReglementLigneId], references: [id], onDelete: Restrict)
 
   // Métadonnées
   createdAt DateTime @default(now())
@@ -2740,6 +2758,7 @@ model NoteFrais {
   ChoixReglements NoteFraisChoixReglement[]
   /// Charge reconnue (lot 4.0) — FK sur Depense.noteFraisId uniquement.
   DepenseCharge Depense? @relation("NoteFraisCharge")
+  Reglements    NoteFraisReglement[]
 
   @@index([adherentId, statut])
   @@index([demandeurUserId])
@@ -2813,6 +2832,7 @@ model NoteFraisChoixReglement {
   Remplace    NoteFraisChoixReglement?     @relation("ChoixReglementRemplacement", fields: [remplaceChoixId], references: [id], onDelete: SetNull)
   Remplacants NoteFraisChoixReglement[]    @relation("ChoixReglementRemplacement")
   Cibles      NoteFraisChoixReglementCible[]
+  Reglements  NoteFraisReglement[]
 
   @@index([noteFraisId, statut])
   @@index([noteFraisId])
@@ -2838,6 +2858,66 @@ model NoteFraisChoixReglementCible {
   @@unique([choixId, typeCible, cibleId])
   @@index([cibleId, typeCible])
   @@map("notes_frais_choix_reglement_cibles")
+}
+
+/// Type d'exécution financière d'un règlement note (lot 4.1+).
+enum TypeNoteFraisReglement {
+  COMPENSATION
+}
+
+enum StatutNoteFraisReglement {
+  EXECUTE
+}
+
+enum TypeLigneNoteFraisReglement {
+  COMPENSATION
+}
+
+/// Exécution financière (compensation 4.1 ; remboursement 4.2+).
+model NoteFraisReglement {
+  id              String                   @id @default(cuid())
+  noteFraisId     String
+  choixId         String
+  type            TypeNoteFraisReglement
+  statut          StatutNoteFraisReglement @default(EXECUTE)
+  montantTotal    Decimal                  @db.Decimal(10, 2)
+  idempotencyKey  String                   @unique @db.VarChar(64)
+  executeurUserId String
+  executeAt       DateTime
+  createdAt       DateTime                 @default(now())
+
+  NoteFrais NoteFrais               @relation(fields: [noteFraisId], references: [id], onDelete: Restrict)
+  Choix     NoteFraisChoixReglement @relation(fields: [choixId], references: [id], onDelete: Restrict)
+  Executeur User                    @relation("NoteFraisReglementExecuteur", fields: [executeurUserId], references: [id], onDelete: Restrict)
+  Lignes    NoteFraisReglementLigne[]
+
+  @@index([noteFraisId, executeAt])
+  @@index([choixId])
+  @@index([type, statut])
+  @@map("notes_frais_reglements")
+}
+
+/// Ligne d'exécution — pas de FK miroir vers Avoir/Utilisation (FK côté Avoir/Utilisation).
+model NoteFraisReglementLigne {
+  id                          String                        @id @default(cuid())
+  reglementId                 String
+  typeLigne                   TypeLigneNoteFraisReglement
+  typeCible                   TypeCibleCompensationNoteFrais
+  cibleId                     String
+  rang                        Int
+  montant                     Decimal                       @db.Decimal(10, 2)
+  montantRestantCibleAvant    Decimal                       @db.Decimal(10, 2)
+  montantRestantCibleApres    Decimal                       @db.Decimal(10, 2)
+  montantAutoriseRestantAvant Decimal                       @db.Decimal(10, 2)
+  createdAt                   DateTime                      @default(now())
+
+  Reglement        NoteFraisReglement @relation(fields: [reglementId], references: [id], onDelete: Cascade)
+  Avoir            Avoir?             @relation("AvoirFromNoteFraisLigne")
+  UtilisationAvoir UtilisationAvoir?  @relation("UtilisationFromNoteFraisLigne")
+
+  @@unique([reglementId, typeCible, cibleId])
+  @@index([cibleId, typeCible])
+  @@map("notes_frais_reglement_lignes")
 }
 
 model JustificatifNoteFrais {

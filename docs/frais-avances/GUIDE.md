@@ -40,6 +40,13 @@
   - `soldeBancaireEstime` = recettes − ORDINAIRE (− décaissements notes + restitutions, encore 0).
 - RGPD : Restrict + refus sans politique restent sûrs ; détachement FK futur (4.9) conservera `origine=FRAIS_AVANCE`.
 
+### Compensation exécutée (lot 4.1 — local, flag off)
+- Choix ACTIF `COMPENSATION` ou `MIXTE` (part compensation uniquement).
+- TX : verrous demandeur → note → choix → cibles → dettes/CM ; OCC version note.
+- Écritures : règlement + lignes + Avoir (`COMPENSATION_NOTE_FRAIS`, `Utilise`) + `UtilisationAvoir` XOR cible.
+- Synthèse : `compensationsNotesFrais` ↑ ; créances ↓ ; **solde bancaire inchangé**.
+- Pas de notif/outbox (→ 4.5) ; pas de remboursement.
+
 ### Choix de règlement (lot 3 — local, flag off)
 - Après `VALIDEE` uniquement ; propriétaire seul (`demandeurUserId`).
 - Modes : `REMBOURSEMENT` | `COMPENSATION` | `MIXTE`.
@@ -106,11 +113,12 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
     lib/services/frais-avances/note-frais-archive.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-decision.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-choix-reglement.pg.integration.test.ts \
+    lib/services/frais-avances/note-frais-compensation.pg.integration.test.ts \
     lib/frais-avances/pg-test-allowlist.test.ts
 ```
 
 ## Non livré / futur
-- Lots **4.1+** : compensation, remboursement, mixte, permissions exécution, outbox règlement, corrections, restitutions, annulation (`EXPIREE` 30 j), détachement RGPD FK.
+- Lots **4.2+** : remboursement, mixte complet, outbox/notif règlement (4.5), corrections, restitutions, annulation (`EXPIREE` 30 j), détachement RGPD FK.
 - Index partiel unique choix ACTIF.
 - API v1, mobile.
 - Validation trésorier de la durée / point de départ + activation politique env.

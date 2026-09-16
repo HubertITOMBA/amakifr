@@ -17,7 +17,7 @@ export type ChargesSyntheseIndicators = {
   depensesOrdinairesDecaissees: number;
   /** Remboursements nets exécutés (lot 4.2+) — 0 tant que non implémenté. */
   decaissementsNotesFrais: number;
-  /** Compensations nettes (info ; 0 banque) — 0 tant que non implémenté. */
+  /** Compensations nettes exécutées (Σ règlements COMPENSATION EXECUTE). */
   compensationsNotesFrais: number;
   /** Restitutions exécutées — 0 tant que non implémenté. */
   restitutionsNotesFrais: number;
@@ -78,4 +78,22 @@ export function computeSoldeBancaireEstime(
     indicators.decaissementsNotesFrais +
     indicators.restitutionsNotesFrais;
   return Number(solde.toFixed(2));
+}
+
+/**
+ * Injecte le total des compensations notes (lot 4.1+) dans les indicateurs.
+ * N'affecte pas le solde bancaire estimé.
+ *
+ * @param indicators - Indicateurs charges / banque
+ * @param compensationsNotesFrais - Σ règlements COMPENSATION EXECUTE
+ */
+export function withCompensationsNotesFrais(
+  indicators: ChargesSyntheseIndicators,
+  compensationsNotesFrais: number
+): ChargesSyntheseIndicators {
+  const v = Number(compensationsNotesFrais);
+  return {
+    ...indicators,
+    compensationsNotesFrais: Number.isFinite(v) ? Number(v.toFixed(2)) : 0,
+  };
 }

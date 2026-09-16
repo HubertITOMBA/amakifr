@@ -460,3 +460,53 @@ export async function actionGetNotesFraisArchive(archiveId: string) {
     };
   }
 }
+
+/**
+ * Exécute une compensation (partielle) sur le choix ACTIF COMPENSATION|MIXTE.
+ */
+export async function actionExecuteNoteFraisCompensation(form: {
+  noteId: string;
+  expectedNoteVersion: number;
+  idempotencyKey: string;
+  lignes: Array<{
+    typeCible: "COTISATION_MENSUELLE" | "DETTE_INITIALE";
+    cibleId: string;
+    montant: number;
+    rang: number;
+  }>;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    if (!form.idempotencyKey?.trim()) {
+      return {
+        success: false as const,
+        error: "Clé d'idempotence requise",
+        code: "IDEMPOTENCY_REQUIRED",
+      };
+    }
+    const { executeNoteFraisCompensation } = await import(
+      "@/lib/services/frais-avances/note-frais-compensation-service"
+    );
+    const result = await executeNoteFraisCompensation({
+      actorUserId: userId,
+      noteId: form.noteId,
+      expectedNoteVersion: form.expectedNoteVersion,
+      idempotencyKey: form.idempotencyKey,
+      lignes: form.lignes,
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath("/admin/frais-avances");
+      revalidatePath(`/user/frais-avances/${form.noteId}`);
+      revalidatePath(`/admin/frais-avances/${form.noteId}`);
+      revalidatePath("/admin/finances/synthese");
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}

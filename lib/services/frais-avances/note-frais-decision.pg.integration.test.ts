@@ -39,6 +39,14 @@ describe("intégration PG décision notes-frais", () => {
 
   async function wipe() {
     // Restrict : Depense.noteFraisId → NoteFrais — supprimer charges d'abord.
+    await prisma.utilisationAvoir.deleteMany({
+      where: { noteFraisReglementLigneId: { not: null } },
+    });
+    await prisma.avoir.deleteMany({
+      where: { noteFraisReglementLigneId: { not: null } },
+    });
+    await prisma.noteFraisReglementLigne.deleteMany({});
+    await prisma.noteFraisReglement.deleteMany({});
     await prisma.depense.deleteMany({
       where: { noteFraisId: { not: null } },
     });

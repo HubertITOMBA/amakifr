@@ -117,6 +117,14 @@ describePg("intégration PG archive privée notes-frais", () => {
   });
 
   async function wipe() {
+    await prisma.utilisationAvoir.deleteMany({
+      where: { noteFraisReglementLigneId: { not: null } },
+    });
+    await prisma.avoir.deleteMany({
+      where: { noteFraisReglementLigneId: { not: null } },
+    });
+    await prisma.noteFraisReglementLigne.deleteMany({});
+    await prisma.noteFraisReglement.deleteMany({});
     await prisma.depense.deleteMany({ where: { noteFraisId: { not: null } } });
     await prisma.noteFraisFileJob.deleteMany({});
     await prisma.noteFraisArchiveAccessLog.deleteMany({});

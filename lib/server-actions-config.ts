@@ -439,6 +439,16 @@ export const SERVER_ACTIONS_CONFIG: ServerActionConfig[] = [
     category: "Frais avancés",
   },
   {
+    action: "executeNoteFraisCompensation",
+    label: "Exécuter une compensation de note de frais",
+    description:
+      "Appliquer la part compensation d'un choix ACTIF (COMPENSATION|MIXTE) — TRESOR/ADMIN ; aucun effet banque",
+    resource: "frais-avances",
+    defaultType: "WRITE",
+    route: "/admin/frais-avances",
+    category: "Frais avancés",
+  },
+  {
     action: "chooseNoteFraisReglement",
     label: "Choisir le mode de règlement d'une note validée",
     description:

@@ -1,5 +1,21 @@
 # Changelog — frais avancés
 
+## 0.4.1-compensation — 2026-09-16
+
+### Ajouté (lot 4.1 — local, flag off, **pas de migration dépôt**)
+- Exécution compensation : `NoteFraisReglement` + `NoteFraisReglementLigne`.
+- `OrigineAvoir.COMPENSATION_NOTE_FRAIS` ; Avoir créé `statut=Utilise`, hors FIFO.
+- FK uniquement `Avoir`/`UtilisationAvoir.noteFraisReglementLigneId` (pas de miroir sur la ligne).
+- Modes choix `COMPENSATION` et `MIXTE` (part compensation seulement).
+- Partiel + complément ; revalidation stricte `REFRESH_REQUIRED` ; OCC `expectedNoteVersion`.
+- Permission `executeNoteFraisCompensation` (TRESOR|ADMIN, restrictive).
+- Synthèse : `compensationsNotesFrais` = Σ règlements EXECUTE ; solde bancaire inchangé.
+- **Aucune** notif/outbox ; **aucun** `PaiementCotisation` / 2ᵉ Depense / remboursement.
+
+### Non inclus
+- Remboursement (4.2), mixte exécution complète, restitution, correction, annulation.
+- Migration dépôt ; activation permanente.
+
 ## 0.4.0-charge — 2026-09-16
 
 ### Ajouté (lot 4.0 — local, flag off, **pas de migration dépôt**)

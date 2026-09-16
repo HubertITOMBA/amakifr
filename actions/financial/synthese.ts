@@ -6,6 +6,7 @@ import { UserRole } from "@prisma/client";
 import {
   computeChargesFromDepensesValides,
   computeSoldeBancaireEstime,
+  withCompensationsNotesFrais,
 } from "@/lib/financial/synthese-charges";
 
 /**
@@ -65,11 +66,19 @@ export async function getFinancialSynthese() {
         dateDepense: "desc",
       },
     });
-    const chargesIndicators = computeChargesFromDepensesValides(
+    const chargesIndicatorsBase = computeChargesFromDepensesValides(
       depensesValides.map((d) => ({
         montant: Number(d.montant),
         origine: d.origine,
       }))
+    );
+    const compensationsAgg = await prisma.noteFraisReglement.aggregate({
+      where: { type: "COMPENSATION", statut: "EXECUTE" },
+      _sum: { montantTotal: true },
+    });
+    const chargesIndicators = withCompensationsNotesFrais(
+      chargesIndicatorsBase,
+      Number(compensationsAgg._sum.montantTotal ?? 0)
     );
     const totalCharges = chargesIndicators.totalCharges;
     const depensesOrdinairesDecaissees =

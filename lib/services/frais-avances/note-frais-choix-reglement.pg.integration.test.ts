@@ -27,6 +27,14 @@ describe("intégration PG choix règlement notes-frais", () => {
   });
 
   async function wipe() {
+    await prisma.utilisationAvoir.deleteMany({
+      where: { noteFraisReglementLigneId: { not: null } },
+    });
+    await prisma.avoir.deleteMany({
+      where: { noteFraisReglementLigneId: { not: null } },
+    });
+    await prisma.noteFraisReglementLigne.deleteMany({});
+    await prisma.noteFraisReglement.deleteMany({});
     await prisma.depense.deleteMany({ where: { noteFraisId: { not: null } } });
     await prisma.noteFraisChoixReglementCible.deleteMany({});
     await prisma.noteFraisChoixReglement.deleteMany({});
@@ -154,7 +162,6 @@ describe("intégration PG choix règlement notes-frais", () => {
         annee: 2025,
         montant: 60,
         montantPaye: 10,
-        montantRestant: 50,
         createdBy: admin.id,
       },
     });
@@ -217,7 +224,6 @@ describe("intégration PG choix règlement notes-frais", () => {
         annee: 2024,
         montant: 20,
         montantPaye: 0,
-        montantRestant: 20,
         createdBy: admin.id,
       },
     });

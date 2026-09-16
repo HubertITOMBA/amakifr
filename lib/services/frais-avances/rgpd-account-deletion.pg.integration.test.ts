@@ -121,6 +121,14 @@ describePg("intégration PG notes-frais RGPD (base Docker allowlistée)", () => 
   });
 
   async function wipeFixtures(client: PrismaClient) {
+    await client.utilisationAvoir.deleteMany({
+      where: { noteFraisReglementLigneId: { not: null } },
+    });
+    await client.avoir.deleteMany({
+      where: { noteFraisReglementLigneId: { not: null } },
+    });
+    await client.noteFraisReglementLigne.deleteMany({});
+    await client.noteFraisReglement.deleteMany({});
     await client.depense.deleteMany({ where: { noteFraisId: { not: null } } });
     await client.noteFraisFileJob.deleteMany({});
     await client.noteFraisArchiveAccessLog.deleteMany({});
