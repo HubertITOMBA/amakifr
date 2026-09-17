@@ -19,8 +19,9 @@ import { LogoutButton } from '@/components/auth/logout-button';
 import Link from "next/link";
 import { LoginButton } from "./login-button";
 import { ChangePasswordDialog } from "@/components/user/ChangePasswordDialog";
-import { Download, FileText, Lock, LogIn, LogOut, Shield, User } from "lucide-react";
+import { Download, FileText, Lock, LogIn, LogOut, Receipt, Shield, User } from "lucide-react";
 import { usePwaInstallPrompt } from "@/components/pwa/usePwaInstallPrompt";
+import { isNotesFraisEnabledClientHint } from "@/lib/frais-avances/feature-flag-client";
 
 
 /**
@@ -46,7 +47,9 @@ export const UserButton = () => {
         normalizedRole === "PRESID" ||
         normalizedRole === "VICEPR" ||
         normalizedRole === "SECRET";
-    
+    /** Hint UI uniquement — l'authz réelle est serveur. */
+    const canSeeMesFraisAvances = isNotesFraisEnabledClientHint();
+
     const userImage = userProfile?.image || user?.image;
     const firstInitial = user?.name?.charAt(0).toUpperCase() ?? 'U';
 
@@ -152,6 +155,15 @@ export const UserButton = () => {
                   Mes Documents
                 </Link>
               </DropdownMenuItem>
+
+              {canSeeMesFraisAvances && (
+                <DropdownMenuItem>
+                  <Link href='/user/frais-avances' className='w-full flex items-center hover:bg-orange-300'>
+                    <Receipt className="h-4 w-4 mr-2" />
+                    Mes frais avancés
+                  </Link>
+                </DropdownMenuItem>
+              )}
 
               <DropdownMenuItem
                 className="hover:bg-orange-300"

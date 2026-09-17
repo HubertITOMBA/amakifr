@@ -70,7 +70,7 @@ describe("DecideNoteFraisDialog", () => {
         expectedVersion: 3,
         idempotencyKey: "decide-key",
         outcome: "VALIDEE",
-        montantAccepte: 80,
+        montantAccepte: "80",
         motif: "Partiel",
       });
     });

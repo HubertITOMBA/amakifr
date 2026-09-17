@@ -1,4 +1,6 @@
 import { PrismaClient } from "@prisma/client";
+import { FRAIS_AVANCES_MENU_SEEDS } from "../lib/frais-avances/menu-seeds";
+import { upsertFraisAvancesMenusIdempotent } from "./frais-avances-menus-upsert";
 
 // Créer le client Prisma avec gestion d'erreur
 let prisma: PrismaClient;
@@ -283,6 +285,7 @@ async function seedMenus() {
         electoral: false,
         parent: null,
       },
+      ...FRAIS_AVANCES_MENU_SEEDS,
       {
         libelle: "Événements",
         description: "Gestion des événements",
@@ -627,6 +630,9 @@ async function seedMenus() {
 
     const totalMenus = allParentMenus.length + navbarElectoralSubmenus.length;
     console.log(`\n🎉 ${totalMenus} menus créés avec succès!`);
+
+    // Idempotent : aligne les 3 entrées frais avancés (future activation, pas runtime pages).
+    await upsertFraisAvancesMenusIdempotent(prisma);
     
     // Afficher un résumé
     const navbarCount = await prisma.menu.count({ where: { niveau: "NAVBAR" } });

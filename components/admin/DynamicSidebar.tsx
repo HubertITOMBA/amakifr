@@ -11,6 +11,7 @@ import { getCurrentUserAdminRoles } from "@/actions/user/admin-roles";
 import { AdminRole } from "@prisma/client";
 import * as LucideIcons from "lucide-react";
 import { cn } from "@/lib/utils";
+import { filterMenusByNotesFraisPublicHint } from "@/lib/frais-avances/menu-visibility";
 
 /**
  * Composant Sidebar dynamique pour l'admin qui charge les menus depuis la base de données
@@ -101,10 +102,12 @@ export function DynamicSidebar() {
 
   // Organiser les menus en hiérarchie parent-enfant (comme la navbar, mais pour la sidebar)
   const { parentMenus, submenusByParent } = useMemo(() => {
-    const allFilteredMenus = menus.filter((menu) => {
-      if (menu.electoral && !electoralMenuEnabled) return false;
-      return true;
-    });
+    const allFilteredMenus = filterMenusByNotesFraisPublicHint(
+      menus.filter((menu) => {
+        if (menu.electoral && !electoralMenuEnabled) return false;
+        return true;
+      })
+    );
 
     const parents = allFilteredMenus.filter((m) => !m.parent);
     const submenuMap: Record<string, DynamicMenu[]> = {};

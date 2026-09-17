@@ -1,5 +1,24 @@
 # Changelog — frais avancés
 
+## 0.4.4-permissions-ui — 2026-09-17
+
+### Ajouté (lot 4.4 — local, flag off, **pas de migration dépôt**)
+- Authz lecture live `readNoteFrais` **restrictive** (Actif + ADMIN|PRESID|SECRET|TRESOR ; ADMIN bypass ; MEMBRE/COMCPT seuls impossibles).
+- Authz vue financière `readNoteFraisFinancialView` branchée (Actif + ADMIN|TRESOR|COMCPT ; PRESID/SECRET/MEMBRE refusés).
+- DTO capacités serveur (`canReadLive`, `canReadFinancial`, `canDecide`, exécutions, `isOwner`) — boutons UI dérivés côté serveur uniquement.
+- Historique règlements groupé (simples + MIXTE parent) ; référence absente du DTO membre (pas seulement `undefined`).
+- Parcours membre post-règlement (montants, badge état financier, historique, masquage remplacement si compteurs > 0).
+- Liste admin : filtres statut + état financier serveur ; détail boutons selon capacités.
+- Route COMCPT `/admin/frais-avances/comptabilite` (liste financière minimale, sans PJ / sans exécution).
+- Navigation : « Mes frais avancés » (hint `NEXT_PUBLIC`), « Frais avancés » (lecteurs live), « Comptabilité des frais » (capacité financière) ; provisionnement **seed uniquement** (pas d’ensure runtime).
+- Listes admin / compta : pagination serveur (défaut 20) ; filtre état financier SQL avant slice ; liste admin sans lignes Justificatif (count seulement).
+- UI money-cents (chaînes) : Choix, Décision, brouillon nouveau, conditions de boutons.
+- Messages toast `REFRESH_REQUIRED` / `VERSION_CONFLICT` / `IDEMPOTENCY_CONFLICT` sans données sensibles.
+
+### Non inclus
+- Notification règlement (4.5) ; correction / restitution / annulation ; évolution RGPD.
+- Migration dépôt ; activation permanente.
+
 ## 0.4.3-mixte — 2026-09-16
 
 ### Ajouté (lot 4.3 — local, flag off, **pas de migration dépôt**)

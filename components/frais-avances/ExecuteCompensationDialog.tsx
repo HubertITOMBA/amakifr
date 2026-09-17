@@ -5,7 +5,10 @@ import { Loader2, Scale } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { toast } from "react-toastify";
 import { actionExecuteNoteFraisCompensation } from "@/actions/frais-avances";
-import { NoteFraisMontantBadge } from "@/components/frais-avances/note-frais-badges";
+import {
+  messageErreurNoteFrais,
+  NoteFraisMontantBadge,
+} from "@/components/frais-avances/note-frais-badges";
 import {
   CompensationCiblesFields,
   buildCompensationLignesFromAllocations,
@@ -63,7 +66,7 @@ export function ExecuteCompensationDialog({
         lignes,
       });
       if (!res.success) {
-        toast.error(res.error);
+        toast.error(messageErreurNoteFrais(res.code, res.error));
         return;
       }
       toast.success(res.message || "Compensation enregistrée");

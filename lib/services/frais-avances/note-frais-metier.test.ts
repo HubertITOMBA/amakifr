@@ -4,6 +4,7 @@ const {
   noteFindUnique,
   noteFindFirst,
   noteFindMany,
+  noteCount,
   noteCreate,
   noteUpdate,
   noteUpdateMany,
@@ -24,12 +25,14 @@ const {
   notificationCreateMany,
   userFindUnique,
   reglementFindMany,
+  operationFindMany,
   $transaction,
   $executeRaw,
 } = vi.hoisted(() => ({
   noteFindUnique: vi.fn(),
   noteFindFirst: vi.fn(),
   noteFindMany: vi.fn(),
+  noteCount: vi.fn(),
   noteCreate: vi.fn(),
   noteUpdate: vi.fn(),
   noteUpdateMany: vi.fn(),
@@ -50,6 +53,7 @@ const {
   notificationCreateMany: vi.fn(),
   userFindUnique: vi.fn(),
   reglementFindMany: vi.fn(),
+  operationFindMany: vi.fn(),
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
 }));
@@ -60,6 +64,7 @@ vi.mock("@/lib/db", () => ({
       findUnique: (...a: unknown[]) => noteFindUnique(...a),
       findFirst: (...a: unknown[]) => noteFindFirst(...a),
       findMany: (...a: unknown[]) => noteFindMany(...a),
+      count: (...a: unknown[]) => noteCount(...a),
       create: (...a: unknown[]) => noteCreate(...a),
       update: (...a: unknown[]) => noteUpdate(...a),
       updateMany: (...a: unknown[]) => noteUpdateMany(...a),
@@ -97,6 +102,9 @@ vi.mock("@/lib/db", () => ({
     },
     noteFraisReglement: {
       findMany: (...a: unknown[]) => reglementFindMany(...a),
+    },
+    noteFraisReglementOperation: {
+      findMany: (...a: unknown[]) => operationFindMany(...a),
     },
     $transaction: (...a: unknown[]) => $transaction(...a),
     $executeRaw: (...a: unknown[]) => $executeRaw(...a),
@@ -187,6 +195,7 @@ describe("métier notes-frais (mocks)", () => {
     vi.mocked(canUserReadSubmittedNotesFrais).mockResolvedValue(false);
     vi.mocked(resolveSubmissionRecipientUserIds).mockResolvedValue(["admin1"]);
     reglementFindMany.mockResolvedValue([]);
+    operationFindMany.mockResolvedValue([]);
     $executeRaw.mockResolvedValue(undefined);
     $transaction.mockImplementation(async (fn: (tx: unknown) => unknown) => {
       const tx = {
@@ -280,13 +289,17 @@ describe("métier notes-frais (mocks)", () => {
       createdAt: new Date(),
       updatedAt: new Date(),
       Justificatifs: [],
+      ChoixReglements: [],
+      Decision: null,
     });
     const detail = await getNoteFraisForUser({ userId: "admin", noteId: "n1" });
     expect(detail.success).toBe(true);
 
     noteFindMany.mockResolvedValue([]);
+    noteCount.mockResolvedValue(0);
     await listAdminNotesFrais({ actorUserId: "admin" });
-    expect(noteFindMany).toHaveBeenCalledWith(
+    expect(noteFindMany).toHaveBeenCalled();
+    expect(noteCount).toHaveBeenCalledWith(
       expect.objectContaining({
         where: expect.objectContaining({
           statut: { in: ["SOUMISE", "VALIDEE", "REJETEE"] },

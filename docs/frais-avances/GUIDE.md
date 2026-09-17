@@ -62,6 +62,18 @@
 - Synthèse : agrège **uniquement** les règlements enfants (jamais la table parent).
 - Pas de notif/outbox (→ 4.5 événement unique).
 
+### Permissions et UI opérationnelle (lot 4.4 — local, flag off)
+- **Lecture live** (`canUserReadSubmittedNotesFrais`) : Actif + rôle dur ADMIN|PRESID|SECRET|TRESOR (principal/additionnel) ; permission `readNoteFrais` restrictive ; ADMIN principal bypass ; une permission dynamique ne peut pas autoriser MEMBRE/COMCPT seul ; propriétaire via chemin owner.
+- **Vue financière** (`canUserReadNoteFraisFinancialView`) : Actif + ADMIN|TRESOR|COMCPT ; `readNoteFraisFinancialView` restrictive ; pas de détail live / PJ.
+- **Capacités** calculées serveur (`getNoteFraisCapabilities`) : boutons Décider / Exécuter uniquement si capacité + statut/choix/plafonds ; contrôles serveur conservés.
+- **Membre** : montants + badge état financier + historique groupé (MIXTE une fois) ; jamais de référence ; masquer « remplacer » si compteurs > 0.
+- **Admin** : filtres statut / état financier serveur ; historique + référence si capacité financière ; CTA MIXTE prioritaire si deux reliquats > 0.
+- **COMCPT** : `/admin/frais-avances/comptabilite` (liste financière dédiée, pas `listAdminNotesFrais`).
+- **Navigation** : hint `NEXT_PUBLIC_NOTES_FRAIS_ENABLED` pour l’affichage uniquement ; menus sidebar **seed** (`scripts/seed-menus.ts`) — **aucune** écriture Menu runtime ; URL toujours protégée serveur ; flag off → indisponible sans requêtes tables.
+- **Listes** : pagination serveur (défaut 20) ; filtre état financier SQL avant pagination ; admin sans lignes Justificatif (count).
+- **Money UI** : chaînes + `money-cents` (centimes entiers) ; payloads décision / choix / brouillon en chaîne.
+- Pas de nouvelle écriture financière ; pas de notif / correction / restitution / annulation / RGPD.
+
 ### Compensation exécutée (lot 4.1 — local, flag off)
 - Choix ACTIF `COMPENSATION` ou `MIXTE` (part compensation uniquement).
 - TX : verrous demandeur → note → choix → cibles → dettes/CM ; OCC version note.
@@ -142,10 +154,10 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
 ```
 
 ## Non livré / futur
-- Lots **4.4+** : polish UI, outbox/notif règlement (4.5), corrections, restitutions, annulation (`EXPIREE` 30 j), détachement RGPD FK.
+- Lot **4.5+** : outbox/notif règlement, corrections, restitutions, annulation (`EXPIREE` 30 j), détachement RGPD FK.
 - Index partiel unique choix ACTIF.
 - CHECK SQL polymorphes sur `notes_frais_reglement_lignes` et opérations MIXTE.
-- API v1, mobile.
+- API v1, mobile notes de frais.
 - Validation trésorier de la durée / point de départ + activation politique env.
 - Migration Prisma dépôt ; activation prod permanente.
 

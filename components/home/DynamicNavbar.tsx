@@ -15,6 +15,7 @@ import { useUnreadMessages } from "@/hooks/use-unread-messages";
 import { getCurrentUserAdminRoles } from "@/actions/user/admin-roles";
 import { AdminRole } from "@prisma/client";
 import * as LucideIcons from "lucide-react";
+import { filterMenusByNotesFraisPublicHint } from "@/lib/frais-avances/menu-visibility";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -102,19 +103,17 @@ export function DynamicNavbar() {
 
   // Organiser les menus en hiérarchie parent-enfant
   const { parentMenus, submenusByParent } = useMemo(() => {
-    const allFilteredMenus = menus.filter(menu => {
-      // Si c'est un menu électoral et que les menus électoraux sont désactivés
-      if (menu.electoral && !electoralMenuEnabled) {
-        return false;
-      }
-      
-      // Filtrer les menus réservés aux utilisateurs connectés
-      if (!user && (menu.lien === "/chat" || menu.lien === "/notifications")) {
-        return false;
-      }
-      
-      return true;
-    });
+    const allFilteredMenus = filterMenusByNotesFraisPublicHint(
+      menus.filter((menu) => {
+        if (menu.electoral && !electoralMenuEnabled) {
+          return false;
+        }
+        if (!user && (menu.lien === "/chat" || menu.lien === "/notifications")) {
+          return false;
+        }
+        return true;
+      })
+    );
 
     const parents = allFilteredMenus.filter(m => !m.parent);
     const submenuMap: Record<string, DynamicMenu[]> = {};

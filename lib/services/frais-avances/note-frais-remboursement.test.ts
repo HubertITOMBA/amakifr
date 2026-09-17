@@ -216,6 +216,7 @@ describe("canUserReadNoteFraisRemboursementReference / financial view", () => {
   beforeEach(() => {
     userAdminRoleFindMany.mockResolvedValue([]);
     getUserAdminRolesFromDb.mockResolvedValue([]);
+    resolveActionPermissionConfig.mockResolvedValue({ status: "absent" });
   });
 
   it("ADMIN TRESOR COMCPT oui ; PRESID SECRET non ; Inactif non", async () => {
@@ -307,7 +308,7 @@ describe("DTO enrichissement référence", () => {
     expect(avec.Remboursements?.[0]?.reference).toBe("SECRET-REF");
   });
 
-  it("enrich refuse état incohérent", () => {
+  it("enrich marque alerte si état incohérent (jamais REGLEE)", () => {
     const base = {
       id: "n1",
       libelle: "x",
@@ -340,9 +341,11 @@ describe("DTO enrichissement référence", () => {
         Cibles: [],
       },
     };
-    expect(() =>
-      enrichNoteFraisFinancierDto(base, { includeReference: false })
-    ).toThrow(NOTES_FRAIS_FINANCIAL_STATE_INCONSISTENT);
+    const dto = enrichNoteFraisFinancierDto(base as never, {
+      includeReference: false,
+    });
+    expect(dto.alerteEtatFinancier).toBe(true);
+    expect(dto.etatFinancier).toBeUndefined();
   });
 });
 

@@ -9,6 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { actionDecideNoteFrais } from "@/actions/frais-avances";
 import { toast } from "react-toastify";
 import {
+  messageErreurNoteFrais,
   NoteFraisMontantBadge,
   NoteFraisStatutBadge,
 } from "@/components/frais-avances/note-frais-badges";
@@ -19,6 +20,7 @@ import {
   FRAIS_AVANCES_SECTION_CLASS,
   FraisAvancesDialogShell,
 } from "@/components/frais-avances/FraisAvancesDialogShell";
+import { parseMoneyToCents } from "@/lib/frais-avances/money-cents";
 
 type DecideNoteFraisDialogProps = {
   open: boolean;
@@ -57,10 +59,17 @@ export function DecideNoteFraisDialog({
     }
   }, [open, montantDemande]);
 
-  const motifRequired =
-    outcome === "REJETEE" ||
-    (outcome === "VALIDEE" &&
-      Number(montantAccepte) < Number(montantDemande));
+  const motifRequired = (() => {
+    if (outcome === "REJETEE") return true;
+    if (outcome !== "VALIDEE") return false;
+    try {
+      return (
+        parseMoneyToCents(montantAccepte) < parseMoneyToCents(montantDemande)
+      );
+    } catch {
+      return true;
+    }
+  })();
 
   async function onDecide() {
     setSubmitting(true);
@@ -70,11 +79,11 @@ export function DecideNoteFraisDialog({
         expectedVersion,
         idempotencyKey,
         outcome,
-        montantAccepte: outcome === "VALIDEE" ? Number(montantAccepte) : null,
+        montantAccepte: outcome === "VALIDEE" ? montantAccepte.trim() : null,
         motif: motif.trim() || null,
       });
       if (!res.success) {
-        toast.error(res.error);
+        toast.error(messageErreurNoteFrais(res.code, res.error));
         return;
       }
       toast.success(res.message || "Décision enregistrée");

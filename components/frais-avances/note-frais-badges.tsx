@@ -21,14 +21,32 @@ const MODE_CLASS: Record<string, string> = {
     "bg-indigo-100 text-indigo-900 border-indigo-300 dark:bg-indigo-900/40 dark:text-indigo-100",
 };
 
+const ETAT_FINANCIER_CLASS: Record<string, string> = {
+  NON_REGLEE:
+    "bg-orange-100 text-orange-950 border-orange-300 dark:bg-orange-950/40 dark:text-orange-100",
+  PARTIELLEMENT_REGLEE:
+    "bg-sky-100 text-sky-950 border-sky-300 dark:bg-sky-950/40 dark:text-sky-100",
+  REGLEE:
+    "bg-teal-100 text-teal-950 border-teal-300 dark:bg-teal-950/40 dark:text-teal-100",
+};
+
+const ETAT_FINANCIER_LABEL: Record<string, string> = {
+  NON_REGLEE: "Non réglée",
+  PARTIELLEMENT_REGLEE: "Partiellement réglée",
+  REGLEE: "Réglée",
+};
+
 /**
- * Badge statut note de frais.
+ * Badge statut note de frais (administratif).
  */
 export function NoteFraisStatutBadge({ statut }: { statut: string }) {
   return (
     <Badge
       variant="outline"
-      className={cn("text-xs font-semibold", STATUT_CLASS[statut] || STATUT_CLASS.BROUILLON)}
+      className={cn(
+        "text-xs font-semibold",
+        STATUT_CLASS[statut] || STATUT_CLASS.BROUILLON
+      )}
       data-testid="note-frais-statut-badge"
     >
       {statut}
@@ -43,7 +61,10 @@ export function NoteFraisModeBadge({ mode }: { mode: string }) {
   return (
     <Badge
       variant="outline"
-      className={cn("text-xs font-semibold", MODE_CLASS[mode] || MODE_CLASS.REMBOURSEMENT)}
+      className={cn(
+        "text-xs font-semibold",
+        MODE_CLASS[mode] || MODE_CLASS.REMBOURSEMENT
+      )}
       data-testid="note-frais-mode-badge"
     >
       {mode}
@@ -52,7 +73,25 @@ export function NoteFraisModeBadge({ mode }: { mode: string }) {
 }
 
 /**
- * Badge montant (€).
+ * Badge état financier (distinct du statut administratif).
+ */
+export function NoteFraisEtatFinancierBadge({ etat }: { etat: string }) {
+  return (
+    <Badge
+      variant="outline"
+      className={cn(
+        "text-xs font-semibold",
+        ETAT_FINANCIER_CLASS[etat] || ETAT_FINANCIER_CLASS.NON_REGLEE
+      )}
+      data-testid="note-frais-etat-financier-badge"
+    >
+      {ETAT_FINANCIER_LABEL[etat] || etat}
+    </Badge>
+  );
+}
+
+/**
+ * Badge montant (€) — value déjà formatée (chaîne).
  */
 export function NoteFraisMontantBadge({
   label,
@@ -70,4 +109,29 @@ export function NoteFraisMontantBadge({
       {label}&nbsp;: {String(value)}&nbsp;€
     </Badge>
   );
+}
+
+/**
+ * Message toast métier sans données sensibles (référence, etc.).
+ */
+export function messageErreurNoteFrais(
+  code?: string,
+  fallback?: string
+): string {
+  switch (code) {
+    case "REFRESH_REQUIRED":
+      return "Données obsolètes — actualisez les cibles ou la note, puis réessayez.";
+    case "VERSION_CONFLICT":
+      return "Conflit de version — rechargez la note et réessayez.";
+    case "IDEMPOTENCY_CONFLICT":
+      return "Cette opération a déjà été enregistrée avec un contenu différent.";
+    case "NOTES_FRAIS_MIXTE_OPERATION_INCOMPLETE":
+      return "Opération mixte incomplète — contactez un administrateur.";
+    case "FORBIDDEN":
+      return "Action non autorisée.";
+    case "NOTES_FRAIS_DISABLED":
+      return "Le module frais avancés n'est pas activé.";
+    default:
+      return fallback || "Erreur lors de l'opération.";
+  }
 }

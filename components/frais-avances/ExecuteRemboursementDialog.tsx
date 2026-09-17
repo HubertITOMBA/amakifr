@@ -14,7 +14,10 @@ import {
 } from "@/components/ui/select";
 import { actionExecuteNoteFraisRemboursement } from "@/actions/frais-avances";
 import { toast } from "react-toastify";
-import { NoteFraisMontantBadge } from "@/components/frais-avances/note-frais-badges";
+import {
+  messageErreurNoteFrais,
+  NoteFraisMontantBadge,
+} from "@/components/frais-avances/note-frais-badges";
 import { datetimeLocalToIso } from "@/lib/frais-avances/datetime-local";
 import {
   FRAIS_AVANCES_INPUT_CLASS,
@@ -94,7 +97,7 @@ export function ExecuteRemboursementDialog({
         executeAt,
       });
       if (!res.success) {
-        toast.error(res.error);
+        toast.error(messageErreurNoteFrais(res.code, res.error));
         return;
       }
       toast.success(res.message || "Remboursement enregistré");

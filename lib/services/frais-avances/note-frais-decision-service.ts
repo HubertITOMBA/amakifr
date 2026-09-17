@@ -41,7 +41,7 @@ export type DecideNoteFraisInput = {
   idempotencyKey: string;
   outcome: DecideNoteFraisOutcome;
   /** Requis si VALIDEE ; ignoré / doit être absent si REJETEE. */
-  montantAccepte?: number | null;
+  montantAccepte?: string | number | null;
   motif?: string | null;
   client?: typeof db;
   beforeDemandeurLock?: () => Promise<void>;
@@ -103,7 +103,7 @@ export type NormalizedDecisionContent = {
 export function validateAndNormalizeDecisionContent(input: {
   outcome: DecideNoteFraisOutcome;
   montantDemande: Prisma.Decimal | number | string;
-  montantAccepte?: number | null;
+  montantAccepte?: string | number | null;
   motif?: string | null;
 }): NormalizedDecisionContent {
   const montantDemande = new Prisma.Decimal(input.montantDemande);
@@ -118,7 +118,7 @@ export function validateAndNormalizeDecisionContent(input: {
     }
     if (
       input.montantAccepte != null &&
-      Number.isFinite(Number(input.montantAccepte))
+      String(input.montantAccepte).trim() !== ""
     ) {
       throw new Error("Un rejet ne comporte pas de montant accepté");
     }
@@ -130,11 +130,16 @@ export function validateAndNormalizeDecisionContent(input: {
   }
   if (
     input.montantAccepte == null ||
-    !Number.isFinite(Number(input.montantAccepte))
+    String(input.montantAccepte).trim() === ""
   ) {
     throw new Error("Montant accepté requis pour une validation");
   }
-  const accepte = new Prisma.Decimal(input.montantAccepte);
+  let accepte: Prisma.Decimal;
+  try {
+    accepte = new Prisma.Decimal(input.montantAccepte);
+  } catch {
+    throw new Error("Montant accepté invalide");
+  }
   if (!(accepte.gt(0))) {
     throw new Error("Le montant accepté doit être strictement positif");
   }

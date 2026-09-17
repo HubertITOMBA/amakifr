@@ -1,8 +1,6 @@
 import { AdminRole, UserRole, UserStatus } from "@prisma/client";
 import { db } from "@/lib/db";
-import { getUserAdminRolesFromDb } from "@/lib/user-roles";
-import { NOTES_FRAIS_ARCHIVE_READ_ROLES } from "@/lib/frais-avances/recipients";
-import { canRead, resolveActionPermissionConfig } from "@/lib/dynamic-permissions";
+import { resolveActionPermissionConfig } from "@/lib/dynamic-permissions";
 import { isAdminRole } from "@/lib/utils";
 
 const SUBMITTED_READER_ROLES = new Set<string>([
@@ -16,7 +14,7 @@ const SUBMITTED_READER_ROLES = new Set<string>([
   AdminRole.TRESOR,
 ]);
 
-/** Décideurs exclusifs : TRESOR + ADMIN (≠ destinataires notif soumission). */
+/** Décideurs / exécuteurs exclusifs : TRESOR + ADMIN. */
 const DECIDER_ROLES = new Set<string>([
   UserRole.ADMIN,
   UserRole.TRESOR,
@@ -24,364 +22,265 @@ const DECIDER_ROLES = new Set<string>([
   AdminRole.TRESOR,
 ]);
 
-const ARCHIVE_READER_ROLES = new Set<string>([
-  ...NOTES_FRAIS_ARCHIVE_READ_ROLES,
+const FINANCIAL_READER_ROLES = new Set<string>([
+  UserRole.ADMIN,
+  UserRole.TRESOR,
+  UserRole.COMCPT,
   AdminRole.ADMIN,
   AdminRole.TRESOR,
   AdminRole.COMCPT,
 ]);
 
+const ARCHIVE_READER_ROLES = new Set<string>([
+  UserRole.ADMIN,
+  UserRole.TRESOR,
+  UserRole.COMCPT,
+  AdminRole.ADMIN,
+  AdminRole.TRESOR,
+  AdminRole.COMCPT,
+]);
+
+type AuthzClient = {
+  user: { findUnique: typeof db.user.findUnique };
+  userAdminRole: { findMany: typeof db.userAdminRole.findMany };
+};
+
 /**
- * Lecteur responsable des notes soumises/décidées live : permission dynamique ou
- * rôle ADMIN|PRESID|SECRET|TRESOR (principal / additionnel) + Actif.
+ * Évalue une permission dynamique WRITE/READ de façon **restrictive**
+ * (même pattern que decideNoteFrais) : absente → OK ; disabled → refus ;
+ * configurée → intersection avec les rôles du compte.
+ */
+async function evaluateRestrictiveDynamicPermission(
+  action: string,
+  primaryRole: string,
+  extras: Array<{ role: string }>
+): Promise<boolean> {
+  const config = await resolveActionPermissionConfig(action);
+  if (config.status === "absent") return true;
+  if (config.status === "disabled") return false;
+
+  const userRoles: string[] = [];
+  if (isAdminRole(primaryRole)) userRoles.push(primaryRole);
+  for (const extra of extras) {
+    const r = extra.role.toString().trim().toUpperCase();
+    if (!userRoles.includes(r)) userRoles.push(r);
+  }
+  return userRoles.some((role) => config.roles.includes(role));
+}
+
+async function loadActifUserWithExtras(
+  userId: string,
+  client: AuthzClient,
+  extraRoles: AdminRole[]
+): Promise<{
+  primaryRole: string;
+  userRole: string;
+  extras: Array<{ role: string }>;
+} | null> {
+  if (!userId) return null;
+  const user = await client.user.findUnique({
+    where: { id: userId },
+    select: { role: true, status: true },
+  });
+  if (!user || user.status !== UserStatus.Actif) return null;
+  const primaryRole = user.role?.toString().trim().toUpperCase() || "";
+  const extras = await client.userAdminRole.findMany({
+    where: { userId, role: { in: extraRoles } },
+    select: { role: true },
+  });
+  return { primaryRole, userRole: user.role, extras };
+}
+
+/**
+ * Lecteur responsable des notes soumises/décidées live.
+ *
+ * 1. Compte **Actif** obligatoire.
+ * 2. Rôle principal **ou** additionnel ADMIN|PRESID|SECRET|TRESOR obligatoire
+ *    (une permission dynamique ne peut pas autoriser MEMBRE/COMCPT seul).
+ * 3. Rôle principal **ADMIN** : bypass.
+ * 4. Permission dynamique `readNoteFrais` **restrictive**.
+ *
+ * Le propriétaire accède à ses notes via le chemin owner (`getNoteFraisForUser`),
+ * pas via cette fonction.
  */
 export async function canUserReadSubmittedNotesFrais(
   userId: string,
-  client: {
-    user: { findUnique: typeof db.user.findUnique };
-  } = db
+  client: AuthzClient = db
 ): Promise<boolean> {
-  if (!userId) return false;
-  if (await canRead(userId, "readNoteFrais")) return true;
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.PRESID,
+    AdminRole.SECRET,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
 
-  const user = await client.user.findUnique({
-    where: { id: userId },
-    select: { role: true, status: true },
-  });
-  if (!user || user.status !== UserStatus.Actif) return false;
-  if (SUBMITTED_READER_ROLES.has(user.role)) return true;
-  const extras = await getUserAdminRolesFromDb(userId);
-  return extras.some((r) => SUBMITTED_READER_ROLES.has(r));
+  const hasHardRole =
+    SUBMITTED_READER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
+  if (!hasHardRole) return false;
+
+  if (loaded.primaryRole === "ADMIN") return true;
+
+  return evaluateRestrictiveDynamicPermission(
+    "readNoteFrais",
+    loaded.primaryRole,
+    loaded.extras
+  );
 }
 
 /**
- * Décision sur une note SOUMISE.
- *
- * Règle exacte :
- * 1. Compte **Actif** obligatoire.
- * 2. Rôle principal **ou** additionnel **TRESOR|ADMIN** obligatoire
- *    (une permission dynamique ne peut pas élargir ce filtre).
- * 3. Rôle principal **ADMIN** : autorisé (bypass existant de `hasPermission`).
- * 4. Sinon, config dynamique `decideNoteFrais` WRITE :
- *    - **absente** (non configurée) → le rôle métier suffit → autorisé ;
- *    - **disabled** (`enabled=false`) → refus explicite → refusé ;
- *    - **configured** → autorisé seulement si l’un des rôles user (principal
- *      admin ou additionnel) figure dans `permission.roles`
- *      (rôle absent de la liste = refus explicite).
- *
- * PRESID/SECRET/COMCPT : non.
+ * Décision sur une note SOUMISE — TRESOR|ADMIN + dynamique restrictive.
  */
 export async function canUserDecideNoteFrais(
   userId: string,
-  client: {
-    user: { findUnique: typeof db.user.findUnique };
-    userAdminRole: { findMany: typeof db.userAdminRole.findMany };
-  } = db
+  client: AuthzClient = db
 ): Promise<boolean> {
-  if (!userId) return false;
-
-  const user = await client.user.findUnique({
-    where: { id: userId },
-    select: { role: true, status: true },
-  });
-  if (!user || user.status !== UserStatus.Actif) return false;
-
-  const primaryRole = user.role?.toString().trim().toUpperCase() || "";
-
-  const extras = await client.userAdminRole.findMany({
-    where: {
-      userId,
-      role: { in: [AdminRole.ADMIN, AdminRole.TRESOR] },
-    },
-    select: { role: true },
-  });
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
 
   const hasDeciderRole =
-    DECIDER_ROLES.has(user.role) || extras.length > 0;
-
-  // Filtre métier dur : sans TRESOR/ADMIN, refuser même si une permission WRITE existe.
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
   if (!hasDeciderRole) return false;
+  if (loaded.primaryRole === "ADMIN") return true;
 
-  // Bypass ADMIN principal — aligné sur hasPermission (L38–42).
-  if (primaryRole === "ADMIN") return true;
-
-  const config = await resolveActionPermissionConfig("decideNoteFrais");
-
-  // Permission non configurée : le rôle Actif TRESOR/ADMIN suffit.
-  if (config.status === "absent") return true;
-
-  // Refus explicite global (permission désactivée).
-  if (config.status === "disabled") return false;
-
-  // Refus explicite ou accord selon la liste de rôles (comme hasPermission L94–102).
-  const userRoles: string[] = [];
-  if (isAdminRole(primaryRole)) userRoles.push(primaryRole);
-  for (const extra of extras) {
-    const r = extra.role.toString().trim().toUpperCase();
-    if (!userRoles.includes(r)) userRoles.push(r);
-  }
-
-  return userRoles.some((role) => config.roles.includes(role));
+  return evaluateRestrictiveDynamicPermission(
+    "decideNoteFrais",
+    loaded.primaryRole,
+    loaded.extras
+  );
 }
 
 /**
- * Exécution d'une compensation de note VALIDEE (lot 4.1).
- * Même filtre dur TRESOR|ADMIN + dynamique restrictive que decideNoteFrais.
- * Action distincte : `executeNoteFraisCompensation`.
- *
- * @param userId - Identifiant du compte à autoriser
- * @param client - Client Prisma (ou TX)
- * @returns true si autorisé
+ * Exécution compensation — TRESOR|ADMIN + dynamique restrictive.
  */
 export async function canUserExecuteNoteFraisCompensation(
   userId: string,
-  client: {
-    user: { findUnique: typeof db.user.findUnique };
-    userAdminRole: { findMany: typeof db.userAdminRole.findMany };
-  } = db
+  client: AuthzClient = db
 ): Promise<boolean> {
-  if (!userId) return false;
-
-  const user = await client.user.findUnique({
-    where: { id: userId },
-    select: { role: true, status: true },
-  });
-  if (!user || user.status !== UserStatus.Actif) return false;
-
-  const primaryRole = user.role?.toString().trim().toUpperCase() || "";
-
-  const extras = await client.userAdminRole.findMany({
-    where: {
-      userId,
-      role: { in: [AdminRole.ADMIN, AdminRole.TRESOR] },
-    },
-    select: { role: true },
-  });
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
 
   const hasExecutorRole =
-    DECIDER_ROLES.has(user.role) || extras.length > 0;
-
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
   if (!hasExecutorRole) return false;
-  if (primaryRole === "ADMIN") return true;
+  if (loaded.primaryRole === "ADMIN") return true;
 
-  const config = await resolveActionPermissionConfig(
-    "executeNoteFraisCompensation"
+  return evaluateRestrictiveDynamicPermission(
+    "executeNoteFraisCompensation",
+    loaded.primaryRole,
+    loaded.extras
   );
-  if (config.status === "absent") return true;
-  if (config.status === "disabled") return false;
-
-  const userRoles: string[] = [];
-  if (isAdminRole(primaryRole)) userRoles.push(primaryRole);
-  for (const extra of extras) {
-    const r = extra.role.toString().trim().toUpperCase();
-    if (!userRoles.includes(r)) userRoles.push(r);
-  }
-
-  return userRoles.some((role) => config.roles.includes(role));
 }
 
 /**
- * Exécution d'un remboursement de note VALIDEE (lot 4.2).
- * Même filtre dur TRESOR|ADMIN + dynamique restrictive que decide/compensation.
- * Action distincte : `executeNoteFraisRemboursement`.
- *
- * @param userId - Identifiant du compte à autoriser
- * @param client - Client Prisma (ou TX)
- * @returns true si autorisé
+ * Exécution remboursement — TRESOR|ADMIN + dynamique restrictive.
  */
 export async function canUserExecuteNoteFraisRemboursement(
   userId: string,
-  client: {
-    user: { findUnique: typeof db.user.findUnique };
-    userAdminRole: { findMany: typeof db.userAdminRole.findMany };
-  } = db
+  client: AuthzClient = db
 ): Promise<boolean> {
-  if (!userId) return false;
-
-  const user = await client.user.findUnique({
-    where: { id: userId },
-    select: { role: true, status: true },
-  });
-  if (!user || user.status !== UserStatus.Actif) return false;
-
-  const primaryRole = user.role?.toString().trim().toUpperCase() || "";
-
-  const extras = await client.userAdminRole.findMany({
-    where: {
-      userId,
-      role: { in: [AdminRole.ADMIN, AdminRole.TRESOR] },
-    },
-    select: { role: true },
-  });
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
 
   const hasExecutorRole =
-    DECIDER_ROLES.has(user.role) || extras.length > 0;
-
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
   if (!hasExecutorRole) return false;
-  if (primaryRole === "ADMIN") return true;
+  if (loaded.primaryRole === "ADMIN") return true;
 
-  const config = await resolveActionPermissionConfig(
-    "executeNoteFraisRemboursement"
+  return evaluateRestrictiveDynamicPermission(
+    "executeNoteFraisRemboursement",
+    loaded.primaryRole,
+    loaded.extras
   );
-  if (config.status === "absent") return true;
-  if (config.status === "disabled") return false;
-
-  const userRoles: string[] = [];
-  if (isAdminRole(primaryRole)) userRoles.push(primaryRole);
-  for (const extra of extras) {
-    const r = extra.role.toString().trim().toUpperCase();
-    if (!userRoles.includes(r)) userRoles.push(r);
-  }
-
-  return userRoles.some((role) => config.roles.includes(role));
 }
 
 /**
- * Exécution mixte atomique (lot 4.3).
- * Même filtre dur TRESOR|ADMIN + dynamique restrictive.
- * Action distincte : `executeNoteFraisReglementMixte`.
- *
- * @param userId - Identifiant du compte à autoriser
- * @param client - Client Prisma (ou TX)
- * @returns true si autorisé
+ * Exécution mixte — TRESOR|ADMIN + dynamique restrictive.
  */
 export async function canUserExecuteNoteFraisReglementMixte(
   userId: string,
-  client: {
-    user: { findUnique: typeof db.user.findUnique };
-    userAdminRole: { findMany: typeof db.userAdminRole.findMany };
-  } = db
+  client: AuthzClient = db
 ): Promise<boolean> {
-  if (!userId) return false;
-
-  const user = await client.user.findUnique({
-    where: { id: userId },
-    select: { role: true, status: true },
-  });
-  if (!user || user.status !== UserStatus.Actif) return false;
-
-  const primaryRole = user.role?.toString().trim().toUpperCase() || "";
-
-  const extras = await client.userAdminRole.findMany({
-    where: {
-      userId,
-      role: { in: [AdminRole.ADMIN, AdminRole.TRESOR] },
-    },
-    select: { role: true },
-  });
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
 
   const hasExecutorRole =
-    DECIDER_ROLES.has(user.role) || extras.length > 0;
-
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
   if (!hasExecutorRole) return false;
-  if (primaryRole === "ADMIN") return true;
+  if (loaded.primaryRole === "ADMIN") return true;
 
-  const config = await resolveActionPermissionConfig(
-    "executeNoteFraisReglementMixte"
+  return evaluateRestrictiveDynamicPermission(
+    "executeNoteFraisReglementMixte",
+    loaded.primaryRole,
+    loaded.extras
   );
-  if (config.status === "absent") return true;
-  if (config.status === "disabled") return false;
-
-  const userRoles: string[] = [];
-  if (isAdminRole(primaryRole)) userRoles.push(primaryRole);
-  for (const extra of extras) {
-    const r = extra.role.toString().trim().toUpperCase();
-    if (!userRoles.includes(r)) userRoles.push(r);
-  }
-
-  return userRoles.some((role) => config.roles.includes(role));
 }
 
 /**
  * Lecture de la référence de remboursement (traçabilité).
- * Actif ADMIN|TRESOR|COMCPT (principal ou additionnel) uniquement.
- *
- * @param userId - Lecteur
- * @param client - Prisma
+ * Alignée sur la vue financière (ADMIN|TRESOR|COMCPT + dynamique).
  */
 export async function canUserReadNoteFraisRemboursementReference(
   userId: string,
-  client: {
-    user: { findUnique: typeof db.user.findUnique };
-    userAdminRole: { findMany: typeof db.userAdminRole.findMany };
-  } = db
+  client: AuthzClient = db
 ): Promise<boolean> {
-  if (!userId) return false;
-
-  const user = await client.user.findUnique({
-    where: { id: userId },
-    select: { role: true, status: true },
-  });
-  if (!user || user.status !== UserStatus.Actif) return false;
-
-  const REF_READER = new Set<string>([
-    UserRole.ADMIN,
-    UserRole.TRESOR,
-    UserRole.COMCPT,
-    AdminRole.ADMIN,
-    AdminRole.TRESOR,
-    AdminRole.COMCPT,
-  ]);
-  if (REF_READER.has(user.role)) return true;
-
-  const extras = await client.userAdminRole.findMany({
-    where: {
-      userId,
-      role: {
-        in: [AdminRole.ADMIN, AdminRole.TRESOR, AdminRole.COMCPT],
-      },
-    },
-    select: { role: true },
-  });
-  return extras.length > 0;
+  return canUserReadNoteFraisFinancialView(userId, client);
 }
 
 /**
  * Lecture vue financière dédiée (règlements + référence).
- * Même filtre que la référence : Actif ADMIN|TRESOR|COMCPT.
- * Ne donne **pas** accès au détail live complet (`canUserReadSubmittedNotesFrais`).
- *
- * @param userId - Lecteur
- * @param client - Prisma
+ * Actif ADMIN|TRESOR|COMCPT ; permission `readNoteFraisFinancialView` restrictive.
+ * Ne donne **pas** accès au détail live / justificatifs.
  */
 export async function canUserReadNoteFraisFinancialView(
   userId: string,
-  client: {
-    user: { findUnique: typeof db.user.findUnique };
-    userAdminRole: { findMany: typeof db.userAdminRole.findMany };
-  } = db
+  client: AuthzClient = db
 ): Promise<boolean> {
-  return canUserReadNoteFraisRemboursementReference(userId, client);
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+    AdminRole.COMCPT,
+  ]);
+  if (!loaded) return false;
+
+  const hasHardRole =
+    FINANCIAL_READER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
+  if (!hasHardRole) return false;
+  if (loaded.primaryRole === "ADMIN") return true;
+
+  return evaluateRestrictiveDynamicPermission(
+    "readNoteFraisFinancialView",
+    loaded.primaryRole,
+    loaded.extras
+  );
 }
 
 /**
  * Lecture archive privée : Actif ADMIN|TRESOR|COMCPT (principal ou additionnel).
- * Droits distincts des notes live (COMCPT inclus ; PRESID/SECRET exclus).
  */
 export async function canUserReadNotesFraisArchive(
   userId: string,
-  client: {
-    user: { findUnique: typeof db.user.findUnique };
-    userAdminRole: { findMany: typeof db.userAdminRole.findMany };
-  } = db
+  client: AuthzClient = db
 ): Promise<boolean> {
-  if (!userId) return false;
-
-  const user = await client.user.findUnique({
-    where: { id: userId },
-    select: { role: true, status: true },
-  });
-  if (!user || user.status !== UserStatus.Actif) return false;
-  if (ARCHIVE_READER_ROLES.has(user.role)) return true;
-
-  const extras = await client.userAdminRole.findMany({
-    where: {
-      userId,
-      role: {
-        in: [AdminRole.ADMIN, AdminRole.TRESOR, AdminRole.COMCPT],
-      },
-    },
-    select: { role: true },
-  });
-  return extras.length > 0;
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+    AdminRole.COMCPT,
+  ]);
+  if (!loaded) return false;
+  return (
+    ARCHIVE_READER_ROLES.has(loaded.userRole) || loaded.extras.length > 0
+  );
 }

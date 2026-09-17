@@ -3,6 +3,7 @@
  */
 
 import { computeEtatFinancierNoteFrais } from "@/lib/services/frais-avances/note-frais-remboursement-service";
+import { parseMoneyToCents } from "@/lib/frais-avances/money-cents";
 
 export type JustificatifNoteFraisPublicDto = {
   id: string;
@@ -51,8 +52,36 @@ export type NoteFraisRemboursementPublicDto = {
   montantTotal: string;
   moyen: string;
   executeAt: Date | string;
-  /** Présent uniquement pour Actif ADMIN|TRESOR|COMCPT. */
+  /** Présent uniquement pour Actif ADMIN|TRESOR|COMCPT — omis sinon (pas `undefined`). */
   reference?: string;
+};
+
+/** Entrée d'historique de règlement (simples ou mixte groupé). */
+export type NoteFraisHistoriqueReglementDto = {
+  kind: "REMBOURSEMENT_SIMPLE" | "COMPENSATION_SIMPLE" | "MIXTE";
+  id: string;
+  executeAt: string;
+  montantRemboursement?: string;
+  montantCompensation?: string;
+  moyen?: string;
+  executeurLabel?: string | null;
+  cibles?: Array<{
+    libelle: string;
+    montant: string;
+    typeCible: string;
+  }>;
+  /** Uniquement si droit financier — clé absente sinon. */
+  reference?: string;
+};
+
+export type NoteFraisChoixHistoriqueDto = {
+  id: string;
+  mode: string;
+  statut: string;
+  montantRemboursement: string;
+  montantCompensation: string;
+  choisiAt: string;
+  remplaceChoixId: string | null;
 };
 
 export type NoteFraisPublicDto = {
@@ -75,11 +104,21 @@ export type NoteFraisPublicDto = {
   Justificatifs: JustificatifNoteFraisPublicDto[];
   Decision?: NoteFraisDecisionPublicDto | null;
   ChoixReglementActif?: NoteFraisChoixReglementPublicDto | null;
-  /** État financier calculé (lot 4.2) — absent si pas de montant accepté / choix. */
+  /** Historique des choix (ACTIF + REMPLACE), ACTIF en tête. */
+  ChoixHistorique?: NoteFraisChoixHistoriqueDto[];
+  /** Remplacement possible uniquement si compteurs utilisés = 0. */
+  canReplaceChoix?: boolean;
   etatFinancier?: "NON_REGLEE" | "PARTIELLEMENT_REGLEE" | "REGLEE";
+  /** Présent si compteurs incohérents (consommé > accepté) — jamais classé REGLEE. */
+  alerteEtatFinancier?: boolean;
   restantDu?: string;
   consomme?: string;
+  /** Indicateur liste (sans charger les PJ). */
+  justificatifsReadyCount?: number;
+  /** @deprecated préférer `historiqueReglements` */
   Remboursements?: NoteFraisRemboursementPublicDto[];
+  /** Historique groupé : pas de double comptage parent/enfants. */
+  historiqueReglements?: NoteFraisHistoriqueReglementDto[];
   Demandeur?: { id: string; email: string | null; name: string | null };
   Adherent?: { id: string; firstname: string; lastname: string };
 };
@@ -279,11 +318,11 @@ export function toNoteFraisPublicDto(note: NoteRow): NoteFraisPublicDto {
 }
 
 /**
- * Enrichit le DTO avec état financier et remboursements (référence selon droit).
+ * Enrichit le DTO avec état financier et historique (référence selon droit).
+ * Les enfants d'une opération MIXTE ne sont pas listés séparément.
  *
  * @param dto - DTO de base
  * @param opts.includeReference - true pour ADMIN|TRESOR|COMCPT
- * @param opts.remboursements - règlements REMBOURSEMENT EXECUTE
  */
 export function enrichNoteFraisFinancierDto(
   dto: NoteFraisPublicDto,
@@ -295,27 +334,149 @@ export function enrichNoteFraisFinancierDto(
       moyen: string | null;
       reference: string | null;
       executeAt: Date;
+      operationId?: string | null;
+      executeurLabel?: string | null;
     }>;
+    compensations?: Array<{
+      id: string;
+      montantTotal: { toString(): string } | number | string;
+      executeAt: Date;
+      operationId?: string | null;
+      executeurLabel?: string | null;
+      Lignes?: Array<{
+        typeCible: string | null;
+        montant: { toString(): string } | number | string;
+        libelleSnapshot?: string | null;
+      }>;
+    }>;
+    operationsMixte?: Array<{
+      id: string;
+      executeAt: Date;
+      executeurLabel?: string | null;
+      compensationMontant: string;
+      remboursementMontant: string;
+      moyen: string;
+      reference: string | null;
+      cibles?: Array<{
+        libelle: string;
+        montant: string;
+        typeCible: string;
+      }>;
+    }>;
+    choixHistorique?: NoteFraisChoixHistoriqueDto[];
   }
 ): NoteFraisPublicDto {
   const choix = dto.ChoixReglementActif;
   if (dto.montantAccepte != null && choix) {
-    const etat = computeEtatFinancierNoteFrais({
-      montantAccepte: dto.montantAccepte,
-      montantRembourseUtilise: choix.montantRembourseUtilise,
-      montantCompensationUtilise: choix.montantCompensationUtilise,
-    });
-    dto = {
-      ...dto,
-      etatFinancier: etat.etatFinancier,
-      restantDu: etat.restantDu,
-      consomme: etat.consomme,
-    };
+    try {
+      const etat = computeEtatFinancierNoteFrais({
+        montantAccepte: dto.montantAccepte,
+        montantRembourseUtilise: choix.montantRembourseUtilise,
+        montantCompensationUtilise: choix.montantCompensationUtilise,
+      });
+      dto = {
+        ...dto,
+        etatFinancier: etat.etatFinancier,
+        restantDu: etat.restantDu,
+        consomme: etat.consomme,
+        alerteEtatFinancier: false,
+        canReplaceChoix: (() => {
+          try {
+            return (
+              parseMoneyToCents(String(choix.montantRembourseUtilise)) === 0 &&
+              parseMoneyToCents(String(choix.montantCompensationUtilise)) === 0
+            );
+          } catch {
+            return false;
+          }
+        })(),
+      };
+    } catch {
+      dto = {
+        ...dto,
+        alerteEtatFinancier: true,
+        canReplaceChoix: false,
+      };
+    }
   }
-  if (opts.remboursements && opts.remboursements.length > 0) {
+
+  if (opts.choixHistorique && opts.choixHistorique.length > 0) {
+    dto = { ...dto, ChoixHistorique: opts.choixHistorique };
+  }
+
+  const historique: NoteFraisHistoriqueReglementDto[] = [];
+
+  for (const op of opts.operationsMixte ?? []) {
+    const entry: NoteFraisHistoriqueReglementDto = {
+      kind: "MIXTE",
+      id: op.id,
+      executeAt: op.executeAt.toISOString(),
+      montantRemboursement: op.remboursementMontant,
+      montantCompensation: op.compensationMontant,
+      moyen: op.moyen,
+      executeurLabel: op.executeurLabel ?? null,
+      cibles: op.cibles,
+    };
+    if (opts.includeReference && op.reference) {
+      entry.reference = op.reference;
+    }
+    historique.push(entry);
+  }
+
+  const mixteChildIds = new Set(
+    (opts.operationsMixte ?? []).flatMap(() => [] as string[])
+  );
+  // Les IDs enfants ne sont pas nécessaires si on filtre via operationId null.
+  void mixteChildIds;
+
+  for (const r of opts.remboursements ?? []) {
+    if (r.operationId) continue; // enfant mixte → déjà dans parent
+    const entry: NoteFraisHistoriqueReglementDto = {
+      kind: "REMBOURSEMENT_SIMPLE",
+      id: r.id,
+      executeAt: r.executeAt.toISOString(),
+      montantRemboursement: decimalToString(r.montantTotal) ?? "0",
+      moyen: r.moyen ?? "",
+      executeurLabel: r.executeurLabel ?? null,
+    };
+    if (opts.includeReference && r.reference) {
+      entry.reference = r.reference;
+    }
+    historique.push(entry);
+  }
+
+  for (const c of opts.compensations ?? []) {
+    if (c.operationId) continue;
+    historique.push({
+      kind: "COMPENSATION_SIMPLE",
+      id: c.id,
+      executeAt: c.executeAt.toISOString(),
+      montantCompensation: decimalToString(c.montantTotal) ?? "0",
+      executeurLabel: c.executeurLabel ?? null,
+      cibles: (c.Lignes ?? [])
+        .filter((l) => l.typeCible)
+        .map((l) => ({
+          typeCible: l.typeCible!,
+          libelle: l.libelleSnapshot?.trim() || l.typeCible!,
+          montant: decimalToString(l.montant) ?? "0",
+        })),
+    });
+  }
+
+  historique.sort(
+    (a, b) => new Date(a.executeAt).getTime() - new Date(b.executeAt).getTime()
+  );
+
+  if (historique.length > 0) {
+    dto = { ...dto, historiqueReglements: historique };
+  }
+
+  // Compat tests : remboursements simples (+ mixte enfants uniquement si includeRef admin list flat)
+  const rembFlat = (opts.remboursements ?? []).filter((r) => !r.operationId);
+  if (rembFlat.length > 0) {
     dto = {
       ...dto,
-      Remboursements: opts.remboursements.map((r) => {
+      Remboursements: rembFlat.map((r) => {
         const base: NoteFraisRemboursementPublicDto = {
           id: r.id,
           montantTotal: decimalToString(r.montantTotal) ?? "0",

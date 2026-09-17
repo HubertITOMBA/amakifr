@@ -43,7 +43,7 @@ describe("ChoixReglementDialog", () => {
         noteId="n2"
         expectedNoteVersion={4}
         idempotencyKey="choix-key"
-        montantAccepte={50}
+        montantAccepte="50.00"
         cibles={[]}
         onDone={vi.fn()}
       />
@@ -66,8 +66,8 @@ describe("ChoixReglementDialog", () => {
         expectedNoteVersion: 4,
         idempotencyKey: "choix-key",
         mode: "REMBOURSEMENT",
-        montantRemboursement: 50,
-        montantCompensation: 0,
+        montantRemboursement: "50.00",
+        montantCompensation: "0.00",
         cibles: [],
       });
     });

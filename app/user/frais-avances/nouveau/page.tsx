@@ -36,7 +36,7 @@ export default function NouveauFraisAvancesPage() {
         libelle,
         description,
         dateDepense,
-        montantDemande: Number(montant),
+        montantDemande: montant.trim(),
       });
       if (!res.success) {
         toast.error(res.error);

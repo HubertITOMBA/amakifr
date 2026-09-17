@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
+import Link from "next/link";
 import { Paperclip, Send, Trash2, Wallet } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -11,15 +12,19 @@ import {
   actionListCiblesCompensationNoteFrais,
 } from "@/actions/frais-avances";
 import { toast } from "react-toastify";
+import { isNotesFraisEnabledClientHint } from "@/lib/frais-avances/feature-flag-client";
 import { UploadJustificatifDialog } from "@/components/frais-avances/UploadJustificatifDialog";
 import { DeleteJustificatifConfirmDialog } from "@/components/frais-avances/DeleteJustificatifConfirmDialog";
 import { SubmitNoteFraisConfirmDialog } from "@/components/frais-avances/SubmitNoteFraisConfirmDialog";
 import { ChoixReglementDialog } from "@/components/frais-avances/ChoixReglementDialog";
+import { NoteFraisHistoriqueReglements } from "@/components/frais-avances/NoteFraisHistoriqueReglements";
 import {
+  NoteFraisEtatFinancierBadge,
   NoteFraisModeBadge,
   NoteFraisMontantBadge,
   NoteFraisStatutBadge,
 } from "@/components/frais-avances/note-frais-badges";
+import type { NoteFraisHistoriqueReglementDto } from "@/lib/frais-avances/dto";
 
 type Justificatif = {
   id: string;
@@ -33,6 +38,8 @@ type ChoixActif = {
   montantReference: string | number;
   montantRemboursement: string | number;
   montantCompensation: string | number;
+  montantRembourseUtilise: string | number;
+  montantCompensationUtilise: string | number;
   Cibles: Array<{
     typeCible: string;
     cibleId: string;
@@ -51,26 +58,41 @@ type CibleEligible = {
 
 type ModeChoix = "REMBOURSEMENT" | "COMPENSATION" | "MIXTE";
 
+type NoteDetail = {
+  id: string;
+  libelle: string;
+  statut: string;
+  version: number;
+  montantDemande?: string | number;
+  montantAccepte?: string | number | null;
+  motifDecision?: string | null;
+  decideeAt?: string | Date | null;
+  corrigeNoteFraisId?: string | null;
+  etatFinancier?: string;
+  restantDu?: string;
+  canReplaceChoix?: boolean;
+  Justificatifs: Justificatif[];
+  ChoixReglementActif?: ChoixActif | null;
+  ChoixHistorique?: Array<{
+    id: string;
+    mode: string;
+    statut: string;
+    montantRemboursement: string;
+    montantCompensation: string;
+    choisiAt: string;
+  }>;
+  historiqueReglements?: NoteFraisHistoriqueReglementDto[];
+};
+
 /**
- * Détail / dépôt PJ / soumission / décision / choix règlement d'une note membre.
+ * Détail membre : dépôt, décision, choix, post-règlement.
  */
 export default function UserNoteFraisDetailPage() {
   const params = useParams();
   const router = useRouter();
   const noteId = String(params.id || "");
-  const [note, setNote] = useState<{
-    id: string;
-    libelle: string;
-    statut: string;
-    version: number;
-    montantDemande?: string | number;
-    montantAccepte?: string | number | null;
-    motifDecision?: string | null;
-    decideeAt?: string | Date | null;
-    corrigeNoteFraisId?: string | null;
-    Justificatifs: Justificatif[];
-    ChoixReglementActif?: ChoixActif | null;
-  } | null>(null);
+  const enabledHint = isNotesFraisEnabledClientHint();
+  const [note, setNote] = useState<NoteDetail | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [idempotencyKey] = useState(() => `submit-${noteId}-${Date.now()}`);
   const [choixKey, setChoixKey] = useState(
@@ -86,13 +108,14 @@ export default function UserNoteFraisDetailPage() {
     useState<ModeChoix>("REMBOURSEMENT");
 
   const reload = useCallback(async () => {
+    if (!enabledHint) return;
     const res = await actionGetNoteFrais(noteId);
     if (!res.success) {
       setError(res.error);
       setNote(null);
       return;
     }
-    const data = res.data as NonNullable<typeof note>;
+    const data = res.data as NoteDetail;
     setNote(data);
     setError(null);
     if (data.statut === "VALIDEE" && data.montantAccepte != null) {
@@ -101,7 +124,7 @@ export default function UserNoteFraisDetailPage() {
         setCibles(ciblesRes.data as CibleEligible[]);
       }
     }
-  }, [noteId]);
+  }, [noteId, enabledHint]);
 
   useEffect(() => {
     void reload();
@@ -132,17 +155,40 @@ export default function UserNoteFraisDetailPage() {
     setChoixOpen(true);
   }
 
-  const montantAccepteNum = Number(note?.montantAccepte ?? 0);
-  const needsChoix =
-    note?.statut === "VALIDEE" && !note.ChoixReglementActif;
+  const montantAccepteStr = String(note?.montantAccepte ?? "0");
+  const needsChoix = note?.statut === "VALIDEE" && !note.ChoixReglementActif;
+  const hasReglements = (note?.historiqueReglements?.length ?? 0) > 0;
+  const canReplace =
+    note?.canReplaceChoix === true && note.ChoixReglementActif != null;
+
+  if (!enabledHint) {
+    return (
+      <div className="min-h-screen p-4 sm:p-8">
+        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3" role="status">
+          Module indisponible.
+        </p>
+        <Link href="/user/frais-avances" className="text-sm text-blue-700 underline mt-3 inline-block">
+          Retour
+        </Link>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 p-4 sm:p-8">
       <Card className="mx-auto max-w-2xl border-blue-200 shadow-lg">
         <CardHeader className="bg-gradient-to-r from-blue-500/90 via-blue-400/80 to-blue-500/90 text-white rounded-t-lg pt-4 sm:pt-5">
-          <CardTitle className="text-white">{note?.libelle || "Note de frais"}</CardTitle>
+          <CardTitle className="text-white">
+            {note?.libelle || "Note de frais"}
+          </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4 p-4 sm:p-6">
+          <Link
+            href="/user/frais-avances"
+            className="text-xs text-blue-700 underline"
+          >
+            ← Mes frais avancés
+          </Link>
           {error ? (
             <p className="text-sm text-red-700" role="alert">
               {error}
@@ -155,26 +201,24 @@ export default function UserNoteFraisDetailPage() {
                 {note.montantDemande != null ? (
                   <NoteFraisMontantBadge
                     label="Demandé"
-                    value={note.montantDemande}
+                    value={String(note.montantDemande)}
                   />
                 ) : null}
+                {note.etatFinancier ? (
+                  <NoteFraisEtatFinancierBadge etat={note.etatFinancier} />
+                ) : null}
               </div>
-              {note.corrigeNoteFraisId ? (
-                <p className="text-xs text-slate-600">
-                  Demande corrigée liée à une note rejetée précédente.
-                </p>
-              ) : null}
+
               {note.statut === "VALIDEE" || note.statut === "REJETEE" ? (
                 <div className="rounded-lg border border-slate-200 bg-slate-50 p-3 space-y-2 text-sm">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">
                     Décision
                   </p>
                   <div className="flex flex-wrap gap-2">
-                    <NoteFraisStatutBadge statut={note.statut} />
                     {note.montantAccepte != null ? (
                       <NoteFraisMontantBadge
                         label="Accepté"
-                        value={note.montantAccepte}
+                        value={String(note.montantAccepte)}
                       />
                     ) : null}
                   </div>
@@ -191,13 +235,23 @@ export default function UserNoteFraisDetailPage() {
                   <div className="flex flex-wrap gap-2 items-center">
                     <NoteFraisModeBadge mode={note.ChoixReglementActif.mode} />
                     <NoteFraisMontantBadge
-                      label="Remboursement"
-                      value={note.ChoixReglementActif.montantRemboursement}
+                      label="Remboursé"
+                      value={String(
+                        note.ChoixReglementActif.montantRembourseUtilise
+                      )}
                     />
                     <NoteFraisMontantBadge
-                      label="Compensation"
-                      value={note.ChoixReglementActif.montantCompensation}
+                      label="Compensé"
+                      value={String(
+                        note.ChoixReglementActif.montantCompensationUtilise
+                      )}
                     />
+                    {note.restantDu != null ? (
+                      <NoteFraisMontantBadge
+                        label="Restant dû"
+                        value={note.restantDu}
+                      />
+                    ) : null}
                   </div>
                   {note.ChoixReglementActif.Cibles?.length ? (
                     <ul className="text-xs space-y-1 list-disc pl-4">
@@ -209,22 +263,54 @@ export default function UserNoteFraisDetailPage() {
                       ))}
                     </ul>
                   ) : null}
-                  <p className="text-xs text-slate-600">
-                    Aucun mouvement financier tant que le règlement n&apos;est
-                    pas exécuté.
-                  </p>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="h-8"
-                    onClick={() => openChoix(true)}
-                    data-testid="open-replace-choix-reglement"
-                  >
-                    <Wallet className="h-3.5 w-3.5 mr-1.5" />
-                    Remplacer le choix
-                  </Button>
+                  {!hasReglements ? (
+                    <p className="text-xs text-slate-600">
+                      En attente d&apos;exécution du règlement par le trésorier.
+                    </p>
+                  ) : null}
+                  {canReplace ? (
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => openChoix(true)}
+                      data-testid="open-replace-choix-reglement"
+                    >
+                      <Wallet className="h-3.5 w-3.5 mr-1.5" />
+                      Remplacer le choix
+                    </Button>
+                  ) : null}
                 </div>
+              ) : null}
+
+              {hasReglements ? (
+                <section className="rounded-lg border border-slate-200 bg-slate-50/80 p-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+                    Historique des règlements
+                  </p>
+                  <NoteFraisHistoriqueReglements
+                    entries={note.historiqueReglements!}
+                    showReference={false}
+                  />
+                </section>
+              ) : null}
+
+              {note.ChoixHistorique && note.ChoixHistorique.length > 1 ? (
+                <section className="text-xs space-y-1">
+                  <p className="font-semibold uppercase tracking-wide text-slate-700">
+                    Historique des choix
+                  </p>
+                  <ul className="space-y-1">
+                    {note.ChoixHistorique.map((c) => (
+                      <li key={c.id} className="text-slate-600">
+                        {c.statut === "ACTIF" ? "ACTIF" : "Remplacé"} — {c.mode}{" "}
+                        (remb. {c.montantRemboursement} / comp.{" "}
+                        {c.montantCompensation})
+                      </li>
+                    ))}
+                  </ul>
+                </section>
               ) : null}
 
               {needsChoix ? (
@@ -251,7 +337,9 @@ export default function UserNoteFraisDetailPage() {
                     >
                       <span className="min-w-0 break-all">
                         {j.nomFichierOrig}{" "}
-                        <span className="text-xs text-slate-500">({j.statut})</span>
+                        <span className="text-xs text-slate-500">
+                          ({j.statut})
+                        </span>
                       </span>
                       <span className="flex gap-2 shrink-0">
                         {j.statut === "READY" ? (
@@ -271,7 +359,6 @@ export default function UserNoteFraisDetailPage() {
                             size="sm"
                             className="h-7 text-xs border-red-300 text-red-700 hover:bg-red-50"
                             onClick={() => setDeleteTarget(j)}
-                            data-testid={`open-delete-justificatif-${j.id}`}
                           >
                             <Trash2 className="h-3 w-3 mr-1" />
                             Supprimer
@@ -288,7 +375,6 @@ export default function UserNoteFraisDetailPage() {
                       variant="outline"
                       className="h-9 border-slate-300"
                       onClick={() => setUploadOpen(true)}
-                      data-testid="open-upload-justificatif"
                     >
                       <Paperclip className="h-4 w-4 mr-2" />
                       Ajouter un justificatif
@@ -297,7 +383,6 @@ export default function UserNoteFraisDetailPage() {
                       type="button"
                       onClick={() => setSubmitOpen(true)}
                       className="h-9 bg-gradient-to-r from-blue-600 to-blue-500 text-white"
-                      data-testid="open-submit-note-frais"
                     >
                       <Send className="h-4 w-4 mr-2" />
                       Soumettre
@@ -352,7 +437,7 @@ export default function UserNoteFraisDetailPage() {
             noteId={noteId}
             expectedNoteVersion={note.version}
             idempotencyKey={choixKey}
-            montantAccepte={montantAccepteNum}
+            montantAccepte={montantAccepteStr}
             cibles={cibles}
             initialMode={choixInitialMode}
             replacing={replacingChoix}

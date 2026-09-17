@@ -14,7 +14,10 @@ import {
 } from "@/components/ui/select";
 import { toast } from "react-toastify";
 import { actionExecuteNoteFraisReglementMixte } from "@/actions/frais-avances";
-import { NoteFraisMontantBadge } from "@/components/frais-avances/note-frais-badges";
+import {
+  messageErreurNoteFrais,
+  NoteFraisMontantBadge,
+} from "@/components/frais-avances/note-frais-badges";
 import { datetimeLocalToIso } from "@/lib/frais-avances/datetime-local";
 import { moneyIsStrictlyPositive } from "@/lib/frais-avances/money-cents";
 import {
@@ -125,7 +128,7 @@ export function ExecuteMixteDialog({
         lignesCompensation: lignes,
       });
       if (!res.success) {
-        toast.error(res.error);
+        toast.error(messageErreurNoteFrais(res.code, res.error));
         return;
       }
       toast.success(res.message || "Règlement mixte enregistré");

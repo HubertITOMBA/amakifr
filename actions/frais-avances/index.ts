@@ -45,7 +45,8 @@ export async function actionCreateNoteFraisDraft(form: {
   libelle: string;
   description?: string;
   dateDepense: string;
-  montantDemande: number;
+  /** Chaîne monétaire (ex. "10.01"). */
+  montantDemande: string;
 }) {
   if (!isNotesFraisEnabled()) return disabled();
   try {
@@ -202,7 +203,7 @@ export async function actionDecideNoteFrais(form: {
   expectedVersion: number;
   idempotencyKey: string;
   outcome: "VALIDEE" | "REJETEE";
-  montantAccepte?: number | null;
+  montantAccepte?: string | number | null;
   motif?: string | null;
 }) {
   if (!isNotesFraisEnabled()) return disabled();
@@ -331,12 +332,12 @@ export async function actionSetChoixReglementNoteFrais(form: {
   expectedNoteVersion: number;
   idempotencyKey: string;
   mode: "REMBOURSEMENT" | "COMPENSATION" | "MIXTE";
-  montantRemboursement: number;
-  montantCompensation: number;
+  montantRemboursement: string | number;
+  montantCompensation: string | number;
   cibles: Array<{
     typeCible: "COTISATION_MENSUELLE" | "DETTE_INITIALE";
     cibleId: string;
-    montantAutorise: number;
+    montantAutorise: string | number;
     rang: number;
   }>;
 }) {
@@ -393,6 +394,14 @@ export async function actionListMyNotesFrais() {
 
 export async function actionListAdminNotesFrais(opts?: {
   onlyAlerteSansDestinataire?: boolean;
+  statut?: "SOUMISE" | "VALIDEE" | "REJETEE" | "all";
+  etatFinancier?:
+    | "NON_REGLEE"
+    | "PARTIELLEMENT_REGLEE"
+    | "REGLEE"
+    | "all";
+  page?: number;
+  pageSize?: number;
 }) {
   if (!isNotesFraisEnabled()) return disabled();
   try {
@@ -400,6 +409,79 @@ export async function actionListAdminNotesFrais(opts?: {
     return await listAdminNotesFrais({
       actorUserId: userId,
       onlyAlerteSansDestinataire: opts?.onlyAlerteSansDestinataire,
+      statut: opts?.statut,
+      etatFinancier: opts?.etatFinancier,
+      page: opts?.page,
+      pageSize: opts?.pageSize,
+    });
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
+ * Capacités UI pour une note (boutons / parcours).
+ */
+export async function actionGetNoteFraisCapabilities(noteId: string) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    const { getNoteFraisCapabilities } = await import(
+      "@/lib/services/frais-avances/note-frais-capabilities-service"
+    );
+    return await getNoteFraisCapabilities({ userId, noteId });
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
+ * Capacités navigation (menus) — flag off → tout false.
+ */
+export async function actionGetNotesFraisNavCapabilities() {
+  try {
+    const userId = await requireSessionUserId();
+    const { getNotesFraisNavCapabilities } = await import(
+      "@/lib/services/frais-avances/note-frais-capabilities-service"
+    );
+    return await getNotesFraisNavCapabilities({ userId });
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
+ * Liste comptable VALIDEE (COMCPT / ADMIN / TRESOR).
+ */
+export async function actionListNotesFraisComptabilite(opts?: {
+  etatFinancier?:
+    | "NON_REGLEE"
+    | "PARTIELLEMENT_REGLEE"
+    | "REGLEE"
+    | "all";
+  page?: number;
+  pageSize?: number;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    const { listNotesFraisComptabilite } = await import(
+      "@/lib/services/frais-avances/note-frais-comptabilite-list-service"
+    );
+    return await listNotesFraisComptabilite({
+      userId,
+      etatFinancier: opts?.etatFinancier,
+      page: opts?.page,
+      pageSize: opts?.pageSize,
     });
   } catch (error) {
     return {

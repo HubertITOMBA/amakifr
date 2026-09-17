@@ -15,6 +15,12 @@ import {
   enrichNoteFraisFinancierDto,
   type NoteFraisPublicDto,
 } from "@/lib/frais-avances/dto";
+import {
+  buildNotesFraisListPaginationMeta,
+  normalizeNotesFraisListPagination,
+  queryAdminNoteFraisListIds,
+  type NotesFraisListPagination,
+} from "@/lib/frais-avances/list-pagination";
 import { resolveSubmissionRecipientUserIds } from "@/lib/frais-avances/recipients";
 import {
   absoluteFromRelative,
@@ -29,6 +35,7 @@ import { assertAllowedJustificatifBuffer } from "@/lib/frais-avances/justificati
 import { sendPushToUsersDetailed } from "@/lib/services/push/send-push";
 import { lockUserRowForNotesFrais } from "@/lib/services/frais-avances/rgpd-account-deletion";
 import { NOTES_FRAIS_FINANCIAL_STATE_INCONSISTENT } from "@/lib/services/frais-avances/note-frais-remboursement-service";
+import { normalizeNotesFraisMontant } from "@/lib/services/frais-avances/note-frais-decision-service";
 
 export type NotesFraisActionResult<T = unknown> =
   | { success: true; data: T; message?: string }
@@ -131,12 +138,14 @@ export async function createNoteFraisDraft(input: {
   libelle: string;
   description?: string | null;
   dateDepense: Date;
-  montantDemande: number;
+  /** Montant demandé en chaîne monétaire (centimes côté validation). */
+  montantDemande: string | number;
 }): Promise<NotesFraisActionResult<{ id: string; version: number }>> {
   try {
     assertNotesFraisEnabled();
     if (!input.libelle?.trim()) throw new Error("Libellé requis");
-    if (!(input.montantDemande > 0)) {
+    const montantNorm = normalizeNotesFraisMontant(input.montantDemande);
+    if (!montantNorm || !new Prisma.Decimal(montantNorm).gt(0)) {
       throw new Error("Le montant demandé doit être strictement positif");
     }
     const { userId, adherentId } = await requireAdherentForUser(input.userId);
@@ -150,7 +159,7 @@ export async function createNoteFraisDraft(input: {
           libelle: input.libelle.trim().slice(0, 200),
           description: input.description?.trim() || null,
           dateDepense: input.dateDepense,
-          montantDemande: new Prisma.Decimal(input.montantDemande),
+          montantDemande: new Prisma.Decimal(montantNorm),
           statut: "BROUILLON",
         },
         select: { id: true, version: true },
@@ -685,6 +694,11 @@ export async function listMyNotesFrais(
       orderBy: { updatedAt: "desc" },
       include: {
         Decision: true,
+        ChoixReglements: {
+          where: { statut: "ACTIF" },
+          take: 1,
+          include: { Cibles: true },
+        },
         Justificatifs: {
           select: {
             id: true,
@@ -699,7 +713,11 @@ export async function listMyNotesFrais(
     });
     return {
       success: true,
-      data: rows.map((r) => toNoteFraisPublicDto(r)),
+      data: rows.map((r) =>
+        enrichNoteFraisFinancierDto(toNoteFraisPublicDto(r), {
+          includeReference: false,
+        })
+      ),
     };
   } catch (error) {
     return mapError(error);
@@ -708,11 +726,26 @@ export async function listMyNotesFrais(
 
 /**
  * Liste admin des notes soumises et décidées (authz dans le service).
+ * Pagination serveur ; filtre état financier avant slice (SQL paramétré).
+ * Pas de chargement des lignes Justificatif (count uniquement).
  */
 export async function listAdminNotesFrais(input: {
   actorUserId: string;
   onlyAlerteSansDestinataire?: boolean;
-}): Promise<NotesFraisActionResult<NoteFraisPublicDto[]>> {
+  statut?: "SOUMISE" | "VALIDEE" | "REJETEE" | "all";
+  etatFinancier?:
+    | "NON_REGLEE"
+    | "PARTIELLEMENT_REGLEE"
+    | "REGLEE"
+    | "all";
+  page?: number;
+  pageSize?: number;
+}): Promise<
+  NotesFraisActionResult<{
+    items: NoteFraisPublicDto[];
+    pagination: NotesFraisListPagination;
+  }>
+> {
   try {
     assertNotesFraisEnabled();
     const allowed = await canUserReadSubmittedNotesFrais(input.actorUserId);
@@ -720,31 +753,81 @@ export async function listAdminNotesFrais(input: {
       return { success: false, error: "Non autorisé", code: "FORBIDDEN" };
     }
 
+    const statutFilter =
+      input.statut && input.statut !== "all" ? input.statut : null;
+    const statutIn = input.onlyAlerteSansDestinataire
+      ? ["SOUMISE"]
+      : statutFilter
+        ? [statutFilter]
+        : ["SOUMISE", "VALIDEE", "REJETEE"];
+
+    const { page, pageSize } = normalizeNotesFraisListPagination(input);
+    const { ids, total } = await queryAdminNoteFraisListIds({
+      statutIn,
+      onlyAlerteSansDestinataire: input.onlyAlerteSansDestinataire,
+      etatFinancier: input.etatFinancier,
+      page,
+      pageSize,
+    });
+
+    if (ids.length === 0) {
+      return {
+        success: true,
+        data: {
+          items: [],
+          pagination: buildNotesFraisListPaginationMeta({
+            page,
+            pageSize,
+            total,
+          }),
+        },
+      };
+    }
+
     const rows = await db.noteFrais.findMany({
-      where: input.onlyAlerteSansDestinataire
-        ? { statut: "SOUMISE", alerteSansDestinataire: true }
-        : { statut: { in: ["SOUMISE", "VALIDEE", "REJETEE"] } },
-      orderBy: [{ soumiseAt: "desc" }],
+      where: { id: { in: ids } },
       include: {
         Demandeur: { select: { id: true, email: true, name: true } },
         Adherent: { select: { id: true, firstname: true, lastname: true } },
         Decision: true,
-        Justificatifs: {
-          where: { statut: "READY" },
+        ChoixReglements: {
+          where: { statut: "ACTIF" },
+          take: 1,
+          include: { Cibles: true },
+        },
+        _count: {
           select: {
-            id: true,
-            nomFichierOrig: true,
-            typeMime: true,
-            taille: true,
-            statut: true,
-            createdAt: true,
+            Justificatifs: { where: { statut: "READY" } },
           },
         },
       },
     });
+
+    const byId = new Map(rows.map((r) => [r.id, r]));
+    const items = ids
+      .map((id) => byId.get(id))
+      .filter((r): r is NonNullable<typeof r> => r != null)
+      .map((r) => {
+        const dto = enrichNoteFraisFinancierDto(
+          toNoteFraisPublicDto({ ...r, Justificatifs: [] }),
+          { includeReference: false }
+        );
+        return {
+          ...dto,
+          justificatifsReadyCount: r._count.Justificatifs,
+        };
+      });
+
     return {
       success: true,
-      data: rows.map((r) => toNoteFraisPublicDto(r)),
+      data: {
+        items,
+        pagination: buildNotesFraisListPaginationMeta({
+          page,
+          pageSize,
+          total,
+        }),
+      },
     };
   } catch (error) {
     return mapError(error);
@@ -775,9 +858,8 @@ export async function getNoteFraisForUser(input: {
         },
         Decision: true,
         ChoixReglements: {
-          where: { statut: "ACTIF" },
+          orderBy: { choisiAt: "desc" },
           include: { Cibles: true },
-          take: 1,
         },
         Demandeur: { select: { id: true, email: true, name: true } },
         Adherent: { select: { id: true, firstname: true, lastname: true } },
@@ -786,39 +868,128 @@ export async function getNoteFraisForUser(input: {
     if (!note) throw new Error("Note introuvable");
 
     const isOwner = note.demandeurUserId === input.userId;
-    const remboursements = await db.noteFraisReglement.findMany({
-      where: {
-        noteFraisId: input.noteId,
-        type: "REMBOURSEMENT",
-        statut: "EXECUTE",
-      },
-      orderBy: { executeAt: "asc" },
-      select: {
-        id: true,
-        montantTotal: true,
-        moyen: true,
-        reference: true,
-        executeAt: true,
-      },
-    });
+    if (!isOwner) {
+      const asAdmin = await canUserReadSubmittedNotesFrais(input.userId);
+      if (!asAdmin || note.statut === "BROUILLON") {
+        throw new Error("Note introuvable");
+      }
+    }
+
+    const [remboursements, compensations, operations] = await Promise.all([
+      db.noteFraisReglement.findMany({
+        where: {
+          noteFraisId: input.noteId,
+          type: "REMBOURSEMENT",
+          statut: "EXECUTE",
+        },
+        orderBy: { executeAt: "asc" },
+        select: {
+          id: true,
+          montantTotal: true,
+          moyen: true,
+          reference: true,
+          executeAt: true,
+          operationId: true,
+          Executeur: { select: { name: true, email: true } },
+        },
+      }),
+      db.noteFraisReglement.findMany({
+        where: {
+          noteFraisId: input.noteId,
+          type: "COMPENSATION",
+          statut: "EXECUTE",
+        },
+        orderBy: { executeAt: "asc" },
+        select: {
+          id: true,
+          montantTotal: true,
+          executeAt: true,
+          operationId: true,
+          Executeur: { select: { name: true, email: true } },
+          Lignes: {
+            select: {
+              typeCible: true,
+              montant: true,
+              cibleId: true,
+            },
+          },
+        },
+      }),
+      db.noteFraisReglementOperation.findMany({
+        where: { noteFraisId: input.noteId, type: "MIXTE" },
+        orderBy: { executeAt: "asc" },
+        include: {
+          Executeur: { select: { name: true, email: true } },
+          Reglements: {
+            include: {
+              Lignes: {
+                select: { typeCible: true, montant: true, cibleId: true },
+              },
+            },
+          },
+        },
+      }),
+    ]);
 
     // Membre propriétaire : jamais la référence (même si double casquette).
     const includeReference =
       !isOwner &&
       (await canUserReadNoteFraisRemboursementReference(input.userId));
-    const data = enrichNoteFraisFinancierDto(toNoteFraisPublicDto(note), {
+
+    const noteForDto = {
+      ...note,
+      ChoixReglements: note.ChoixReglements.filter((c) => c.statut === "ACTIF"),
+    };
+    const choixHistorique = note.ChoixReglements.map((c) => ({
+      id: c.id,
+      mode: c.mode,
+      statut: c.statut,
+      montantRemboursement: c.montantRemboursement.toFixed(2),
+      montantCompensation: c.montantCompensation.toFixed(2),
+      choisiAt: c.choisiAt.toISOString(),
+      remplaceChoixId: c.remplaceChoixId,
+    }));
+
+    const data = enrichNoteFraisFinancierDto(toNoteFraisPublicDto(noteForDto), {
       includeReference,
-      remboursements,
+      remboursements: remboursements.map((r) => ({
+        ...r,
+        executeurLabel: r.Executeur?.name || r.Executeur?.email || null,
+      })),
+      compensations: compensations.map((c) => ({
+        ...c,
+        executeurLabel: c.Executeur?.name || c.Executeur?.email || null,
+        Lignes: c.Lignes.map((l) => ({
+          typeCible: l.typeCible,
+          montant: l.montant,
+          libelleSnapshot: l.typeCible
+            ? `${l.typeCible}${l.cibleId ? ` (${l.cibleId.slice(0, 8)})` : ""}`
+            : null,
+        })),
+      })),
+      operationsMixte: operations.map((op) => {
+        const remb = op.Reglements.find((r) => r.type === "REMBOURSEMENT");
+        const comp = op.Reglements.find((r) => r.type === "COMPENSATION");
+        return {
+          id: op.id,
+          executeAt: op.executeAt,
+          executeurLabel: op.Executeur?.name || op.Executeur?.email || null,
+          compensationMontant: comp?.montantTotal.toFixed(2) ?? "0.00",
+          remboursementMontant: remb?.montantTotal.toFixed(2) ?? "0.00",
+          moyen: remb?.moyen ?? "",
+          reference: remb?.reference ?? null,
+          cibles: (comp?.Lignes ?? [])
+            .filter((l) => l.typeCible)
+            .map((l) => ({
+              typeCible: l.typeCible!,
+              libelle: `${l.typeCible}${l.cibleId ? ` (${l.cibleId.slice(0, 8)})` : ""}`,
+              montant: l.montant.toFixed(2),
+            })),
+        };
+      }),
+      choixHistorique,
     });
 
-    if (isOwner) {
-      return { success: true, data };
-    }
-
-    const asAdmin = await canUserReadSubmittedNotesFrais(input.userId);
-    if (!asAdmin || note.statut === "BROUILLON") {
-      throw new Error("Note introuvable");
-    }
     return { success: true, data };
   } catch (error) {
     return mapError(error);

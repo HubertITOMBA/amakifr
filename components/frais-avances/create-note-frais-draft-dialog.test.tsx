@@ -87,7 +87,7 @@ describe("CreateNoteFraisDraftDialog", () => {
         libelle: "Achat test",
         description: "",
         dateDepense: "2026-03-15",
-        montantDemande: 42.5,
+        montantDemande: "42.5",
       });
     });
     expect(screen.getByRole("button", { name: /Annuler/i })).toBeTruthy();

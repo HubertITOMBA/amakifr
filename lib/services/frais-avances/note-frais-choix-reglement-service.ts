@@ -34,7 +34,7 @@ export type TypeCibleChoix = "COTISATION_MENSUELLE" | "DETTE_INITIALE";
 export type CibleChoixInput = {
   typeCible: TypeCibleChoix;
   cibleId: string;
-  montantAutorise: number;
+  montantAutorise: number | string;
   rang: number;
 };
 
@@ -44,8 +44,8 @@ export type SetChoixReglementInput = {
   expectedNoteVersion: number;
   idempotencyKey: string;
   mode: ModeReglementChoix;
-  montantRemboursement: number;
-  montantCompensation: number;
+  montantRemboursement: number | string;
+  montantCompensation: number | string;
   cibles: CibleChoixInput[];
   client?: typeof db;
   beforeDemandeurLock?: () => Promise<void>;
@@ -138,8 +138,8 @@ function moneyEq(a: Prisma.Decimal, b: Prisma.Decimal): boolean {
 export function validateChoixMontants(input: {
   mode: ModeReglementChoix;
   montantReference: Prisma.Decimal | number | string;
-  montantRemboursement: number;
-  montantCompensation: number;
+  montantRemboursement: number | string;
+  montantCompensation: number | string;
   cibles: CibleChoixInput[];
 }): {
   montantReference: string;
