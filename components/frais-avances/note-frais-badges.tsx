@@ -139,6 +139,21 @@ export function messageErreurNoteFrais(
       return "Auto-restitution interdite.";
     case "RESTITUTION_EXCEEDS_REMAINING":
       return "Montant supérieur au reste restituable.";
+    case "REGLEMENT_HAS_CORRECTIONS":
+      return "Annulation impossible : des corrections existent déjà.";
+    case "REGLEMENT_HAS_RESTITUTIONS":
+      return "Annulation impossible : des restitutions existent déjà.";
+    case "MIXTE_PARENT_REQUIRED":
+      return "Pour un MIXTE, annulez l'opération parente (pas un enfant).";
+    case "ANNULATION_EXPIRED":
+      return "Cette demande d'annulation a expiré.";
+    case "ANNULATION_ALREADY_DECIDED":
+      return "Cette demande a déjà été tranchée.";
+    case "ANNULATION_ALREADY_PENDING":
+    case "ANNULATION_DEMANDE_ACTIVE":
+      return "Une demande d'annulation est déjà en cours sur cette cible.";
+    case "ANNULATION_ATTESTATION_REQUIRED":
+      return "Attestation obligatoire pour confirmer l'annulation.";
     case "NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED":
       return "Historique financier présent — archivage reporté (lot 4.9).";
     case "FORBIDDEN":

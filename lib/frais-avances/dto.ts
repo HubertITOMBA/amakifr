@@ -56,7 +56,7 @@ export type NoteFraisRemboursementPublicDto = {
   reference?: string;
 };
 
-/** Entrée d'historique de règlement (simples, mixte groupé, correction ou restitution). */
+/** Entrée d'historique de règlement (simples, mixte, correction, restitution, annulation). */
 export type NoteFraisHistoriqueReglementDto = {
   kind:
     | "REMBOURSEMENT_SIMPLE"
@@ -64,7 +64,8 @@ export type NoteFraisHistoriqueReglementDto = {
     | "MIXTE"
     | "CORRECTION_REFERENCE"
     | "CORRECTION_MONTANT_NEGATIF"
-    | "RESTITUTION";
+    | "RESTITUTION"
+    | "ANNULATION";
   id: string;
   executeAt: string;
   montantRemboursement?: string;
@@ -73,6 +74,8 @@ export type NoteFraisHistoriqueReglementDto = {
   montantCorrection?: string;
   /** Montant positif restitué (RESTITUTION). */
   montantRestitution?: string;
+  /** Libellé membre pour ANNULATION CONFIRMEE (« règlement annulé »). */
+  libelleAnnulation?: string;
   moyen?: string;
   executeurLabel?: string | null;
   cibles?: Array<{
@@ -88,9 +91,9 @@ export type NoteFraisHistoriqueReglementDto = {
   preuveRef?: string;
   referenceAvant?: string;
   referenceApres?: string;
-  /** Lien vers le règlement corrigé / restitué. */
+  /** Lien vers le règlement corrigé / restitué / annulé. */
   reglementId?: string;
-  /** Parent MIXTE (restitution sur enfant) — affichage groupé. */
+  /** Parent MIXTE (restitution enfant ou annulation parent). */
   operationId?: string | null;
 };
 
@@ -417,6 +420,21 @@ export function enrichNoteFraisFinancierDto(
     includeRestitutionAudit?: boolean;
     /** Inclure référence restitution (ADMIN/TRESOR uniquement — jamais COMCPT). */
     includeRestitutionReference?: boolean;
+    /**
+     * Annulations CONFIRMEE uniquement (jamais DEMANDEE/REFUSEE/EXPIREE).
+     * Membre/COMCPT : résultat sans audit ; ADMIN/TRESOR : audit si flag.
+     */
+    annulations?: Array<{
+      id: string;
+      reglementId: string | null;
+      operationId: string | null;
+      decideeAt: Date;
+      motif: string;
+      preuveKind: string;
+      preuveRef: string;
+    }>;
+    /** Inclure motif/preuve annulation (ADMIN/TRESOR + canReadAnnulationAudit). */
+    includeAnnulationAudit?: boolean;
     choixHistorique?: NoteFraisChoixHistoriqueDto[];
   }
 ): NoteFraisPublicDto {
@@ -562,6 +580,24 @@ export function enrichNoteFraisFinancierDto(
     }
     if (includeRestitAudit) {
       entry.motif = rest.motif;
+    }
+    historique.push(entry);
+  }
+
+  const includeAnnulAudit = opts.includeAnnulationAudit === true;
+  for (const ann of opts.annulations ?? []) {
+    const entry: NoteFraisHistoriqueReglementDto = {
+      kind: "ANNULATION",
+      id: ann.id,
+      executeAt: ann.decideeAt.toISOString(),
+      libelleAnnulation: "Règlement annulé",
+      reglementId: ann.reglementId ?? undefined,
+      operationId: ann.operationId ?? null,
+    };
+    if (includeAnnulAudit) {
+      entry.motif = ann.motif;
+      if (ann.preuveKind) entry.preuveKind = ann.preuveKind;
+      if (ann.preuveRef) entry.preuveRef = ann.preuveRef;
     }
     historique.push(entry);
   }

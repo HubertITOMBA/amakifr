@@ -31,6 +31,10 @@ import {
   canUserReadNoteFraisRestitutionReference,
   canUserReadNoteFraisFinancialView,
   canUserReadSubmittedNotesFrais,
+  canUserRequestCancelNoteFraisReglement,
+  canUserConfirmCancelNoteFraisReglement,
+  canUserRefuseCancelNoteFraisReglement,
+  canUserReadNoteFraisAnnulationAudit,
 } from "@/lib/frais-avances/authz";
 
 describe("canUserReadSubmittedNotesFrais (restrictive)", () => {
@@ -276,3 +280,100 @@ describe("canUserRecordNoteFraisRestitution", () => {
     expect(await canUserReadNoteFraisRestitutionReference("m")).toBe(false);
   });
 });
+
+const ANNULATION_PERMS = [
+  {
+    label: "requestCancelNoteFraisReglement",
+    action: "requestCancelNoteFraisReglement",
+    fn: canUserRequestCancelNoteFraisReglement,
+  },
+  {
+    label: "confirmCancelNoteFraisReglement",
+    action: "confirmCancelNoteFraisReglement",
+    fn: canUserConfirmCancelNoteFraisReglement,
+  },
+  {
+    label: "refuseCancelNoteFraisReglement",
+    action: "refuseCancelNoteFraisReglement",
+    fn: canUserRefuseCancelNoteFraisReglement,
+  },
+  {
+    label: "readNoteFraisAnnulationAudit",
+    action: "readNoteFraisAnnulationAudit",
+    fn: canUserReadNoteFraisAnnulationAudit,
+  },
+] as const;
+
+describe.each(ANNULATION_PERMS)(
+  "annulation 4.8 — $label (matrice)",
+  ({ action, fn }) => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      userAdminRoleFindMany.mockResolvedValue([]);
+      resolveActionPermissionConfig.mockResolvedValue({ status: "absent" });
+    });
+
+    it("accepte TRESOR|ADMIN principaux et additionnels", async () => {
+      userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+      expect(await fn("t")).toBe(true);
+      userFindUnique.mockResolvedValue({ role: "ADMIN", status: "Actif" });
+      expect(await fn("a")).toBe(true);
+
+      userFindUnique.mockResolvedValue({ role: "MEMBRE", status: "Actif" });
+      userAdminRoleFindMany.mockResolvedValue([{ role: "TRESOR" }]);
+      expect(await fn("m-t")).toBe(true);
+      userAdminRoleFindMany.mockResolvedValue([{ role: "ADMIN" }]);
+      expect(await fn("m-a")).toBe(true);
+    });
+
+    it("refuse COMCPT|PRESID|SECRET|MEMBRE|Inactif", async () => {
+      for (const role of ["COMCPT", "PRESID", "SECRET", "MEMBRE"] as const) {
+        userFindUnique.mockResolvedValue({ role, status: "Actif" });
+        userAdminRoleFindMany.mockResolvedValue([]);
+        expect(await fn(`u-${role}`)).toBe(false);
+      }
+      userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Inactif" });
+      expect(await fn("inact")).toBe(false);
+    });
+
+    it("MEMBRE avec permission dynamique large refusée sans rôle dur", async () => {
+      resolveActionPermissionConfig.mockResolvedValue({
+        status: "configured",
+        roles: ["MEMBRE", "COMCPT", "ADMIN", "TRESOR"],
+      });
+      userFindUnique.mockResolvedValue({ role: "MEMBRE", status: "Actif" });
+      userAdminRoleFindMany.mockResolvedValue([]);
+      expect(await fn("m")).toBe(false);
+    });
+
+    it("permission disabled refuse TRESOR ; ADMIN principal bypass", async () => {
+      resolveActionPermissionConfig.mockResolvedValue({ status: "disabled" });
+      userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+      expect(await fn("t")).toBe(false);
+      userFindUnique.mockResolvedValue({ role: "ADMIN", status: "Actif" });
+      expect(await fn("a")).toBe(true);
+    });
+
+    it("permission configurée hors rôle refuse ; absente autorise métier", async () => {
+      resolveActionPermissionConfig.mockResolvedValue({
+        status: "configured",
+        roles: ["ADMIN"],
+      });
+      userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+      expect(await fn("t")).toBe(false);
+      expect(resolveActionPermissionConfig).toHaveBeenCalledWith(action);
+
+      resolveActionPermissionConfig.mockResolvedValue({ status: "absent" });
+      expect(await fn("t2")).toBe(true);
+    });
+
+    it("TRESOR dynamique : configurée avec TRESOR autorise", async () => {
+      resolveActionPermissionConfig.mockResolvedValue({
+        status: "configured",
+        roles: ["TRESOR"],
+      });
+      userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+      expect(await fn("t-dyn")).toBe(true);
+    });
+  }
+);

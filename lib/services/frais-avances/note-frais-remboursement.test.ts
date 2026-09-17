@@ -425,6 +425,9 @@ describe("getNoteFraisFinancialView", () => {
           },
         ]),
       },
+      noteFraisReglementAnnulationDemande: {
+        findMany: vi.fn().mockResolvedValue([]),
+      },
     } as unknown as typeof import("@/lib/db").db;
 
     userFindUnique.mockResolvedValue({ role: "COMCPT", status: "Actif" });

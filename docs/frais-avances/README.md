@@ -2,6 +2,7 @@
 
 | Version | Date | Contenu |
 |---------|------|---------|
+| 0.4.8-annulation-double-validation | 2026-09-17 | Lot 4.8 : annulation double validation (flag off) |
 | 0.4.7-restitutions-reelles | 2026-09-17 | Lot 4.7 : restitutions réelles (flag off) |
 | 0.4.6-corrections-append-only | 2026-09-17 | Lot 4.6 : corrections append-only (flag off) |
 | 0.4.5-notifications-reglement | 2026-09-17 | Lot 4.5 : notif + outbox règlement (flag off) |
@@ -29,4 +30,5 @@ Voir [GUIDE.md](./GUIDE.md) et [CHANGELOG.md](./CHANGELOG.md).
 **Choix de règlement** ≠ exécution financière ≠ création d'`Avoir`.
 **Lot 4.6** : corrections append-only REFERENCE / MONTANT_NEGATIF — flag off ; pas de migration dépôt.
 **Lot 4.7** : restitutions réelles (entrée bancaire) ≠ corrections — flag off ; pas de migration dépôt.
-**Lots suivants** : annulation 4.8, détachement RGPD 4.9.
+**Lot 4.8** : annulation double validation (30 j) — flag off ; pas de migration dépôt.
+**Lots suivants** : détachement RGPD 4.9.

@@ -11,6 +11,8 @@ import {
   processNoteFraisOutboxOnce,
 } from "@/lib/services/frais-avances/note-frais-service";
 import { processNoteFraisArchivePurgeOnce } from "@/lib/services/frais-avances/note-frais-archive-service";
+import { expirePendingCancellationRequests } from "@/lib/services/frais-avances/note-frais-annulation-service";
+import { hashIdForLog } from "@/lib/frais-avances/storage";
 
 type WorkerState = {
   started: boolean;
@@ -59,6 +61,14 @@ export async function startNotesFraisWorkers(): Promise<void> {
       await processNoteFraisOutboxOnce();
       await processNoteFraisFileJobsOnce();
       await processNoteFraisArchivePurgeOnce();
+      // Lot 4.8 — expiration opportuniste (flag workers off en V1 staging).
+      const expired = await expirePendingCancellationRequests({ limit: 50 });
+      if (expired > 0) {
+        console.info("[notes-frais] annulation expire tick", {
+          count: expired,
+          sampleHash: hashIdForLog(`expire-tick-${expired}`),
+        });
+      }
     } catch (error) {
       logWorkerError("tick failed", error);
     } finally {

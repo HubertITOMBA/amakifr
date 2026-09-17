@@ -306,6 +306,98 @@ export async function canUserReadNoteFraisRestitutionReference(
 }
 
 /**
+ * Demande d'annulation de règlement — TRESOR|ADMIN + dynamique restrictive.
+ */
+export async function canUserRequestCancelNoteFraisReglement(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
+  const hasRole =
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
+  if (!hasRole) return false;
+  if (loaded.primaryRole === "ADMIN") return true;
+  return evaluateRestrictiveDynamicPermission(
+    "requestCancelNoteFraisReglement",
+    loaded.primaryRole,
+    loaded.extras
+  );
+}
+
+/**
+ * Confirmation d'annulation — TRESOR|ADMIN + dynamique restrictive.
+ */
+export async function canUserConfirmCancelNoteFraisReglement(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
+  const hasRole =
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
+  if (!hasRole) return false;
+  if (loaded.primaryRole === "ADMIN") return true;
+  return evaluateRestrictiveDynamicPermission(
+    "confirmCancelNoteFraisReglement",
+    loaded.primaryRole,
+    loaded.extras
+  );
+}
+
+/**
+ * Refus d'annulation — TRESOR|ADMIN + dynamique restrictive.
+ */
+export async function canUserRefuseCancelNoteFraisReglement(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
+  const hasRole =
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
+  if (!hasRole) return false;
+  if (loaded.primaryRole === "ADMIN") return true;
+  return evaluateRestrictiveDynamicPermission(
+    "refuseCancelNoteFraisReglement",
+    loaded.primaryRole,
+    loaded.extras
+  );
+}
+
+/**
+ * Lecture audit annulation (motif/preuve/acteurs) — ADMIN|TRESOR uniquement.
+ */
+export async function canUserReadNoteFraisAnnulationAudit(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
+  const hasRole =
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
+  if (!hasRole) return false;
+  if (loaded.primaryRole === "ADMIN") return true;
+  return evaluateRestrictiveDynamicPermission(
+    "readNoteFraisAnnulationAudit",
+    loaded.primaryRole,
+    loaded.extras
+  );
+}
+
+/**
  * Lecture audit correction (motif / preuve) — mêmes rôles durs que la correction.
  */
 export async function canUserReadNoteFraisCorrectionAudit(

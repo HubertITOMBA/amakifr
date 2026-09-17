@@ -80,6 +80,31 @@ Argent réellement revenu à l'association après un remboursement :
 - confidentialité : membre/COMCPT sans référence/motif/acteur ;
 - `restantDuNotesFrais` activé (notes VALIDEE, choix ACTIF uniquement).
 
+### Annulation double validation (lot 4.8 — local, flag off)
+
+Annulation d'un règlement simple ou d'une opération MIXTE **parente** :
+- demande XOR `reglementId` | `operationId` (enfant MIXTE interdit) ;
+- `DEMANDEE` sans effet financier ; `CONFIRMEE` seule inverse les compteurs / cibles ;
+- expiration 30 j (`EXPIREE`) ; confirmateur ≠ auteur de la demande ≠ demandeur note ;
+- preuves `PreuveAnnulationReglement` selon remb / comp / MIXTE ;
+- attestation confirmateur obligatoire (`attestation: true`) ;
+- historique membre : CONFIRMEE (« règlement annulé ») uniquement — pas de DEMANDEE ;
+- COMCPT : résultat financier sans audit ; ADMIN/TRESOR : audit si `readNoteFraisAnnulationAudit` ;
+- UI : `RequestCancelDialog` / `ConfirmCancelDialog` / `RefuseCancelDialog` + countdown `expiresAt` ;
+- notifs CONFIRMEE : lien `/user/...` pour le demandeur note, `/admin/...` pour l'auteur (eventKeys `…:confirmee:user|admin`) ;
+- distincte corrections 4.6 et restitutions 4.7 (présence corr/restit bloque la demande) ;
+- **garde TX** une seule `DEMANDEE` active par cible ; index partiels uniques = **prérequis de la première migration avant activation** (DDL dans `schema.prisma` + ci-dessous) — absents en V1 locale.
+
+```sql
+CREATE UNIQUE INDEX notes_frais_annul_demande_reglement_demandee_uidx
+  ON notes_frais_reglement_annulation_demandes (reglement_id)
+  WHERE statut = 'DEMANDEE' AND reglement_id IS NOT NULL;
+
+CREATE UNIQUE INDEX notes_frais_annul_demande_operation_demandee_uidx
+  ON notes_frais_reglement_annulation_demandes (operation_id)
+  WHERE statut = 'DEMANDEE' AND operation_id IS NOT NULL;
+```
+
 ### Notifications de règlement (lot 4.5 — local, flag off)
 - Helper TX `note-frais-reglement-notify` : textes génériques (« Règlement enregistré ») + lien `/user/frais-avances/{noteId}`.
 - Kinds : `REGLEMENT_COMPENSATION` | `REGLEMENT_REMBOURSEMENT` | `REGLEMENT_MIXTE`.
@@ -177,12 +202,13 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
     lib/services/frais-avances/note-frais-mixte.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-correction.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-restitution.pg.integration.test.ts \
+    lib/services/frais-avances/note-frais-annulation.pg.integration.test.ts \
     lib/frais-avances/pg-test-allowlist.test.ts
 ```
 
 
 ## Non livré / futur
-- Lot **4.8+** : annulation (`EXPIREE` 30 j), détachement RGPD FK 4.9.
+- Lot **4.9** détachement RGPD FK (historique financier dont annulations).
 - Index partiel unique choix ACTIF.
 - CHECK SQL polymorphes sur `notes_frais_reglement_lignes` et opérations MIXTE.
 - API v1, mobile notes de frais.

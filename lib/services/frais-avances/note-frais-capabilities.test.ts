@@ -12,6 +12,10 @@ const {
   canCorrect,
   canRecordRestit,
   canReadRestitRef,
+  canRequestCancel,
+  canConfirmCancel,
+  canRefuseCancel,
+  canReadAnnulAudit,
 } = vi.hoisted(() => ({
   noteFindUnique: vi.fn(),
   reglementFindMany: vi.fn(),
@@ -24,6 +28,10 @@ const {
   canCorrect: vi.fn(),
   canRecordRestit: vi.fn(),
   canReadRestitRef: vi.fn(),
+  canRequestCancel: vi.fn(),
+  canConfirmCancel: vi.fn(),
+  canRefuseCancel: vi.fn(),
+  canReadAnnulAudit: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -58,6 +66,14 @@ vi.mock("@/lib/frais-avances/authz", () => ({
   canUserRecordNoteFraisRestitution: (...a: unknown[]) => canRecordRestit(...a),
   canUserReadNoteFraisRestitutionReference: (...a: unknown[]) =>
     canReadRestitRef(...a),
+  canUserRequestCancelNoteFraisReglement: (...a: unknown[]) =>
+    canRequestCancel(...a),
+  canUserConfirmCancelNoteFraisReglement: (...a: unknown[]) =>
+    canConfirmCancel(...a),
+  canUserRefuseCancelNoteFraisReglement: (...a: unknown[]) =>
+    canRefuseCancel(...a),
+  canUserReadNoteFraisAnnulationAudit: (...a: unknown[]) =>
+    canReadAnnulAudit(...a),
 }));
 
 import { getNoteFraisCapabilities } from "@/lib/services/frais-avances/note-frais-capabilities-service";
@@ -74,6 +90,10 @@ describe("getNoteFraisCapabilities", () => {
     canCorrect.mockResolvedValue(false);
     canRecordRestit.mockResolvedValue(false);
     canReadRestitRef.mockResolvedValue(false);
+    canRequestCancel.mockResolvedValue(false);
+    canConfirmCancel.mockResolvedValue(false);
+    canRefuseCancel.mockResolvedValue(false);
+    canReadAnnulAudit.mockResolvedValue(false);
     reglementFindMany.mockResolvedValue([]);
   });
 

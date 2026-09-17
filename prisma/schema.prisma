@@ -313,6 +313,8 @@ model User {
   notesFraisReglementOperationsExecuteur NoteFraisReglementOperation[] @relation("NoteFraisReglementOperationExecuteur")
   notesFraisReglementCorrectionsActor NoteFraisReglementCorrection[] @relation("NoteFraisReglementCorrectionActor")
   notesFraisRestitutionsActor   NoteFraisRestitution[]       @relation("NoteFraisRestitutionActor")
+  notesFraisAnnulationDemandesAuteur NoteFraisReglementAnnulationDemande[] @relation("NoteFraisAnnulationDemandeur")
+  notesFraisAnnulationDemandesConfirmateur NoteFraisReglementAnnulationDemande[] @relation("NoteFraisAnnulationConfirmateur")
   justificatifsNoteFraisUploades JustificatifNoteFrais[]     @relation("JustificatifNoteFraisUploader")
   notesFraisArchiveAccessLogs   NoteFraisArchiveAccessLog[]  @relation("NoteFraisArchiveAccessActor")
 
@@ -2873,6 +2875,7 @@ enum TypeNoteFraisReglement {
 
 enum StatutNoteFraisReglement {
   EXECUTE
+  ANNULE
 }
 
 enum TypeLigneNoteFraisReglement {
@@ -2891,27 +2894,36 @@ enum TypeNoteFraisReglementOperation {
   MIXTE
 }
 
+/// Statut d'une opération MIXTE (lot 4.8 — annulation parent).
+enum StatutNoteFraisReglementOperation {
+  EXECUTE
+  ANNULEE
+}
+
 /// Parent idempotent d'une exécution mixte (compensation + remboursement).
 /// Futurs CHECK SQL (migration ultérieure, pas maintenant) :
 ///   une opération MIXTE a exactement un enfant COMPENSATION et un REMBOURSEMENT.
 model NoteFraisReglementOperation {
-  id              String                         @id @default(cuid())
+  id              String                          @id @default(cuid())
   noteFraisId     String
   choixId         String
   type            TypeNoteFraisReglementOperation @default(MIXTE)
-  idempotencyKey  String                         @unique @db.VarChar(64)
+  statut          StatutNoteFraisReglementOperation @default(EXECUTE)
+  idempotencyKey  String                          @unique @db.VarChar(64)
   executeurUserId String
   /// Instant canonique partagé avec les deux règlements enfants.
   executeAt       DateTime
-  createdAt       DateTime                       @default(now())
+  createdAt       DateTime                        @default(now())
 
   NoteFrais  NoteFrais               @relation(fields: [noteFraisId], references: [id], onDelete: Restrict)
   Choix      NoteFraisChoixReglement @relation(fields: [choixId], references: [id], onDelete: Restrict)
   Executeur  User                    @relation("NoteFraisReglementOperationExecuteur", fields: [executeurUserId], references: [id], onDelete: Restrict)
   Reglements NoteFraisReglement[]
+  AnnulationDemandes NoteFraisReglementAnnulationDemande[]
 
   @@index([noteFraisId, executeAt])
   @@index([choixId])
+  @@index([statut])
   @@map("notes_frais_reglement_operations")
 }
 
@@ -2945,6 +2957,7 @@ model NoteFraisReglement {
   Lignes      NoteFraisReglementLigne[]
   Corrections NoteFraisReglementCorrection[]
   Restitutions NoteFraisRestitution[]
+  AnnulationDemandes NoteFraisReglementAnnulationDemande[]
 
   @@unique([operationId, type])
   @@index([noteFraisId, executeAt])
@@ -2976,6 +2989,7 @@ model NoteFraisReglementLigne {
   Avoir            Avoir?             @relation("AvoirFromNoteFraisLigne")
   UtilisationAvoir UtilisationAvoir?  @relation("UtilisationFromNoteFraisLigne")
   InversesCorrection NoteFraisCorrectionInverseCible[]
+  InversesAnnulation NoteFraisAnnulationInverseCible[]
 
   @@unique([reglementId, rang])
   @@index([cibleId, typeCible])
@@ -3050,6 +3064,97 @@ model NoteFraisRestitution {
 
   @@index([reglementId, dateRestitution])
   @@map("notes_frais_restitutions")
+}
+
+/// Statut d'une demande d'annulation à double validation (lot 4.8).
+enum StatutDemandeAnnulationReglement {
+  DEMANDEE
+  CONFIRMEE
+  REFUSEE
+  EXPIREE
+}
+
+/// Preuve technique d'annulation (remboursement banque/caisse ou compensation interne).
+enum PreuveAnnulationReglement {
+  REJET_BANQUE
+  ANNULATION_VIREMENT
+  RECU_CAISSE_ANNULE
+  TRACE_ETABLISSEMENT
+  PV_TRESORERIE
+  JUSTIFICATIF_INTERNE
+  AUTRE_TRACE
+}
+
+/// Demande d'annulation — double validation, expiration 30 j (lot 4.8).
+/// XOR applicatif reglementId / operationId (futur CHECK SQL).
+///
+/// Prérequis **première migration dépôt avant activation** — index partiels
+/// (absents aujourd'hui ; garde TX + tests concurrence obligatoires en V1) :
+///
+///   CREATE UNIQUE INDEX notes_frais_annul_demande_reglement_demandee_uidx
+///     ON notes_frais_reglement_annulation_demandes (reglement_id)
+///     WHERE statut = 'DEMANDEE' AND reglement_id IS NOT NULL;
+///
+///   CREATE UNIQUE INDEX notes_frais_annul_demande_operation_demandee_uidx
+///     ON notes_frais_reglement_annulation_demandes (operation_id)
+///     WHERE statut = 'DEMANDEE' AND operation_id IS NOT NULL;
+///
+/// Activation bloquée tant que ces index ne sont pas créés avec les tables 4.8.
+model NoteFraisReglementAnnulationDemande {
+  id                     String                           @id @default(cuid())
+  /// Cible règlement simple (null si MIXTE parent).
+  reglementId            String?
+  /// Cible opération MIXTE parent (null si règlement simple).
+  operationId            String?
+  statut                 StatutDemandeAnnulationReglement @default(DEMANDEE)
+  motif                  String                           @db.Text
+  preuveKind             PreuveAnnulationReglement
+  preuveRef              String                           @db.VarChar(64)
+  /// Nullable + SetNull : ne bloque pas user.delete (RGPD).
+  demandeurUserId        String?
+  confirmateurUserId     String?
+  idempotencyKey         String                           @unique @db.VarChar(64)
+  decisionIdempotencyKey String?                          @unique @db.VarChar(64)
+  createdAt              DateTime                         @default(now())
+  /// Exactement createdAt + 30 jours (serveur).
+  expiresAt              DateTime
+  decideeAt              DateTime?
+  /// Obligatoire applicativement si REFUSEE.
+  decisionMotif          String?                          @db.Text
+
+  Reglement    NoteFraisReglement?          @relation(fields: [reglementId], references: [id], onDelete: Restrict)
+  Operation    NoteFraisReglementOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  Demandeur    User?                        @relation("NoteFraisAnnulationDemandeur", fields: [demandeurUserId], references: [id], onDelete: SetNull)
+  Confirmateur User?                        @relation("NoteFraisAnnulationConfirmateur", fields: [confirmateurUserId], references: [id], onDelete: SetNull)
+  Inverses     NoteFraisAnnulationInverseCible[]
+
+  @@index([reglementId, statut])
+  @@index([operationId, statut])
+  @@index([statut, expiresAt])
+  @@map("notes_frais_reglement_annulation_demandes")
+}
+
+/// Inversion append-only d'une compensation lors d'une annulation confirmée (lot 4.8).
+/// Distincte de NoteFraisCorrectionInverseCible (4.6) — ne pas confondre.
+model NoteFraisAnnulationInverseCible {
+  id               String                         @id @default(cuid())
+  demandeId        String
+  reglementLigneId String
+  typeCible        TypeCibleCompensationNoteFrais
+  cibleId          String
+  /// Strictement positif.
+  montantRestaure  Decimal                        @db.Decimal(10, 2)
+  restantAvant     Decimal                        @db.Decimal(10, 2)
+  restantApres     Decimal                        @db.Decimal(10, 2)
+  createdAt        DateTime                       @default(now())
+
+  Demande NoteFraisReglementAnnulationDemande @relation(fields: [demandeId], references: [id], onDelete: Restrict)
+  Ligne   NoteFraisReglementLigne             @relation(fields: [reglementLigneId], references: [id], onDelete: Restrict)
+
+  @@unique([demandeId, reglementLigneId])
+  @@index([reglementLigneId])
+  @@index([cibleId, typeCible])
+  @@map("notes_frais_annulation_inverses_cible")
 }
 
 /// Ligne d'inversion explicite pour correction MONTANT_NEGATIF compensation.

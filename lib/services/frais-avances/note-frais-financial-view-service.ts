@@ -56,6 +56,14 @@ export type NoteFraisFinancialCorrectionDto = {
   montantCorrection?: string;
 };
 
+/** Annulation CONFIRMEE — résultat financier sans audit (COMCPT inclus). */
+export type NoteFraisFinancialAnnulationDto = {
+  id: string;
+  reglementId: string | null;
+  operationId: string | null;
+  decideeAt: string;
+};
+
 /**
  * Agrégats + règlements (montants nets).
  * Opérations MIXTE groupées sans double comptage.
@@ -78,6 +86,8 @@ export type NoteFraisFinancialViewDto = {
   operationsMixte: NoteFraisFinancialOperationDto[];
   /** Journal des corrections (type + montant absolu + date) — sans motif/preuve/réf/acteur. */
   corrections: NoteFraisFinancialCorrectionDto[];
+  /** Annulations CONFIRMEE — résultat sans audit. */
+  annulations: NoteFraisFinancialAnnulationDto[];
 };
 
 function money(v: Prisma.Decimal | number | string): Prisma.Decimal {
@@ -247,7 +257,11 @@ export async function getNoteFraisFinancialView(input: {
     });
 
     const operations = await client.noteFraisReglementOperation.findMany({
-      where: { noteFraisId: input.noteId, type: "MIXTE" },
+      where: {
+        noteFraisId: input.noteId,
+        type: "MIXTE",
+        statut: "EXECUTE",
+      },
       orderBy: { executeAt: "asc" },
       include: {
         Reglements: {
@@ -277,6 +291,24 @@ export async function getNoteFraisFinancialView(input: {
         createdAt: true,
       },
     });
+
+    const annulationsConfirmees =
+      await client.noteFraisReglementAnnulationDemande.findMany({
+        where: {
+          statut: "CONFIRMEE",
+          OR: [
+            { Reglement: { noteFraisId: input.noteId } },
+            { Operation: { noteFraisId: input.noteId } },
+          ],
+        },
+        orderBy: { decideeAt: "asc" },
+        select: {
+          id: true,
+          reglementId: true,
+          operationId: true,
+          decideeAt: true,
+        },
+      });
 
     const netById = new Map<string, string>();
     for (const r of remboursements) {
@@ -378,6 +410,14 @@ export async function getNoteFraisFinancialView(input: {
           }
           return entry;
         }),
+        annulations: annulationsConfirmees
+          .filter((a) => a.decideeAt != null)
+          .map((a) => ({
+            id: a.id,
+            reglementId: a.reglementId,
+            operationId: a.operationId,
+            decideeAt: a.decideeAt!.toISOString(),
+          })),
       },
     };
   } catch (error) {

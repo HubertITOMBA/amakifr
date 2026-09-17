@@ -19,13 +19,28 @@ export const RESTITUTION_NOTIFY_TITRE = "Restitution enregistrée";
 export const RESTITUTION_NOTIFY_MESSAGE =
   "Une restitution a été enregistrée sur votre note de frais. Consultez le détail pour en savoir plus.";
 
+export const ANNULATION_DEMANDE_TITRE = "Demande d'annulation de règlement";
+export const ANNULATION_DEMANDE_MESSAGE =
+  "Une demande d'annulation de règlement nécessite une confirmation. Consultez le détail administrateur.";
+
+export const ANNULATION_CONFIRMEE_TITRE = "Annulation de règlement confirmée";
+export const ANNULATION_CONFIRMEE_MESSAGE =
+  "Une annulation de règlement a été confirmée sur une note de frais. Consultez le détail.";
+
+export const ANNULATION_REFUSEE_TITRE = "Annulation de règlement refusée";
+export const ANNULATION_REFUSEE_MESSAGE =
+  "Votre demande d'annulation de règlement a été refusée. Consultez le détail administrateur.";
+
 export type NoteFraisReglementNotifyKind =
   | "REGLEMENT_COMPENSATION"
   | "REGLEMENT_REMBOURSEMENT"
   | "REGLEMENT_MIXTE"
   | "CORRECTION_REFERENCE"
   | "CORRECTION_MONTANT_NEGATIF"
-  | "RESTITUTION_ENREGISTREE";
+  | "RESTITUTION_ENREGISTREE"
+  | "ANNULATION_DEMANDEE"
+  | "ANNULATION_CONFIRMEE"
+  | "ANNULATION_REFUSEE";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -62,6 +77,12 @@ export function buildNoteFraisReglementOutboxEventKey(
       return `note:${noteId}:correction:${anchorId}`;
     case "RESTITUTION_ENREGISTREE":
       return `note:${noteId}:restitution:${anchorId}`;
+    case "ANNULATION_DEMANDEE":
+      return `note:${noteId}:annulation:${anchorId}:demandee`;
+    case "ANNULATION_CONFIRMEE":
+      return `note:${noteId}:annulation:${anchorId}:confirmee`;
+    case "ANNULATION_REFUSEE":
+      return `note:${noteId}:annulation:${anchorId}:refusee`;
   }
 }
 
@@ -82,6 +103,24 @@ function notifyCopy(kind: NoteFraisReglementNotifyKind): {
     return {
       titre: RESTITUTION_NOTIFY_TITRE,
       message: RESTITUTION_NOTIFY_MESSAGE,
+    };
+  }
+  if (kind === "ANNULATION_DEMANDEE") {
+    return {
+      titre: ANNULATION_DEMANDE_TITRE,
+      message: ANNULATION_DEMANDE_MESSAGE,
+    };
+  }
+  if (kind === "ANNULATION_CONFIRMEE") {
+    return {
+      titre: ANNULATION_CONFIRMEE_TITRE,
+      message: ANNULATION_CONFIRMEE_MESSAGE,
+    };
+  }
+  if (kind === "ANNULATION_REFUSEE") {
+    return {
+      titre: ANNULATION_REFUSEE_TITRE,
+      message: ANNULATION_REFUSEE_MESSAGE,
     };
   }
   return {
@@ -143,4 +182,104 @@ export async function createNoteFraisReglementNotificationInTx(
       status: "PENDING",
     },
   });
+}
+
+/**
+ * Notifications multi-destinataires pour transitions d'annulation (lot 4.8).
+ * Une notif in-app + une outbox par groupe (lien/audience).
+ * CONFIRMEE : audiences user/admin → eventKeys `…:confirmee:user` / `…:confirmee:admin`.
+ */
+export async function createNoteFraisAnnulationNotificationsInTx(
+  tx: TxClient,
+  params: {
+    noteId: string;
+    kind:
+      | "ANNULATION_DEMANDEE"
+      | "ANNULATION_CONFIRMEE"
+      | "ANNULATION_REFUSEE";
+    demandeId: string;
+    /** Destinataires avec lien (et audience pour CONFIRMEE). */
+    recipients?: Array<{
+      userId: string;
+      lien: string;
+      audience?: "user" | "admin";
+    }>;
+    /** Compat : même lien pour tous (DEMANDEE / REFUSEE). */
+    userIds?: string[];
+    lien?: string;
+  }
+): Promise<void> {
+  const { titre, message } = notifyCopy(params.kind);
+
+  let recipients = params.recipients ?? [];
+  if (recipients.length === 0 && params.userIds && params.lien) {
+    recipients = [...new Set(params.userIds.filter(Boolean))].map((userId) => ({
+      userId,
+      lien: params.lien!,
+    }));
+  }
+  // Dédupliquer par userId (premier gagne — CONFIRMEE : user avant admin si doublon).
+  const seen = new Set<string>();
+  const deduped: typeof recipients = [];
+  for (const r of recipients) {
+    if (!r.userId || seen.has(r.userId)) continue;
+    seen.add(r.userId);
+    deduped.push(r);
+  }
+  if (deduped.length === 0) return;
+
+  // Grouper par (lien, audience) → une outbox par groupe
+  const groups = new Map<
+    string,
+    { userIds: string[]; lien: string; audience?: "user" | "admin" }
+  >();
+  for (const r of deduped) {
+    const gKey = `${r.audience ?? ""}|${r.lien}`;
+    const g = groups.get(gKey) ?? {
+      userIds: [],
+      lien: r.lien,
+      audience: r.audience,
+    };
+    g.userIds.push(r.userId);
+    groups.set(gKey, g);
+  }
+
+  for (const g of groups.values()) {
+    const eventKey =
+      params.kind === "ANNULATION_CONFIRMEE" && g.audience
+        ? `note:${params.noteId}:annulation:${params.demandeId}:confirmee:${g.audience}`
+        : buildNoteFraisReglementOutboxEventKey(
+            params.kind,
+            params.noteId,
+            params.demandeId
+          );
+
+    for (const userId of g.userIds) {
+      await tx.notification.create({
+        data: {
+          userId,
+          type: TypeNotification.Action,
+          titre,
+          message,
+          lien: g.lien,
+          lue: false,
+        },
+      });
+    }
+
+    await tx.noteFraisOutboxEvent.create({
+      data: {
+        noteFraisId: params.noteId,
+        eventKey,
+        kind: params.kind,
+        payload: {
+          userIds: g.userIds,
+          titre,
+          message,
+          lien: g.lien,
+        },
+        status: "PENDING",
+      },
+    });
+  }
 }

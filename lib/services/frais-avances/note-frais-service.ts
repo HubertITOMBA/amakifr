@@ -11,6 +11,7 @@ import {
   canUserReadNoteFraisRemboursementReference,
   canUserReadNoteFraisCorrectionAudit,
   canUserReadNoteFraisRestitutionReference,
+  canUserReadNoteFraisAnnulationAudit,
 } from "@/lib/frais-avances/authz";
 import {
   toNoteFraisPublicDto,
@@ -877,7 +878,7 @@ export async function getNoteFraisForUser(input: {
       }
     }
 
-    const [remboursements, compensations, operations, restitutions] =
+    const [remboursements, compensations, operations, restitutions, annulations] =
       await Promise.all([
       db.noteFraisReglement.findMany({
         where: {
@@ -951,7 +952,11 @@ export async function getNoteFraisForUser(input: {
         },
       }),
       db.noteFraisReglementOperation.findMany({
-        where: { noteFraisId: input.noteId, type: "MIXTE" },
+        where: {
+          noteFraisId: input.noteId,
+          type: "MIXTE",
+          statut: "EXECUTE",
+        },
         orderBy: { executeAt: "asc" },
         include: {
           Executeur: { select: { name: true, email: true } },
@@ -982,6 +987,26 @@ export async function getNoteFraisForUser(input: {
           Reglement: { select: { operationId: true } },
         },
       }),
+      // Historique membre/admin : CONFIRMEE uniquement (pas DEMANDEE).
+      db.noteFraisReglementAnnulationDemande.findMany({
+        where: {
+          statut: "CONFIRMEE",
+          OR: [
+            { Reglement: { noteFraisId: input.noteId } },
+            { Operation: { noteFraisId: input.noteId } },
+          ],
+        },
+        orderBy: { decideeAt: "asc" },
+        select: {
+          id: true,
+          reglementId: true,
+          operationId: true,
+          decideeAt: true,
+          motif: true,
+          preuveKind: true,
+          preuveRef: true,
+        },
+      }),
     ]);
 
     // Membre propriétaire : jamais la référence (même si double casquette).
@@ -995,6 +1020,9 @@ export async function getNoteFraisForUser(input: {
       !isOwner &&
       (await canUserReadNoteFraisRestitutionReference(input.userId));
     const includeRestitutionAudit = includeRestitutionReference;
+    const includeAnnulationAudit =
+      !isOwner &&
+      (await canUserReadNoteFraisAnnulationAudit(input.userId));
 
     const { computeReglementNetMontant } = await import(
       "@/lib/services/frais-avances/note-frais-correction-service"
@@ -1113,6 +1141,18 @@ export async function getNoteFraisForUser(input: {
       })),
       includeRestitutionAudit,
       includeRestitutionReference,
+      annulations: annulations
+        .filter((a) => a.decideeAt != null)
+        .map((a) => ({
+          id: a.id,
+          reglementId: a.reglementId,
+          operationId: a.operationId,
+          decideeAt: a.decideeAt!,
+          motif: a.motif,
+          preuveKind: a.preuveKind,
+          preuveRef: a.preuveRef,
+        })),
+      includeAnnulationAudit,
       choixHistorique,
     });
 

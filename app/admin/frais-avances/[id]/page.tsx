@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Banknote, FilePenLine, Gavel, GitMerge, MinusCircle, Scale } from "lucide-react";
+import { Banknote, Ban, CheckCircle2, FilePenLine, Gavel, GitMerge, MinusCircle, Scale, XCircle } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,8 +18,12 @@ import { ExecuteMixteDialog } from "@/components/frais-avances/ExecuteMixteDialo
 import { CorrectReferenceDialog } from "@/components/frais-avances/CorrectReferenceDialog";
 import { CorrectMontantDialog } from "@/components/frais-avances/CorrectMontantDialog";
 import { RecordRestitutionDialog } from "@/components/frais-avances/RecordRestitutionDialog";
+import { RequestCancelDialog } from "@/components/frais-avances/RequestCancelDialog";
+import { ConfirmCancelDialog } from "@/components/frais-avances/ConfirmCancelDialog";
+import { RefuseCancelDialog } from "@/components/frais-avances/RefuseCancelDialog";
 import type { CompensationCibleOption } from "@/components/frais-avances/CompensationCiblesFields";
 import { NoteFraisHistoriqueReglements } from "@/components/frais-avances/NoteFraisHistoriqueReglements";
+import { useExpiresCountdown } from "@/components/frais-avances/useExpiresCountdown";
 import {
   NoteFraisEtatFinancierBadge,
   NoteFraisModeBadge,
@@ -101,6 +105,12 @@ type FinancialView = {
     createdAt: string;
     montantCorrection?: string;
   }>;
+  annulations?: Array<{
+    id: string;
+    reglementId: string | null;
+    operationId: string | null;
+    decideeAt: string;
+  }>;
 };
 
 function financialToHistorique(
@@ -146,6 +156,16 @@ function financialToHistorique(
     if (c.montantCorrection) entry.montantCorrection = c.montantCorrection;
     entries.push(entry);
   }
+  for (const a of fin.annulations ?? []) {
+    entries.push({
+      kind: "ANNULATION",
+      id: a.id,
+      executeAt: a.decideeAt,
+      libelleAnnulation: "Règlement annulé",
+      reglementId: a.reglementId ?? undefined,
+      operationId: a.operationId,
+    });
+  }
   entries.sort(
     (a, b) => new Date(a.executeAt).getTime() - new Date(b.executeAt).getTime()
   );
@@ -174,6 +194,15 @@ export default function AdminNoteFraisDetailPage() {
     id: string;
     resteRestituable: string;
   } | null>(null);
+  const [requestCancelOpen, setRequestCancelOpen] = useState(false);
+  const [confirmCancelOpen, setConfirmCancelOpen] = useState(false);
+  const [refuseCancelOpen, setRefuseCancelOpen] = useState(false);
+  const [cancelDemandeTarget, setCancelDemandeTarget] = useState<{
+    id: string;
+    expiresAt: string;
+    cibleLabel: string;
+    cibleTypes: Array<"REMBOURSEMENT" | "COMPENSATION" | "MIXTE">;
+  } | null>(null);
   const [corrTarget, setCorrTarget] = useState<{
     id: string;
     type: "REMBOURSEMENT" | "COMPENSATION";
@@ -194,6 +223,12 @@ export default function AdminNoteFraisDetailPage() {
   );
   const [restitIdempotencyKey, setRestitIdempotencyKey] = useState(
     () => `restit-${noteId}-${Date.now()}`
+  );
+  const [cancelIdempotencyKey, setCancelIdempotencyKey] = useState(
+    () => `annul-req-${noteId}-${Date.now()}`
+  );
+  const [cancelDecisionKey, setCancelDecisionKey] = useState(
+    () => `annul-dec-${noteId}-${Date.now()}`
   );
   const [idempotencyKey, setIdempotencyKey] = useState(
     () => `decide-${noteId}-${Date.now()}`
@@ -303,6 +338,15 @@ export default function AdminNoteFraisDetailPage() {
   const showRestitution =
     caps?.canRecordRestitution === true &&
     (caps?.reglementsRestituables?.length ?? 0) > 0;
+  const showRequestCancel =
+    caps?.canRequestCancel === true &&
+    (caps?.ciblesAnnulables?.length ?? 0) > 0;
+  const pendingAnnulations = (caps?.demandesAnnulationPending ?? []).filter(
+    (d) => !d.isDemandeur
+  );
+  const showPendingAnnulations =
+    pendingAnnulations.length > 0 &&
+    (caps?.canConfirmCancel === true || caps?.canRefuseCancel === true);
   const showReference = caps?.canReadFinancial === true;
 
   if (!enabledHint) {
@@ -587,6 +631,76 @@ export default function AdminNoteFraisDetailPage() {
                 </section>
               ) : null}
 
+              {showRequestCancel ? (
+                <section className="rounded-lg border border-red-200 bg-red-50/60 p-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-red-900">
+                    Annulation de règlement
+                  </p>
+                  <p className="text-[11px] text-slate-600">
+                    Double validation · XOR simple ou MIXTE parent · pas de
+                    correction/restitution préalable
+                  </p>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    className="border-red-300 hover:bg-red-50"
+                    onClick={() => {
+                      setCancelIdempotencyKey(
+                        `annul-req-${noteId}-${Date.now()}`
+                      );
+                      setRequestCancelOpen(true);
+                    }}
+                    data-testid="open-request-cancel"
+                  >
+                    <Ban className="h-3.5 w-3.5 mr-1" />
+                    Demander une annulation
+                  </Button>
+                </section>
+              ) : null}
+
+              {showPendingAnnulations ? (
+                <section className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">
+                    Demandes d&apos;annulation en attente
+                  </p>
+                  <ul className="space-y-2">
+                    {pendingAnnulations.map((d) => (
+                      <PendingAnnulationRow
+                        key={d.id}
+                        demande={d}
+                        canConfirm={caps?.canConfirmCancel === true}
+                        canRefuse={caps?.canRefuseCancel === true}
+                        onConfirm={() => {
+                          setCancelDemandeTarget({
+                            id: d.id,
+                            expiresAt: d.expiresAt,
+                            cibleLabel: d.cibleLabel,
+                            cibleTypes: d.cibleTypes ?? ["REMBOURSEMENT"],
+                          });
+                          setCancelDecisionKey(
+                            `annul-conf-${d.id}-${Date.now()}`
+                          );
+                          setConfirmCancelOpen(true);
+                        }}
+                        onRefuse={() => {
+                          setCancelDemandeTarget({
+                            id: d.id,
+                            expiresAt: d.expiresAt,
+                            cibleLabel: d.cibleLabel,
+                            cibleTypes: d.cibleTypes ?? ["REMBOURSEMENT"],
+                          });
+                          setCancelDecisionKey(
+                            `annul-ref-${d.id}-${Date.now()}`
+                          );
+                          setRefuseCancelOpen(true);
+                        }}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
               {note.description && caps?.canReadLive ? (
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 mb-1">
@@ -737,6 +851,87 @@ export default function AdminNoteFraisDetailPage() {
           onDone={reload}
         />
       ) : null}
+      {note && showRequestCancel ? (
+        <RequestCancelDialog
+          open={requestCancelOpen}
+          onOpenChange={setRequestCancelOpen}
+          noteId={noteId}
+          idempotencyKey={cancelIdempotencyKey}
+          cibles={caps?.ciblesAnnulables ?? []}
+          onDone={reload}
+        />
+      ) : null}
+      {note && cancelDemandeTarget && confirmCancelOpen ? (
+        <ConfirmCancelDialog
+          open={confirmCancelOpen}
+          onOpenChange={setConfirmCancelOpen}
+          noteId={noteId}
+          demandeId={cancelDemandeTarget.id}
+          expectedVersion={note.version}
+          decisionIdempotencyKey={cancelDecisionKey}
+          expiresAt={cancelDemandeTarget.expiresAt}
+          cibleLabel={cancelDemandeTarget.cibleLabel}
+          cibleTypes={cancelDemandeTarget.cibleTypes}
+          onDone={reload}
+        />
+      ) : null}
     </div>
+  );
+}
+
+function PendingAnnulationRow({
+  demande,
+  canConfirm,
+  canRefuse,
+  onConfirm,
+  onRefuse,
+}: {
+  demande: {
+    id: string;
+    expiresAt: string;
+    cibleLabel: string;
+  };
+  canConfirm: boolean;
+  canRefuse: boolean;
+  onConfirm: () => void;
+  onRefuse: () => void;
+}) {
+  const countdown = useExpiresCountdown(demande.expiresAt);
+  return (
+    <li className="flex flex-wrap items-center gap-2 text-xs">
+      <span className="font-mono text-slate-700">{demande.cibleLabel}</span>
+      <span
+        className={
+          countdown.expired ? "text-red-700" : "text-amber-800 font-medium"
+        }
+      >
+        {countdown.expired ? "Expirée" : `Expire dans ${countdown.label}`}
+      </span>
+      {canConfirm && !countdown.expired ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          onClick={onConfirm}
+          data-testid={`open-confirm-cancel-${demande.id}`}
+        >
+          <CheckCircle2 className="h-3.5 w-3.5 mr-1" />
+          Confirmer
+        </Button>
+      ) : null}
+      {canRefuse && !countdown.expired ? (
+        <Button
+          type="button"
+          size="sm"
+          variant="outline"
+          className="border-red-300 hover:bg-red-50"
+          onClick={onRefuse}
+          data-testid={`open-refuse-cancel-${demande.id}`}
+        >
+          <XCircle className="h-3.5 w-3.5 mr-1" />
+          Refuser
+        </Button>
+      ) : null}
+    </li>
   );
 }

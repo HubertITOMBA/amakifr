@@ -842,3 +842,159 @@ export async function actionRecordNoteFraisRestitution(form: {
     };
   }
 }
+
+/**
+ * Demande d'annulation de règlement (lot 4.8) — XOR reglementId | operationId.
+ */
+export async function actionRequestNoteFraisReglementAnnulation(form: {
+  noteId: string;
+  reglementId?: string | null;
+  operationId?: string | null;
+  idempotencyKey: string;
+  motif: string;
+  preuveKind:
+    | "REJET_BANQUE"
+    | "ANNULATION_VIREMENT"
+    | "RECU_CAISSE_ANNULE"
+    | "TRACE_ETABLISSEMENT"
+    | "PV_TRESORERIE"
+    | "JUSTIFICATIF_INTERNE"
+    | "AUTRE_TRACE";
+  preuveRef: string;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    if (!form.idempotencyKey?.trim()) {
+      return {
+        success: false as const,
+        error: "Clé d'idempotence requise",
+        code: "IDEMPOTENCY_REQUIRED",
+      };
+    }
+    const { requestNoteFraisReglementAnnulation } = await import(
+      "@/lib/services/frais-avances/note-frais-annulation-service"
+    );
+    const result = await requestNoteFraisReglementAnnulation({
+      actorUserId: userId,
+      noteId: form.noteId,
+      reglementId: form.reglementId,
+      operationId: form.operationId,
+      idempotencyKey: form.idempotencyKey,
+      motif: form.motif,
+      preuveKind: form.preuveKind,
+      preuveRef: form.preuveRef,
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath("/admin/frais-avances");
+      revalidatePath(`/user/frais-avances/${form.noteId}`);
+      revalidatePath(`/admin/frais-avances/${form.noteId}`);
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
+ * Confirmation d'annulation (lot 4.8) — effet financier.
+ */
+export async function actionConfirmNoteFraisReglementAnnulation(form: {
+  noteId: string;
+  demandeId: string;
+  expectedNoteVersion: number;
+  decisionIdempotencyKey: string;
+  /** Attestation obligatoire — `true` uniquement (jamais case UI seule). */
+  attestation: boolean;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    if (!form.decisionIdempotencyKey?.trim()) {
+      return {
+        success: false as const,
+        error: "Clé d'idempotence de décision requise",
+        code: "IDEMPOTENCY_REQUIRED",
+      };
+    }
+    if (form.attestation !== true) {
+      return {
+        success: false as const,
+        error: "Attestation obligatoire",
+        code: "ANNULATION_ATTESTATION_REQUIRED",
+      };
+    }
+    const { confirmNoteFraisReglementAnnulation } = await import(
+      "@/lib/services/frais-avances/note-frais-annulation-service"
+    );
+    const result = await confirmNoteFraisReglementAnnulation({
+      actorUserId: userId,
+      noteId: form.noteId,
+      demandeId: form.demandeId,
+      expectedNoteVersion: form.expectedNoteVersion,
+      decisionIdempotencyKey: form.decisionIdempotencyKey,
+      attestation: true,
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath("/admin/frais-avances");
+      revalidatePath(`/user/frais-avances/${form.noteId}`);
+      revalidatePath(`/admin/frais-avances/${form.noteId}`);
+      revalidatePath("/admin/finances/synthese");
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
+ * Refus d'annulation (lot 4.8) — sans effet financier.
+ */
+export async function actionRefuseNoteFraisReglementAnnulation(form: {
+  noteId: string;
+  demandeId: string;
+  decisionIdempotencyKey: string;
+  decisionMotif: string;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    if (!form.decisionIdempotencyKey?.trim()) {
+      return {
+        success: false as const,
+        error: "Clé d'idempotence de décision requise",
+        code: "IDEMPOTENCY_REQUIRED",
+      };
+    }
+    const { refuseNoteFraisReglementAnnulation } = await import(
+      "@/lib/services/frais-avances/note-frais-annulation-service"
+    );
+    const result = await refuseNoteFraisReglementAnnulation({
+      actorUserId: userId,
+      noteId: form.noteId,
+      demandeId: form.demandeId,
+      decisionIdempotencyKey: form.decisionIdempotencyKey,
+      decisionMotif: form.decisionMotif,
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath("/admin/frais-avances");
+      revalidatePath(`/user/frais-avances/${form.noteId}`);
+      revalidatePath(`/admin/frais-avances/${form.noteId}`);
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}

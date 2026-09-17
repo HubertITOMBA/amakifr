@@ -1,5 +1,21 @@
 # Changelog — frais avancés
 
+## 0.4.8-annulation-double-validation — 2026-09-17
+
+### Ajouté (lot 4.8 — local, flag off, **pas de migration dépôt**)
+- Annulation à double validation (`DEMANDEE` → `CONFIRMEE` | `REFUSEE` | `EXPIREE` 30 j).
+- XOR `reglementId` | `operationId` (MIXTE parent uniquement — jamais enfant).
+- Preuves `PreuveAnnulationReglement` ; permissions `requestCancel*` / `confirmCancel*` / `refuseCancel*` / `readNoteFraisAnnulationAudit`.
+- Attestation confirmateur obligatoire ; liens CONFIRMEE user/admin séparés.
+- Verrous confirm alignés 4.1–4.7 (choix → cibles → dettes/CM) ; garde une `DEMANDEE` active (TX).
+- Historique : CONFIRMEE seule (« règlement annulé ») ; pas de DEMANDEE ; COMCPT sans audit ; ADMIN/TRESOR audit si capacité.
+- Capacités UI + `listPendingAnnulationDemandesForNote` ; dialogs Request / Confirm / Refuse + countdown `expiresAt`.
+- Distincte corrections 4.6 et restitutions 4.7 ; tick expiration instrumentation (flag on uniquement).
+- Tests unitaires + PG (courses demandes, confirm↔refus, compteur, verrous).
+
+### Non inclus
+- Index partiels uniques `DEMANDEE` (prérequis **première migration avant activation**) ; détachement RGPD 4.9 ; migration dépôt ; activation.
+
 ## 0.4.7-restitutions-reelles — 2026-09-17
 
 ### Ajouté (lot 4.7 — local, flag off, **pas de migration dépôt**)
@@ -13,7 +29,7 @@
 - RGPD : présence restitution = historique financier (refus explicite avant 4.9).
 
 ### Non inclus
-- Annulation 4.8 ; détachement archive 4.9 ; migration dépôt ; activation.
+- Détachement archive 4.9 ; migration dépôt ; activation.
 
 ## 0.4.6-corrections-append-only — 2026-09-17
 

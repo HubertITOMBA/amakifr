@@ -109,6 +109,9 @@ vi.mock("@/lib/db", () => ({
     noteFraisRestitution: {
       findMany: vi.fn().mockResolvedValue([]),
     },
+    noteFraisReglementAnnulationDemande: {
+      findMany: vi.fn().mockResolvedValue([]),
+    },
     $transaction: (...a: unknown[]) => $transaction(...a),
     $executeRaw: (...a: unknown[]) => $executeRaw(...a),
   },
@@ -119,6 +122,7 @@ vi.mock("@/lib/frais-avances/authz", () => ({
   canUserReadNoteFraisRemboursementReference: vi.fn().mockResolvedValue(false),
   canUserReadNoteFraisCorrectionAudit: vi.fn().mockResolvedValue(false),
   canUserReadNoteFraisRestitutionReference: vi.fn().mockResolvedValue(false),
+  canUserReadNoteFraisAnnulationAudit: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("@/lib/frais-avances/recipients", () => ({

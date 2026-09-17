@@ -159,6 +159,32 @@ export async function archiveSubmittedNotesInTransaction(
     if (restitCount > 0) {
       throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
     }
+    const annulationDemandeCount =
+      await tx.noteFraisReglementAnnulationDemande.count({
+        where: {
+          OR: [
+            { Reglement: { noteFraisId: noteId } },
+            { Operation: { noteFraisId: noteId } },
+          ],
+        },
+      });
+    if (annulationDemandeCount > 0) {
+      throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
+    }
+    const annulationInverseCount =
+      await tx.noteFraisAnnulationInverseCible.count({
+        where: {
+          Demande: {
+            OR: [
+              { Reglement: { noteFraisId: noteId } },
+              { Operation: { noteFraisId: noteId } },
+            ],
+          },
+        },
+      });
+    if (annulationInverseCount > 0) {
+      throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
+    }
 
     await cancelPendingMovesAndEnqueueUnlinks(tx as never, [noteId]);
 

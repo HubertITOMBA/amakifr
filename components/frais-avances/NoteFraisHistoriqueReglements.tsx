@@ -53,6 +53,11 @@ export function NoteFraisHistoriqueReglements({
                 Restitution
                 {e.operationId ? " (MIXTE)" : ""}
               </span>
+            ) : e.kind === "ANNULATION" ? (
+              <span className="rounded bg-red-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-red-900">
+                {e.libelleAnnulation || "Règlement annulé"}
+                {e.operationId ? " (MIXTE)" : ""}
+              </span>
             ) : (
               <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-900">
                 Correction montant
