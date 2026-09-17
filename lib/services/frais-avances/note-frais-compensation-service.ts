@@ -1,7 +1,8 @@
 /**
- * Exécution réelle d'une compensation de note VALIDEE (lot 4.1).
+ * Exécution réelle d'une compensation de note VALIDEE (lot 4.1 + notif 4.5).
  * Modes choix : COMPENSATION | MIXTE (part compensation uniquement).
- * Aucun remboursement, PaiementCotisation, 2ᵉ Depense, notif/outbox.
+ * Aucun remboursement, PaiementCotisation, 2ᵉ Depense.
+ * Notif + outbox atomiques sur exécution fresh uniquement.
  */
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -10,6 +11,7 @@ import {
   assertNotesFraisEnabled,
 } from "@/lib/frais-avances/feature-flag";
 import { canUserExecuteNoteFraisCompensation } from "@/lib/frais-avances/authz";
+import { hashIdForLog } from "@/lib/frais-avances/storage";
 import { lockUserRowForNotesFrais } from "@/lib/services/frais-avances/rgpd-account-deletion";
 import { normalizeNotesFraisMontant } from "@/lib/services/frais-avances/note-frais-decision-service";
 import {
@@ -17,6 +19,7 @@ import {
   lockCompensationTargetsInTx,
   prepareCompensationLignesInTx,
 } from "@/lib/services/frais-avances/note-frais-reglement-apply";
+import { createNoteFraisReglementNotificationInTx } from "@/lib/services/frais-avances/note-frais-reglement-notify";
 
 export type NotesFraisCompensationActionResult<T = unknown> =
   | { success: true; data: T; message?: string }
@@ -52,6 +55,8 @@ export type ExecuteCompensationInput = {
   afterNoteLock?: () => Promise<void>;
   /** Hook tests : appelé avant l'application de chaque ligne (index 0-based). */
   beforeApplyLigne?: (index: number) => Promise<void>;
+  /** Hook tests : après notif+outbox, avant commit — erreur ⇒ rollback intégral. */
+  afterNotifyOutbox?: () => Promise<void>;
 };
 
 export type CompensationExecutionDto = {
@@ -238,7 +243,8 @@ function isIdempotencyKeyUniqueViolation(error: unknown): boolean {
         typeof t === "string" && t.toLowerCase().includes("idempotency")
     );
   }
-  return true;
+  // Ne pas masquer un P2002 d'eventKey outbox / autre contrainte.
+  return false;
 }
 
 type ReglementWithLignes = {
@@ -400,10 +406,9 @@ export async function executeNoteFraisCompensation(
       if (note.statut !== "VALIDEE") {
         throw new Error("Seules les notes validées peuvent être compensées");
       }
-      if (note.version !== input.expectedNoteVersion) {
-        throw new Error(NOTES_FRAIS_COMP_VERSION_CONFLICT);
-      }
 
+      // Idempotence avant OCC : un concurrent avec la même clé rejoue sans
+      // être bloqué par l'incrément de version du vainqueur.
       const existingKey = await tx.noteFraisReglement.findUnique({
         where: { idempotencyKey: key },
         include: { Lignes: true },
@@ -423,6 +428,10 @@ export async function executeNoteFraisCompensation(
           };
         }
         throw new Error(NOTES_FRAIS_COMP_IDEMPOTENCY_CONFLICT);
+      }
+
+      if (note.version !== input.expectedNoteVersion) {
+        throw new Error(NOTES_FRAIS_COMP_VERSION_CONFLICT);
       }
 
       await tx.$executeRaw`
@@ -518,6 +527,14 @@ export async function executeNoteFraisCompensation(
         },
       });
 
+      await createNoteFraisReglementNotificationInTx(tx, {
+        noteId: input.noteId,
+        demandeurUserId: note.demandeurUserId,
+        kind: "REGLEMENT_COMPENSATION",
+        anchorId: reglementId,
+      });
+      if (input.afterNotifyOutbox) await input.afterNotifyOutbox();
+
       return {
         kind: "fresh" as const,
         reglementId,
@@ -566,6 +583,17 @@ export async function executeNoteFraisCompensation(
         },
         message: "Déjà exécutée",
       };
+    }
+
+    if (!input.client) {
+      void import("@/lib/services/frais-avances/note-frais-service")
+        .then(({ processNoteFraisOutboxOnce }) => processNoteFraisOutboxOnce())
+        .catch((err) => {
+          console.error("[notes-frais] outbox kick failed after compensation", {
+            note: hashIdForLog(input.noteId),
+            err: err instanceof Error ? err.message.slice(0, 120) : "unknown",
+          });
+        });
     }
 
     return {

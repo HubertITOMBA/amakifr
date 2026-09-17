@@ -25,6 +25,8 @@ const {
   userFindUnique,
   userAdminRoleFindMany,
   resolveActionPermissionConfig,
+  notificationCreate,
+  outboxCreate,
 } = vi.hoisted(() => ({
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
@@ -49,6 +51,8 @@ const {
   userFindUnique: vi.fn(),
   userAdminRoleFindMany: vi.fn(),
   resolveActionPermissionConfig: vi.fn(),
+  notificationCreate: vi.fn(),
+  outboxCreate: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -87,6 +91,8 @@ vi.mock("@/lib/db", () => ({
     },
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     userAdminRole: { findMany: (...a: unknown[]) => userAdminRoleFindMany(...a) },
+    notification: { create: (...a: unknown[]) => notificationCreate(...a) },
+    noteFraisOutboxEvent: { create: (...a: unknown[]) => outboxCreate(...a) },
   },
 }));
 
@@ -224,6 +230,8 @@ describe("executeNoteFraisReglementMixte", () => {
     utilisationCreate.mockResolvedValue({ id: "ut1" });
     cibleUpdate.mockResolvedValue({});
     choixUpdate.mockResolvedValue({});
+    notificationCreate.mockResolvedValue({ id: "notif1" });
+    outboxCreate.mockResolvedValue({ id: "ob1" });
   });
 
   it("refuse partie nulle (USE_SIMPLE)", async () => {
@@ -366,6 +374,8 @@ describe("executeNoteFraisReglementMixte", () => {
           findUniqueOrThrow: cmFindUniqueOrThrow,
           update: cmUpdate,
         },
+        notification: { create: notificationCreate },
+        noteFraisOutboxEvent: { create: outboxCreate },
       };
       return fn(tx);
     });
@@ -405,6 +415,16 @@ describe("executeNoteFraisReglementMixte", () => {
     expect(rembCreate.operationId).toBe("op1");
     expect(compCreate.executeAt.toISOString()).toBe(executeAtIso);
     expect(rembCreate.executeAt.toISOString()).toBe(executeAtIso);
+    expect(notificationCreate).toHaveBeenCalledTimes(1);
+    expect(outboxCreate).toHaveBeenCalledTimes(1);
+    const outboxArg = outboxCreate.mock.calls[0]![0] as {
+      data: { kind: string; eventKey: string; payload: Record<string, unknown> };
+    };
+    expect(outboxArg.data.kind).toBe("REGLEMENT_MIXTE");
+    expect(outboxArg.data.eventKey).toBe("note:n1:operation:op1:mixte");
+    expect(JSON.stringify(outboxArg.data.payload)).not.toMatch(
+      /40\.00|60\.00|VIREMENT|VIR-1|DETTE/
+    );
   });
 
   it("replay même contenu → alreadyExecuted", async () => {
@@ -417,6 +437,8 @@ describe("executeNoteFraisReglementMixte", () => {
       expect(res.data.operationId).toBe("op1");
     }
     expect($transaction).not.toHaveBeenCalled();
+    expect(notificationCreate).not.toHaveBeenCalled();
+    expect(outboxCreate).not.toHaveBeenCalled();
   });
 
   it("replay : contenu canonique (rang / date / référence) — conflit si différent", async () => {
@@ -502,6 +524,8 @@ describe("executeNoteFraisReglementMixte", () => {
     const res = await executeNoteFraisReglementMixte(baseMixteInput);
     expect(res.success).toBe(true);
     if (res.success) expect(res.data.alreadyExecuted).toBe(true);
+    expect(notificationCreate).not.toHaveBeenCalled();
+    expect(outboxCreate).not.toHaveBeenCalled();
   });
 
   it("P2002 autre contrainte → propagé (pas de replay)", async () => {

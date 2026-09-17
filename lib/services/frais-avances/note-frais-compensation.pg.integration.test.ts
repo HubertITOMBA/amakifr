@@ -290,8 +290,32 @@ describe("intégration PG compensation notes-frais", () => {
     );
     expect(Number(restantFifo)).toBe(10);
 
-    expect(await prisma.notification.count()).toBe(notifBefore);
-    expect(await prisma.noteFraisOutboxEvent.count()).toBe(outboxBefore);
+    expect(await prisma.notification.count()).toBe(notifBefore + 1);
+    expect(await prisma.noteFraisOutboxEvent.count()).toBe(outboxBefore + 1);
+    const outbox = await prisma.noteFraisOutboxEvent.findFirstOrThrow({
+      where: { noteFraisId: noteR.id, kind: "REGLEMENT_COMPENSATION" },
+    });
+    expect(outbox.eventKey).toMatch(
+      new RegExp(`^note:${noteR.id}:reglement:.+:compensation$`)
+    );
+    const payload = outbox.payload as Record<string, unknown>;
+    expect(Object.keys(payload).sort()).toEqual([
+      "lien",
+      "message",
+      "titre",
+      "userIds",
+    ]);
+    expect(payload.titre).toBe("Règlement enregistré");
+    expect(payload).not.toHaveProperty("montant");
+    expect(String(payload.message)).not.toMatch(/VIREMENT|DETTE|COTISATION|motif/i);
+    const notif = await prisma.notification.findFirstOrThrow({
+      where: {
+        userId: demR.id,
+        lien: `/user/frais-avances/${noteR.id}`,
+        titre: "Règlement enregistré",
+      },
+    });
+    expect(notif.message).toContain("Consultez le détail");
     expect(await prisma.paiementCotisation.count()).toBe(payBefore);
     expect(
       await prisma.depense.count({ where: { noteFraisId: noteR.id } })
@@ -1140,4 +1164,269 @@ describe("intégration PG compensation notes-frais", () => {
       true
     );
   });
+
+  it("rollback afterNotifyOutbox : zéro finance, notification et outbox", async () => {
+    await wipe();
+    const dem = await createUser("demNf", "MEMBRE");
+    const tres = await createUser("tresNf", "TRESOR");
+    await ensureTypeDepenseFraisAvanceForTests(prisma, tres.id);
+    const dette = await prisma.detteInitiale.create({
+      data: {
+        adherentId: dem.adherent!.id,
+        annee: 2018,
+        montant: 50,
+        montantPaye: 0,
+        createdBy: tres.id,
+      },
+    });
+    const note = await prisma.noteFrais.create({
+      data: {
+        adherentId: dem.adherent!.id,
+        demandeurUserId: dem.id,
+        libelle: "comp-after-notify",
+        dateDepense: new Date(),
+        montantDemande: 25,
+        montantAccepte: 25,
+        statut: "VALIDEE",
+        soumiseAt: new Date(),
+        decideeAt: new Date(),
+        decideurUserId: tres.id,
+        decisionIdempotencyKey: `dec-${randomUUID().slice(0, 12)}`,
+        version: 3,
+      },
+    });
+    await prisma.depense.create({
+      data: {
+        libelle: "cnf",
+        montant: 25,
+        dateDepense: note.dateDepense,
+        statut: "Valide",
+        origine: "FRAIS_AVANCE",
+        noteFraisId: note.id,
+        createdBy: tres.id,
+        validatedBy: tres.id,
+      },
+    });
+    await prisma.noteFraisChoixReglement.create({
+      data: {
+        noteFraisId: note.id,
+        mode: "COMPENSATION",
+        statut: "ACTIF",
+        montantReference: 25,
+        montantCompensation: 25,
+        idempotencyKey: `choix-${randomUUID().slice(0, 12)}`,
+        choisiAt: new Date(),
+        Cibles: {
+          create: [
+            {
+              typeCible: "DETTE_INITIALE",
+              cibleId: dette.id,
+              montantAutorise: 25,
+              montantRestantSnapshot: 50,
+              rang: 1,
+            },
+          ],
+        },
+      },
+    });
+
+    const { executeNoteFraisCompensation } = await import(
+      "@/lib/services/frais-avances/note-frais-compensation-service"
+    );
+    const fail = await executeNoteFraisCompensation({
+      actorUserId: tres.id,
+      noteId: note.id,
+      expectedNoteVersion: 3,
+      idempotencyKey: "comp-pg-after-notify",
+      lignes: [
+        {
+          typeCible: "DETTE_INITIALE",
+          cibleId: dette.id,
+          montant: 25,
+          rang: 1,
+        },
+      ],
+      client: prisma,
+      afterNotifyOutbox: async () => {
+        throw new Error("forced-comp-notify-rollback");
+      },
+    });
+    expect(fail.success).toBe(false);
+    expect(
+      await prisma.noteFraisReglement.count({ where: { noteFraisId: note.id } })
+    ).toBe(0);
+    expect(
+      await prisma.avoir.count({
+        where: {
+          adherentId: dem.adherent!.id,
+          origine: "COMPENSATION_NOTE_FRAIS",
+        },
+      })
+    ).toBe(0);
+    expect(
+      await prisma.noteFraisOutboxEvent.count({
+        where: { noteFraisId: note.id },
+      })
+    ).toBe(0);
+    expect(
+      await prisma.notification.count({
+        where: { lien: `/user/frais-avances/${note.id}` },
+      })
+    ).toBe(0);
+    const noteAfter = await prisma.noteFrais.findUniqueOrThrow({
+      where: { id: note.id },
+    });
+    expect(noteAfter.version).toBe(3);
+    const detteAfter = await prisma.detteInitiale.findUniqueOrThrow({
+      where: { id: dette.id },
+    });
+    expect(Number(detteAfter.montantPaye)).toBe(0);
+  }, 60_000);
+
+  it("concurrence même clé : exactement une notification et une outbox", async () => {
+    await wipe();
+    const dem = await createUser("demSame", "MEMBRE");
+    const t1 = await createUser("t1same", "TRESOR");
+    const t2 = await createUser("t2same", "ADMIN");
+    await ensureTypeDepenseFraisAvanceForTests(prisma, t1.id);
+    const dette = await prisma.detteInitiale.create({
+      data: {
+        adherentId: dem.adherent!.id,
+        annee: 2017,
+        montant: 40,
+        montantPaye: 0,
+        createdBy: t1.id,
+      },
+    });
+    const note = await prisma.noteFrais.create({
+      data: {
+        adherentId: dem.adherent!.id,
+        demandeurUserId: dem.id,
+        libelle: "comp-same-key",
+        dateDepense: new Date(),
+        montantDemande: 40,
+        montantAccepte: 40,
+        statut: "VALIDEE",
+        soumiseAt: new Date(),
+        decideeAt: new Date(),
+        decideurUserId: t1.id,
+        decisionIdempotencyKey: `dec-${randomUUID().slice(0, 12)}`,
+        version: 3,
+      },
+    });
+    await prisma.depense.create({
+      data: {
+        libelle: "csk",
+        montant: 40,
+        dateDepense: note.dateDepense,
+        statut: "Valide",
+        origine: "FRAIS_AVANCE",
+        noteFraisId: note.id,
+        createdBy: t1.id,
+        validatedBy: t1.id,
+      },
+    });
+    await prisma.noteFraisChoixReglement.create({
+      data: {
+        noteFraisId: note.id,
+        mode: "COMPENSATION",
+        statut: "ACTIF",
+        montantReference: 40,
+        montantCompensation: 40,
+        idempotencyKey: `choix-${randomUUID().slice(0, 12)}`,
+        choisiAt: new Date(),
+        Cibles: {
+          create: [
+            {
+              typeCible: "DETTE_INITIALE",
+              cibleId: dette.id,
+              montantAutorise: 40,
+              montantRestantSnapshot: 40,
+              rang: 1,
+            },
+          ],
+        },
+      },
+    });
+
+    const { executeNoteFraisCompensation } = await import(
+      "@/lib/services/frais-avances/note-frais-compensation-service"
+    );
+    const key = "comp-pg-same-key-01";
+    let releaseBoth!: () => void;
+    const go = new Promise<void>((r) => {
+      releaseBoth = r;
+    });
+    let signal1!: () => void;
+    let signal2!: () => void;
+    const bothAtLock = Promise.all([
+      new Promise<void>((r) => {
+        signal1 = r;
+      }),
+      new Promise<void>((r) => {
+        signal2 = r;
+      }),
+    ]);
+
+    const payload = {
+      noteId: note.id,
+      expectedNoteVersion: 3,
+      idempotencyKey: key,
+      lignes: [
+        {
+          typeCible: "DETTE_INITIALE" as const,
+          cibleId: dette.id,
+          montant: 40,
+          rang: 1,
+        },
+      ],
+      client: prisma,
+    };
+
+    const p1 = executeNoteFraisCompensation({
+      ...payload,
+      actorUserId: t1.id,
+      beforeDemandeurLock: async () => {
+        signal1();
+        await go;
+      },
+    });
+    const p2 = executeNoteFraisCompensation({
+      ...payload,
+      actorUserId: t2.id,
+      beforeDemandeurLock: async () => {
+        signal2();
+        await go;
+      },
+    });
+    await bothAtLock;
+    releaseBoth();
+    const [r1, r2] = await Promise.all([p1, p2]);
+    expect(r1.success && r2.success).toBe(true);
+    const fresh = [r1, r2].filter(
+      (r) => r.success && !r.data.alreadyExecuted
+    );
+    const already = [r1, r2].filter(
+      (r) => r.success && r.data.alreadyExecuted
+    );
+    expect(fresh.length + already.length).toBe(2);
+    expect(fresh.length).toBe(1);
+    expect(
+      await prisma.noteFraisReglement.count({ where: { noteFraisId: note.id } })
+    ).toBe(1);
+    expect(
+      await prisma.noteFraisOutboxEvent.count({
+        where: { noteFraisId: note.id, kind: "REGLEMENT_COMPENSATION" },
+      })
+    ).toBe(1);
+    expect(
+      await prisma.notification.count({
+        where: {
+          userId: dem.id,
+          lien: `/user/frais-avances/${note.id}`,
+          titre: "Règlement enregistré",
+        },
+      })
+    ).toBe(1);
+  }, 90_000);
 });

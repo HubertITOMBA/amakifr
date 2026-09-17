@@ -16,6 +16,8 @@ const {
   userAdminRoleFindMany,
   resolveActionPermissionConfig,
   getUserAdminRolesFromDb,
+  notificationCreate,
+  outboxCreate,
 } = vi.hoisted(() => ({
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
@@ -31,6 +33,8 @@ const {
   userAdminRoleFindMany: vi.fn(),
   resolveActionPermissionConfig: vi.fn(),
   getUserAdminRolesFromDb: vi.fn(),
+  notificationCreate: vi.fn(),
+  outboxCreate: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -55,6 +59,8 @@ vi.mock("@/lib/db", () => ({
     },
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     userAdminRole: { findMany: (...a: unknown[]) => userAdminRoleFindMany(...a) },
+    notification: { create: (...a: unknown[]) => notificationCreate(...a) },
+    noteFraisOutboxEvent: { create: (...a: unknown[]) => outboxCreate(...a) },
   },
 }));
 
@@ -446,6 +452,8 @@ describe("executeNoteFraisRemboursement", () => {
     reglementCreate.mockResolvedValue({ id: "reg1" });
     ligneCreate.mockResolvedValue({ id: "lig1" });
     choixUpdate.mockResolvedValue({});
+    notificationCreate.mockResolvedValue({ id: "notif1" });
+    outboxCreate.mockResolvedValue({ id: "ob1" });
   });
 
   it("refuse auto-exécution", async () => {
@@ -570,6 +578,8 @@ describe("executeNoteFraisRemboursement", () => {
           findFirst: choixFindFirst,
           update: choixUpdate,
         },
+        notification: { create: notificationCreate },
+        noteFraisOutboxEvent: { create: outboxCreate },
       };
       noteFindUnique.mockResolvedValue({
         id: "n1",
@@ -643,6 +653,8 @@ describe("executeNoteFraisRemboursement", () => {
           findFirst: choixFindFirst,
           update: choixUpdate,
         },
+        notification: { create: notificationCreate },
+        noteFraisOutboxEvent: { create: outboxCreate },
       };
       return fn(tx);
     });
@@ -772,5 +784,7 @@ describe("executeNoteFraisRemboursement", () => {
     });
     expect(res.success).toBe(true);
     if (res.success) expect(res.data.alreadyExecuted).toBe(true);
+    expect(notificationCreate).not.toHaveBeenCalled();
+    expect(outboxCreate).not.toHaveBeenCalled();
   });
 });

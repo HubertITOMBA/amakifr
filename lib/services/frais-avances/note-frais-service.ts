@@ -1213,8 +1213,8 @@ async function finishOutbox(
   lockId: string,
   status: "DONE" | "FAILED",
   lastError: string | null
-) {
-  await db.noteFraisOutboxEvent.updateMany({
+): Promise<number> {
+  const res = await db.noteFraisOutboxEvent.updateMany({
     where: { id, lockedBy: lockId, status: "PROCESSING" },
     data: {
       status,
@@ -1224,6 +1224,8 @@ async function finishOutbox(
       lastError,
     },
   });
+  // count=0 : claim perdu (ex. archivage RGPD) — ne rien réécrire.
+  return res.count;
 }
 
 async function requeueOutbox(
@@ -1231,8 +1233,8 @@ async function requeueOutbox(
   lockId: string,
   lastError: string,
   attempts: number
-) {
-  await db.noteFraisOutboxEvent.updateMany({
+): Promise<number> {
+  const res = await db.noteFraisOutboxEvent.updateMany({
     where: { id, lockedBy: lockId, status: "PROCESSING" },
     data: {
       status: "PENDING",
@@ -1242,6 +1244,8 @@ async function requeueOutbox(
       nextAttemptAt: new Date(Date.now() + backoffMs(attempts)),
     },
   });
+  // count=0 : claim perdu (ex. archivage RGPD) — ne rien réécrire.
+  return res.count;
 }
 
 /**

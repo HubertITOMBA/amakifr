@@ -2,6 +2,7 @@
 
 | Version | Date | Contenu |
 |---------|------|---------|
+| 0.4.5-notifications-reglement | 2026-09-17 | Lot 4.5 : notif + outbox règlement (flag off) |
 | 0.4.4-permissions-ui | 2026-09-17 | Lot 4.4 : permissions + UI opérationnelle (flag off) |
 | 0.4.3-mixte | 2026-09-16 | Lot 4.3 : exécution mixte atomique (flag off) |
 | 0.4.2-remboursement | 2026-09-16 | Lot 4.2 : remboursement traçable (flag off) |
@@ -24,5 +25,5 @@ Voir [GUIDE.md](./GUIDE.md) et [CHANGELOG.md](./CHANGELOG.md).
 **Archive** : privée, non anonyme.
 **Décision VALIDEE** = reconnaissance de charge (`Depense` origine `FRAIS_AVANCE`) ≠ décaissement bancaire.
 **Choix de règlement** ≠ exécution financière ≠ création d'`Avoir`.
-**Lot 4.4** : UI / authz / DTO / navigation opérationnels (flag off) — pas d’écritures financières nouvelles.
-**Lots suivants** : notif règlement (4.5), correction, restitution, annulation, détachement RGPD.
+**Lot 4.5** : notif interne + outbox push règlement (compensation / remboursement / MIXTE parent) — flag off ; pas d’écritures financières nouvelles.
+**Lots suivants** : correction, restitution, annulation, détachement RGPD.

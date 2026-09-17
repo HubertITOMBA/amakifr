@@ -272,6 +272,34 @@ describe("intégration PG mixte notes-frais", () => {
     expect(ind.compensationsNotesFrais).toBe(60);
     expect(ind.decaissementsNotesFrais).toBe(40);
     expect(computeSoldeBancaireEstime(200, ind)).toBe(160);
+
+    const outboxes = await prisma.noteFraisOutboxEvent.findMany({
+      where: { noteFraisId: note.id },
+    });
+    expect(outboxes).toHaveLength(1);
+    expect(outboxes[0]!.kind).toBe("REGLEMENT_MIXTE");
+    expect(outboxes[0]!.eventKey).toBe(
+      `note:${note.id}:operation:${res.data.operationId}:mixte`
+    );
+    expect(JSON.stringify(outboxes[0]!.payload)).not.toMatch(
+      /40\.00|60\.00|VIREMENT|VIR-/i
+    );
+    const notifs = await prisma.notification.findMany({
+      where: {
+        userId: dem.id,
+        lien: `/user/frais-avances/${note.id}`,
+        titre: "Règlement enregistré",
+      },
+    });
+    expect(notifs).toHaveLength(1);
+    // Aucun outbox ancré sur les enfants
+    for (const child of op.Reglements) {
+      expect(
+        await prisma.noteFraisOutboxEvent.count({
+          where: { eventKey: { contains: child.id } },
+        })
+      ).toBe(0);
+    }
   }, 60_000);
 
   it("idempotence parent : même clé + contenu, replay version, conflits, FORBIDDEN, P2002", async () => {
@@ -301,6 +329,19 @@ describe("intégration PG mixte notes-frais", () => {
     expect(first.success).toBe(true);
     if (!first.success) return;
 
+    const notifAfterFirst = await prisma.notification.count({
+      where: {
+        userId: dem.id,
+        lien: `/user/frais-avances/${note.id}`,
+        titre: "Règlement enregistré",
+      },
+    });
+    const outboxAfterFirst = await prisma.noteFraisOutboxEvent.count({
+      where: { noteFraisId: note.id, kind: "REGLEMENT_MIXTE" },
+    });
+    expect(notifAfterFirst).toBe(1);
+    expect(outboxAfterFirst).toBe(1);
+
     const second = await executeNoteFraisReglementMixte({
       ...payload,
       actorUserId: admin.id,
@@ -323,6 +364,20 @@ describe("intégration PG mixte notes-frais", () => {
       where: { id: note.id },
     });
     expect(noteAfterReplay.version).toBe(4);
+    expect(
+      await prisma.notification.count({
+        where: {
+          userId: dem.id,
+          lien: `/user/frais-avances/${note.id}`,
+          titre: "Règlement enregistré",
+        },
+      })
+    ).toBe(notifAfterFirst);
+    expect(
+      await prisma.noteFraisOutboxEvent.count({
+        where: { noteFraisId: note.id, kind: "REGLEMENT_MIXTE" },
+      })
+    ).toBe(outboxAfterFirst);
 
     const conflictContent = await executeNoteFraisReglementMixte({
       ...payload,
@@ -463,6 +518,23 @@ describe("intégration PG mixte notes-frais", () => {
         where: { noteFraisId: race.note.id },
       })
     ).toBe(2);
+    expect(
+      await prisma.noteFraisOutboxEvent.count({
+        where: {
+          noteFraisId: race.note.id,
+          kind: "REGLEMENT_MIXTE",
+        },
+      })
+    ).toBe(1);
+    expect(
+      await prisma.notification.count({
+        where: {
+          userId: dem.id,
+          lien: `/user/frais-avances/${race.note.id}`,
+          titre: "Règlement enregistré",
+        },
+      })
+    ).toBe(1);
   }, 90_000);
 
   it("concurrence mixte : deux clés, une seule réussite, une compensation, un décaissement", async () => {
@@ -654,6 +726,16 @@ describe("intégration PG mixte notes-frais", () => {
         where: { noteFraisReglementLigneId: { not: null } },
       })
     ).toBe(0);
+    expect(
+      await prisma.noteFraisOutboxEvent.count({
+        where: { noteFraisId: note.id },
+      })
+    ).toBe(0);
+    expect(
+      await prisma.notification.count({
+        where: { lien: `/user/frais-avances/${note.id}` },
+      })
+    ).toBe(0);
 
     const detteAfter = await prisma.detteInitiale.findUniqueOrThrow({
       where: { id: dette.id },
@@ -696,6 +778,68 @@ describe("intégration PG mixte notes-frais", () => {
     );
     expect(ind.compensationsNotesFrais).toBe(0);
     expect(ind.decaissementsNotesFrais).toBe(0);
+  }, 60_000);
+
+  it("rollback afterNotifyOutbox : zéro finance, notification et outbox", async () => {
+    await wipe();
+    const dem = await createUser("dem-nf", "MEMBRE");
+    const tres = await createUser("tres-nf", "TRESOR");
+    const { note, dette, decideeAt } = await seedMixteNote({
+      dem,
+      tres,
+      libelle: "mixte-after-notify",
+      montantAccepte: 50,
+      montantRemb: 20,
+      montantComp: 30,
+    });
+    const { executeNoteFraisReglementMixte } = await import(
+      "@/lib/services/frais-avances/note-frais-mixte-service"
+    );
+
+    const fail = await executeNoteFraisReglementMixte({
+      ...mixtePayload({
+        actorUserId: tres.id,
+        noteId: note.id,
+        detteId: dette.id,
+        decideeAt,
+        key: "mixte-pg-after-notify",
+        montantRemb: "20.00",
+        montantComp: "30.00",
+        reference: "AFTER-NOTIFY",
+      }),
+      afterNotifyOutbox: async () => {
+        throw new Error("forced-rollback-after-notify-outbox");
+      },
+    });
+    expect(fail.success).toBe(false);
+
+    expect(
+      await prisma.noteFraisReglementOperation.count({
+        where: { noteFraisId: note.id },
+      })
+    ).toBe(0);
+    expect(
+      await prisma.noteFraisReglement.count({ where: { noteFraisId: note.id } })
+    ).toBe(0);
+    expect(
+      await prisma.avoir.count({
+        where: { origine: "COMPENSATION_NOTE_FRAIS" },
+      })
+    ).toBe(0);
+    expect(
+      await prisma.noteFraisOutboxEvent.count({
+        where: { noteFraisId: note.id },
+      })
+    ).toBe(0);
+    expect(
+      await prisma.notification.count({
+        where: { lien: `/user/frais-avances/${note.id}` },
+      })
+    ).toBe(0);
+    const noteAfter = await prisma.noteFrais.findUniqueOrThrow({
+      where: { id: note.id },
+    });
+    expect(noteAfter.version).toBe(3);
   }, 60_000);
 
   it("parent incomplet → NOTES_FRAIS_MIXTE_OPERATION_INCOMPLETE sans mutation", async () => {

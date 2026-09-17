@@ -138,6 +138,128 @@ describe("workers outbox / file jobs", () => {
     expect(requeue).toBeTruthy();
   });
 
+  it("REGLEMENT_COMPENSATION : chemin push normal → DONE", async () => {
+    outboxFindMany.mockResolvedValue([
+      {
+        id: "e-reg",
+        kind: "REGLEMENT_COMPENSATION",
+        payload: {
+          userIds: ["u1"],
+          titre: "Règlement enregistré",
+          message:
+            "Un règlement a été enregistré sur votre note de frais. Consultez le détail pour en savoir plus.",
+          lien: "/user/frais-avances/n1",
+        },
+        attempts: 0,
+        maxAttempts: 8,
+      },
+    ]);
+    outboxUpdateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
+    sendPushToUsersDetailed.mockResolvedValue({
+      summary: "success",
+      attempted: 1,
+      ok: 1,
+      disabled: 0,
+      details: [],
+    });
+
+    expect(await processNoteFraisOutboxOnce()).toBe(1);
+    expect(sendPushToUsersDetailed).toHaveBeenCalledWith(
+      ["u1"],
+      expect.objectContaining({
+        title: "Règlement enregistré",
+        data: { url: "/user/frais-avances/n1" },
+      })
+    );
+    const pushArg = sendPushToUsersDetailed.mock.calls[0]![1] as {
+      title: string;
+      body: string;
+      data: Record<string, string>;
+    };
+    expect(JSON.stringify(pushArg)).not.toMatch(
+      /montant|VIREMENT|référence|DETTE|motif/i
+    );
+    const done = outboxUpdateMany.mock.calls.find(
+      (c) => c[0]?.data?.status === "DONE"
+    );
+    expect(done).toBeTruthy();
+  });
+
+  it("REGLEMENT_* partial → requeue ; FAILED après maxAttempts", async () => {
+    outboxFindMany.mockResolvedValue([
+      {
+        id: "e-mix",
+        kind: "REGLEMENT_MIXTE",
+        payload: {
+          userIds: ["u1"],
+          titre: "Règlement enregistré",
+          message: "Un règlement a été enregistré sur votre note de frais.",
+          lien: "/user/frais-avances/n1",
+        },
+        attempts: 7,
+        maxAttempts: 8,
+      },
+    ]);
+    outboxUpdateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 1 });
+    outboxFindUnique.mockResolvedValue({ attempts: 8, maxAttempts: 8 });
+    sendPushToUsersDetailed.mockResolvedValue({
+      summary: "all_failed_temporary",
+      attempted: 1,
+      ok: 0,
+      disabled: 0,
+      details: [],
+    });
+
+    expect(await processNoteFraisOutboxOnce()).toBe(1);
+    const failed = outboxUpdateMany.mock.calls.find(
+      (c) => c[0]?.data?.status === "FAILED"
+    );
+    expect(failed).toBeTruthy();
+  });
+
+  it("finish/requeue conditionnés PROCESSING+lockedBy : count 0 = no-op (claim RGPD)", async () => {
+    outboxFindMany.mockResolvedValue([
+      {
+        id: "e-lost",
+        kind: "REGLEMENT_COMPENSATION",
+        payload: { userIds: ["u1"], titre: "t", message: "m", lien: "/x" },
+        attempts: 0,
+        maxAttempts: 8,
+      },
+    ]);
+    // recover + claim OK + finish count 0 (archivage a pris la main)
+    outboxUpdateMany
+      .mockResolvedValueOnce({ count: 0 })
+      .mockResolvedValueOnce({ count: 1 })
+      .mockResolvedValueOnce({ count: 0 });
+    sendPushToUsersDetailed.mockResolvedValue({
+      summary: "success",
+      attempted: 1,
+      ok: 1,
+      disabled: 0,
+      details: [],
+    });
+
+    expect(await processNoteFraisOutboxOnce()).toBe(1);
+    const finishCall = outboxUpdateMany.mock.calls.find(
+      (c) =>
+        c[0]?.where?.status === "PROCESSING" &&
+        c[0]?.where?.lockedBy &&
+        c[0]?.data?.status === "DONE"
+    );
+    expect(finishCall).toBeTruthy();
+    expect(finishCall![0].where).toMatchObject({
+      id: "e-lost",
+      status: "PROCESSING",
+    });
+  });
+
   it("UNLINK job : assert path + unlink + DONE", async () => {
     fileJobFindMany.mockResolvedValue([
       {

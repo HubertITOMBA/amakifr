@@ -21,6 +21,55 @@ import {
 import { canUserReadNotesFraisArchive } from "@/lib/frais-avances/authz";
 import { cancelPendingMovesAndEnqueueUnlinks } from "@/lib/services/frais-avances/rgpd-account-deletion";
 
+/** Payload outbox après archivage RGPD — aucun userId / texte nominatif. */
+export const NOTES_FRAIS_OUTBOX_RGPD_PURGED_PAYLOAD = {
+  userIds: [] as string[],
+};
+
+/**
+ * Purge RGPD des outbox d'une note dans la TX d'archivage.
+ * - PENDING|PROCESSING → FAILED + lastError rgpd_account_archived + locks nuls + payload purgé
+ * - DONE|FAILED → statut conservé, payload purgé uniquement
+ * - kind conservé pour audit technique
+ *
+ * @param tx - Client transaction
+ * @param noteId - Note archivée
+ */
+export async function purgeNoteFraisOutboxEventsForArchiveInTx(
+  tx: {
+    noteFraisOutboxEvent: {
+      updateMany: typeof db.noteFraisOutboxEvent.updateMany;
+    };
+  },
+  noteId: string
+): Promise<void> {
+  await tx.noteFraisOutboxEvent.updateMany({
+    where: {
+      noteFraisId: noteId,
+      status: { in: ["PENDING", "PROCESSING"] },
+    },
+    data: {
+      status: "FAILED",
+      lastError: "rgpd_account_archived",
+      lockedAt: null,
+      lockedBy: null,
+      processedAt: new Date(),
+      payload: NOTES_FRAIS_OUTBOX_RGPD_PURGED_PAYLOAD,
+    },
+  });
+
+  // Inclut les événements déjà terminés et ceux venant d'être passés FAILED.
+  await tx.noteFraisOutboxEvent.updateMany({
+    where: {
+      noteFraisId: noteId,
+      status: { in: ["DONE", "FAILED"] },
+    },
+    data: {
+      payload: NOTES_FRAIS_OUTBOX_RGPD_PURGED_PAYLOAD,
+    },
+  });
+}
+
 export type NotesFraisArchiveDbClient = {
   $executeRaw: typeof db.$executeRaw;
   noteFrais: typeof db.noteFrais;
@@ -154,19 +203,7 @@ export async function archiveSubmittedNotesInTransaction(
       `/user/frais-avances/${noteId}`,
     ];
     await tx.notification.deleteMany({ where: { lien: { in: liens } } });
-    await tx.noteFraisOutboxEvent.updateMany({
-      where: {
-        noteFraisId: noteId,
-        status: { in: ["PENDING", "PROCESSING"] },
-      },
-      data: {
-        status: "FAILED",
-        lastError: "rgpd_account_archived",
-        lockedAt: null,
-        lockedBy: null,
-        processedAt: new Date(),
-      },
-    });
+    await purgeNoteFraisOutboxEventsForArchiveInTx(tx, noteId);
 
     // Journal décision : Cascade via delete note.
     await tx.justificatifNoteFrais.deleteMany({ where: { noteFraisId: noteId } });

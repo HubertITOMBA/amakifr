@@ -1,7 +1,8 @@
 /**
- * Exécution réelle d'un remboursement de note VALIDEE (lot 4.2).
+ * Exécution réelle d'un remboursement de note VALIDEE (lot 4.2 + notif 4.5).
  * Modes choix : REMBOURSEMENT | MIXTE (part remboursement uniquement).
- * Aucune compensation, PaiementCotisation, Avoir, 2ᵉ Depense, notif/outbox.
+ * Aucune compensation, PaiementCotisation, Avoir, 2ᵉ Depense.
+ * Notif + outbox atomiques sur exécution fresh uniquement.
  */
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -10,9 +11,11 @@ import {
   assertNotesFraisEnabled,
 } from "@/lib/frais-avances/feature-flag";
 import { canUserExecuteNoteFraisRemboursement } from "@/lib/frais-avances/authz";
+import { hashIdForLog } from "@/lib/frais-avances/storage";
 import { lockUserRowForNotesFrais } from "@/lib/services/frais-avances/rgpd-account-deletion";
 import { normalizeNotesFraisMontant } from "@/lib/services/frais-avances/note-frais-decision-service";
 import { createRemboursementReglementInTx } from "@/lib/services/frais-avances/note-frais-reglement-apply";
+import { createNoteFraisReglementNotificationInTx } from "@/lib/services/frais-avances/note-frais-reglement-notify";
 
 export type NotesFraisRemboursementActionResult<T = unknown> =
   | { success: true; data: T; message?: string }
@@ -56,8 +59,10 @@ export type ExecuteRemboursementInput = {
   afterDemandeurLock?: () => Promise<void>;
   beforeNoteLock?: () => Promise<void>;
   afterNoteLock?: () => Promise<void>;
-  /** Hook tests : après insert règlement, avant commit. */
+  /** Hook tests : après insert règlement, avant compteur / notif. */
   afterReglementInsert?: () => Promise<void>;
+  /** Hook tests : après notif+outbox, avant commit — erreur ⇒ rollback intégral. */
+  afterNotifyOutbox?: () => Promise<void>;
 };
 
 export type RemboursementExecutionDto = {
@@ -527,13 +532,11 @@ export async function executeNoteFraisRemboursement(
         if (note.statut !== "VALIDEE") {
           throw new Error("Seules les notes validées peuvent être remboursées");
         }
-        if (note.version !== input.expectedNoteVersion) {
-          throw new Error(NOTES_FRAIS_REMB_VERSION_CONFLICT);
-        }
         if (note.montantAccepte == null) {
           throw new Error("Montant accepté manquant");
         }
 
+        // Idempotence avant OCC : même clé concurrente → already sans VERSION_CONFLICT.
         const existingKey = await tx.noteFraisReglement.findUnique({
           where: { idempotencyKey: key },
         });
@@ -550,6 +553,10 @@ export async function executeNoteFraisRemboursement(
             };
           }
           throw new Error(NOTES_FRAIS_REMB_IDEMPOTENCY_CONFLICT);
+        }
+
+        if (note.version !== input.expectedNoteVersion) {
+          throw new Error(NOTES_FRAIS_REMB_VERSION_CONFLICT);
         }
 
         await tx.$executeRaw`
@@ -635,6 +642,14 @@ export async function executeNoteFraisRemboursement(
           },
         });
 
+        await createNoteFraisReglementNotificationInTx(tx, {
+          noteId: input.noteId,
+          demandeurUserId: note.demandeurUserId,
+          kind: "REGLEMENT_REMBOURSEMENT",
+          anchorId: reglementId,
+        });
+        if (input.afterNotifyOutbox) await input.afterNotifyOutbox();
+
         return {
           kind: "fresh" as const,
           reglementId,
@@ -674,6 +689,17 @@ export async function executeNoteFraisRemboursement(
         },
         message: "Déjà exécuté",
       };
+    }
+
+    if (!input.client) {
+      void import("@/lib/services/frais-avances/note-frais-service")
+        .then(({ processNoteFraisOutboxOnce }) => processNoteFraisOutboxOnce())
+        .catch((err) => {
+          console.error("[notes-frais] outbox kick failed after remboursement", {
+            note: hashIdForLog(input.noteId),
+            err: err instanceof Error ? err.message.slice(0, 120) : "unknown",
+          });
+        });
     }
 
     return {

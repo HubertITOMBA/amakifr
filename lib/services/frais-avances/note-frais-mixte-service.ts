@@ -1,6 +1,7 @@
 /**
- * Exécution mixte atomique (lot 4.3) — parent Operation + 2 règlements enfants.
+ * Exécution mixte atomique (lot 4.3 + notif 4.5) — parent Operation + 2 règlements enfants.
  * Ne appelle pas les services publics compensation/remboursement.
+ * Une seule notif/outbox sur l'opération parente (jamais par enfant).
  */
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
@@ -9,6 +10,7 @@ import {
   assertNotesFraisEnabled,
 } from "@/lib/frais-avances/feature-flag";
 import { canUserExecuteNoteFraisReglementMixte } from "@/lib/frais-avances/authz";
+import { hashIdForLog } from "@/lib/frais-avances/storage";
 import { lockUserRowForNotesFrais } from "@/lib/services/frais-avances/rgpd-account-deletion";
 import { normalizeNotesFraisMontant } from "@/lib/services/frais-avances/note-frais-decision-service";
 import {
@@ -29,6 +31,7 @@ import {
   lockCompensationTargetsInTx,
   prepareCompensationLignesInTx,
 } from "@/lib/services/frais-avances/note-frais-reglement-apply";
+import { createNoteFraisReglementNotificationInTx } from "@/lib/services/frais-avances/note-frais-reglement-notify";
 
 export type NotesFraisMixteActionResult<T = unknown> =
   | { success: true; data: T; message?: string }
@@ -71,8 +74,10 @@ export type ExecuteMixteInput = {
   afterNoteLock?: () => Promise<void>;
   /** Hook tests : après enfant compensation, avant remboursement. */
   afterCompensationChild?: () => Promise<void>;
-  /** Hook tests : après les deux enfants, avant commit (fin TX). */
+  /** Hook tests : après les deux enfants, avant notif/compteurs. */
   afterBothChildren?: () => Promise<void>;
+  /** Hook tests : après notif+outbox, avant commit — erreur ⇒ rollback intégral. */
+  afterNotifyOutbox?: () => Promise<void>;
 };
 
 export type MixteExecutionDto = {
@@ -663,6 +668,14 @@ export async function executeNoteFraisReglementMixte(
           },
         });
 
+        await createNoteFraisReglementNotificationInTx(tx, {
+          noteId: input.noteId,
+          demandeurUserId: note.demandeurUserId,
+          kind: "REGLEMENT_MIXTE",
+          anchorId: operation.id,
+        });
+        if (input.afterNotifyOutbox) await input.afterNotifyOutbox();
+
         return {
           kind: "fresh" as const,
           operationId: operation.id,
@@ -713,6 +726,17 @@ export async function executeNoteFraisReglementMixte(
         },
         message: "Déjà exécuté",
       };
+    }
+
+    if (!input.client) {
+      void import("@/lib/services/frais-avances/note-frais-service")
+        .then(({ processNoteFraisOutboxOnce }) => processNoteFraisOutboxOnce())
+        .catch((err) => {
+          console.error("[notes-frais] outbox kick failed after mixte", {
+            note: hashIdForLog(input.noteId),
+            err: err instanceof Error ? err.message.slice(0, 120) : "unknown",
+          });
+        });
     }
 
     return {

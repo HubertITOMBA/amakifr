@@ -169,6 +169,7 @@ describe("intégration PG remboursement notes-frais", () => {
     );
 
     const notifBefore = await prisma.notification.count();
+    const outboxBefore = await prisma.noteFraisOutboxEvent.count();
     const payBefore = await prisma.paiementCotisation.count();
     const depBefore = await prisma.depense.count({
       where: { noteFraisId: note.id },
@@ -225,7 +226,26 @@ describe("intégration PG remboursement notes-frais", () => {
         where: { origine: "COMPENSATION_NOTE_FRAIS" },
       })
     ).toBe(0);
-    expect(await prisma.notification.count()).toBe(notifBefore);
+    expect(await prisma.notification.count()).toBe(notifBefore + 2);
+    expect(await prisma.noteFraisOutboxEvent.count()).toBe(outboxBefore + 2);
+    const outboxes = await prisma.noteFraisOutboxEvent.findMany({
+      where: { noteFraisId: note.id, kind: "REGLEMENT_REMBOURSEMENT" },
+    });
+    expect(outboxes).toHaveLength(2);
+    for (const o of outboxes) {
+      const p = o.payload as Record<string, unknown>;
+      expect(Object.keys(p).sort()).toEqual([
+        "lien",
+        "message",
+        "titre",
+        "userIds",
+      ]);
+      expect(p.titre).toBe("Règlement enregistré");
+      expect(String(p.message)).not.toMatch(/VIREMENT|ESPECES|VIR-001|REC-002/i);
+      expect(p).not.toHaveProperty("montant");
+      expect(p).not.toHaveProperty("moyen");
+      expect(p).not.toHaveProperty("reference");
+    }
     expect(await prisma.paiementCotisation.count()).toBe(payBefore);
     expect(
       await prisma.depense.count({ where: { noteFraisId: note.id } })

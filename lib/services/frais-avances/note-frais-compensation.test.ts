@@ -24,6 +24,8 @@ const {
   userFindUnique,
   userAdminRoleFindMany,
   resolveActionPermissionConfig,
+  notificationCreate,
+  outboxCreate,
 } = vi.hoisted(() => ({
   $transaction: vi.fn(),
   $executeRaw: vi.fn(),
@@ -47,6 +49,8 @@ const {
   userFindUnique: vi.fn(),
   userAdminRoleFindMany: vi.fn(),
   resolveActionPermissionConfig: vi.fn(),
+  notificationCreate: vi.fn(),
+  outboxCreate: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -90,6 +94,8 @@ vi.mock("@/lib/db", () => ({
     },
     user: { findUnique: (...a: unknown[]) => userFindUnique(...a) },
     userAdminRole: { findMany: (...a: unknown[]) => userAdminRoleFindMany(...a) },
+    notification: { create: (...a: unknown[]) => notificationCreate(...a) },
+    noteFraisOutboxEvent: { create: (...a: unknown[]) => outboxCreate(...a) },
   },
 }));
 
@@ -254,6 +260,8 @@ describe("executeNoteFraisCompensation", () => {
     utilisationCreate.mockResolvedValue({ id: "ua1" });
     cibleUpdate.mockResolvedValue({});
     choixUpdate.mockResolvedValue({});
+    notificationCreate.mockResolvedValue({ id: "notif1" });
+    outboxCreate.mockResolvedValue({ id: "ob1" });
   });
 
   it("refuse auto-exécution", async () => {
@@ -306,6 +314,8 @@ describe("executeNoteFraisCompensation", () => {
     if (res.success) expect(res.data.alreadyExecuted).toBe(true);
     expect($transaction).not.toHaveBeenCalled();
     expect(userFindUnique).toHaveBeenCalled();
+    expect(notificationCreate).not.toHaveBeenCalled();
+    expect(outboxCreate).not.toHaveBeenCalled();
   });
 
   it("replay refuse MEMBRE même avec clé connue", async () => {
@@ -401,6 +411,8 @@ describe("executeNoteFraisCompensation", () => {
     });
     expect(res.success).toBe(true);
     if (res.success) expect(res.data.alreadyExecuted).toBe(true);
+    expect(notificationCreate).not.toHaveBeenCalled();
+    expect(outboxCreate).not.toHaveBeenCalled();
   });
 
   it("P2002 + contenu différent → IDEMPOTENCY_CONFLICT", async () => {
@@ -451,5 +463,42 @@ describe("executeNoteFraisCompensation", () => {
     });
     expect(res.success).toBe(false);
     if (!res.success) expect(res.code).toBe("IDEMPOTENCY_CONFLICT");
+    expect(notificationCreate).not.toHaveBeenCalled();
+    expect(outboxCreate).not.toHaveBeenCalled();
+  });
+
+  it("P2002 eventKey outbox → non transformé en replay", async () => {
+    noteFindUnique.mockResolvedValue({
+      id: "n1",
+      statut: "VALIDEE",
+      version: 3,
+      demandeurUserId: "dem",
+      adherentId: "adh",
+    });
+    reglementFindUnique.mockResolvedValue(null);
+    $transaction.mockRejectedValue(
+      new Prisma.PrismaClientKnownRequestError("Unique constraint", {
+        code: "P2002",
+        clientVersion: "test",
+        meta: { target: ["eventKey"] },
+      })
+    );
+
+    const res = await executeNoteFraisCompensation({
+      actorUserId: "tres",
+      noteId: "n1",
+      expectedNoteVersion: 3,
+      idempotencyKey: "comp-key-01",
+      lignes: [
+        {
+          typeCible: "DETTE_INITIALE",
+          cibleId: "d1",
+          montant: 10,
+          rang: 1,
+        },
+      ],
+    });
+    expect(res.success).toBe(false);
+    expect(notificationCreate).not.toHaveBeenCalled();
   });
 });

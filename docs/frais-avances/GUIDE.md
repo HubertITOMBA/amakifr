@@ -50,7 +50,7 @@
 - TX : demandeur → note → choix ; OCC ; compteur `montantRembourseUtilise` ; une ligne sans cible/Avoir.
 - Synthèse : `decaissementsNotesFrais` ↑ ; **solde bancaire ↓** ; `totalCharges` inchangé (pas de double soustraction FRAIS_AVANCE).
 - État financier calculé (non stocké) : remboursé + compensé vs accepté.
-- Pas de notif/outbox (→ 4.5).
+- Notif + outbox `REGLEMENT_REMBOURSEMENT` atomiques sur exécution fresh (lot 4.5).
 
 ### Règlement mixte atomique (lot 4.3 — local, flag off)
 - Parent `NoteFraisReglementOperation` + enfants COMPENSATION et REMBOURSEMENT (`operationId`, `idempotencyKey` null sur enfants).
@@ -60,7 +60,14 @@
 - UI plafonds / activation : `lib/frais-avances/money-cents` (centimes entiers, pas de `Number()` flottant).
 - Compléments partiels toujours possibles via services 4.1/4.2 sur le même choix MIXTE.
 - Synthèse : agrège **uniquement** les règlements enfants (jamais la table parent).
-- Pas de notif/outbox (→ 4.5 événement unique).
+- Notif + outbox `REGLEMENT_MIXTE` **uniques** sur l'opération parente (lot 4.5) — jamais par enfant.
+
+### Notifications de règlement (lot 4.5 — local, flag off)
+- Helper TX `note-frais-reglement-notify` : textes génériques (« Règlement enregistré ») + lien `/user/frais-avances/{noteId}`.
+- Kinds : `REGLEMENT_COMPENSATION` | `REGLEMENT_REMBOURSEMENT` | `REGLEMENT_MIXTE`.
+- EventKeys ancrés sur `reglementId` / `operationId` ; replay alreadyExecuted sans doublon.
+- Kick outbox post-commit fresh (sauf client injecté) ; échec push/lease sans impact financier.
+- Aucune donnée sensible dans titre/message/push/logs ; aucune écriture financière additionnelle.
 
 ### Permissions et UI opérationnelle (lot 4.4 — local, flag off)
 - **Lecture live** (`canUserReadSubmittedNotesFrais`) : Actif + rôle dur ADMIN|PRESID|SECRET|TRESOR (principal/additionnel) ; permission `readNoteFrais` restrictive ; ADMIN principal bypass ; une permission dynamique ne peut pas autoriser MEMBRE/COMCPT seul ; propriétaire via chemin owner.
@@ -72,14 +79,14 @@
 - **Navigation** : hint `NEXT_PUBLIC_NOTES_FRAIS_ENABLED` pour l’affichage uniquement ; menus sidebar **seed** (`scripts/seed-menus.ts`) — **aucune** écriture Menu runtime ; URL toujours protégée serveur ; flag off → indisponible sans requêtes tables.
 - **Listes** : pagination serveur (défaut 20) ; filtre état financier SQL avant pagination ; admin sans lignes Justificatif (count).
 - **Money UI** : chaînes + `money-cents` (centimes entiers) ; payloads décision / choix / brouillon en chaîne.
-- Pas de nouvelle écriture financière ; pas de notif / correction / restitution / annulation / RGPD.
+- Pas de nouvelle écriture financière ; pas de correction / restitution / annulation / RGPD.
 
 ### Compensation exécutée (lot 4.1 — local, flag off)
 - Choix ACTIF `COMPENSATION` ou `MIXTE` (part compensation uniquement).
 - TX : verrous demandeur → note → choix → cibles → dettes/CM ; OCC version note.
 - Écritures : règlement + lignes + Avoir (`COMPENSATION_NOTE_FRAIS`, `Utilise`) + `UtilisationAvoir` XOR cible.
 - Synthèse : `compensationsNotesFrais` ↑ ; créances ↓ ; **solde bancaire inchangé**.
-- Pas de notif/outbox (→ 4.5) ; pas de remboursement.
+- Notif + outbox `REGLEMENT_COMPENSATION` atomiques sur exécution fresh (lot 4.5) ; pas de remboursement.
 
 ### Choix de règlement (lot 3 — local, flag off)
 - Après `VALIDEE` uniquement ; propriétaire seul (`demandeurUserId`).
@@ -154,7 +161,7 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
 ```
 
 ## Non livré / futur
-- Lot **4.5+** : outbox/notif règlement, corrections, restitutions, annulation (`EXPIREE` 30 j), détachement RGPD FK.
+- Lot **4.6+** : correction, restitution, annulation (`EXPIREE` 30 j), détachement RGPD FK.
 - Index partiel unique choix ACTIF.
 - CHECK SQL polymorphes sur `notes_frais_reglement_lignes` et opérations MIXTE.
 - API v1, mobile notes de frais.

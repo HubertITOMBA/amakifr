@@ -595,4 +595,151 @@ describePg("intégration PG archive privée notes-frais", () => {
       expect(res.error).toMatch(/READY/);
     }
   });
+
+  it("RGPD outbox : purge payload PENDING/PROCESSING/DONE/FAILED + notif user + course claim", async () => {
+    const { deleteUserAtomicallyWithNotesFraisRgpd } = await import(
+      "@/lib/services/frais-avances/rgpd-account-deletion"
+    );
+    await wipe();
+    const user = await createUser("obx", "MEMBRE");
+    const note = await prisma.noteFrais.create({
+      data: {
+        adherentId: user.adherent!.id,
+        demandeurUserId: user.id,
+        libelle: "validee-outbox-rgpd",
+        dateDepense: new Date("2026-03-01"),
+        montantDemande: 10,
+        montantAccepte: 10,
+        statut: "VALIDEE",
+        soumiseAt: new Date("2026-03-02"),
+        decideeAt: new Date("2026-03-03"),
+        version: 3,
+      },
+    });
+    const lienUser = `/user/frais-avances/${note.id}`;
+    await prisma.notification.create({
+      data: {
+        userId: user.id,
+        type: "Action",
+        titre: "Règlement enregistré",
+        message: "Un règlement a été enregistré sur votre note de frais.",
+        lien: lienUser,
+      },
+    });
+
+    const sensitive = {
+      userIds: [user.id],
+      titre: "Règlement enregistré",
+      message: "Consultez le détail",
+      lien: lienUser,
+    };
+    const claimId = "claim-worker-rgpd-01";
+    const rows = await Promise.all([
+      prisma.noteFraisOutboxEvent.create({
+        data: {
+          noteFraisId: note.id,
+          eventKey: `note:${note.id}:reglement:r1:compensation`,
+          kind: "REGLEMENT_COMPENSATION",
+          payload: sensitive,
+          status: "PENDING",
+        },
+      }),
+      prisma.noteFraisOutboxEvent.create({
+        data: {
+          noteFraisId: note.id,
+          eventKey: `note:${note.id}:reglement:r2:remboursement`,
+          kind: "REGLEMENT_REMBOURSEMENT",
+          payload: sensitive,
+          status: "PROCESSING",
+          lockedAt: new Date(),
+          lockedBy: claimId,
+          attempts: 1,
+        },
+      }),
+      prisma.noteFraisOutboxEvent.create({
+        data: {
+          noteFraisId: note.id,
+          eventKey: `note:${note.id}:decided`,
+          kind: "DECIDED",
+          payload: sensitive,
+          status: "DONE",
+          processedAt: new Date(),
+        },
+      }),
+      prisma.noteFraisOutboxEvent.create({
+        data: {
+          noteFraisId: note.id,
+          eventKey: `note:${note.id}:submitted`,
+          kind: "SUBMITTED",
+          payload: sensitive,
+          status: "FAILED",
+          lastError: "old_error",
+          processedAt: new Date(),
+        },
+      }),
+    ]);
+    const processingId = rows[1]!.id;
+
+    await deleteUserAtomicallyWithNotesFraisRgpd(user.id, prisma, {
+      injectedRetention,
+    });
+
+    expect(await prisma.notification.count({ where: { lien: lienUser } })).toBe(
+      0
+    );
+    expect(await prisma.noteFrais.findUnique({ where: { id: note.id } })).toBeNull();
+
+    const outboxes = await prisma.noteFraisOutboxEvent.findMany({
+      where: { id: { in: rows.map((r) => r.id) } },
+    });
+    expect(outboxes).toHaveLength(4);
+    for (const o of outboxes) {
+      expect(o.noteFraisId).toBeNull();
+      expect(o.payload).toEqual({ userIds: [] });
+      const dumped = JSON.stringify(o.payload);
+      expect(dumped).not.toMatch(
+        new RegExp(`${user.id}|Règlement|Consultez|frais-avances`, "i")
+      );
+      expect(["REGLEMENT_COMPENSATION", "REGLEMENT_REMBOURSEMENT", "DECIDED", "SUBMITTED"]).toContain(
+        o.kind
+      );
+    }
+    const pendingLike = outboxes.filter((o) =>
+      ["REGLEMENT_COMPENSATION", "REGLEMENT_REMBOURSEMENT"].includes(o.kind)
+    );
+    for (const o of pendingLike) {
+      expect(o.status).toBe("FAILED");
+      expect(o.lastError).toBe("rgpd_account_archived");
+      expect(o.lockedAt).toBeNull();
+      expect(o.lockedBy).toBeNull();
+    }
+    expect(outboxes.find((o) => o.kind === "DECIDED")!.status).toBe("DONE");
+    expect(outboxes.find((o) => o.kind === "SUBMITTED")!.status).toBe("FAILED");
+    expect(outboxes.find((o) => o.kind === "SUBMITTED")!.lastError).toBe(
+      "old_error"
+    );
+
+    // Course : worker claimé tente DONE après archivage → 0 ligne, RGPD préservé
+    const hijack = await prisma.noteFraisOutboxEvent.updateMany({
+      where: {
+        id: processingId,
+        lockedBy: claimId,
+        status: "PROCESSING",
+      },
+      data: {
+        status: "DONE",
+        lockedAt: null,
+        lockedBy: null,
+        lastError: null,
+        payload: sensitive,
+      },
+    });
+    expect(hijack.count).toBe(0);
+    const still = await prisma.noteFraisOutboxEvent.findUniqueOrThrow({
+      where: { id: processingId },
+    });
+    expect(still.status).toBe("FAILED");
+    expect(still.lastError).toBe("rgpd_account_archived");
+    expect(still.payload).toEqual({ userIds: [] });
+  }, 60_000);
 });

@@ -1,5 +1,20 @@
 # Changelog — frais avancés
 
+## 0.4.5-notifications-reglement — 2026-09-17
+
+### Ajouté (lot 4.5 — local, flag off, **pas de migration dépôt**)
+- Notification interne + outbox push au demandeur après exécution **fresh** compensation / remboursement / MIXTE.
+- Helper TX partagé `note-frais-reglement-notify` (textes génériques, kinds `REGLEMENT_*`, eventKeys ancrés).
+- Atomique dans la même TX que le règlement ; MIXTE = **un** événement sur l'opération parente.
+- Replay / alreadyExecuted / P2002 idempotency : **zéro** notif/outbox supplémentaire ; P2002 eventKey non masqué.
+- Kick best-effort `processNoteFraisOutboxOnce` après commit fresh (absent si client injecté).
+- Hook test `afterNotifyOutbox` pour rollback intégral (finance + notif + outbox).
+- Push minimal : pas de montant, moyen, référence, cible, motif ; lien `/user/frais-avances/{noteId}`.
+- Archivage RGPD : purge payload outbox (`{ userIds: [] }`) pour PENDING|PROCESSING|DONE|FAILED ; worker finish/requeue no-op si claim perdu.
+
+### Non inclus
+- Correction / restitution / annulation ; évolution RGPD ; migration dépôt ; activation permanente.
+
 ## 0.4.4-permissions-ui — 2026-09-17
 
 ### Ajouté (lot 4.4 — local, flag off, **pas de migration dépôt**)
@@ -16,7 +31,7 @@
 - Messages toast `REFRESH_REQUIRED` / `VERSION_CONFLICT` / `IDEMPOTENCY_CONFLICT` sans données sensibles.
 
 ### Non inclus
-- Notification règlement (4.5) ; correction / restitution / annulation ; évolution RGPD.
+- Correction / restitution / annulation ; évolution RGPD.
 - Migration dépôt ; activation permanente.
 
 ## 0.4.3-mixte — 2026-09-16
