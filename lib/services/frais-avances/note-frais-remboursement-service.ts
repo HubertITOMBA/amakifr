@@ -12,6 +12,7 @@ import {
 import { canUserExecuteNoteFraisRemboursement } from "@/lib/frais-avances/authz";
 import { lockUserRowForNotesFrais } from "@/lib/services/frais-avances/rgpd-account-deletion";
 import { normalizeNotesFraisMontant } from "@/lib/services/frais-avances/note-frais-decision-service";
+import { createRemboursementReglementInTx } from "@/lib/services/frais-avances/note-frais-reglement-apply";
 
 export type NotesFraisRemboursementActionResult<T = unknown> =
   | { success: true; data: T; message?: string }
@@ -609,34 +610,18 @@ export async function executeNoteFraisRemboursement(
           throw new Error(NOTES_FRAIS_REMB_VERSION_CONFLICT);
         }
 
-        const reglement = await tx.noteFraisReglement.create({
-          data: {
-            noteFraisId: input.noteId,
-            choixId: choix.id,
-            type: "REMBOURSEMENT",
-            statut: "EXECUTE",
-            montantTotal: montant,
-            moyen: input.moyen,
-            reference: brute,
-            referenceNormalisee: normalisee,
-            idempotencyKey: key,
-            executeurUserId: input.actorUserId,
-            executeAt: executeAtDate,
-          },
-        });
-
-        await tx.noteFraisReglementLigne.create({
-          data: {
-            reglementId: reglement.id,
-            typeLigne: "REMBOURSEMENT",
-            typeCible: null,
-            cibleId: null,
-            rang: 1,
-            montant,
-            montantRestantCibleAvant: null,
-            montantRestantCibleApres: null,
-            montantAutoriseRestantAvant: null,
-          },
+        const { reglementId } = await createRemboursementReglementInTx({
+          tx,
+          noteId: input.noteId,
+          choixId: choix.id,
+          executeurUserId: input.actorUserId,
+          executeAt: executeAtDate,
+          montant,
+          moyen: input.moyen,
+          reference: brute,
+          referenceNormalisee: normalisee,
+          idempotencyKey: key,
+          operationId: null,
         });
 
         if (input.afterReglementInsert) {
@@ -652,7 +637,7 @@ export async function executeNoteFraisRemboursement(
 
         return {
           kind: "fresh" as const,
-          reglementId: reglement.id,
+          reglementId,
           choixId: choix.id,
           montantTotal: montantNorm,
           moyen: input.moyen,

@@ -2,6 +2,7 @@
 
 | Version | Date | Contenu |
 |---------|------|---------|
+| 0.4.3-mixte | 2026-09-16 | Lot 4.3 : exécution mixte atomique (flag off) |
 | 0.4.2-remboursement | 2026-09-16 | Lot 4.2 : remboursement traçable (flag off) |
 | 0.4.1-compensation | 2026-09-16 | Lot 4.1 : exécution compensation (flag off) |
 | 0.4.0-charge | 2026-09-16 | Lot 4.0 : charge Depense FRAIS_AVANCE à la validation + synthèse par origine (flag off) |

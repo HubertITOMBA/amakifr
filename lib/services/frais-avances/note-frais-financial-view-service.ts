@@ -26,10 +26,24 @@ export type NoteFraisFinancialRemboursementDto = {
   /** Référence complète — réservée à cette vue comptable. */
   reference: string;
   executeAt: string;
+  operationId: string | null;
+};
+
+export type NoteFraisFinancialOperationDto = {
+  id: string;
+  executeAt: string;
+  compensation: { reglementId: string; montantTotal: string };
+  remboursement: {
+    reglementId: string;
+    montantTotal: string;
+    moyen: string;
+    reference: string;
+  };
 };
 
 /**
  * Agrégats + règlements remboursements (référence incluse).
+ * Opérations MIXTE groupées (enfants) sans double comptage des totaux état.
  * Aucun justificatif / description / chemin.
  */
 export type NoteFraisFinancialViewDto = {
@@ -46,6 +60,7 @@ export type NoteFraisFinancialViewDto = {
   restantDu: string;
   consomme: string;
   remboursements: NoteFraisFinancialRemboursementDto[];
+  operationsMixte: NoteFraisFinancialOperationDto[];
 };
 
 function disabledResult(): NotesFraisFinancialViewActionResult<never> {
@@ -150,6 +165,23 @@ export async function getNoteFraisFinancialView(input: {
         moyen: true,
         reference: true,
         executeAt: true,
+        operationId: true,
+      },
+    });
+
+    const operations = await client.noteFraisReglementOperation.findMany({
+      where: { noteFraisId: input.noteId, type: "MIXTE" },
+      orderBy: { executeAt: "asc" },
+      include: {
+        Reglements: {
+          select: {
+            id: true,
+            type: true,
+            montantTotal: true,
+            moyen: true,
+            reference: true,
+          },
+        },
       },
     });
 
@@ -180,7 +212,28 @@ export async function getNoteFraisFinancialView(input: {
           moyen: r.moyen ?? "",
           reference: r.reference ?? "",
           executeAt: r.executeAt.toISOString(),
+          operationId: r.operationId,
         })),
+        operationsMixte: operations.map((op) => {
+          const remb = op.Reglements.find((r) => r.type === "REMBOURSEMENT");
+          const comp = op.Reglements.find((r) => r.type === "COMPENSATION");
+          return {
+            id: op.id,
+            executeAt: op.executeAt.toISOString(),
+            compensation: {
+              reglementId: comp?.id ?? "",
+              montantTotal:
+                normalizeNotesFraisMontant(comp?.montantTotal) ?? "0.00",
+            },
+            remboursement: {
+              reglementId: remb?.id ?? "",
+              montantTotal:
+                normalizeNotesFraisMontant(remb?.montantTotal) ?? "0.00",
+              moyen: remb?.moyen ?? "",
+              reference: remb?.reference ?? "",
+            },
+          };
+        }),
       },
     };
   } catch (error) {

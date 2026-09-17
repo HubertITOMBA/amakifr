@@ -129,6 +129,7 @@ describePg("intégration PG notes-frais RGPD (base Docker allowlistée)", () => 
     });
     await client.noteFraisReglementLigne.deleteMany({});
     await client.noteFraisReglement.deleteMany({});
+    await client.noteFraisReglementOperation.deleteMany({});
     await client.depense.deleteMany({ where: { noteFraisId: { not: null } } });
     await client.noteFraisFileJob.deleteMany({});
     await client.noteFraisArchiveAccessLog.deleteMany({});

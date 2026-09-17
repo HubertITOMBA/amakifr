@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Banknote, Loader2 } from "lucide-react";
+import { GitMerge, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -12,10 +12,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { actionExecuteNoteFraisRemboursement } from "@/actions/frais-avances";
 import { toast } from "react-toastify";
+import { actionExecuteNoteFraisReglementMixte } from "@/actions/frais-avances";
 import { NoteFraisMontantBadge } from "@/components/frais-avances/note-frais-badges";
 import { datetimeLocalToIso } from "@/lib/frais-avances/datetime-local";
+import { moneyIsStrictlyPositive } from "@/lib/frais-avances/money-cents";
+import {
+  CompensationCiblesFields,
+  buildCompensationLignesFromAllocations,
+  type CompensationCibleOption,
+} from "@/components/frais-avances/CompensationCiblesFields";
 import {
   FRAIS_AVANCES_INPUT_CLASS,
   FRAIS_AVANCES_LABEL_CLASS,
@@ -24,33 +30,39 @@ import {
   FraisAvancesDialogShell,
 } from "@/components/frais-avances/FraisAvancesDialogShell";
 
-type ExecuteRemboursementDialogProps = {
+type ExecuteMixteDialogProps = {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   noteId: string;
   expectedVersion: number;
   idempotencyKey: string;
-  /** Plafond restant en chaîne monétaire (ex. "40.00"). */
-  plafondRestant: string;
+  plafondRemboursement: string;
+  plafondCompensation: string;
+  cibles: CompensationCibleOption[];
   onDone: () => void | Promise<void>;
+  onRedirectSimple?: (kind: "REMBOURSEMENT" | "COMPENSATION") => void;
 };
 
 /**
- * Dialog minimal d'exécution d'un remboursement (TRESOR/ADMIN).
+ * Dialog minimal d'exécution mixte atomique (compensation + remboursement).
  */
-export function ExecuteRemboursementDialog({
+export function ExecuteMixteDialog({
   open,
   onOpenChange,
   noteId,
   expectedVersion,
   idempotencyKey,
-  plafondRestant,
+  plafondRemboursement,
+  plafondCompensation,
+  cibles,
   onDone,
-}: ExecuteRemboursementDialogProps) {
-  const [montant, setMontant] = useState(plafondRestant);
+  onRedirectSimple,
+}: ExecuteMixteDialogProps) {
+  const [montantRemb, setMontantRemb] = useState(plafondRemboursement);
   const [moyen, setMoyen] = useState<"VIREMENT" | "ESPECES">("VIREMENT");
   const [reference, setReference] = useState("");
   const [executeLocal, setExecuteLocal] = useState("");
+  const [allocations, setAllocations] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
 
   const tzLabel = useMemo(() => {
@@ -63,18 +75,36 @@ export function ExecuteRemboursementDialog({
 
   useEffect(() => {
     if (open) {
-      setMontant(plafondRestant);
+      setMontantRemb(plafondRemboursement);
       setMoyen("VIREMENT");
       setReference("");
+      setAllocations({});
       const now = new Date();
       const pad = (n: number) => String(n).padStart(2, "0");
       setExecuteLocal(
         `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}T${pad(now.getHours())}:${pad(now.getMinutes())}`
       );
     }
-  }, [open, plafondRestant]);
+  }, [open, plafondRemboursement]);
 
   async function onConfirm() {
+    const lignes = buildCompensationLignesFromAllocations(cibles, allocations);
+    const rembTrim = montantRemb.trim();
+    if (!moneyIsStrictlyPositive(rembTrim)) {
+      toast.error(
+        "Partie remboursement nulle — utilisez le dialog remboursement simple"
+      );
+      onRedirectSimple?.("REMBOURSEMENT");
+      return;
+    }
+    if (lignes.length === 0) {
+      toast.error(
+        "Partie compensation nulle — utilisez le dialog compensation simple"
+      );
+      onRedirectSimple?.("COMPENSATION");
+      return;
+    }
+
     setSubmitting(true);
     try {
       let executeAt: string;
@@ -84,20 +114,21 @@ export function ExecuteRemboursementDialog({
         toast.error("Date/heure d'exécution invalide");
         return;
       }
-      const res = await actionExecuteNoteFraisRemboursement({
+      const res = await actionExecuteNoteFraisReglementMixte({
         noteId,
         expectedNoteVersion: expectedVersion,
         idempotencyKey,
-        montant,
+        montantRembourse: rembTrim,
         moyen,
         reference,
         executeAt,
+        lignesCompensation: lignes,
       });
       if (!res.success) {
         toast.error(res.error);
         return;
       }
-      toast.success(res.message || "Remboursement enregistré");
+      toast.success(res.message || "Règlement mixte enregistré");
       onOpenChange(false);
       await onDone();
     } finally {
@@ -109,10 +140,10 @@ export function ExecuteRemboursementDialog({
     <FraisAvancesDialogShell
       open={open}
       onOpenChange={onOpenChange}
-      title="Exécuter un remboursement"
-      description={`Décaissement bancaire ou caisse (fuseau navigateur : ${tzLabel}). La date est convertie en UTC côté serveur.`}
-      icon={<Banknote className="h-4 w-4 sm:h-5 sm:w-5 text-white" />}
-      testId="execute-remboursement-dialog"
+      title="Exécuter un règlement mixte"
+      description={`Compensation et remboursement atomiques (fuseau : ${tzLabel}). Une seule confirmation.`}
+      icon={<GitMerge className="h-4 w-4 sm:h-5 sm:w-5 text-white" />}
+      testId="execute-mixte-dialog"
       footer={
         <>
           <Button
@@ -132,44 +163,50 @@ export function ExecuteRemboursementDialog({
             {submitting ? (
               <Loader2 className="h-4 w-4 animate-spin mr-2" aria-hidden />
             ) : null}
-            Confirmer le remboursement
+            Confirmer le mixte
           </Button>
         </>
       }
     >
       <div className={FRAIS_AVANCES_SECTION_BLUE_CLASS}>
-        <NoteFraisMontantBadge
-          label="Plafond restant"
-          value={plafondRestant}
-        />
-        <p className="text-xs text-slate-600 dark:text-slate-300">
-          Partiels autorisés jusqu&apos;au plafond du choix ACTIF.
-        </p>
+        <div className="flex flex-wrap gap-2">
+          <NoteFraisMontantBadge
+            label="Plafond remb."
+            value={plafondRemboursement}
+          />
+          <NoteFraisMontantBadge
+            label="Plafond comp."
+            value={plafondCompensation}
+          />
+        </div>
       </div>
 
       <div className={FRAIS_AVANCES_SECTION_CLASS}>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-700">
+          Remboursement
+        </p>
         <div className="space-y-1">
-          <Label htmlFor="remb-montant" className={FRAIS_AVANCES_LABEL_CLASS}>
+          <Label htmlFor="mixte-montant-remb" className={FRAIS_AVANCES_LABEL_CLASS}>
             Montant (€)
           </Label>
           <Input
-            id="remb-montant"
+            id="mixte-montant-remb"
             inputMode="decimal"
-            value={montant}
-            onChange={(e) => setMontant(e.target.value)}
+            value={montantRemb}
+            onChange={(e) => setMontantRemb(e.target.value)}
             className={FRAIS_AVANCES_INPUT_CLASS}
             aria-required
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="remb-moyen" className={FRAIS_AVANCES_LABEL_CLASS}>
+          <Label htmlFor="mixte-moyen" className={FRAIS_AVANCES_LABEL_CLASS}>
             Moyen
           </Label>
           <Select
             value={moyen}
             onValueChange={(v) => setMoyen(v as "VIREMENT" | "ESPECES")}
           >
-            <SelectTrigger id="remb-moyen" className={FRAIS_AVANCES_INPUT_CLASS}>
+            <SelectTrigger id="mixte-moyen" className={FRAIS_AVANCES_INPUT_CLASS}>
               <SelectValue placeholder="Choisir" />
             </SelectTrigger>
             <SelectContent>
@@ -179,13 +216,11 @@ export function ExecuteRemboursementDialog({
           </Select>
         </div>
         <div className="space-y-1">
-          <Label htmlFor="remb-ref" className={FRAIS_AVANCES_LABEL_CLASS}>
-            {moyen === "ESPECES"
-              ? "N° / référence de reçu"
-              : "Référence bancaire"}
+          <Label htmlFor="mixte-ref" className={FRAIS_AVANCES_LABEL_CLASS}>
+            {moyen === "ESPECES" ? "N° / référence de reçu" : "Référence bancaire"}
           </Label>
           <Input
-            id="remb-ref"
+            id="mixte-ref"
             value={reference}
             onChange={(e) => setReference(e.target.value)}
             className={FRAIS_AVANCES_INPUT_CLASS}
@@ -195,23 +230,34 @@ export function ExecuteRemboursementDialog({
           />
         </div>
         <div className="space-y-1">
-          <Label htmlFor="remb-date" className={FRAIS_AVANCES_LABEL_CLASS}>
+          <Label htmlFor="mixte-date" className={FRAIS_AVANCES_LABEL_CLASS}>
             Date et heure d&apos;exécution
           </Label>
           <Input
-            id="remb-date"
+            id="mixte-date"
             type="datetime-local"
             value={executeLocal}
             onChange={(e) => setExecuteLocal(e.target.value)}
             className={FRAIS_AVANCES_INPUT_CLASS}
             aria-required
-            aria-describedby="remb-date-help"
+            aria-describedby="mixte-date-help"
           />
-          <p id="remb-date-help" className="text-xs text-slate-500">
-            Saisie en heure locale ({tzLabel}), envoyée en ISO UTC. Tolérance
-            serveur : jusqu&apos;à +5 minutes.
+          <p id="mixte-date-help" className="text-xs text-slate-500">
+            Instant unique pour l&apos;opération et les deux règlements enfants.
           </p>
         </div>
+      </div>
+
+      <div className={FRAIS_AVANCES_SECTION_CLASS}>
+        <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 mb-1">
+          Compensation
+        </p>
+        <CompensationCiblesFields
+          cibles={cibles}
+          allocations={allocations}
+          onChange={setAllocations}
+          disabled={submitting}
+        />
       </div>
     </FraisAvancesDialogShell>
   );

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import { Banknote, Gavel } from "lucide-react";
+import { Banknote, Gavel, GitMerge, Scale } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -11,11 +11,18 @@ import {
 } from "@/actions/frais-avances";
 import { DecideNoteFraisDialog } from "@/components/frais-avances/DecideNoteFraisDialog";
 import { ExecuteRemboursementDialog } from "@/components/frais-avances/ExecuteRemboursementDialog";
+import { ExecuteCompensationDialog } from "@/components/frais-avances/ExecuteCompensationDialog";
+import { ExecuteMixteDialog } from "@/components/frais-avances/ExecuteMixteDialog";
+import type { CompensationCibleOption } from "@/components/frais-avances/CompensationCiblesFields";
 import {
   NoteFraisModeBadge,
   NoteFraisMontantBadge,
   NoteFraisStatutBadge,
 } from "@/components/frais-avances/note-frais-badges";
+import {
+  moneyIsStrictlyPositive,
+  moneyRestantNonNegatif,
+} from "@/lib/frais-avances/money-cents";
 
 type NoteDetail = {
   id: string;
@@ -47,6 +54,7 @@ type NoteDetail = {
       typeCible: string;
       cibleId: string;
       montantAutorise: string | number;
+      montantUtilise?: string | number;
       libelleSnapshot: string | null;
       rang: number;
     }>;
@@ -79,6 +87,18 @@ type FinancialView = {
     moyen: string;
     reference: string;
     executeAt: string;
+    operationId?: string | null;
+  }>;
+  operationsMixte?: Array<{
+    id: string;
+    executeAt: string;
+    compensation: { reglementId: string; montantTotal: string };
+    remboursement: {
+      reglementId: string;
+      montantTotal: string;
+      moyen: string;
+      reference: string;
+    };
   }>;
 };
 
@@ -94,28 +114,91 @@ export default function AdminNoteFraisDetailPage() {
   const [financial, setFinancial] = useState<FinancialView | null>(null);
   const [decideOpen, setDecideOpen] = useState(false);
   const [rembOpen, setRembOpen] = useState(false);
+  const [compOpen, setCompOpen] = useState(false);
+  const [mixteOpen, setMixteOpen] = useState(false);
   const [idempotencyKey] = useState(
     () => `decide-${noteId}-${Date.now()}`
   );
   const [rembIdempotencyKey, setRembIdempotencyKey] = useState(
     () => `remb-${noteId}-${Date.now()}`
   );
+  const [compIdempotencyKey, setCompIdempotencyKey] = useState(
+    () => `comp-${noteId}-${Date.now()}`
+  );
+  const [mixteIdempotencyKey, setMixteIdempotencyKey] = useState(
+    () => `mixte-${noteId}-${Date.now()}`
+  );
 
-  const plafondRemb = useMemo(() => {
+  const plafondRembStr = useMemo(() => {
     const c = note?.ChoixReglementActif;
-    if (!c) return 0;
-    return Math.max(
-      0,
-      Number(c.montantRemboursement) - Number(c.montantRembourseUtilise)
-    );
+    if (!c) return "0.00";
+    try {
+      return moneyRestantNonNegatif(
+        c.montantRemboursement,
+        c.montantRembourseUtilise
+      );
+    } catch {
+      return "0.00";
+    }
   }, [note]);
 
+  const plafondCompStr = useMemo(() => {
+    const c = note?.ChoixReglementActif;
+    if (!c) return "0.00";
+    try {
+      return moneyRestantNonNegatif(
+        c.montantCompensation,
+        c.montantCompensationUtilise
+      );
+    } catch {
+      return "0.00";
+    }
+  }, [note]);
+
+  const compensationCibles: CompensationCibleOption[] = useMemo(() => {
+    const cibles = note?.ChoixReglementActif?.Cibles ?? [];
+    return cibles
+      .filter(
+        (c) =>
+          c.typeCible === "COTISATION_MENSUELLE" ||
+          c.typeCible === "DETTE_INITIALE"
+      )
+      .map((c) => {
+        let plafondRestant = "0.00";
+        try {
+          plafondRestant = moneyRestantNonNegatif(
+            c.montantAutorise,
+            c.montantUtilise ?? 0
+          );
+        } catch {
+          plafondRestant = "0.00";
+        }
+        return {
+          typeCible: c.typeCible as
+            | "COTISATION_MENSUELLE"
+            | "DETTE_INITIALE",
+          cibleId: c.cibleId,
+          libelle: c.libelleSnapshot || c.cibleId,
+          plafondRestant,
+        };
+      })
+      .filter((c) => moneyIsStrictlyPositive(c.plafondRestant));
+  }, [note]);
+
+  const mode = note?.ChoixReglementActif?.mode;
   const canExecuteRemb =
     note?.statut === "VALIDEE" &&
-    note.ChoixReglementActif &&
-    (note.ChoixReglementActif.mode === "REMBOURSEMENT" ||
-      note.ChoixReglementActif.mode === "MIXTE") &&
-    plafondRemb > 0;
+    (mode === "REMBOURSEMENT" || mode === "MIXTE") &&
+    moneyIsStrictlyPositive(plafondRembStr);
+  const canExecuteComp =
+    note?.statut === "VALIDEE" &&
+    (mode === "COMPENSATION" || mode === "MIXTE") &&
+    moneyIsStrictlyPositive(plafondCompStr);
+  const canExecuteMixte =
+    note?.statut === "VALIDEE" &&
+    mode === "MIXTE" &&
+    moneyIsStrictlyPositive(plafondRembStr) &&
+    moneyIsStrictlyPositive(plafondCompStr);
 
   const reload = useCallback(async () => {
     const res = await actionGetNoteFrais(noteId);
@@ -283,21 +366,56 @@ export default function AdminNoteFraisDetailPage() {
                       ))}
                     </ul>
                   ) : null}
-                  {canExecuteRemb ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      className="mt-1"
-                      onClick={() => {
-                        setRembIdempotencyKey(
-                          `remb-${noteId}-${Date.now()}`
-                        );
-                        setRembOpen(true);
-                      }}
-                    >
-                      <Banknote className="h-4 w-4 mr-1" />
-                      Exécuter un remboursement
-                    </Button>
+                  {canExecuteRemb || canExecuteComp || canExecuteMixte ? (
+                    <div className="flex flex-wrap gap-2 mt-1">
+                      {canExecuteMixte ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            setMixteIdempotencyKey(
+                              `mixte-${noteId}-${Date.now()}`
+                            );
+                            setMixteOpen(true);
+                          }}
+                        >
+                          <GitMerge className="h-4 w-4 mr-1" />
+                          Exécuter mixte
+                        </Button>
+                      ) : null}
+                      {canExecuteRemb ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setRembIdempotencyKey(
+                              `remb-${noteId}-${Date.now()}`
+                            );
+                            setRembOpen(true);
+                          }}
+                        >
+                          <Banknote className="h-4 w-4 mr-1" />
+                          Remboursement
+                        </Button>
+                      ) : null}
+                      {canExecuteComp ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setCompIdempotencyKey(
+                              `comp-${noteId}-${Date.now()}`
+                            );
+                            setCompOpen(true);
+                          }}
+                        >
+                          <Scale className="h-4 w-4 mr-1" />
+                          Compensation
+                        </Button>
+                      ) : null}
+                    </div>
                   ) : null}
                 </div>
               ) : note.statut === "VALIDEE" ? (
@@ -368,8 +486,43 @@ export default function AdminNoteFraisDetailPage() {
           noteId={noteId}
           expectedVersion={note.version}
           idempotencyKey={rembIdempotencyKey}
-          plafondRestant={plafondRemb}
+          plafondRestant={plafondRembStr}
           onDone={reload}
+        />
+      ) : null}
+      {note && canExecuteComp ? (
+        <ExecuteCompensationDialog
+          open={compOpen}
+          onOpenChange={setCompOpen}
+          noteId={noteId}
+          expectedVersion={note.version}
+          idempotencyKey={compIdempotencyKey}
+          plafondRestant={plafondCompStr}
+          cibles={compensationCibles}
+          onDone={reload}
+        />
+      ) : null}
+      {note && canExecuteMixte ? (
+        <ExecuteMixteDialog
+          open={mixteOpen}
+          onOpenChange={setMixteOpen}
+          noteId={noteId}
+          expectedVersion={note.version}
+          idempotencyKey={mixteIdempotencyKey}
+          plafondRemboursement={plafondRembStr}
+          plafondCompensation={plafondCompStr}
+          cibles={compensationCibles}
+          onDone={reload}
+          onRedirectSimple={(kind) => {
+            setMixteOpen(false);
+            if (kind === "REMBOURSEMENT") {
+              setRembIdempotencyKey(`remb-${noteId}-${Date.now()}`);
+              setRembOpen(true);
+            } else {
+              setCompIdempotencyKey(`comp-${noteId}-${Date.now()}`);
+              setCompOpen(true);
+            }
+          }}
         />
       ) : null}
     </div>

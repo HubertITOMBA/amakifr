@@ -52,6 +52,16 @@
 - État financier calculé (non stocké) : remboursé + compensé vs accepté.
 - Pas de notif/outbox (→ 4.5).
 
+### Règlement mixte atomique (lot 4.3 — local, flag off)
+- Parent `NoteFraisReglementOperation` + enfants COMPENSATION et REMBOURSEMENT (`operationId`, `idempotencyKey` null sur enfants).
+- Choix ACTIF `MIXTE` uniquement ; les deux parts > 0 ; sinon services simples.
+- Instant unique `executeAt` partagé ; TX unique (verrous comp ⊃ remb) ; OCC version une fois.
+- Idempotence parent avant OCC ; parent incomplet → `NOTES_FRAIS_MIXTE_OPERATION_INCOMPLETE` (fail-closed).
+- UI plafonds / activation : `lib/frais-avances/money-cents` (centimes entiers, pas de `Number()` flottant).
+- Compléments partiels toujours possibles via services 4.1/4.2 sur le même choix MIXTE.
+- Synthèse : agrège **uniquement** les règlements enfants (jamais la table parent).
+- Pas de notif/outbox (→ 4.5 événement unique).
+
 ### Compensation exécutée (lot 4.1 — local, flag off)
 - Choix ACTIF `COMPENSATION` ou `MIXTE` (part compensation uniquement).
 - TX : verrous demandeur → note → choix → cibles → dettes/CM ; OCC version note.
@@ -127,13 +137,14 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
     lib/services/frais-avances/note-frais-choix-reglement.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-compensation.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-remboursement.pg.integration.test.ts \
+    lib/services/frais-avances/note-frais-mixte.pg.integration.test.ts \
     lib/frais-avances/pg-test-allowlist.test.ts
 ```
 
 ## Non livré / futur
-- Lots **4.3+** : mixte une TX, outbox/notif règlement (4.5), corrections, restitutions, annulation (`EXPIREE` 30 j), détachement RGPD FK.
+- Lots **4.4+** : polish UI, outbox/notif règlement (4.5), corrections, restitutions, annulation (`EXPIREE` 30 j), détachement RGPD FK.
 - Index partiel unique choix ACTIF.
-- CHECK SQL polymorphes sur `notes_frais_reglement_lignes` (COMPENSATION / REMBOURSEMENT).
+- CHECK SQL polymorphes sur `notes_frais_reglement_lignes` et opérations MIXTE.
 - API v1, mobile.
 - Validation trésorier de la durée / point de départ + activation politique env.
 - Migration Prisma dépôt ; activation prod permanente.

@@ -47,6 +47,7 @@ describe("intégration PG remboursement notes-frais", () => {
     });
     await prisma.noteFraisReglementLigne.deleteMany({});
     await prisma.noteFraisReglement.deleteMany({});
+    await prisma.noteFraisReglementOperation.deleteMany({});
     await prisma.depense.deleteMany({ where: { noteFraisId: { not: null } } });
     await prisma.noteFraisChoixReglementCible.deleteMany({});
     await prisma.noteFraisChoixReglement.deleteMany({});

@@ -491,7 +491,7 @@ export async function actionExecuteNoteFraisCompensation(form: {
   lignes: Array<{
     typeCible: "COTISATION_MENSUELLE" | "DETTE_INITIALE";
     cibleId: string;
-    montant: number;
+    montant: string | number;
     rang: number;
   }>;
 }) {
@@ -567,6 +567,64 @@ export async function actionExecuteNoteFraisRemboursement(form: {
       reference: form.reference,
       executeAt: form.executeAt,
       // clock / now volontairement absents — horloge serveur uniquement
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath("/admin/frais-avances");
+      revalidatePath(`/user/frais-avances/${form.noteId}`);
+      revalidatePath(`/admin/frais-avances/${form.noteId}`);
+      revalidatePath("/admin/finances/synthese");
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}
+
+/**
+ * Exécute compensation + remboursement atomiques (choix MIXTE).
+ */
+export async function actionExecuteNoteFraisReglementMixte(form: {
+  noteId: string;
+  expectedNoteVersion: number;
+  idempotencyKey: string;
+  montantRembourse: string;
+  moyen: "VIREMENT" | "ESPECES";
+  reference: string;
+  executeAt: string;
+  lignesCompensation: Array<{
+    typeCible: "COTISATION_MENSUELLE" | "DETTE_INITIALE";
+    cibleId: string;
+    montant: string;
+    rang: number;
+  }>;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    if (!form.idempotencyKey?.trim()) {
+      return {
+        success: false as const,
+        error: "Clé d'idempotence requise",
+        code: "IDEMPOTENCY_REQUIRED",
+      };
+    }
+    const { executeNoteFraisReglementMixte } = await import(
+      "@/lib/services/frais-avances/note-frais-mixte-service"
+    );
+    const result = await executeNoteFraisReglementMixte({
+      actorUserId: userId,
+      noteId: form.noteId,
+      expectedNoteVersion: form.expectedNoteVersion,
+      idempotencyKey: form.idempotencyKey,
+      montantRembourse: form.montantRembourse,
+      moyen: form.moyen,
+      reference: form.reference,
+      executeAt: form.executeAt,
+      lignesCompensation: form.lignesCompensation,
     });
     if (result.success) {
       revalidatePath("/user/frais-avances");

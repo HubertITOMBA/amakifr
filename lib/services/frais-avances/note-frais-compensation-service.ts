@@ -12,6 +12,11 @@ import {
 import { canUserExecuteNoteFraisCompensation } from "@/lib/frais-avances/authz";
 import { lockUserRowForNotesFrais } from "@/lib/services/frais-avances/rgpd-account-deletion";
 import { normalizeNotesFraisMontant } from "@/lib/services/frais-avances/note-frais-decision-service";
+import {
+  applyCompensationReglementInTx,
+  lockCompensationTargetsInTx,
+  prepareCompensationLignesInTx,
+} from "@/lib/services/frais-avances/note-frais-reglement-apply";
 
 export type NotesFraisCompensationActionResult<T = unknown> =
   | { success: true; data: T; message?: string }
@@ -29,7 +34,8 @@ export const NOTES_FRAIS_COMP_REFRESH_REQUIRED =
 export type CompensationLigneInput = {
   typeCible: "COTISATION_MENSUELLE" | "DETTE_INITIALE";
   cibleId: string;
-  montant: number;
+  /** Chaîne décimale préférée ; number accepté pour rétrocompat. */
+  montant: string | number;
   rang: number;
 };
 
@@ -129,10 +135,11 @@ export function normalizeCompensationLignes(
     if (!Number.isInteger(l.rang) || l.rang < 1) {
       throw new Error("Rang de ligne invalide");
     }
-    if (l.montant == null || !Number.isFinite(Number(l.montant))) {
+    const montantNorm = normalizeNotesFraisMontant(l.montant);
+    if (!montantNorm) {
       throw new Error("Montant de ligne invalide");
     }
-    const m = money(l.montant);
+    const m = money(montantNorm);
     if (!(m.gt(0))) {
       throw new Error("Chaque montant de ligne doit être strictement positif");
     }
@@ -144,7 +151,7 @@ export function normalizeCompensationLignes(
     out.push({
       typeCible: l.typeCible,
       cibleId: l.cibleId.trim(),
-      montant: m.toFixed(2),
+      montant: montantNorm,
       rang: l.rang,
     });
   }
@@ -190,15 +197,6 @@ function sameCompensationContent(
     }
   }
   return true;
-}
-
-function cmStatutApres(
-  montantPaye: Prisma.Decimal,
-  montantRestant: Prisma.Decimal
-): string {
-  if (montantRestant.lte(0)) return "Paye";
-  if (montantPaye.gt(0)) return "PartiellementPaye";
-  return "EnAttente";
 }
 
 /**
@@ -458,29 +456,8 @@ export async function executeNoteFraisCompensation(
         FOR UPDATE
       `;
 
-      const ciblesByKey = new Map(
-        choix.Cibles.map((c) => [`${c.typeCible}:${c.cibleId}`, c])
-      );
-
       // Verrou dettes/CM ordre déterministe type puis id
-      const lockTargets = normalized
-        .map((l) => ({ typeCible: l.typeCible, cibleId: l.cibleId }))
-        .sort(
-          (a, b) =>
-            a.typeCible.localeCompare(b.typeCible) ||
-            a.cibleId.localeCompare(b.cibleId)
-        );
-      for (const t of lockTargets) {
-        if (t.typeCible === "DETTE_INITIALE") {
-          await tx.$executeRaw`
-            SELECT id FROM dettes_initiales WHERE id = ${t.cibleId} FOR UPDATE
-          `;
-        } else {
-          await tx.$executeRaw`
-            SELECT id FROM cotisations_mensuelles WHERE id = ${t.cibleId} FOR UPDATE
-          `;
-        }
-      }
+      await lockCompensationTargetsInTx(tx, normalized);
 
       // Recharger choix/cibles après locks (compteurs)
       const choixFresh = await tx.noteFraisChoixReglement.findUniqueOrThrow({
@@ -500,75 +477,12 @@ export async function executeNoteFraisCompensation(
         );
       }
 
-      type Prepared = {
-        ligne: NormalizedLigne;
-        cibleChoixId: string;
-        restantAvant: Prisma.Decimal;
-        autoriseRestantAvant: Prisma.Decimal;
-      };
-      const prepared: Prepared[] = [];
-
-      for (const ligne of normalized) {
-        const ck = `${ligne.typeCible}:${ligne.cibleId}`;
-        const cibleChoix = ciblesFresh.get(ck) ?? ciblesByKey.get(ck);
-        if (!cibleChoix) {
-          throw new Error("Cible absente du choix ACTIF");
-        }
-        const autoriseRestant = money(cibleChoix.montantAutorise).minus(
-          money(cibleChoix.montantUtilise)
-        );
-        const montant = money(ligne.montant);
-        if (montant.gt(autoriseRestant)) {
-          throw new Error(
-            "Montant supérieur au plafond autorisé restant de la cible"
-          );
-        }
-
-        if (ligne.typeCible === "DETTE_INITIALE") {
-          const dette = await tx.detteInitiale.findFirst({
-            where: { id: ligne.cibleId, adherentId: note.adherentId },
-            select: { id: true, montantRestant: true, montantPaye: true },
-          });
-          if (!dette) throw new Error("Cible introuvable");
-          const restant = money(dette.montantRestant);
-          if (montant.gt(restant)) {
-            throw new Error(NOTES_FRAIS_COMP_REFRESH_REQUIRED);
-          }
-          prepared.push({
-            ligne,
-            cibleChoixId: cibleChoix.id,
-            restantAvant: restant,
-            autoriseRestantAvant: autoriseRestant,
-          });
-        } else {
-          const cm = await tx.cotisationMensuelle.findFirst({
-            where: {
-              id: ligne.cibleId,
-              adherentId: note.adherentId,
-              adherentBeneficiaireId: null,
-              TypeCotisation: { categorie: { not: "Assistance" } },
-            },
-            select: {
-              id: true,
-              montantAttendu: true,
-              montantPaye: true,
-              montantRestant: true,
-              statut: true,
-            },
-          });
-          if (!cm) throw new Error("Cible introuvable");
-          const restant = money(cm.montantRestant);
-          if (montant.gt(restant)) {
-            throw new Error(NOTES_FRAIS_COMP_REFRESH_REQUIRED);
-          }
-          prepared.push({
-            ligne,
-            cibleChoixId: cibleChoix.id,
-            restantAvant: restant,
-            autoriseRestantAvant: autoriseRestant,
-          });
-        }
-      }
+      const prepared = await prepareCompensationLignesInTx({
+        tx,
+        adherentId: note.adherentId,
+        normalized,
+        ciblesFresh,
+      });
 
       const executeAt = new Date();
       const claimed = await tx.noteFrais.updateMany({
@@ -583,110 +497,19 @@ export async function executeNoteFraisCompensation(
         throw new Error(NOTES_FRAIS_COMP_VERSION_CONFLICT);
       }
 
-      const reglement = await tx.noteFraisReglement.create({
-        data: {
-          noteFraisId: input.noteId,
-          choixId: choixFresh.id,
-          type: "COMPENSATION",
-          statut: "EXECUTE",
-          montantTotal: money(montantTotal),
-          idempotencyKey: key,
-          executeurUserId: input.actorUserId,
-          executeAt,
-        },
+      const { reglementId } = await applyCompensationReglementInTx({
+        tx,
+        noteId: input.noteId,
+        adherentId: note.adherentId,
+        choixId: choixFresh.id,
+        executeurUserId: input.actorUserId,
+        executeAt,
+        montantTotal,
+        prepared,
+        idempotencyKey: key,
+        operationId: null,
+        beforeApplyLigne: input.beforeApplyLigne,
       });
-
-      for (let i = 0; i < prepared.length; i++) {
-        const p = prepared[i]!;
-        if (input.beforeApplyLigne) await input.beforeApplyLigne(i);
-        const montant = money(p.ligne.montant);
-        let restantApres: Prisma.Decimal;
-
-        if (p.ligne.typeCible === "DETTE_INITIALE") {
-          const dette = await tx.detteInitiale.findUniqueOrThrow({
-            where: { id: p.ligne.cibleId },
-          });
-          const newPaye = money(dette.montantPaye).plus(montant);
-          await tx.detteInitiale.update({
-            where: { id: p.ligne.cibleId },
-            data: { montantPaye: newPaye },
-          });
-          const after = await tx.detteInitiale.findUniqueOrThrow({
-            where: { id: p.ligne.cibleId },
-            select: { montantRestant: true },
-          });
-          restantApres = money(after.montantRestant);
-        } else {
-          const cm = await tx.cotisationMensuelle.findUniqueOrThrow({
-            where: { id: p.ligne.cibleId },
-          });
-          const newPaye = money(cm.montantPaye).plus(montant);
-          let newRestant = money(cm.montantRestant).minus(montant);
-          if (newRestant.lt(0)) newRestant = money(0);
-          const statut = cmStatutApres(newPaye, newRestant);
-          await tx.cotisationMensuelle.update({
-            where: { id: p.ligne.cibleId },
-            data: {
-              montantPaye: newPaye,
-              montantRestant: newRestant,
-              statut,
-            },
-          });
-          restantApres = newRestant;
-        }
-
-        const ligneRow = await tx.noteFraisReglementLigne.create({
-          data: {
-            reglementId: reglement.id,
-            typeLigne: "COMPENSATION",
-            typeCible: p.ligne.typeCible,
-            cibleId: p.ligne.cibleId,
-            rang: p.ligne.rang,
-            montant,
-            montantRestantCibleAvant: p.restantAvant,
-            montantRestantCibleApres: restantApres,
-            montantAutoriseRestantAvant: p.autoriseRestantAvant,
-          },
-        });
-
-        const avoir = await tx.avoir.create({
-          data: {
-            adherentId: note.adherentId,
-            montant,
-            montantUtilise: montant,
-            montantRestant: money(0),
-            paiementId: null,
-            description: `Compensation note de frais ${input.noteId}`,
-            origine: "COMPENSATION_NOTE_FRAIS",
-            statut: "Utilise",
-            noteFraisReglementLigneId: ligneRow.id,
-          },
-        });
-
-        await tx.utilisationAvoir.create({
-          data: {
-            avoirId: avoir.id,
-            montant,
-            detteInitialeId:
-              p.ligne.typeCible === "DETTE_INITIALE" ? p.ligne.cibleId : null,
-            cotisationMensuelleId:
-              p.ligne.typeCible === "COTISATION_MENSUELLE"
-                ? p.ligne.cibleId
-                : null,
-            assistanceId: null,
-            obligationCotisationId: null,
-            description: `Compensation note de frais ${input.noteId}`,
-            noteFraisReglementLigneId: ligneRow.id,
-          },
-        });
-
-        await tx.noteFraisChoixReglementCible.update({
-          where: { id: p.cibleChoixId },
-          data: {
-            montantUtilise: { increment: montant },
-          },
-        });
-      }
 
       await tx.noteFraisChoixReglement.update({
         where: { id: choixFresh.id },
@@ -697,7 +520,7 @@ export async function executeNoteFraisCompensation(
 
       return {
         kind: "fresh" as const,
-        reglementId: reglement.id,
+        reglementId,
         choixId: choixFresh.id,
         montantTotal,
         version: input.expectedNoteVersion + 1,

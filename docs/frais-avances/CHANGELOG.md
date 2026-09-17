@@ -1,5 +1,23 @@
 # Changelog — frais avancés
 
+## 0.4.3-mixte — 2026-09-16
+
+### Ajouté (lot 4.3 — local, flag off, **pas de migration dépôt**)
+- `NoteFraisReglementOperation` (type MIXTE) + 2 règlements enfants COMPENSATION / REMBOURSEMENT.
+- `NoteFraisReglement.operationId` nullable ; `idempotencyKey` nullable (null sur enfants MIXTE).
+- `@@unique([operationId, type])` ; CHECK SQL futurs documentés.
+- Service `executeNoteFraisReglementMixte` : TX unique, horloge injectable, même `executeAt`.
+- Helpers TX partagés (`note-frais-reglement-apply`) ; contrats 4.1/4.2 conservés.
+- Permission `executeNoteFraisReglementMixte` ; UI `ExecuteMixteDialog` + `ExecuteCompensationDialog`.
+- Parent incomplet / corrompu → `NOTES_FRAIS_MIXTE_OPERATION_INCOMPLETE` (fail-closed, aucune réparation).
+- Helper client `money-cents` (centimes entiers) pour plafonds / activation UI.
+- Synthèse inchangée (agrège uniquement les enfants typés).
+- **Aucune** notif/outbox.
+
+### Non inclus
+- Correction / restitution / annulation ; polish UI (4.4) ; notif règlement (4.5).
+- Migration dépôt ; activation permanente.
+
 ## 0.4.2-remboursement — 2026-09-16
 
 ### Ajouté (lot 4.2 — local, flag off, **pas de migration dépôt**)

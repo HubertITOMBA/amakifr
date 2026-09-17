@@ -310,6 +310,7 @@ model User {
   notesFraisDecideur            NoteFrais[]                  @relation("NoteFraisDecideur")
   notesFraisDecisions           NoteFraisDecision[]          @relation("NoteFraisDecisionDecideur")
   notesFraisReglementsExecuteur NoteFraisReglement[]         @relation("NoteFraisReglementExecuteur")
+  notesFraisReglementOperationsExecuteur NoteFraisReglementOperation[] @relation("NoteFraisReglementOperationExecuteur")
   justificatifsNoteFraisUploades JustificatifNoteFrais[]     @relation("JustificatifNoteFraisUploader")
   notesFraisArchiveAccessLogs   NoteFraisArchiveAccessLog[]  @relation("NoteFraisArchiveAccessActor")
 
@@ -2759,6 +2760,7 @@ model NoteFrais {
   /// Charge reconnue (lot 4.0) — FK sur Depense.noteFraisId uniquement.
   DepenseCharge Depense? @relation("NoteFraisCharge")
   Reglements    NoteFraisReglement[]
+  ReglementOperations NoteFraisReglementOperation[]
 
   @@index([adherentId, statut])
   @@index([demandeurUserId])
@@ -2833,6 +2835,7 @@ model NoteFraisChoixReglement {
   Remplacants NoteFraisChoixReglement[]    @relation("ChoixReglementRemplacement")
   Cibles      NoteFraisChoixReglementCible[]
   Reglements  NoteFraisReglement[]
+  ReglementOperations NoteFraisReglementOperation[]
 
   @@index([noteFraisId, statut])
   @@index([noteFraisId])
@@ -2881,7 +2884,39 @@ enum MoyenReglementNoteFrais {
   ESPECES
 }
 
-/// Exécution financière (compensation 4.1 ; remboursement 4.2).
+/// Opération métier atomique (lot 4.3) — parent d'exactement 2 règlements MIXTE.
+enum TypeNoteFraisReglementOperation {
+  MIXTE
+}
+
+/// Parent idempotent d'une exécution mixte (compensation + remboursement).
+/// Futurs CHECK SQL (migration ultérieure, pas maintenant) :
+///   une opération MIXTE a exactement un enfant COMPENSATION et un REMBOURSEMENT.
+model NoteFraisReglementOperation {
+  id              String                         @id @default(cuid())
+  noteFraisId     String
+  choixId         String
+  type            TypeNoteFraisReglementOperation @default(MIXTE)
+  idempotencyKey  String                         @unique @db.VarChar(64)
+  executeurUserId String
+  /// Instant canonique partagé avec les deux règlements enfants.
+  executeAt       DateTime
+  createdAt       DateTime                       @default(now())
+
+  NoteFrais  NoteFrais               @relation(fields: [noteFraisId], references: [id], onDelete: Restrict)
+  Choix      NoteFraisChoixReglement @relation(fields: [choixId], references: [id], onDelete: Restrict)
+  Executeur  User                    @relation("NoteFraisReglementOperationExecuteur", fields: [executeurUserId], references: [id], onDelete: Restrict)
+  Reglements NoteFraisReglement[]
+
+  @@index([noteFraisId, executeAt])
+  @@index([choixId])
+  @@map("notes_frais_reglement_operations")
+}
+
+/// Exécution financière (compensation 4.1 ; remboursement 4.2 ; enfants MIXTE 4.3).
+/// Futurs CHECK SQL (migration ultérieure, pas maintenant) :
+///   operationId IS NULL  => idempotencyKey IS NOT NULL
+///   operationId IS NOT NULL => idempotencyKey IS NULL
 model NoteFraisReglement {
   id                   String                    @id @default(cuid())
   noteFraisId          String
@@ -2893,19 +2928,25 @@ model NoteFraisReglement {
   moyen                MoyenReglementNoteFrais?
   reference            String?                   @db.VarChar(64)
   referenceNormalisee  String?                   @db.VarChar(64)
-  idempotencyKey       String                    @unique @db.VarChar(64)
+  /// Obligatoire applicativement si operationId null (4.1/4.2) ; null si enfant MIXTE.
+  idempotencyKey       String?                   @unique @db.VarChar(64)
   executeurUserId      String
   executeAt            DateTime
+  /// Null pour règlements simples 4.1/4.2 ; renseigné pour enfants d'une opération MIXTE.
+  operationId          String?
   createdAt            DateTime                  @default(now())
 
   NoteFrais NoteFrais               @relation(fields: [noteFraisId], references: [id], onDelete: Restrict)
   Choix     NoteFraisChoixReglement @relation(fields: [choixId], references: [id], onDelete: Restrict)
   Executeur User                    @relation("NoteFraisReglementExecuteur", fields: [executeurUserId], references: [id], onDelete: Restrict)
+  Operation NoteFraisReglementOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
   Lignes    NoteFraisReglementLigne[]
 
+  @@unique([operationId, type])
   @@index([noteFraisId, executeAt])
   @@index([choixId])
   @@index([type, statut])
+  @@index([operationId])
   @@map("notes_frais_reglements")
 }
 

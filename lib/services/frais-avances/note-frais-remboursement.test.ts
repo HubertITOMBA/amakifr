@@ -397,6 +397,7 @@ describe("getNoteFraisFinancialView", () => {
       userAdminRole: { findMany: userAdminRoleFindMany },
       noteFrais: { findUnique: noteFindUnique },
       noteFraisReglement: { findMany: reglementFindMany },
+      noteFraisReglementOperation: { findMany: vi.fn().mockResolvedValue([]) },
     } as unknown as typeof import("@/lib/db").db;
 
     userFindUnique.mockResolvedValue({ role: "COMCPT", status: "Actif" });

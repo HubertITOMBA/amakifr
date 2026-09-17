@@ -459,6 +459,16 @@ export const SERVER_ACTIONS_CONFIG: ServerActionConfig[] = [
     category: "Frais avancés",
   },
   {
+    action: "executeNoteFraisReglementMixte",
+    label: "Exécuter un règlement mixte de note de frais",
+    description:
+      "Compensation + remboursement atomiques sur choix MIXTE — TRESOR/ADMIN ; une opération parent, deux règlements enfants",
+    resource: "frais-avances",
+    defaultType: "WRITE",
+    route: "/admin/frais-avances",
+    category: "Frais avancés",
+  },
+  {
     action: "readNoteFraisFinancialView",
     label: "Consulter la vue financière d'une note de frais",
     description:
