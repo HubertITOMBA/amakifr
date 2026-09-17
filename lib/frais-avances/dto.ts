@@ -56,20 +56,23 @@ export type NoteFraisRemboursementPublicDto = {
   reference?: string;
 };
 
-/** Entrée d'historique de règlement (simples, mixte groupé ou correction). */
+/** Entrée d'historique de règlement (simples, mixte groupé, correction ou restitution). */
 export type NoteFraisHistoriqueReglementDto = {
   kind:
     | "REMBOURSEMENT_SIMPLE"
     | "COMPENSATION_SIMPLE"
     | "MIXTE"
     | "CORRECTION_REFERENCE"
-    | "CORRECTION_MONTANT_NEGATIF";
+    | "CORRECTION_MONTANT_NEGATIF"
+    | "RESTITUTION";
   id: string;
   executeAt: string;
   montantRemboursement?: string;
   montantCompensation?: string;
   /** Absolu du montant corrigé (MONTANT_NEGATIF) — toujours positif. */
   montantCorrection?: string;
+  /** Montant positif restitué (RESTITUTION). */
+  montantRestitution?: string;
   moyen?: string;
   executeurLabel?: string | null;
   cibles?: Array<{
@@ -85,8 +88,10 @@ export type NoteFraisHistoriqueReglementDto = {
   preuveRef?: string;
   referenceAvant?: string;
   referenceApres?: string;
-  /** Lien vers le règlement corrigé. */
+  /** Lien vers le règlement corrigé / restitué. */
   reglementId?: string;
+  /** Parent MIXTE (restitution sur enfant) — affichage groupé. */
+  operationId?: string | null;
 };
 
 export type NoteFraisChoixHistoriqueDto = {
@@ -398,6 +403,20 @@ export function enrichNoteFraisFinancierDto(
       referenceApres: string | null;
       reglementType: "REMBOURSEMENT" | "COMPENSATION" | string;
     }>;
+    restitutions?: Array<{
+      id: string;
+      reglementId: string;
+      montant: { toString(): string } | number | string;
+      moyen: string;
+      reference: string | null;
+      dateRestitution: Date;
+      motif: string;
+      operationId?: string | null;
+    }>;
+    /** Inclure motif restitution (ADMIN/TRESOR). */
+    includeRestitutionAudit?: boolean;
+    /** Inclure référence restitution (ADMIN/TRESOR uniquement — jamais COMCPT). */
+    includeRestitutionReference?: boolean;
     choixHistorique?: NoteFraisChoixHistoriqueDto[];
   }
 ): NoteFraisPublicDto {
@@ -520,6 +539,29 @@ export function enrichNoteFraisFinancierDto(
     if (includeAudit && opts.includeReference && corr.type === "REFERENCE") {
       if (corr.referenceAvant) entry.referenceAvant = corr.referenceAvant;
       if (corr.referenceApres) entry.referenceApres = corr.referenceApres;
+    }
+    historique.push(entry);
+  }
+
+  const includeRestitAudit = opts.includeRestitutionAudit === true;
+  for (const rest of opts.restitutions ?? []) {
+    const entry: NoteFraisHistoriqueReglementDto = {
+      kind: "RESTITUTION",
+      id: rest.id,
+      reglementId: rest.reglementId,
+      executeAt: rest.dateRestitution.toISOString(),
+      montantRestitution: decimalToString(rest.montant) ?? "0",
+      moyen: rest.moyen,
+      operationId: rest.operationId ?? null,
+    };
+    if (
+      opts.includeRestitutionReference === true &&
+      rest.reference
+    ) {
+      entry.reference = rest.reference;
+    }
+    if (includeRestitAudit) {
+      entry.motif = rest.motif;
     }
     historique.push(entry);
   }

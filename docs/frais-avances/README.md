@@ -2,6 +2,7 @@
 
 | Version | Date | Contenu |
 |---------|------|---------|
+| 0.4.7-restitutions-reelles | 2026-09-17 | Lot 4.7 : restitutions réelles (flag off) |
 | 0.4.6-corrections-append-only | 2026-09-17 | Lot 4.6 : corrections append-only (flag off) |
 | 0.4.5-notifications-reglement | 2026-09-17 | Lot 4.5 : notif + outbox règlement (flag off) |
 | 0.4.4-permissions-ui | 2026-09-17 | Lot 4.4 : permissions + UI opérationnelle (flag off) |
@@ -27,4 +28,5 @@ Voir [GUIDE.md](./GUIDE.md) et [CHANGELOG.md](./CHANGELOG.md).
 **Décision VALIDEE** = reconnaissance de charge (`Depense` origine `FRAIS_AVANCE`) ≠ décaissement bancaire.
 **Choix de règlement** ≠ exécution financière ≠ création d'`Avoir`.
 **Lot 4.6** : corrections append-only REFERENCE / MONTANT_NEGATIF — flag off ; pas de migration dépôt.
-**Lots suivants** : restitution, annulation, détachement RGPD 4.9.
+**Lot 4.7** : restitutions réelles (entrée bancaire) ≠ corrections — flag off ; pas de migration dépôt.
+**Lots suivants** : annulation 4.8, détachement RGPD 4.9.

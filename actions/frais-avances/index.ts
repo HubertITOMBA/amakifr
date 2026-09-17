@@ -786,3 +786,59 @@ export async function actionCorrectNoteFraisReglement(form: {
     };
   }
 }
+
+/**
+ * Enregistre une restitution réelle sur un remboursement (lot 4.7).
+ * Montant en chaîne décimale positive ; référence obligatoire.
+ */
+export async function actionRecordNoteFraisRestitution(form: {
+  noteId: string;
+  reglementId: string;
+  expectedNoteVersion: number;
+  idempotencyKey: string;
+  montant: string;
+  moyen: "VIREMENT" | "ESPECES";
+  reference: string;
+  dateRestitution: string;
+  motif: string;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    if (!form.idempotencyKey?.trim()) {
+      return {
+        success: false as const,
+        error: "Clé d'idempotence requise",
+        code: "IDEMPOTENCY_REQUIRED",
+      };
+    }
+    const { recordNoteFraisRestitution } = await import(
+      "@/lib/services/frais-avances/note-frais-restitution-service"
+    );
+    const result = await recordNoteFraisRestitution({
+      actorUserId: userId,
+      noteId: form.noteId,
+      reglementId: form.reglementId,
+      expectedNoteVersion: form.expectedNoteVersion,
+      idempotencyKey: form.idempotencyKey,
+      montant: form.montant,
+      moyen: form.moyen,
+      reference: form.reference,
+      dateRestitution: form.dateRestitution,
+      motif: form.motif,
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath("/admin/frais-avances");
+      revalidatePath(`/user/frais-avances/${form.noteId}`);
+      revalidatePath(`/admin/frais-avances/${form.noteId}`);
+      revalidatePath("/admin/finances/synthese");
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}

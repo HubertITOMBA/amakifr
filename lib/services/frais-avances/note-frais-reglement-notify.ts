@@ -1,5 +1,5 @@
 /**
- * Notification interne + outbox push pour un règlement / correction fresh (lots 4.5–4.6).
+ * Notification interne + outbox push pour un règlement / correction / restitution.
  * Textes génériques uniquement — aucune donnée financière sensible.
  */
 import { TypeNotification, type Prisma } from "@prisma/client";
@@ -14,12 +14,18 @@ export const CORRECTION_NOTIFY_TITRE = "Correction de règlement enregistrée";
 export const CORRECTION_NOTIFY_MESSAGE =
   "Une correction a été enregistrée sur un règlement de votre note de frais. Consultez le détail pour en savoir plus.";
 
+export const RESTITUTION_NOTIFY_TITRE = "Restitution enregistrée";
+
+export const RESTITUTION_NOTIFY_MESSAGE =
+  "Une restitution a été enregistrée sur votre note de frais. Consultez le détail pour en savoir plus.";
+
 export type NoteFraisReglementNotifyKind =
   | "REGLEMENT_COMPENSATION"
   | "REGLEMENT_REMBOURSEMENT"
   | "REGLEMENT_MIXTE"
   | "CORRECTION_REFERENCE"
-  | "CORRECTION_MONTANT_NEGATIF";
+  | "CORRECTION_MONTANT_NEGATIF"
+  | "RESTITUTION_ENREGISTREE";
 
 type TxClient = Prisma.TransactionClient;
 
@@ -33,11 +39,11 @@ export function buildNoteFraisReglementNotifyLien(noteId: string): string {
 }
 
 /**
- * Construit l'eventKey outbox unique pour un règlement / opération / correction.
+ * Construit l'eventKey outbox unique pour un règlement / opération / correction / restitution.
  *
  * @param kind - Discriminant technique outbox
  * @param noteId - Note concernée
- * @param anchorId - reglementId, operationId ou correctionId
+ * @param anchorId - reglementId, operationId, correctionId ou restitutionId
  */
 export function buildNoteFraisReglementOutboxEventKey(
   kind: NoteFraisReglementNotifyKind,
@@ -54,6 +60,8 @@ export function buildNoteFraisReglementOutboxEventKey(
     case "CORRECTION_REFERENCE":
     case "CORRECTION_MONTANT_NEGATIF":
       return `note:${noteId}:correction:${anchorId}`;
+    case "RESTITUTION_ENREGISTREE":
+      return `note:${noteId}:restitution:${anchorId}`;
   }
 }
 
@@ -70,6 +78,12 @@ function notifyCopy(kind: NoteFraisReglementNotifyKind): {
       message: CORRECTION_NOTIFY_MESSAGE,
     };
   }
+  if (kind === "RESTITUTION_ENREGISTREE") {
+    return {
+      titre: RESTITUTION_NOTIFY_TITRE,
+      message: RESTITUTION_NOTIFY_MESSAGE,
+    };
+  }
   return {
     titre: REGLEMENT_NOTIFY_TITRE,
     message: REGLEMENT_NOTIFY_MESSAGE,
@@ -78,7 +92,7 @@ function notifyCopy(kind: NoteFraisReglementNotifyKind): {
 
 /**
  * Crée atomiquement la notification demandeur et l'événement outbox push
- * dans la transaction (après écritures financières / correction).
+ * dans la transaction (après écritures financières / correction / restitution).
  *
  * Payload push : titre/message génériques + lien uniquement (pas de montant,
  * moyen, référence, cible, motif, ni discriminant métier dans le texte).
@@ -92,7 +106,7 @@ export async function createNoteFraisReglementNotificationInTx(
     noteId: string;
     demandeurUserId: string;
     kind: NoteFraisReglementNotifyKind;
-    /** reglementId (4.1/4.2), operationId (4.3) ou correctionId (4.6). */
+    /** reglementId (4.1/4.2), operationId (4.3), correctionId (4.6) ou restitutionId (4.7). */
     anchorId: string;
   }
 ): Promise<void> {

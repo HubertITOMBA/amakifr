@@ -8,6 +8,8 @@ import {
   computeSoldeBancaireEstime,
   withCompensationsNotesFrais,
   withDecaissementsNotesFrais,
+  withRestantDuNotesFrais,
+  withRestitutionsNotesFrais,
 } from "@/lib/financial/synthese-charges";
 
 /**
@@ -84,6 +86,12 @@ export async function getFinancialSynthese() {
     const { aggregateCorrectionsMontantByReglementType } = await import(
       "@/lib/services/frais-avances/note-frais-correction-service"
     );
+    const {
+      aggregateRestitutionsMontant,
+      computeRestantDuNotesFraisGlobal,
+    } = await import(
+      "@/lib/services/frais-avances/note-frais-restitution-service"
+    );
     const corrAgg = await aggregateCorrectionsMontantByReglementType(prisma);
     // Nets Decimal purs (brut + corrections négatives) — pas de Number intermédiaire.
     const rembNet = new Prisma.Decimal(
@@ -96,9 +104,17 @@ export async function getFinancialSynthese() {
     )
       .plus(new Prisma.Decimal(corrAgg.compensations))
       .toFixed(2);
-    const chargesIndicators = withDecaissementsNotesFrais(
-      withCompensationsNotesFrais(chargesIndicatorsBase, compNet),
-      rembNet
+    const restitSum = await aggregateRestitutionsMontant(prisma);
+    const restantDuGlobal = await computeRestantDuNotesFraisGlobal(prisma);
+    const chargesIndicators = withRestantDuNotesFrais(
+      withRestitutionsNotesFrais(
+        withDecaissementsNotesFrais(
+          withCompensationsNotesFrais(chargesIndicatorsBase, compNet),
+          rembNet
+        ),
+        restitSum
+      ),
+      restantDuGlobal
     );
     const totalCharges = chargesIndicators.totalCharges;
     const depensesOrdinairesDecaissees =

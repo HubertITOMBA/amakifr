@@ -66,9 +66,19 @@
 - `REFERENCE` (remboursement) et `MONTANT_NEGATIF` (remboursement / compensation, y compris enfants MIXTE).
 - Aucune mutation du règlement, ligne, Avoir ou UtilisationAvoir d'origine ; pas de restitution bancaire.
 - Compensation multilignes via `NoteFraisCorrectionInverseCible` ; option A (pas d'Avoir/UA inverse).
-- Synthèse nette : décaissements / compensations = brut + corrections négatives ; `restitutionsNotesFrais` = 0.
+- Synthèse nette : décaissements / compensations = brut + corrections négatives.
 - Archivage RGPD : refus `NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED` tant que détachement 4.9 absent.
 - Constraint triggers différés documentés (appartenance ligne, type règlement, Σ inverses) — invariants TX + tests PG.
+
+### Restitutions réelles (lot 4.7 — local, flag off)
+
+Argent réellement revenu à l'association après un remboursement :
+- augmente `restitutionsNotesFrais` (solde bancaire) ;
+- décrémente `montantRembourseUtilise` (réouvre le restant dû) ;
+- jamais sur COMPENSATION ni opération MIXTE parente ;
+- distincte d'une correction 4.6 (aucune création croisée) ;
+- confidentialité : membre/COMCPT sans référence/motif/acteur ;
+- `restantDuNotesFrais` activé (notes VALIDEE, choix ACTIF uniquement).
 
 ### Notifications de règlement (lot 4.5 — local, flag off)
 - Helper TX `note-frais-reglement-notify` : textes génériques (« Règlement enregistré ») + lien `/user/frais-avances/{noteId}`.
@@ -166,12 +176,13 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
     lib/services/frais-avances/note-frais-remboursement.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-mixte.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-correction.pg.integration.test.ts \
+    lib/services/frais-avances/note-frais-restitution.pg.integration.test.ts \
     lib/frais-avances/pg-test-allowlist.test.ts
 ```
 
 
 ## Non livré / futur
-- Lot **4.6+** : correction, restitution, annulation (`EXPIREE` 30 j), détachement RGPD FK.
+- Lot **4.8+** : annulation (`EXPIREE` 30 j), détachement RGPD FK 4.9.
 - Index partiel unique choix ACTIF.
 - CHECK SQL polymorphes sur `notes_frais_reglement_lignes` et opérations MIXTE.
 - API v1, mobile notes de frais.

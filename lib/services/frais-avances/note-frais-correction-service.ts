@@ -574,6 +574,7 @@ export async function correctNoteFraisReglement(
             orderBy: { createdAt: "asc" },
             include: { Inverses: true },
           },
+          Restitutions: { select: { montant: true } },
         },
       });
       if (!reglement || reglement.noteFraisId !== input.noteId) {
@@ -724,8 +725,17 @@ export async function correctNoteFraisReglement(
         (c) => c.type === "MONTANT_NEGATIF" && c.montant != null
       ).map((c) => c.montant!);
       const net = computeReglementNetMontant(reglement.montantTotal, priorNeg);
+      const restitueCumule = (reglement.Restitutions ?? []).reduce(
+        (acc, r) => acc.plus(money(r.montant)),
+        money(0)
+      );
+      // Lot 4.7 : une correction ne peut pas rendre net < cumuls restitués.
+      const montantEncoreCorrigeable = net.minus(restitueCumule);
+      if (montantEncoreCorrigeable.lt(0)) {
+        throw new Error(NOTES_FRAIS_CORR_PLAFOND);
+      }
       const aCorriger = money(montantACorriger!);
-      if (aCorriger.gt(net)) {
+      if (aCorriger.gt(montantEncoreCorrigeable)) {
         throw new Error(NOTES_FRAIS_CORR_PLAFOND);
       }
       const montantStocke = aCorriger.neg();
@@ -738,13 +748,6 @@ export async function correctNoteFraisReglement(
       }
 
       if (reglement.type === "REMBOURSEMENT") {
-        const newUtilise = money(choix.montantRembourseUtilise).minus(
-          aCorriger
-        );
-        if (newUtilise.lt(0)) {
-          throw new Error(NOTES_FRAIS_CORR_PLAFOND);
-        }
-
         const correction = await tx.noteFraisReglementCorrection.create({
           data: {
             reglementId,
@@ -762,10 +765,19 @@ export async function correctNoteFraisReglement(
           },
         });
 
-        await tx.noteFraisChoixReglement.update({
-          where: { id: choix.id },
-          data: { montantRembourseUtilise: newUtilise },
+        // Décrément atomique gardé (aligné restitution 4.7).
+        const compteur = await tx.noteFraisChoixReglement.updateMany({
+          where: {
+            id: choix.id,
+            montantRembourseUtilise: { gte: aCorriger },
+          },
+          data: {
+            montantRembourseUtilise: { decrement: aCorriger },
+          },
         });
+        if (compteur.count !== 1) {
+          throw new Error(NOTES_FRAIS_CORR_PLAFOND);
+        }
 
         if (input.afterCorrectionInsert) await input.afterCorrectionInsert();
 

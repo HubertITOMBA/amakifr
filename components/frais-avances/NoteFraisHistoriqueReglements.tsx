@@ -48,6 +48,11 @@ export function NoteFraisHistoriqueReglements({
               <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-900">
                 Correction réf.
               </span>
+            ) : e.kind === "RESTITUTION" ? (
+              <span className="rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-emerald-900">
+                Restitution
+                {e.operationId ? " (MIXTE)" : ""}
+              </span>
             ) : (
               <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-900">
                 Correction montant
@@ -67,6 +72,9 @@ export function NoteFraisHistoriqueReglements({
             ) : null}
             {e.montantCorrection != null ? (
               <span>Corr. {e.montantCorrection} €</span>
+            ) : null}
+            {e.montantRestitution != null ? (
+              <span>Restit. {e.montantRestitution} €</span>
             ) : null}
             {e.moyen ? <span>Moyen : {e.moyen}</span> : null}
             {showReference && e.reference ? (

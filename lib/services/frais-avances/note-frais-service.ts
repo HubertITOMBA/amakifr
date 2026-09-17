@@ -10,6 +10,7 @@ import {
   canUserReadSubmittedNotesFrais,
   canUserReadNoteFraisRemboursementReference,
   canUserReadNoteFraisCorrectionAudit,
+  canUserReadNoteFraisRestitutionReference,
 } from "@/lib/frais-avances/authz";
 import {
   toNoteFraisPublicDto,
@@ -876,7 +877,8 @@ export async function getNoteFraisForUser(input: {
       }
     }
 
-    const [remboursements, compensations, operations] = await Promise.all([
+    const [remboursements, compensations, operations, restitutions] =
+      await Promise.all([
       db.noteFraisReglement.findMany({
         where: {
           noteFraisId: input.noteId,
@@ -966,6 +968,20 @@ export async function getNoteFraisForUser(input: {
           },
         },
       }),
+      db.noteFraisRestitution.findMany({
+        where: { Reglement: { noteFraisId: input.noteId } },
+        orderBy: { dateRestitution: "asc" },
+        select: {
+          id: true,
+          reglementId: true,
+          montant: true,
+          moyen: true,
+          reference: true,
+          dateRestitution: true,
+          motif: true,
+          Reglement: { select: { operationId: true } },
+        },
+      }),
     ]);
 
     // Membre propriétaire : jamais la référence (même si double casquette).
@@ -975,6 +991,10 @@ export async function getNoteFraisForUser(input: {
     const includeCorrectionAudit =
       !isOwner &&
       (await canUserReadNoteFraisCorrectionAudit(input.userId));
+    const includeRestitutionReference =
+      !isOwner &&
+      (await canUserReadNoteFraisRestitutionReference(input.userId));
+    const includeRestitutionAudit = includeRestitutionReference;
 
     const { computeReglementNetMontant } = await import(
       "@/lib/services/frais-avances/note-frais-correction-service"
@@ -1081,6 +1101,18 @@ export async function getNoteFraisForUser(input: {
         };
       }),
       corrections: allCorrections,
+      restitutions: restitutions.map((r) => ({
+        id: r.id,
+        reglementId: r.reglementId,
+        montant: r.montant,
+        moyen: r.moyen,
+        reference: r.reference,
+        dateRestitution: r.dateRestitution,
+        motif: r.motif,
+        operationId: r.Reglement.operationId,
+      })),
+      includeRestitutionAudit,
+      includeRestitutionReference,
       choixHistorique,
     });
 

@@ -115,6 +115,7 @@ export function withCompensationsNotesFrais(
 /**
  * Injecte les décaissements notes nets (remboursements EXECUTE + corrections négatives, lot 4.6).
  * Impacte `soldeBancaireEstime` via `computeSoldeBancaireEstime`.
+ * Ne pas y intégrer les restitutions — indicateurs séparés (lot 4.7).
  *
  * @param indicators - Indicateurs
  * @param decaissementsNotesFrais - Σ REMBOURSEMENT EXECUTE + corrections MONTANT_NEGATIF
@@ -130,5 +131,50 @@ export function withDecaissementsNotesFrais(
     };
   } catch {
     return { ...indicators, decaissementsNotesFrais: 0 };
+  }
+}
+
+/**
+ * Injecte les restitutions réelles notes (lot 4.7) — entrée bancaire.
+ * N'altère pas `decaissementsNotesFrais`.
+ *
+ * @param indicators - Indicateurs
+ * @param restitutionsNotesFrais - Σ NoteFraisRestitution.montant
+ */
+export function withRestitutionsNotesFrais(
+  indicators: ChargesSyntheseIndicators,
+  restitutionsNotesFrais: number | string
+): ChargesSyntheseIndicators {
+  try {
+    return {
+      ...indicators,
+      restitutionsNotesFrais: toMoneyNumber(money(restitutionsNotesFrais)),
+    };
+  } catch {
+    return { ...indicators, restitutionsNotesFrais: 0 };
+  }
+}
+
+/**
+ * Injecte le restant dû global des notes VALIDEE (choix ACTIF uniquement).
+ *
+ * @param indicators - Indicateurs
+ * @param restantDuNotesFrais - Σ (accepte − rembUtilise − compUtilise)
+ */
+export function withRestantDuNotesFrais(
+  indicators: ChargesSyntheseIndicators,
+  restantDuNotesFrais: number | string
+): ChargesSyntheseIndicators {
+  try {
+    const v = money(restantDuNotesFrais);
+    if (v.lt(0)) {
+      throw new Error("restantDuNotesFrais négatif");
+    }
+    return {
+      ...indicators,
+      restantDuNotesFrais: toMoneyNumber(v),
+    };
+  } catch {
+    throw new Error("NOTES_FRAIS_FINANCIAL_STATE_INCONSISTENT");
   }
 }

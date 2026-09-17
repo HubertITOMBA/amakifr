@@ -10,6 +10,8 @@ const {
   canExecRemb,
   canExecMixte,
   canCorrect,
+  canRecordRestit,
+  canReadRestitRef,
 } = vi.hoisted(() => ({
   noteFindUnique: vi.fn(),
   reglementFindMany: vi.fn(),
@@ -20,6 +22,8 @@ const {
   canExecRemb: vi.fn(),
   canExecMixte: vi.fn(),
   canCorrect: vi.fn(),
+  canRecordRestit: vi.fn(),
+  canReadRestitRef: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -51,6 +55,9 @@ vi.mock("@/lib/frais-avances/authz", () => ({
   canUserExecuteNoteFraisRemboursement: (...a: unknown[]) => canExecRemb(...a),
   canUserExecuteNoteFraisReglementMixte: (...a: unknown[]) => canExecMixte(...a),
   canUserCorrectNoteFraisReglement: (...a: unknown[]) => canCorrect(...a),
+  canUserRecordNoteFraisRestitution: (...a: unknown[]) => canRecordRestit(...a),
+  canUserReadNoteFraisRestitutionReference: (...a: unknown[]) =>
+    canReadRestitRef(...a),
 }));
 
 import { getNoteFraisCapabilities } from "@/lib/services/frais-avances/note-frais-capabilities-service";
@@ -65,6 +72,8 @@ describe("getNoteFraisCapabilities", () => {
     canExecRemb.mockResolvedValue(false);
     canExecMixte.mockResolvedValue(false);
     canCorrect.mockResolvedValue(false);
+    canRecordRestit.mockResolvedValue(false);
+    canReadRestitRef.mockResolvedValue(false);
     reglementFindMany.mockResolvedValue([]);
   });
 

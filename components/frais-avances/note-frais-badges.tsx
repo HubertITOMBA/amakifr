@@ -135,6 +135,10 @@ export function messageErreurNoteFrais(
       return "Montant supérieur au net restant corrigeable.";
     case "AUTO_CORRECTION_FORBIDDEN":
       return "Auto-correction interdite.";
+    case "AUTO_RESTITUTION_FORBIDDEN":
+      return "Auto-restitution interdite.";
+    case "RESTITUTION_EXCEEDS_REMAINING":
+      return "Montant supérieur au reste restituable.";
     case "NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED":
       return "Historique financier présent — archivage reporté (lot 4.9).";
     case "FORBIDDEN":

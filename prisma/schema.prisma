@@ -312,6 +312,7 @@ model User {
   notesFraisReglementsExecuteur NoteFraisReglement[]         @relation("NoteFraisReglementExecuteur")
   notesFraisReglementOperationsExecuteur NoteFraisReglementOperation[] @relation("NoteFraisReglementOperationExecuteur")
   notesFraisReglementCorrectionsActor NoteFraisReglementCorrection[] @relation("NoteFraisReglementCorrectionActor")
+  notesFraisRestitutionsActor   NoteFraisRestitution[]       @relation("NoteFraisRestitutionActor")
   justificatifsNoteFraisUploades JustificatifNoteFrais[]     @relation("JustificatifNoteFraisUploader")
   notesFraisArchiveAccessLogs   NoteFraisArchiveAccessLog[]  @relation("NoteFraisArchiveAccessActor")
 
@@ -2943,6 +2944,7 @@ model NoteFraisReglement {
   Operation   NoteFraisReglementOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
   Lignes      NoteFraisReglementLigne[]
   Corrections NoteFraisReglementCorrection[]
+  Restitutions NoteFraisRestitution[]
 
   @@unique([operationId, type])
   @@index([noteFraisId, executeAt])
@@ -3023,6 +3025,31 @@ model NoteFraisReglementCorrection {
   @@index([reglementId, createdAt])
   @@index([type, createdAt])
   @@map("notes_frais_reglement_corrections")
+}
+
+/// Restitution réelle (entrée bancaire) sur un remboursement — lot 4.7.
+/// Distincte d'une correction MONTANT_NEGATIF (erreur d'enregistrement, sans flux).
+/// Invariants (TX + tests PG) : règlement REMBOURSEMENT ; Σ restitutions ≤ net corrigé.
+model NoteFraisRestitution {
+  id                  String                  @id @default(cuid())
+  reglementId         String
+  /// Strictement positif (garanti applicativement).
+  montant             Decimal                 @db.Decimal(10, 2)
+  moyen               MoyenReglementNoteFrais
+  reference           String                  @db.VarChar(64)
+  referenceNormalisee String                  @db.VarChar(64)
+  dateRestitution     DateTime
+  motif               String                  @db.Text
+  idempotencyKey      String                  @unique @db.VarChar(64)
+  /// Nullable + SetNull : ne bloque pas user.delete (RGPD).
+  actorUserId         String?
+  createdAt           DateTime                @default(now())
+
+  Reglement NoteFraisReglement @relation(fields: [reglementId], references: [id], onDelete: Restrict)
+  Actor     User?              @relation("NoteFraisRestitutionActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+
+  @@index([reglementId, dateRestitution])
+  @@map("notes_frais_restitutions")
 }
 
 /// Ligne d'inversion explicite pour correction MONTANT_NEGATIF compensation.

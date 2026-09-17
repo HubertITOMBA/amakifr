@@ -17,6 +17,7 @@ import { ExecuteCompensationDialog } from "@/components/frais-avances/ExecuteCom
 import { ExecuteMixteDialog } from "@/components/frais-avances/ExecuteMixteDialog";
 import { CorrectReferenceDialog } from "@/components/frais-avances/CorrectReferenceDialog";
 import { CorrectMontantDialog } from "@/components/frais-avances/CorrectMontantDialog";
+import { RecordRestitutionDialog } from "@/components/frais-avances/RecordRestitutionDialog";
 import type { CompensationCibleOption } from "@/components/frais-avances/CompensationCiblesFields";
 import { NoteFraisHistoriqueReglements } from "@/components/frais-avances/NoteFraisHistoriqueReglements";
 import {
@@ -168,6 +169,11 @@ export default function AdminNoteFraisDetailPage() {
   const [mixteOpen, setMixteOpen] = useState(false);
   const [refCorrOpen, setRefCorrOpen] = useState(false);
   const [montantCorrOpen, setMontantCorrOpen] = useState(false);
+  const [restitOpen, setRestitOpen] = useState(false);
+  const [restitTarget, setRestitTarget] = useState<{
+    id: string;
+    resteRestituable: string;
+  } | null>(null);
   const [corrTarget, setCorrTarget] = useState<{
     id: string;
     type: "REMBOURSEMENT" | "COMPENSATION";
@@ -185,6 +191,9 @@ export default function AdminNoteFraisDetailPage() {
   } | null>(null);
   const [corrIdempotencyKey, setCorrIdempotencyKey] = useState(
     () => `corr-${noteId}-${Date.now()}`
+  );
+  const [restitIdempotencyKey, setRestitIdempotencyKey] = useState(
+    () => `restit-${noteId}-${Date.now()}`
   );
   const [idempotencyKey, setIdempotencyKey] = useState(
     () => `decide-${noteId}-${Date.now()}`
@@ -291,6 +300,9 @@ export default function AdminNoteFraisDetailPage() {
   const showCorrect =
     (caps?.canCorrectReference === true || caps?.canCorrectMontant === true) &&
     (caps?.reglementsCorrigeables?.length ?? 0) > 0;
+  const showRestitution =
+    caps?.canRecordRestitution === true &&
+    (caps?.reglementsRestituables?.length ?? 0) > 0;
   const showReference = caps?.canReadFinancial === true;
 
   if (!enabledHint) {
@@ -538,6 +550,43 @@ export default function AdminNoteFraisDetailPage() {
                 </section>
               ) : null}
 
+              {showRestitution ? (
+                <section className="rounded-lg border border-emerald-200 bg-emerald-50/60 p-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-emerald-900">
+                    Restitutions réelles
+                  </p>
+                  <ul className="space-y-2">
+                    {(caps?.reglementsRestituables ?? []).map((r) => (
+                      <li
+                        key={r.id}
+                        className="flex flex-wrap items-center gap-2 text-xs"
+                      >
+                        <span className="font-mono text-slate-700">
+                          REMBOURSEMENT · reste {r.resteRestituable} €
+                          {r.operationId ? " (enfant MIXTE)" : ""}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          onClick={() => {
+                            setRestitTarget(r);
+                            setRestitIdempotencyKey(
+                              `restit-${r.id}-${Date.now()}`
+                            );
+                            setRestitOpen(true);
+                          }}
+                          data-testid={`open-restit-${r.id}`}
+                        >
+                          <Banknote className="h-3.5 w-3.5 mr-1" />
+                          Restituer
+                        </Button>
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
               {note.description && caps?.canReadLive ? (
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 mb-1">
@@ -673,6 +722,18 @@ export default function AdminNoteFraisDetailPage() {
           idempotencyKey={corrIdempotencyKey}
           netRestant={corrTarget.netRestant}
           lignes={corrTarget.lignesCompensation}
+          onDone={reload}
+        />
+      ) : null}
+      {note && restitTarget && restitOpen ? (
+        <RecordRestitutionDialog
+          open={restitOpen}
+          onOpenChange={setRestitOpen}
+          noteId={noteId}
+          reglementId={restitTarget.id}
+          expectedVersion={note.version}
+          idempotencyKey={restitIdempotencyKey}
+          resteRestituable={restitTarget.resteRestituable}
           onDone={reload}
         />
       ) : null}

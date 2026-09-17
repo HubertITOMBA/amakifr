@@ -24,6 +24,7 @@ const {
     noteFraisChoixReglement: {
       findUniqueOrThrow: vi.fn(),
       update: vi.fn(),
+      updateMany: vi.fn().mockResolvedValue({ count: 1 }),
     },
     noteFraisChoixReglementCible: {
       update: vi.fn(),
@@ -343,6 +344,7 @@ describe("correctNoteFraisReglement (mocks)", () => {
       referenceNormalisee: "SAME",
       Lignes: [],
       Corrections: [],
+      Restitutions: [],
     });
     tx.noteFraisChoixReglement.findUniqueOrThrow.mockResolvedValue({
       id: "ch",
@@ -377,6 +379,7 @@ describe("correctNoteFraisReglement (mocks)", () => {
       referenceNormalisee: "OLD-REF",
       Lignes: [],
       Corrections: [],
+      Restitutions: [],
     });
     tx.noteFraisChoixReglement.findUniqueOrThrow.mockResolvedValue({
       id: "ch",
@@ -432,6 +435,7 @@ describe("correctNoteFraisReglement (mocks)", () => {
       referenceNormalisee: "R",
       Lignes: [],
       Corrections: [],
+      Restitutions: [],
     });
     tx.noteFraisChoixReglement.findUniqueOrThrow.mockResolvedValue({
       id: "ch",
@@ -456,7 +460,16 @@ describe("correctNoteFraisReglement (mocks)", () => {
     if (res.success) expect(res.data.montant).toBe("-10.00");
     const createArg = tx.noteFraisReglementCorrection.create.mock.calls[0]![0];
     expect(createArg.data.montant.toString()).toBe("-10");
-    expect(tx.noteFraisChoixReglement.update).toHaveBeenCalled();
+    expect(tx.noteFraisChoixReglement.updateMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({
+          montantRembourseUtilise: { gte: expect.anything() },
+        }),
+        data: expect.objectContaining({
+          montantRembourseUtilise: { decrement: expect.anything() },
+        }),
+      })
+    );
   });
 
   it("authz refusée avant replay", async () => {
@@ -535,6 +548,7 @@ describe("correctNoteFraisReglement (mocks)", () => {
       referenceNormalisee: "R",
       Lignes: [],
       Corrections: [],
+      Restitutions: [],
     });
     tx.noteFraisChoixReglement.findUniqueOrThrow.mockResolvedValue({
       id: "ch",

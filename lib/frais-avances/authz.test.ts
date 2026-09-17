@@ -27,6 +27,8 @@ vi.mock("@/lib/dynamic-permissions", () => ({
 import {
   canUserCorrectNoteFraisReglement,
   canUserReadNoteFraisCorrectionAudit,
+  canUserRecordNoteFraisRestitution,
+  canUserReadNoteFraisRestitutionReference,
   canUserReadNoteFraisFinancialView,
   canUserReadSubmittedNotesFrais,
 } from "@/lib/frais-avances/authz";
@@ -198,5 +200,79 @@ describe("canUserCorrectNoteFraisReglement", () => {
     expect(await canUserReadNoteFraisCorrectionAudit("c")).toBe(false);
     userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
     expect(await canUserReadNoteFraisCorrectionAudit("t")).toBe(true);
+  });
+});
+
+describe("canUserRecordNoteFraisRestitution", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    userAdminRoleFindMany.mockResolvedValue([]);
+    resolveActionPermissionConfig.mockResolvedValue({ status: "absent" });
+  });
+
+  it("accepte TRESOR|ADMIN principaux", async () => {
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+    expect(await canUserRecordNoteFraisRestitution("t")).toBe(true);
+    userFindUnique.mockResolvedValue({ role: "ADMIN", status: "Actif" });
+    expect(await canUserRecordNoteFraisRestitution("a")).toBe(true);
+  });
+
+  it("accepte ADMIN/TRESOR additionnels", async () => {
+    userFindUnique.mockResolvedValue({ role: "MEMBRE", status: "Actif" });
+    userAdminRoleFindMany.mockResolvedValue([{ role: "TRESOR" }]);
+    expect(await canUserRecordNoteFraisRestitution("m-t")).toBe(true);
+    userAdminRoleFindMany.mockResolvedValue([{ role: "ADMIN" }]);
+    expect(await canUserRecordNoteFraisRestitution("m-a")).toBe(true);
+  });
+
+  it("refuse COMCPT|PRESID|SECRET|MEMBRE|Inactif", async () => {
+    for (const role of ["COMCPT", "PRESID", "SECRET", "MEMBRE"] as const) {
+      userFindUnique.mockResolvedValue({ role, status: "Actif" });
+      userAdminRoleFindMany.mockResolvedValue([]);
+      expect(await canUserRecordNoteFraisRestitution(`u-${role}`)).toBe(false);
+    }
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Inactif" });
+    expect(await canUserRecordNoteFraisRestitution("inact")).toBe(false);
+  });
+
+  it("MEMBRE avec permission dynamique WRITE refusée sans élargissement", async () => {
+    resolveActionPermissionConfig.mockResolvedValue({
+      status: "configured",
+      roles: ["MEMBRE", "COMCPT", "ADMIN", "TRESOR"],
+    });
+    userFindUnique.mockResolvedValue({ role: "MEMBRE", status: "Actif" });
+    userAdminRoleFindMany.mockResolvedValue([]);
+    expect(await canUserRecordNoteFraisRestitution("m")).toBe(false);
+  });
+
+  it("permission disabled refuse TRESOR ; ADMIN principal bypass", async () => {
+    resolveActionPermissionConfig.mockResolvedValue({ status: "disabled" });
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+    expect(await canUserRecordNoteFraisRestitution("t")).toBe(false);
+    userFindUnique.mockResolvedValue({ role: "ADMIN", status: "Actif" });
+    expect(await canUserRecordNoteFraisRestitution("a")).toBe(true);
+  });
+
+  it("permission configurée hors rôle refuse ; absente autorise métier", async () => {
+    resolveActionPermissionConfig.mockResolvedValue({
+      status: "configured",
+      roles: ["ADMIN"],
+    });
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+    expect(await canUserRecordNoteFraisRestitution("t")).toBe(false);
+
+    resolveActionPermissionConfig.mockResolvedValue({ status: "absent" });
+    expect(await canUserRecordNoteFraisRestitution("t2")).toBe(true);
+  });
+
+  it("lecture référence restitution ADMIN/TRESOR uniquement ; COMCPT refusé", async () => {
+    userFindUnique.mockResolvedValue({ role: "COMCPT", status: "Actif" });
+    expect(await canUserReadNoteFraisRestitutionReference("c")).toBe(false);
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+    expect(await canUserReadNoteFraisRestitutionReference("t")).toBe(true);
+    userFindUnique.mockResolvedValue({ role: "ADMIN", status: "Actif" });
+    expect(await canUserReadNoteFraisRestitutionReference("a")).toBe(true);
+    userFindUnique.mockResolvedValue({ role: "MEMBRE", status: "Actif" });
+    expect(await canUserReadNoteFraisRestitutionReference("m")).toBe(false);
   });
 });

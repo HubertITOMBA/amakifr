@@ -35,6 +35,7 @@ describe("intégration PG corrections notes-frais 4.6", () => {
 
   async function wipe() {
     await prisma.noteFraisCorrectionInverseCible.deleteMany({});
+    await prisma.noteFraisRestitution.deleteMany({});
     await prisma.noteFraisReglementCorrection.deleteMany({});
     await prisma.utilisationAvoir.deleteMany({
       where: { noteFraisReglementLigneId: { not: null } },

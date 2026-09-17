@@ -255,6 +255,57 @@ export async function canUserCorrectNoteFraisReglement(
 }
 
 /**
+ * Enregistrement d'une restitution réelle — TRESOR|ADMIN + dynamique restrictive.
+ * COMCPT/PRESID/SECRET/MEMBRE refusés.
+ */
+export async function canUserRecordNoteFraisRestitution(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
+
+  const hasRole =
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
+  if (!hasRole) return false;
+  if (loaded.primaryRole === "ADMIN") return true;
+
+  return evaluateRestrictiveDynamicPermission(
+    "recordNoteFraisRestitution",
+    loaded.primaryRole,
+    loaded.extras
+  );
+}
+
+/**
+ * Lecture de la référence d'une restitution — ADMIN|TRESOR uniquement (pas COMCPT).
+ */
+export async function canUserReadNoteFraisRestitutionReference(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
+
+  const hasRole =
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
+  if (!hasRole) return false;
+  if (loaded.primaryRole === "ADMIN") return true;
+
+  return evaluateRestrictiveDynamicPermission(
+    "readNoteFraisRestitutionReference",
+    loaded.primaryRole,
+    loaded.extras
+  );
+}
+
+/**
  * Lecture audit correction (motif / preuve) — mêmes rôles durs que la correction.
  */
 export async function canUserReadNoteFraisCorrectionAudit(

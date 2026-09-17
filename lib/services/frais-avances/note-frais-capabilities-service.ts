@@ -12,7 +12,9 @@ import {
   canUserExecuteNoteFraisRemboursement,
   canUserExecuteNoteFraisReglementMixte,
   canUserCorrectNoteFraisReglement,
+  canUserRecordNoteFraisRestitution,
   canUserReadNoteFraisFinancialView,
+  canUserReadNoteFraisRestitutionReference,
   canUserReadSubmittedNotesFrais,
 } from "@/lib/frais-avances/authz";
 import {
@@ -33,6 +35,8 @@ export type NoteFraisCapabilitiesDto = {
   canExecuteMixte: boolean;
   canCorrectReference: boolean;
   canCorrectMontant: boolean;
+  canRecordRestitution: boolean;
+  canReadRestitutionReference: boolean;
   /** Plafonds restants (chaînes) si choix ACTIF. */
   plafondRemboursementRestant: string | null;
   plafondCompensationRestant: string | null;
@@ -53,6 +57,12 @@ export type NoteFraisCapabilitiesDto = {
       montant: string;
       montantRestaurable: string;
     }>;
+  }>;
+  /** Règlements REMBOURSEMENT restituables avec plafond serveur. */
+  reglementsRestituables: Array<{
+    id: string;
+    operationId: string | null;
+    resteRestituable: string;
   }>;
 };
 
@@ -154,15 +164,27 @@ export async function getNoteFraisCapabilities(input: {
       input.userId,
       client
     );
+    const canRecordRestitutionAuth = await canUserRecordNoteFraisRestitution(
+      input.userId,
+      client
+    );
+    const canReadRestitutionReference =
+      await canUserReadNoteFraisRestitutionReference(input.userId, client);
 
     const reglementsCorrigeables: NoteFraisCapabilitiesDto["reglementsCorrigeables"] =
       [];
+    const reglementsRestituables: NoteFraisCapabilitiesDto["reglementsRestituables"] =
+      [];
     let canCorrectReference = false;
     let canCorrectMontant = false;
+    let canRecordRestitution = false;
 
-    if (note.statut === "VALIDEE" && canCorrectAuth) {
+    if (note.statut === "VALIDEE" && (canCorrectAuth || canRecordRestitutionAuth)) {
       const { computeReglementNetMontant } = await import(
         "@/lib/services/frais-avances/note-frais-correction-service"
+      );
+      const { computeResteRestituable } = await import(
+        "@/lib/services/frais-avances/note-frais-restitution-service"
       );
       const regs = await client.noteFraisReglement.findMany({
         where: {
@@ -175,6 +197,7 @@ export async function getNoteFraisCapabilities(input: {
             where: { type: "MONTANT_NEGATIF" },
             select: { montant: true },
           },
+          Restitutions: { select: { montant: true } },
           Lignes: {
             where: { typeLigne: "COMPENSATION" },
             orderBy: { rang: "asc" },
@@ -189,38 +212,64 @@ export async function getNoteFraisCapabilities(input: {
           r.montantTotal,
           r.Corrections.map((c) => c.montant)
         );
-        const netStr = net.toFixed(2);
         const isRemb = r.type === "REMBOURSEMENT";
-        const canRef = isRemb;
-        const canMont = net.gt(0);
-        if (canRef) canCorrectReference = true;
-        if (canMont) canCorrectMontant = true;
-        const entry: NoteFraisCapabilitiesDto["reglementsCorrigeables"][number] =
-          {
-            id: r.id,
-            type: r.type as "REMBOURSEMENT" | "COMPENSATION",
-            netRestant: netStr,
-            canCorrectReference: canRef,
-            canCorrectMontant: canMont,
-          };
-        if (r.type === "COMPENSATION") {
-          entry.lignesCompensation = r.Lignes.map((l) => {
-            const prior = l.InversesCorrection.reduce(
-              (acc, inv) => acc.plus(new Prisma.Decimal(inv.montantRestaure)),
-              new Prisma.Decimal(0)
+        let corrigible = net;
+        if (isRemb) {
+          const { resteRestituable, montantEncoreCorrigeable } = (() => {
+            const calc = computeResteRestituable(
+              r.montantTotal,
+              r.Corrections.map((c) => c.montant),
+              r.Restitutions.map((x) => x.montant)
             );
-            const resto = new Prisma.Decimal(l.montant).minus(prior);
             return {
-              id: l.id,
-              rang: l.rang,
-              typeCible: l.typeCible ?? "",
-              cibleId: l.cibleId ?? "",
-              montant: l.montant.toFixed(2),
-              montantRestaurable: resto.gt(0) ? resto.toFixed(2) : "0.00",
+              resteRestituable: calc.resteRestituable,
+              montantEncoreCorrigeable: calc.resteRestituable,
             };
-          });
+          })();
+          corrigible = montantEncoreCorrigeable;
+          if (canRecordRestitutionAuth && resteRestituable.gt(0)) {
+            canRecordRestitution = true;
+            reglementsRestituables.push({
+              id: r.id,
+              operationId: r.operationId,
+              resteRestituable: resteRestituable.toFixed(2),
+            });
+          }
         }
-        reglementsCorrigeables.push(entry);
+        if (canCorrectAuth) {
+          const netStr = corrigible.toFixed(2);
+          const canRef = isRemb;
+          const canMont = corrigible.gt(0);
+          if (canRef) canCorrectReference = true;
+          if (canMont) canCorrectMontant = true;
+          const entry: NoteFraisCapabilitiesDto["reglementsCorrigeables"][number] =
+            {
+              id: r.id,
+              type: r.type as "REMBOURSEMENT" | "COMPENSATION",
+              netRestant: netStr,
+              canCorrectReference: canRef,
+              canCorrectMontant: canMont,
+            };
+          if (r.type === "COMPENSATION") {
+            entry.lignesCompensation = r.Lignes.map((l) => {
+              const prior = l.InversesCorrection.reduce(
+                (acc, inv) =>
+                  acc.plus(new Prisma.Decimal(inv.montantRestaure)),
+                new Prisma.Decimal(0)
+              );
+              const resto = new Prisma.Decimal(l.montant).minus(prior);
+              return {
+                id: l.id,
+                rang: l.rang,
+                typeCible: l.typeCible ?? "",
+                cibleId: l.cibleId ?? "",
+                montant: l.montant.toFixed(2),
+                montantRestaurable: resto.gt(0) ? resto.toFixed(2) : "0.00",
+              };
+            });
+          }
+          reglementsCorrigeables.push(entry);
+        }
       }
     }
 
@@ -237,11 +286,14 @@ export async function getNoteFraisCapabilities(input: {
         canExecuteMixte,
         canCorrectReference,
         canCorrectMontant,
+        canRecordRestitution,
+        canReadRestitutionReference,
         plafondRemboursementRestant: plafondRemb,
         plafondCompensationRestant: plafondComp,
         modeChoix: mode,
         statut: note.statut,
         reglementsCorrigeables,
+        reglementsRestituables,
       },
     };
   } catch (error) {

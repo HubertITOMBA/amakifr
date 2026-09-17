@@ -4,6 +4,8 @@ import {
   computeSoldeBancaireEstime,
   withCompensationsNotesFrais,
   withDecaissementsNotesFrais,
+  withRestantDuNotesFrais,
+  withRestitutionsNotesFrais,
 } from "@/lib/financial/synthese-charges";
 
 describe("computeChargesFromDepensesValides (lot 4.0)", () => {
@@ -34,6 +36,20 @@ describe("computeChargesFromDepensesValides (lot 4.0)", () => {
     expect(withNets.compensationsNotesFrais).toBe(-0.05);
     expect(withNets.decaissementsNotesFrais).toBe(10.1);
     expect(computeSoldeBancaireEstime("100.00", withNets)).toBe(89.8);
+  });
+
+  it("lot 4.7 : restitutions séparées des décaissements ; solde exact", () => {
+    const base = computeChargesFromDepensesValides([
+      { montant: "30.00", origine: "ORDINAIRE" },
+    ]);
+    const withDec = withDecaissementsNotesFrais(base, "100.00");
+    const withRest = withRestitutionsNotesFrais(withDec, "25.00");
+    expect(withRest.decaissementsNotesFrais).toBe(100);
+    expect(withRest.restitutionsNotesFrais).toBe(25);
+    // recettes 200 − ordinaires 30 − décaissements 100 + restitutions 25 = 95
+    expect(computeSoldeBancaireEstime("200.00", withRest)).toBe(95);
+    const withRestant = withRestantDuNotesFrais(withRest, "40.00");
+    expect(withRestant.restantDuNotesFrais).toBe(40);
   });
 
 

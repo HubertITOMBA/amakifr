@@ -78,6 +78,7 @@ export type NotesFraisArchiveDbClient = {
   noteFrais: typeof db.noteFrais;
   noteFraisReglement: typeof db.noteFraisReglement;
   noteFraisReglementCorrection: typeof db.noteFraisReglementCorrection;
+  noteFraisRestitution: typeof db.noteFraisRestitution;
   justificatifNoteFrais: typeof db.justificatifNoteFrais;
   noteFraisFileJob: typeof db.noteFraisFileJob;
   noteFraisOutboxEvent: typeof db.noteFraisOutboxEvent;
@@ -150,6 +151,12 @@ export async function archiveSubmittedNotesInTransaction(
       where: { Reglement: { noteFraisId: noteId } },
     });
     if (corrCount > 0) {
+      throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
+    }
+    const restitCount = await tx.noteFraisRestitution.count({
+      where: { Reglement: { noteFraisId: noteId } },
+    });
+    if (restitCount > 0) {
       throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
     }
 
