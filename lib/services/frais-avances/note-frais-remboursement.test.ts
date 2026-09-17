@@ -374,7 +374,7 @@ describe("getNoteFraisFinancialView", () => {
     userAdminRoleFindMany.mockResolvedValue([]);
   });
 
-  it("COMCPT reçoit référence ; PRESID/MEMBRE refusés ; propriétaire refusé", async () => {
+  it("COMCPT : nets sans référence ; TRESOR avec référence ; PRESID/propriétaire refusés", async () => {
     const noteRow = {
       id: "n1",
       statut: "VALIDEE",
@@ -392,21 +392,39 @@ describe("getNoteFraisFinancialView", () => {
       ],
     };
     noteFindUnique.mockResolvedValue(noteRow);
-    reglementFindMany.mockResolvedValue([
-      {
-        id: "r1",
-        montantTotal: new Prisma.Decimal("40.00"),
-        moyen: "VIREMENT",
-        reference: "REF-SECRET",
-        executeAt: new Date("2026-06-01T12:00:00.000Z"),
-      },
-    ]);
+    reglementFindMany.mockImplementation(async (args: { where?: { type?: string } }) => {
+      if (args?.where?.type === "REMBOURSEMENT") {
+        return [
+          {
+            id: "r1",
+            montantTotal: new Prisma.Decimal("40.00"),
+            moyen: "VIREMENT",
+            reference: "REF-SECRET",
+            executeAt: new Date("2026-06-01T12:00:00.000Z"),
+            operationId: null,
+            Corrections: [{ montant: new Prisma.Decimal("-5.00") }],
+          },
+        ];
+      }
+      return [];
+    });
     const client = {
       user: { findUnique: userFindUnique },
       userAdminRole: { findMany: userAdminRoleFindMany },
       noteFrais: { findUnique: noteFindUnique },
       noteFraisReglement: { findMany: reglementFindMany },
       noteFraisReglementOperation: { findMany: vi.fn().mockResolvedValue([]) },
+      noteFraisReglementCorrection: {
+        findMany: vi.fn().mockResolvedValue([
+          {
+            id: "c1",
+            reglementId: "r1",
+            type: "MONTANT_NEGATIF",
+            montant: new Prisma.Decimal("-5.00"),
+            createdAt: new Date("2026-06-02T12:00:00.000Z"),
+          },
+        ]),
+      },
     } as unknown as typeof import("@/lib/db").db;
 
     userFindUnique.mockResolvedValue({ role: "COMCPT", status: "Actif" });
@@ -417,8 +435,22 @@ describe("getNoteFraisFinancialView", () => {
     });
     expect(ok.success).toBe(true);
     if (ok.success) {
-      expect(ok.data.remboursements[0]?.reference).toBe("REF-SECRET");
+      expect(ok.data.remboursements[0]?.reference).toBeUndefined();
+      expect(ok.data.remboursements[0]?.montantTotal).toBe("35.00");
       expect(ok.data.etatFinancier).toBe("PARTIELLEMENT_REGLEE");
+      expect(ok.data.corrections?.[0]?.montantCorrection).toBe("5.00");
+    }
+
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+    const tres = await getNoteFraisFinancialView({
+      userId: "t",
+      noteId: "n1",
+      client,
+    });
+    expect(tres.success).toBe(true);
+    if (tres.success) {
+      expect(tres.data.remboursements[0]?.reference).toBe("REF-SECRET");
+      expect(tres.data.remboursements[0]?.montantTotal).toBe("35.00");
     }
 
     userFindUnique.mockResolvedValue({ role: "PRESID", status: "Actif" });

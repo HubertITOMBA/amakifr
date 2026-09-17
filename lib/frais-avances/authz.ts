@@ -229,6 +229,42 @@ export async function canUserExecuteNoteFraisReglementMixte(
 }
 
 /**
+ * Correction append-only d'un règlement — TRESOR|ADMIN + dynamique restrictive.
+ * COMCPT : lecture uniquement (pas cette capacité).
+ */
+export async function canUserCorrectNoteFraisReglement(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+    AdminRole.TRESOR,
+  ]);
+  if (!loaded) return false;
+
+  const hasCorrectorRole =
+    DECIDER_ROLES.has(loaded.userRole) || loaded.extras.length > 0;
+  if (!hasCorrectorRole) return false;
+  if (loaded.primaryRole === "ADMIN") return true;
+
+  return evaluateRestrictiveDynamicPermission(
+    "correctNoteFraisReglement",
+    loaded.primaryRole,
+    loaded.extras
+  );
+}
+
+/**
+ * Lecture audit correction (motif / preuve) — mêmes rôles durs que la correction.
+ */
+export async function canUserReadNoteFraisCorrectionAudit(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  return canUserCorrectNoteFraisReglement(userId, client);
+}
+
+/**
  * Lecture de la référence de remboursement (traçabilité).
  * Alignée sur la vue financière (ADMIN|TRESOR|COMCPT + dynamique).
  */

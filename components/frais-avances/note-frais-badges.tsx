@@ -127,6 +127,16 @@ export function messageErreurNoteFrais(
       return "Cette opération a déjà été enregistrée avec un contenu différent.";
     case "NOTES_FRAIS_MIXTE_OPERATION_INCOMPLETE":
       return "Opération mixte incomplète — contactez un administrateur.";
+    case "CORRECTION_NO_CHANGE":
+      return "Aucune modification effective de la référence.";
+    case "CIBLE_MOUVEMENTS_POSTERIEURS":
+      return "Mouvements postérieurs sur une cible — actualisez et réessayez.";
+    case "PLAFOND_DEPASSE":
+      return "Montant supérieur au net restant corrigeable.";
+    case "AUTO_CORRECTION_FORBIDDEN":
+      return "Auto-correction interdite.";
+    case "NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED":
+      return "Historique financier présent — archivage reporté (lot 4.9).";
     case "FORBIDDEN":
       return "Action non autorisée.";
     case "NOTES_FRAIS_DISABLED":

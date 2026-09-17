@@ -42,8 +42,16 @@ export function NoteFraisHistoriqueReglements({
               <NoteFraisModeBadge mode="MIXTE" />
             ) : e.kind === "REMBOURSEMENT_SIMPLE" ? (
               <NoteFraisModeBadge mode="REMBOURSEMENT" />
-            ) : (
+            ) : e.kind === "COMPENSATION_SIMPLE" ? (
               <NoteFraisModeBadge mode="COMPENSATION" />
+            ) : e.kind === "CORRECTION_REFERENCE" ? (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-900">
+                Correction réf.
+              </span>
+            ) : (
+              <span className="rounded bg-amber-100 px-1.5 py-0.5 text-[10px] font-semibold uppercase text-amber-900">
+                Correction montant
+              </span>
             )}
             <span className="text-slate-600">{formatDateFr(e.executeAt)}</span>
             {e.executeurLabel ? (
@@ -57,9 +65,26 @@ export function NoteFraisHistoriqueReglements({
             {e.montantCompensation != null ? (
               <span>Comp. {e.montantCompensation} €</span>
             ) : null}
+            {e.montantCorrection != null ? (
+              <span>Corr. {e.montantCorrection} €</span>
+            ) : null}
             {e.moyen ? <span>Moyen : {e.moyen}</span> : null}
             {showReference && e.reference ? (
               <span className="font-mono">Réf. {e.reference}</span>
+            ) : null}
+            {e.referenceAvant && e.referenceApres ? (
+              <span className="font-mono text-slate-600">
+                {e.referenceAvant} → {e.referenceApres}
+              </span>
+            ) : null}
+            {e.motif ? (
+              <span className="text-slate-600">Motif : {e.motif}</span>
+            ) : null}
+            {e.preuveKind ? (
+              <span className="text-slate-500">
+                Preuve {e.preuveKind}
+                {e.preuveRef ? ` (${e.preuveRef})` : ""}
+              </span>
             ) : null}
           </div>
           {e.cibles?.length ? (

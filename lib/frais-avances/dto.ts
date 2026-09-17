@@ -56,13 +56,20 @@ export type NoteFraisRemboursementPublicDto = {
   reference?: string;
 };
 
-/** Entrée d'historique de règlement (simples ou mixte groupé). */
+/** Entrée d'historique de règlement (simples, mixte groupé ou correction). */
 export type NoteFraisHistoriqueReglementDto = {
-  kind: "REMBOURSEMENT_SIMPLE" | "COMPENSATION_SIMPLE" | "MIXTE";
+  kind:
+    | "REMBOURSEMENT_SIMPLE"
+    | "COMPENSATION_SIMPLE"
+    | "MIXTE"
+    | "CORRECTION_REFERENCE"
+    | "CORRECTION_MONTANT_NEGATIF";
   id: string;
   executeAt: string;
   montantRemboursement?: string;
   montantCompensation?: string;
+  /** Absolu du montant corrigé (MONTANT_NEGATIF) — toujours positif. */
+  montantCorrection?: string;
   moyen?: string;
   executeurLabel?: string | null;
   cibles?: Array<{
@@ -72,6 +79,14 @@ export type NoteFraisHistoriqueReglementDto = {
   }>;
   /** Uniquement si droit financier — clé absente sinon. */
   reference?: string;
+  /** ADMIN/TRESOR audit — absents pour membre/COMCPT. */
+  motif?: string;
+  preuveKind?: string;
+  preuveRef?: string;
+  referenceAvant?: string;
+  referenceApres?: string;
+  /** Lien vers le règlement corrigé. */
+  reglementId?: string;
 };
 
 export type NoteFraisChoixHistoriqueDto = {
@@ -323,11 +338,13 @@ export function toNoteFraisPublicDto(note: NoteRow): NoteFraisPublicDto {
  *
  * @param dto - DTO de base
  * @param opts.includeReference - true pour ADMIN|TRESOR|COMCPT
+ * @param opts.includeCorrectionAudit - true pour ADMIN|TRESOR (motif/preuve)
  */
 export function enrichNoteFraisFinancierDto(
   dto: NoteFraisPublicDto,
   opts: {
     includeReference: boolean;
+    includeCorrectionAudit?: boolean;
     remboursements?: Array<{
       id: string;
       montantTotal: { toString(): string } | number | string;
@@ -336,6 +353,10 @@ export function enrichNoteFraisFinancierDto(
       executeAt: Date;
       operationId?: string | null;
       executeurLabel?: string | null;
+      /** Net après corrections négatives (si fourni). */
+      montantNet?: string;
+      /** Référence effective (chaîne REFERENCE) si fournie. */
+      referenceEffective?: string | null;
     }>;
     compensations?: Array<{
       id: string;
@@ -343,6 +364,7 @@ export function enrichNoteFraisFinancierDto(
       executeAt: Date;
       operationId?: string | null;
       executeurLabel?: string | null;
+      montantNet?: string;
       Lignes?: Array<{
         typeCible: string | null;
         montant: { toString(): string } | number | string;
@@ -362,6 +384,19 @@ export function enrichNoteFraisFinancierDto(
         montant: string;
         typeCible: string;
       }>;
+    }>;
+    corrections?: Array<{
+      id: string;
+      reglementId: string;
+      type: "REFERENCE" | "MONTANT_NEGATIF";
+      createdAt: Date;
+      montant: { toString(): string } | number | string | null;
+      motif: string;
+      preuveKind: string | null;
+      preuveRef: string | null;
+      referenceAvant: string | null;
+      referenceApres: string | null;
+      reglementType: "REMBOURSEMENT" | "COMPENSATION" | string;
     }>;
     choixHistorique?: NoteFraisChoixHistoriqueDto[];
   }
@@ -405,6 +440,7 @@ export function enrichNoteFraisFinancierDto(
   }
 
   const historique: NoteFraisHistoriqueReglementDto[] = [];
+  const includeAudit = opts.includeCorrectionAudit === true;
 
   for (const op of opts.operationsMixte ?? []) {
     const entry: NoteFraisHistoriqueReglementDto = {
@@ -423,24 +459,21 @@ export function enrichNoteFraisFinancierDto(
     historique.push(entry);
   }
 
-  const mixteChildIds = new Set(
-    (opts.operationsMixte ?? []).flatMap(() => [] as string[])
-  );
-  // Les IDs enfants ne sont pas nécessaires si on filtre via operationId null.
-  void mixteChildIds;
-
   for (const r of opts.remboursements ?? []) {
-    if (r.operationId) continue; // enfant mixte → déjà dans parent
+    if (r.operationId) continue;
+    const montantAffiche =
+      r.montantNet ?? decimalToString(r.montantTotal) ?? "0";
     const entry: NoteFraisHistoriqueReglementDto = {
       kind: "REMBOURSEMENT_SIMPLE",
       id: r.id,
       executeAt: r.executeAt.toISOString(),
-      montantRemboursement: decimalToString(r.montantTotal) ?? "0",
+      montantRemboursement: montantAffiche,
       moyen: r.moyen ?? "",
       executeurLabel: r.executeurLabel ?? null,
     };
-    if (opts.includeReference && r.reference) {
-      entry.reference = r.reference;
+    const refShow = r.referenceEffective ?? r.reference;
+    if (opts.includeReference && refShow) {
+      entry.reference = refShow;
     }
     historique.push(entry);
   }
@@ -451,7 +484,8 @@ export function enrichNoteFraisFinancierDto(
       kind: "COMPENSATION_SIMPLE",
       id: c.id,
       executeAt: c.executeAt.toISOString(),
-      montantCompensation: decimalToString(c.montantTotal) ?? "0",
+      montantCompensation:
+        c.montantNet ?? decimalToString(c.montantTotal) ?? "0",
       executeurLabel: c.executeurLabel ?? null,
       cibles: (c.Lignes ?? [])
         .filter((l) => l.typeCible)
@@ -463,6 +497,33 @@ export function enrichNoteFraisFinancierDto(
     });
   }
 
+  for (const corr of opts.corrections ?? []) {
+    const entry: NoteFraisHistoriqueReglementDto = {
+      kind:
+        corr.type === "REFERENCE"
+          ? "CORRECTION_REFERENCE"
+          : "CORRECTION_MONTANT_NEGATIF",
+      id: corr.id,
+      reglementId: corr.reglementId,
+      executeAt: corr.createdAt.toISOString(),
+    };
+    if (corr.type === "MONTANT_NEGATIF" && corr.montant != null) {
+      const s = decimalToString(corr.montant) ?? "0";
+      entry.montantCorrection = s.startsWith("-") ? s.slice(1) : s;
+      // Pas de champ signé ambigu (montantRemboursement/Compensation) sur l'entrée correction.
+    }
+    if (includeAudit) {
+      entry.motif = corr.motif;
+      if (corr.preuveKind) entry.preuveKind = corr.preuveKind;
+      if (corr.preuveRef) entry.preuveRef = corr.preuveRef;
+    }
+    if (includeAudit && opts.includeReference && corr.type === "REFERENCE") {
+      if (corr.referenceAvant) entry.referenceAvant = corr.referenceAvant;
+      if (corr.referenceApres) entry.referenceApres = corr.referenceApres;
+    }
+    historique.push(entry);
+  }
+
   historique.sort(
     (a, b) => new Date(a.executeAt).getTime() - new Date(b.executeAt).getTime()
   );
@@ -471,7 +532,6 @@ export function enrichNoteFraisFinancierDto(
     dto = { ...dto, historiqueReglements: historique };
   }
 
-  // Compat tests : remboursements simples (+ mixte enfants uniquement si includeRef admin list flat)
   const rembFlat = (opts.remboursements ?? []).filter((r) => !r.operationId);
   if (rembFlat.length > 0) {
     dto = {
@@ -479,12 +539,13 @@ export function enrichNoteFraisFinancierDto(
       Remboursements: rembFlat.map((r) => {
         const base: NoteFraisRemboursementPublicDto = {
           id: r.id,
-          montantTotal: decimalToString(r.montantTotal) ?? "0",
+          montantTotal: r.montantNet ?? decimalToString(r.montantTotal) ?? "0",
           moyen: r.moyen ?? "",
           executeAt: r.executeAt,
         };
-        if (opts.includeReference && r.reference) {
-          base.reference = r.reference;
+        const refShow = r.referenceEffective ?? r.reference;
+        if (opts.includeReference && refShow) {
+          base.reference = refShow;
         }
         return base;
       }),

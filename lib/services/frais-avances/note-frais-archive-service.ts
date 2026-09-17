@@ -21,6 +21,9 @@ import {
 import { canUserReadNotesFraisArchive } from "@/lib/frais-avances/authz";
 import { cancelPendingMovesAndEnqueueUnlinks } from "@/lib/services/frais-avances/rgpd-account-deletion";
 
+/** Blocage temporaire 4.6→4.9 : historique financier non détachable. */
+export const NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED =
+  "NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED";
 /** Payload outbox après archivage RGPD — aucun userId / texte nominatif. */
 export const NOTES_FRAIS_OUTBOX_RGPD_PURGED_PAYLOAD = {
   userIds: [] as string[],
@@ -73,6 +76,8 @@ export async function purgeNoteFraisOutboxEventsForArchiveInTx(
 export type NotesFraisArchiveDbClient = {
   $executeRaw: typeof db.$executeRaw;
   noteFrais: typeof db.noteFrais;
+  noteFraisReglement: typeof db.noteFraisReglement;
+  noteFraisReglementCorrection: typeof db.noteFraisReglementCorrection;
   justificatifNoteFrais: typeof db.justificatifNoteFrais;
   noteFraisFileJob: typeof db.noteFraisFileJob;
   noteFraisOutboxEvent: typeof db.noteFraisOutboxEvent;
@@ -132,6 +137,21 @@ export async function archiveSubmittedNotesInTransaction(
       },
     });
     if (!note || !note.soumiseAt) continue;
+
+    // Lot 4.6 → 4.9 : historique financier (règlements / corrections) non détachable.
+    // Refus explicite avant toute mutation — jamais P2003 comme mécanisme.
+    const regCount = await tx.noteFraisReglement.count({
+      where: { noteFraisId: noteId },
+    });
+    if (regCount > 0) {
+      throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
+    }
+    const corrCount = await tx.noteFraisReglementCorrection.count({
+      where: { Reglement: { noteFraisId: noteId } },
+    });
+    if (corrCount > 0) {
+      throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
+    }
 
     await cancelPendingMovesAndEnqueueUnlinks(tx as never, [noteId]);
 

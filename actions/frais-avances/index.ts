@@ -723,3 +723,66 @@ export async function actionExecuteNoteFraisReglementMixte(form: {
     };
   }
 }
+
+/**
+ * Correction append-only d'un règlement (REFERENCE | MONTANT_NEGATIF).
+ * Montants en chaînes décimales positives ; stockage négatif côté serveur.
+ */
+export async function actionCorrectNoteFraisReglement(form: {
+  noteId: string;
+  reglementId: string;
+  expectedNoteVersion: number;
+  idempotencyKey: string;
+  type: "REFERENCE" | "MONTANT_NEGATIF";
+  motif: string;
+  referenceApres?: string;
+  montantACorriger?: string;
+  allocations?: Array<{
+    reglementLigneId: string;
+    montantARestaurer: string;
+  }>;
+  preuveKind?: string;
+  preuveRef?: string;
+}) {
+  if (!isNotesFraisEnabled()) return disabled();
+  try {
+    const userId = await requireSessionUserId();
+    if (!form.idempotencyKey?.trim()) {
+      return {
+        success: false as const,
+        error: "Clé d'idempotence requise",
+        code: "IDEMPOTENCY_REQUIRED",
+      };
+    }
+    const { correctNoteFraisReglement } = await import(
+      "@/lib/services/frais-avances/note-frais-correction-service"
+    );
+    const result = await correctNoteFraisReglement({
+      actorUserId: userId,
+      noteId: form.noteId,
+      reglementId: form.reglementId,
+      expectedNoteVersion: form.expectedNoteVersion,
+      idempotencyKey: form.idempotencyKey,
+      type: form.type,
+      motif: form.motif,
+      referenceApres: form.referenceApres,
+      montantACorriger: form.montantACorriger,
+      allocations: form.allocations,
+      preuveKind: form.preuveKind,
+      preuveRef: form.preuveRef,
+    });
+    if (result.success) {
+      revalidatePath("/user/frais-avances");
+      revalidatePath("/admin/frais-avances");
+      revalidatePath(`/user/frais-avances/${form.noteId}`);
+      revalidatePath(`/admin/frais-avances/${form.noteId}`);
+      revalidatePath("/admin/finances/synthese");
+    }
+    return result;
+  } catch (error) {
+    return {
+      success: false as const,
+      error: error instanceof Error ? error.message : "Erreur",
+    };
+  }
+}

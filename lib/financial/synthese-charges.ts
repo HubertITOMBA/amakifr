@@ -1,7 +1,10 @@
 /**
  * Indicateurs de charges / solde bancaire estimé (lot 4.0).
  * Classification exclusivement par `Depense.origine` — jamais par `noteFraisId`.
+ * Agrégats monétaires via Prisma.Decimal (pas de flottant intermédiaire).
  */
+
+import { Prisma } from "@prisma/client";
 
 export type OrigineDepenseSynthese = "ORDINAIRE" | "FRAIS_AVANCE";
 
@@ -25,6 +28,14 @@ export type ChargesSyntheseIndicators = {
   restantDuNotesFrais: number;
 };
 
+function money(v: Prisma.Decimal | number | string): Prisma.Decimal {
+  return new Prisma.Decimal(v);
+}
+
+function toMoneyNumber(v: Prisma.Decimal): number {
+  return Number(v.toFixed(2));
+}
+
 /**
  * Agrège les charges à partir des dépenses validées.
  * Ne classe jamais par présence de `noteFraisId`.
@@ -34,21 +45,22 @@ export type ChargesSyntheseIndicators = {
 export function computeChargesFromDepensesValides(
   depenses: DepenseValideForSynthese[]
 ): ChargesSyntheseIndicators {
-  let totalCharges = 0;
-  let depensesOrdinairesDecaissees = 0;
+  let totalCharges = money(0);
+  let depensesOrdinairesDecaissees = money(0);
   for (const d of depenses) {
-    const m = Number(d.montant);
-    if (!Number.isFinite(m)) continue;
-    totalCharges += m;
-    if (d.origine === "ORDINAIRE") {
-      depensesOrdinairesDecaissees += m;
+    try {
+      const m = money(d.montant);
+      totalCharges = totalCharges.plus(m);
+      if (d.origine === "ORDINAIRE") {
+        depensesOrdinairesDecaissees = depensesOrdinairesDecaissees.plus(m);
+      }
+    } catch {
+      // montant non décimal — ignore
     }
   }
   return {
-    totalCharges: Number(totalCharges.toFixed(2)),
-    depensesOrdinairesDecaissees: Number(
-      depensesOrdinairesDecaissees.toFixed(2)
-    ),
+    totalCharges: toMoneyNumber(totalCharges),
+    depensesOrdinairesDecaissees: toMoneyNumber(depensesOrdinairesDecaissees),
     decaissementsNotesFrais: 0,
     compensationsNotesFrais: 0,
     restitutionsNotesFrais: 0,
@@ -64,7 +76,7 @@ export function computeChargesFromDepensesValides(
  * @param indicators - Indicateurs issus de `computeChargesFromDepensesValides`
  */
 export function computeSoldeBancaireEstime(
-  recettesEncaissees: number,
+  recettesEncaissees: number | string,
   indicators: Pick<
     ChargesSyntheseIndicators,
     | "depensesOrdinairesDecaissees"
@@ -72,12 +84,11 @@ export function computeSoldeBancaireEstime(
     | "restitutionsNotesFrais"
   >
 ): number {
-  const solde =
-    recettesEncaissees -
-    indicators.depensesOrdinairesDecaissees -
-    indicators.decaissementsNotesFrais +
-    indicators.restitutionsNotesFrais;
-  return Number(solde.toFixed(2));
+  const solde = money(recettesEncaissees)
+    .minus(money(indicators.depensesOrdinairesDecaissees))
+    .minus(money(indicators.decaissementsNotesFrais))
+    .plus(money(indicators.restitutionsNotesFrais));
+  return toMoneyNumber(solde);
 }
 
 /**
@@ -85,33 +96,39 @@ export function computeSoldeBancaireEstime(
  * N'affecte pas le solde bancaire estimé.
  *
  * @param indicators - Indicateurs charges / banque
- * @param compensationsNotesFrais - Σ règlements COMPENSATION EXECUTE
+ * @param compensationsNotesFrais - Σ règlements COMPENSATION EXECUTE + corrections négatives
  */
 export function withCompensationsNotesFrais(
   indicators: ChargesSyntheseIndicators,
-  compensationsNotesFrais: number
+  compensationsNotesFrais: number | string
 ): ChargesSyntheseIndicators {
-  const v = Number(compensationsNotesFrais);
-  return {
-    ...indicators,
-    compensationsNotesFrais: Number.isFinite(v) ? Number(v.toFixed(2)) : 0,
-  };
+  try {
+    return {
+      ...indicators,
+      compensationsNotesFrais: toMoneyNumber(money(compensationsNotesFrais)),
+    };
+  } catch {
+    return { ...indicators, compensationsNotesFrais: 0 };
+  }
 }
 
 /**
- * Injecte les décaissements notes (remboursements EXECUTE, lot 4.2+).
+ * Injecte les décaissements notes nets (remboursements EXECUTE + corrections négatives, lot 4.6).
  * Impacte `soldeBancaireEstime` via `computeSoldeBancaireEstime`.
  *
  * @param indicators - Indicateurs
- * @param decaissementsNotesFrais - Σ règlements REMBOURSEMENT EXECUTE
+ * @param decaissementsNotesFrais - Σ REMBOURSEMENT EXECUTE + corrections MONTANT_NEGATIF
  */
 export function withDecaissementsNotesFrais(
   indicators: ChargesSyntheseIndicators,
-  decaissementsNotesFrais: number
+  decaissementsNotesFrais: number | string
 ): ChargesSyntheseIndicators {
-  const v = Number(decaissementsNotesFrais);
-  return {
-    ...indicators,
-    decaissementsNotesFrais: Number.isFinite(v) ? Number(v.toFixed(2)) : 0,
-  };
+  try {
+    return {
+      ...indicators,
+      decaissementsNotesFrais: toMoneyNumber(money(decaissementsNotesFrais)),
+    };
+  } catch {
+    return { ...indicators, decaissementsNotesFrais: 0 };
+  }
 }

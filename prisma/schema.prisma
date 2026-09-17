@@ -311,6 +311,7 @@ model User {
   notesFraisDecisions           NoteFraisDecision[]          @relation("NoteFraisDecisionDecideur")
   notesFraisReglementsExecuteur NoteFraisReglement[]         @relation("NoteFraisReglementExecuteur")
   notesFraisReglementOperationsExecuteur NoteFraisReglementOperation[] @relation("NoteFraisReglementOperationExecuteur")
+  notesFraisReglementCorrectionsActor NoteFraisReglementCorrection[] @relation("NoteFraisReglementCorrectionActor")
   justificatifsNoteFraisUploades JustificatifNoteFrais[]     @relation("JustificatifNoteFraisUploader")
   notesFraisArchiveAccessLogs   NoteFraisArchiveAccessLog[]  @relation("NoteFraisArchiveAccessActor")
 
@@ -2939,8 +2940,9 @@ model NoteFraisReglement {
   NoteFrais NoteFrais               @relation(fields: [noteFraisId], references: [id], onDelete: Restrict)
   Choix     NoteFraisChoixReglement @relation(fields: [choixId], references: [id], onDelete: Restrict)
   Executeur User                    @relation("NoteFraisReglementExecuteur", fields: [executeurUserId], references: [id], onDelete: Restrict)
-  Operation NoteFraisReglementOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
-  Lignes    NoteFraisReglementLigne[]
+  Operation   NoteFraisReglementOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
+  Lignes      NoteFraisReglementLigne[]
+  Corrections NoteFraisReglementCorrection[]
 
   @@unique([operationId, type])
   @@index([noteFraisId, executeAt])
@@ -2971,10 +2973,78 @@ model NoteFraisReglementLigne {
   Reglement        NoteFraisReglement @relation(fields: [reglementId], references: [id], onDelete: Cascade)
   Avoir            Avoir?             @relation("AvoirFromNoteFraisLigne")
   UtilisationAvoir UtilisationAvoir?  @relation("UtilisationFromNoteFraisLigne")
+  InversesCorrection NoteFraisCorrectionInverseCible[]
 
   @@unique([reglementId, rang])
   @@index([cibleId, typeCible])
   @@map("notes_frais_reglement_lignes")
+}
+
+/// Type de correction append-only d'un règlement (lot 4.6).
+enum TypeNoteFraisReglementCorrection {
+  REFERENCE
+  MONTANT_NEGATIF
+}
+
+/// Kind de preuve V1 pour MONTANT_NEGATIF (pas d'upload fichier).
+enum PreuveCorrectionNoteFrais {
+  PV_TRESORERIE
+  JUSTIFICATIF_INTERNE
+  EMAIL_TRACE
+  AUTRE_TRACE
+}
+
+/// Correction append-only liée uniquement au règlement (note dérivée).
+/// Futurs constraint triggers différés (migration ultérieure) pour :
+///   appartenance ligne↔règlement, type règlement, Σ inverses, nb inverses.
+/// Invariants 4.6 garantis en TX + tests PG uniquement.
+model NoteFraisReglementCorrection {
+  id                 String                           @id @default(cuid())
+  reglementId        String
+  type               TypeNoteFraisReglementCorrection
+  /// MONTANT_NEGATIF uniquement : strictement négatif ; null si REFERENCE.
+  montant            Decimal?                         @db.Decimal(10, 2)
+  referenceAvant     String?                          @db.VarChar(64)
+  referenceAvantNorm String?                          @db.VarChar(64)
+  referenceApres     String?                          @db.VarChar(64)
+  referenceApresNorm String?                          @db.VarChar(64)
+  motif              String                           @db.Text
+  preuveKind         PreuveCorrectionNoteFrais?
+  preuveRef          String?                          @db.VarChar(64)
+  idempotencyKey     String                           @unique @db.VarChar(64)
+  /// Nullable + SetNull : ne bloque pas user.delete (RGPD).
+  actorUserId        String?
+  createdAt          DateTime                         @default(now())
+
+  Reglement NoteFraisReglement @relation(fields: [reglementId], references: [id], onDelete: Restrict)
+  Actor     User?              @relation("NoteFraisReglementCorrectionActor", fields: [actorUserId], references: [id], onDelete: SetNull)
+  Inverses  NoteFraisCorrectionInverseCible[]
+
+  @@index([reglementId, createdAt])
+  @@index([type, createdAt])
+  @@map("notes_frais_reglement_corrections")
+}
+
+/// Ligne d'inversion explicite pour correction MONTANT_NEGATIF compensation.
+model NoteFraisCorrectionInverseCible {
+  id               String                         @id @default(cuid())
+  correctionId     String
+  reglementLigneId String
+  typeCible        TypeCibleCompensationNoteFrais
+  cibleId          String
+  /// Strictement positif ; Σ = abs(correction.montant).
+  montantRestaure  Decimal                        @db.Decimal(10, 2)
+  restantAvant     Decimal                        @db.Decimal(10, 2)
+  restantApres     Decimal                        @db.Decimal(10, 2)
+  createdAt        DateTime                       @default(now())
+
+  Correction NoteFraisReglementCorrection @relation(fields: [correctionId], references: [id], onDelete: Restrict)
+  Ligne      NoteFraisReglementLigne      @relation(fields: [reglementLigneId], references: [id], onDelete: Restrict)
+
+  @@unique([correctionId, reglementLigneId])
+  @@index([reglementLigneId])
+  @@index([cibleId, typeCible])
+  @@map("notes_frais_correction_inverses_cible")
 }
 
 model JustificatifNoteFrais {

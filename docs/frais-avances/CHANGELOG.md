@@ -1,5 +1,22 @@
 # Changelog — frais avancés
 
+## 0.4.6-corrections-append-only — 2026-09-17
+
+### Ajouté (lot 4.6 — local, flag off, **pas de migration dépôt**)
+- Corrections append-only `REFERENCE` | `MONTANT_NEGATIF` sur `NoteFraisReglement` (enfant MIXTE inclus).
+- Schéma : `NoteFraisReglementCorrection` (liaison `reglementId` seule ; `actorUserId` SetNull) + `NoteFraisCorrectionInverseCible` multilignes.
+- Entrées monétaires : chaînes positives → stockage `montant` strictement négatif ; aucun float/capping.
+- REFERENCE en chaîne serveur (effective = dernière correction sinon originale) ; `CORRECTION_NO_CHANGE` si inchangé.
+- Compensation : inverses explicites ; Avoir/UA d'origine immuables ; détection `CIBLE_MOUVEMENTS_POSTERIEURS`.
+- Preuve V1 MONTANT_NEGATIF (`preuveKind` + `preuveRef`) ; REFERENCE sans preuve.
+- Authz `correctNoteFraisReglement` (TRESOR|ADMIN) ; idempotence + OCC ; notif/outbox génériques.
+- Synthèse : nets = bruts + corrections négatives ; `restitutionsNotesFrais` reste 0.
+- RGPD : refus explicite `NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED` si règlement/correction (détachement 4.9).
+- UI : dialogues référence / montant ; historique DTO filtré par rôle.
+
+### Non inclus
+- Correction moyen/`executeAt` ; restitution ; annulation ; migration dépôt ; activation ; archivage financier complet.
+
 ## 0.4.5-notifications-reglement — 2026-09-17
 
 ### Ajouté (lot 4.5 — local, flag off, **pas de migration dépôt**)

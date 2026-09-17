@@ -62,6 +62,14 @@
 - Synthèse : agrège **uniquement** les règlements enfants (jamais la table parent).
 - Notif + outbox `REGLEMENT_MIXTE` **uniques** sur l'opération parente (lot 4.5) — jamais par enfant.
 
+### Corrections append-only (lot 4.6 — local, flag off)
+- `REFERENCE` (remboursement) et `MONTANT_NEGATIF` (remboursement / compensation, y compris enfants MIXTE).
+- Aucune mutation du règlement, ligne, Avoir ou UtilisationAvoir d'origine ; pas de restitution bancaire.
+- Compensation multilignes via `NoteFraisCorrectionInverseCible` ; option A (pas d'Avoir/UA inverse).
+- Synthèse nette : décaissements / compensations = brut + corrections négatives ; `restitutionsNotesFrais` = 0.
+- Archivage RGPD : refus `NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED` tant que détachement 4.9 absent.
+- Constraint triggers différés documentés (appartenance ligne, type règlement, Σ inverses) — invariants TX + tests PG.
+
 ### Notifications de règlement (lot 4.5 — local, flag off)
 - Helper TX `note-frais-reglement-notify` : textes génériques (« Règlement enregistré ») + lien `/user/frais-avances/{noteId}`.
 - Kinds : `REGLEMENT_COMPENSATION` | `REGLEMENT_REMBOURSEMENT` | `REGLEMENT_MIXTE`.
@@ -157,8 +165,10 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
     lib/services/frais-avances/note-frais-compensation.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-remboursement.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-mixte.pg.integration.test.ts \
+    lib/services/frais-avances/note-frais-correction.pg.integration.test.ts \
     lib/frais-avances/pg-test-allowlist.test.ts
 ```
+
 
 ## Non livré / futur
 - Lot **4.6+** : correction, restitution, annulation (`EXPIREE` 30 j), détachement RGPD FK.

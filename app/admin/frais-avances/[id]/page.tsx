@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { Banknote, Gavel, GitMerge, Scale } from "lucide-react";
+import { Banknote, FilePenLine, Gavel, GitMerge, MinusCircle, Scale } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
@@ -15,6 +15,8 @@ import { DecideNoteFraisDialog } from "@/components/frais-avances/DecideNoteFrai
 import { ExecuteRemboursementDialog } from "@/components/frais-avances/ExecuteRemboursementDialog";
 import { ExecuteCompensationDialog } from "@/components/frais-avances/ExecuteCompensationDialog";
 import { ExecuteMixteDialog } from "@/components/frais-avances/ExecuteMixteDialog";
+import { CorrectReferenceDialog } from "@/components/frais-avances/CorrectReferenceDialog";
+import { CorrectMontantDialog } from "@/components/frais-avances/CorrectMontantDialog";
 import type { CompensationCibleOption } from "@/components/frais-avances/CompensationCiblesFields";
 import { NoteFraisHistoriqueReglements } from "@/components/frais-avances/NoteFraisHistoriqueReglements";
 import {
@@ -76,7 +78,7 @@ type FinancialView = {
     id: string;
     montantTotal: string;
     moyen: string;
-    reference: string;
+    reference?: string;
     executeAt: string;
     operationId?: string | null;
   }>;
@@ -88,8 +90,15 @@ type FinancialView = {
       reglementId: string;
       montantTotal: string;
       moyen: string;
-      reference: string;
+      reference?: string;
     };
+  }>;
+  corrections?: Array<{
+    id: string;
+    reglementId: string;
+    type: "REFERENCE" | "MONTANT_NEGATIF";
+    createdAt: string;
+    montantCorrection?: string;
   }>;
 };
 
@@ -98,26 +107,43 @@ function financialToHistorique(
 ): NoteFraisHistoriqueReglementDto[] {
   const entries: NoteFraisHistoriqueReglementDto[] = [];
   for (const op of fin.operationsMixte ?? []) {
-    entries.push({
+    const entry: NoteFraisHistoriqueReglementDto = {
       kind: "MIXTE",
       id: op.id,
       executeAt: op.executeAt,
       montantRemboursement: op.remboursement.montantTotal,
       montantCompensation: op.compensation.montantTotal,
       moyen: op.remboursement.moyen,
-      reference: op.remboursement.reference,
-    });
+    };
+    if (op.remboursement.reference) {
+      entry.reference = op.remboursement.reference;
+    }
+    entries.push(entry);
   }
   for (const r of fin.remboursements) {
     if (r.operationId) continue;
-    entries.push({
+    const entry: NoteFraisHistoriqueReglementDto = {
       kind: "REMBOURSEMENT_SIMPLE",
       id: r.id,
       executeAt: r.executeAt,
       montantRemboursement: r.montantTotal,
       moyen: r.moyen,
-      reference: r.reference,
-    });
+    };
+    if (r.reference) entry.reference = r.reference;
+    entries.push(entry);
+  }
+  for (const c of fin.corrections ?? []) {
+    const entry: NoteFraisHistoriqueReglementDto = {
+      kind:
+        c.type === "REFERENCE"
+          ? "CORRECTION_REFERENCE"
+          : "CORRECTION_MONTANT_NEGATIF",
+      id: c.id,
+      reglementId: c.reglementId,
+      executeAt: c.createdAt,
+    };
+    if (c.montantCorrection) entry.montantCorrection = c.montantCorrection;
+    entries.push(entry);
   }
   entries.sort(
     (a, b) => new Date(a.executeAt).getTime() - new Date(b.executeAt).getTime()
@@ -140,6 +166,26 @@ export default function AdminNoteFraisDetailPage() {
   const [rembOpen, setRembOpen] = useState(false);
   const [compOpen, setCompOpen] = useState(false);
   const [mixteOpen, setMixteOpen] = useState(false);
+  const [refCorrOpen, setRefCorrOpen] = useState(false);
+  const [montantCorrOpen, setMontantCorrOpen] = useState(false);
+  const [corrTarget, setCorrTarget] = useState<{
+    id: string;
+    type: "REMBOURSEMENT" | "COMPENSATION";
+    netRestant: string;
+    canCorrectReference: boolean;
+    canCorrectMontant: boolean;
+    lignesCompensation?: Array<{
+      id: string;
+      rang: number;
+      typeCible: string;
+      cibleId: string;
+      montant: string;
+      montantRestaurable: string;
+    }>;
+  } | null>(null);
+  const [corrIdempotencyKey, setCorrIdempotencyKey] = useState(
+    () => `corr-${noteId}-${Date.now()}`
+  );
   const [idempotencyKey, setIdempotencyKey] = useState(
     () => `decide-${noteId}-${Date.now()}`
   );
@@ -242,6 +288,9 @@ export default function AdminNoteFraisDetailPage() {
   const showMixte = caps?.canExecuteMixte === true;
   const showRemb = caps?.canExecuteRemboursement === true;
   const showComp = caps?.canExecuteCompensation === true;
+  const showCorrect =
+    (caps?.canCorrectReference === true || caps?.canCorrectMontant === true) &&
+    (caps?.reglementsCorrigeables?.length ?? 0) > 0;
   const showReference = caps?.canReadFinancial === true;
 
   if (!enabledHint) {
@@ -433,6 +482,62 @@ export default function AdminNoteFraisDetailPage() {
                 </section>
               ) : null}
 
+              {showCorrect ? (
+                <section className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase tracking-wide text-amber-900">
+                    Corrections append-only
+                  </p>
+                  <ul className="space-y-2">
+                    {(caps?.reglementsCorrigeables ?? []).map((r) => (
+                      <li
+                        key={r.id}
+                        className="flex flex-wrap items-center gap-2 text-xs"
+                      >
+                        <span className="font-mono text-slate-700">
+                          {r.type} · net {r.netRestant} €
+                        </span>
+                        {r.canCorrectReference ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setCorrTarget(r);
+                              setCorrIdempotencyKey(
+                                `corr-ref-${r.id}-${Date.now()}`
+                              );
+                              setRefCorrOpen(true);
+                            }}
+                            data-testid={`open-correct-ref-${r.id}`}
+                          >
+                            <FilePenLine className="h-3.5 w-3.5 mr-1" />
+                            Référence
+                          </Button>
+                        ) : null}
+                        {r.canCorrectMontant ? (
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setCorrTarget(r);
+                              setCorrIdempotencyKey(
+                                `corr-mnt-${r.id}-${Date.now()}`
+                              );
+                              setMontantCorrOpen(true);
+                            }}
+                            data-testid={`open-correct-mnt-${r.id}`}
+                          >
+                            <MinusCircle className="h-3.5 w-3.5 mr-1" />
+                            Montant
+                          </Button>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                </section>
+              ) : null}
+
               {note.description && caps?.canReadLive ? (
                 <div className="rounded-lg border border-slate-200 bg-white p-3">
                   <p className="text-xs font-semibold uppercase tracking-wide text-slate-700 mb-1">
@@ -544,6 +649,31 @@ export default function AdminNoteFraisDetailPage() {
               setCompOpen(true);
             }
           }}
+        />
+      ) : null}
+      {note && corrTarget && refCorrOpen ? (
+        <CorrectReferenceDialog
+          open={refCorrOpen}
+          onOpenChange={setRefCorrOpen}
+          noteId={noteId}
+          reglementId={corrTarget.id}
+          expectedVersion={note.version}
+          idempotencyKey={corrIdempotencyKey}
+          onDone={reload}
+        />
+      ) : null}
+      {note && corrTarget && montantCorrOpen ? (
+        <CorrectMontantDialog
+          open={montantCorrOpen}
+          onOpenChange={setMontantCorrOpen}
+          noteId={noteId}
+          reglementId={corrTarget.id}
+          reglementType={corrTarget.type}
+          expectedVersion={note.version}
+          idempotencyKey={corrIdempotencyKey}
+          netRestant={corrTarget.netRestant}
+          lignes={corrTarget.lignesCompensation}
+          onDone={reload}
         />
       ) : null}
     </div>

@@ -2,7 +2,7 @@
 
 import { auth } from "@/auth";
 import prisma from "@/lib/prisma";
-import { UserRole } from "@prisma/client";
+import { Prisma, UserRole } from "@prisma/client";
 import {
   computeChargesFromDepensesValides,
   computeSoldeBancaireEstime,
@@ -81,12 +81,24 @@ export async function getFinancialSynthese() {
       where: { type: "REMBOURSEMENT", statut: "EXECUTE" },
       _sum: { montantTotal: true },
     });
+    const { aggregateCorrectionsMontantByReglementType } = await import(
+      "@/lib/services/frais-avances/note-frais-correction-service"
+    );
+    const corrAgg = await aggregateCorrectionsMontantByReglementType(prisma);
+    // Nets Decimal purs (brut + corrections négatives) — pas de Number intermédiaire.
+    const rembNet = new Prisma.Decimal(
+      remboursementsAgg._sum.montantTotal ?? 0
+    )
+      .plus(new Prisma.Decimal(corrAgg.remboursements))
+      .toFixed(2);
+    const compNet = new Prisma.Decimal(
+      compensationsAgg._sum.montantTotal ?? 0
+    )
+      .plus(new Prisma.Decimal(corrAgg.compensations))
+      .toFixed(2);
     const chargesIndicators = withDecaissementsNotesFrais(
-      withCompensationsNotesFrais(
-        chargesIndicatorsBase,
-        Number(compensationsAgg._sum.montantTotal ?? 0)
-      ),
-      Number(remboursementsAgg._sum.montantTotal ?? 0)
+      withCompensationsNotesFrais(chargesIndicatorsBase, compNet),
+      rembNet
     );
     const totalCharges = chargesIndicators.totalCharges;
     const depensesOrdinairesDecaissees =

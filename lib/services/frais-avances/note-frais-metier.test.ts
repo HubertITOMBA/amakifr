@@ -114,6 +114,7 @@ vi.mock("@/lib/db", () => ({
 vi.mock("@/lib/frais-avances/authz", () => ({
   canUserReadSubmittedNotesFrais: vi.fn(),
   canUserReadNoteFraisRemboursementReference: vi.fn().mockResolvedValue(false),
+  canUserReadNoteFraisCorrectionAudit: vi.fn().mockResolvedValue(false),
 }));
 
 vi.mock("@/lib/frais-avances/recipients", () => ({

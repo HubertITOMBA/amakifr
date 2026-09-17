@@ -25,6 +25,8 @@ vi.mock("@/lib/dynamic-permissions", () => ({
 }));
 
 import {
+  canUserCorrectNoteFraisReglement,
+  canUserReadNoteFraisCorrectionAudit,
   canUserReadNoteFraisFinancialView,
   canUserReadSubmittedNotesFrais,
 } from "@/lib/frais-avances/authz";
@@ -145,5 +147,56 @@ describe("canUserReadNoteFraisFinancialView (restrictive)", () => {
     });
     userFindUnique.mockResolvedValue({ role: "COMCPT", status: "Actif" });
     expect(await canUserReadNoteFraisFinancialView("c")).toBe(false);
+  });
+});
+
+describe("canUserCorrectNoteFraisReglement", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    userAdminRoleFindMany.mockResolvedValue([]);
+    resolveActionPermissionConfig.mockResolvedValue({ status: "absent" });
+  });
+
+  it("accepte TRESOR|ADMIN principaux et additionnels", async () => {
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+    expect(await canUserCorrectNoteFraisReglement("t")).toBe(true);
+    userFindUnique.mockResolvedValue({ role: "ADMIN", status: "Actif" });
+    expect(await canUserCorrectNoteFraisReglement("a")).toBe(true);
+
+    userFindUnique.mockResolvedValue({ role: "MEMBRE", status: "Actif" });
+    userAdminRoleFindMany.mockResolvedValue([{ role: "TRESOR" }]);
+    expect(await canUserCorrectNoteFraisReglement("m-t")).toBe(true);
+  });
+
+  it("refuse COMCPT|PRESID|SECRET|MEMBRE|Inactif", async () => {
+    for (const role of ["COMCPT", "PRESID", "SECRET", "MEMBRE"] as const) {
+      userFindUnique.mockResolvedValue({ role, status: "Actif" });
+      userAdminRoleFindMany.mockResolvedValue([]);
+      expect(await canUserCorrectNoteFraisReglement(`u-${role}`)).toBe(false);
+    }
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Inactif" });
+    expect(await canUserCorrectNoteFraisReglement("inact")).toBe(false);
+  });
+
+  it("dynamique restrictive + ADMIN bypass", async () => {
+    resolveActionPermissionConfig.mockResolvedValue({ status: "disabled" });
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+    expect(await canUserCorrectNoteFraisReglement("t")).toBe(false);
+    userFindUnique.mockResolvedValue({ role: "ADMIN", status: "Actif" });
+    expect(await canUserCorrectNoteFraisReglement("a")).toBe(true);
+
+    resolveActionPermissionConfig.mockResolvedValue({
+      status: "configured",
+      roles: ["ADMIN"],
+    });
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+    expect(await canUserCorrectNoteFraisReglement("t2")).toBe(false);
+  });
+
+  it("audit correction = même capacité que correcteur", async () => {
+    userFindUnique.mockResolvedValue({ role: "COMCPT", status: "Actif" });
+    expect(await canUserReadNoteFraisCorrectionAudit("c")).toBe(false);
+    userFindUnique.mockResolvedValue({ role: "TRESOR", status: "Actif" });
+    expect(await canUserReadNoteFraisCorrectionAudit("t")).toBe(true);
   });
 });

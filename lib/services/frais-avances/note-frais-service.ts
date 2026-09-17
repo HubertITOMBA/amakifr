@@ -9,6 +9,7 @@ import {
 import {
   canUserReadSubmittedNotesFrais,
   canUserReadNoteFraisRemboursementReference,
+  canUserReadNoteFraisCorrectionAudit,
 } from "@/lib/frais-avances/authz";
 import {
   toNoteFraisPublicDto,
@@ -888,9 +889,26 @@ export async function getNoteFraisForUser(input: {
           montantTotal: true,
           moyen: true,
           reference: true,
+          referenceNormalisee: true,
           executeAt: true,
           operationId: true,
           Executeur: { select: { name: true, email: true } },
+          Corrections: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              type: true,
+              montant: true,
+              motif: true,
+              preuveKind: true,
+              preuveRef: true,
+              referenceAvant: true,
+              referenceApres: true,
+              referenceApresNorm: true,
+              createdAt: true,
+              reglementId: true,
+            },
+          },
         },
       }),
       db.noteFraisReglement.findMany({
@@ -913,6 +931,21 @@ export async function getNoteFraisForUser(input: {
               cibleId: true,
             },
           },
+          Corrections: {
+            orderBy: { createdAt: "asc" },
+            select: {
+              id: true,
+              type: true,
+              montant: true,
+              motif: true,
+              preuveKind: true,
+              preuveRef: true,
+              referenceAvant: true,
+              referenceApres: true,
+              createdAt: true,
+              reglementId: true,
+            },
+          },
         },
       }),
       db.noteFraisReglementOperation.findMany({
@@ -925,6 +958,10 @@ export async function getNoteFraisForUser(input: {
               Lignes: {
                 select: { typeCible: true, montant: true, cibleId: true },
               },
+              Corrections: {
+                where: { type: "MONTANT_NEGATIF" },
+                select: { montant: true },
+              },
             },
           },
         },
@@ -935,6 +972,13 @@ export async function getNoteFraisForUser(input: {
     const includeReference =
       !isOwner &&
       (await canUserReadNoteFraisRemboursementReference(input.userId));
+    const includeCorrectionAudit =
+      !isOwner &&
+      (await canUserReadNoteFraisCorrectionAudit(input.userId));
+
+    const { computeReglementNetMontant } = await import(
+      "@/lib/services/frais-avances/note-frais-correction-service"
+    );
 
     const noteForDto = {
       ...note,
@@ -950,32 +994,81 @@ export async function getNoteFraisForUser(input: {
       remplaceChoixId: c.remplaceChoixId,
     }));
 
+    const allCorrections = [
+      ...remboursements.flatMap((r) =>
+        r.Corrections.map((c) => ({
+          ...c,
+          reglementType: "REMBOURSEMENT" as const,
+        }))
+      ),
+      ...compensations.flatMap((c) =>
+        c.Corrections.map((corr) => ({
+          ...corr,
+          reglementType: "COMPENSATION" as const,
+        }))
+      ),
+    ];
+
     const data = enrichNoteFraisFinancierDto(toNoteFraisPublicDto(noteForDto), {
       includeReference,
-      remboursements: remboursements.map((r) => ({
-        ...r,
-        executeurLabel: r.Executeur?.name || r.Executeur?.email || null,
-      })),
-      compensations: compensations.map((c) => ({
-        ...c,
-        executeurLabel: c.Executeur?.name || c.Executeur?.email || null,
-        Lignes: c.Lignes.map((l) => ({
-          typeCible: l.typeCible,
-          montant: l.montant,
-          libelleSnapshot: l.typeCible
-            ? `${l.typeCible}${l.cibleId ? ` (${l.cibleId.slice(0, 8)})` : ""}`
-            : null,
-        })),
-      })),
+      includeCorrectionAudit,
+      remboursements: remboursements.map((r) => {
+        const neg = r.Corrections.filter((c) => c.type === "MONTANT_NEGATIF").map(
+          (c) => c.montant
+        );
+        const net = computeReglementNetMontant(r.montantTotal, neg);
+        const lastRef = [...r.Corrections]
+          .filter((c) => c.type === "REFERENCE")
+          .sort(
+            (a, b) => b.createdAt.getTime() - a.createdAt.getTime()
+          )[0];
+        return {
+          ...r,
+          montantNet: net.toFixed(2),
+          referenceEffective:
+            lastRef?.referenceApres ?? r.reference ?? null,
+          executeurLabel: r.Executeur?.name || r.Executeur?.email || null,
+        };
+      }),
+      compensations: compensations.map((c) => {
+        const neg = c.Corrections.filter((x) => x.type === "MONTANT_NEGATIF").map(
+          (x) => x.montant
+        );
+        const net = computeReglementNetMontant(c.montantTotal, neg);
+        return {
+          ...c,
+          montantNet: net.toFixed(2),
+          executeurLabel: c.Executeur?.name || c.Executeur?.email || null,
+          Lignes: c.Lignes.map((l) => ({
+            typeCible: l.typeCible,
+            montant: l.montant,
+            libelleSnapshot: l.typeCible
+              ? `${l.typeCible}${l.cibleId ? ` (${l.cibleId.slice(0, 8)})` : ""}`
+              : null,
+          })),
+        };
+      }),
       operationsMixte: operations.map((op) => {
         const remb = op.Reglements.find((r) => r.type === "REMBOURSEMENT");
         const comp = op.Reglements.find((r) => r.type === "COMPENSATION");
+        const rembNet = remb
+          ? computeReglementNetMontant(
+              remb.montantTotal,
+              (remb.Corrections ?? []).map((c) => c.montant)
+            )
+          : null;
+        const compNet = comp
+          ? computeReglementNetMontant(
+              comp.montantTotal,
+              (comp.Corrections ?? []).map((c) => c.montant)
+            )
+          : null;
         return {
           id: op.id,
           executeAt: op.executeAt,
           executeurLabel: op.Executeur?.name || op.Executeur?.email || null,
-          compensationMontant: comp?.montantTotal.toFixed(2) ?? "0.00",
-          remboursementMontant: remb?.montantTotal.toFixed(2) ?? "0.00",
+          compensationMontant: compNet?.toFixed(2) ?? "0.00",
+          remboursementMontant: rembNet?.toFixed(2) ?? "0.00",
           moyen: remb?.moyen ?? "",
           reference: remb?.reference ?? null,
           cibles: (comp?.Lignes ?? [])
@@ -987,6 +1080,7 @@ export async function getNoteFraisForUser(input: {
             })),
         };
       }),
+      corrections: allCorrections,
       choixHistorique,
     });
 
