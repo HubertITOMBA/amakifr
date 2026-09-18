@@ -28,6 +28,8 @@ Voir [GUIDE.md](./GUIDE.md) et [CHANGELOG.md](./CHANGELOG.md).
 **Migrations versionnées 4.0–4.10 en dépôt, non appliquées en production.** Flag off par défaut.
 Voir [`MIGRATIONS-4x.md`](./MIGRATIONS-4x.md) (`prisma migrate deploy` ≠ `db push` de test PG).
 **Lot 4.10** : politique ACTIVE seed (10 ans après clôture) + legal hold — **n'active pas** le module ; validation expert-comptable/DPO recommandée avant prod.
+
+**Déploiement** : voir [`DEPLOY-PRODUCTION.md`](./DEPLOY-PRODUCTION.md) (gardes, répétition, migration orpheline réconciliée).
 **Archive privée** ≠ journal financier détaché ≠ reports de période (synthèse).
 **Décision VALIDEE** = reconnaissance de charge (`Depense` origine `FRAIS_AVANCE`) ≠ décaissement bancaire.
 **Choix de règlement** ≠ exécution financière ≠ création d'`Avoir`.
