@@ -93,16 +93,20 @@ Annulation d'un règlement simple ou d'une opération MIXTE **parente** :
 - UI : `RequestCancelDialog` / `ConfirmCancelDialog` / `RefuseCancelDialog` + countdown `expiresAt` ;
 - notifs CONFIRMEE : lien `/user/...` pour le demandeur note, `/admin/...` pour l'auteur (eventKeys `…:confirmee:user|admin`) ;
 - distincte corrections 4.6 et restitutions 4.7 (présence corr/restit bloque la demande) ;
-- **garde TX** une seule `DEMANDEE` active par cible ; index partiels uniques = **prérequis de la première migration avant activation** (DDL dans `schema.prisma` + ci-dessous) — absents en V1 locale.
+- **garde TX** une seule `DEMANDEE` active par cible ; index partiels uniques livrés dans `20260918120200_notes_frais_4x_integrity` (prérequis activation — voir `docs/frais-avances/MIGRATIONS-4x.md`).
 
 ```sql
+-- Noms exacts (migration integrity) :
+-- notes_frais_choix_reglement_actif_uidx
+-- notes_frais_annul_demande_reglement_demandee_uidx
+-- notes_frais_annul_demande_operation_demandee_uidx
 CREATE UNIQUE INDEX notes_frais_annul_demande_reglement_demandee_uidx
-  ON notes_frais_reglement_annulation_demandes (reglement_id)
-  WHERE statut = 'DEMANDEE' AND reglement_id IS NOT NULL;
+  ON notes_frais_reglement_annulation_demandes ("reglementId")
+  WHERE statut = 'DEMANDEE' AND "reglementId" IS NOT NULL;
 
 CREATE UNIQUE INDEX notes_frais_annul_demande_operation_demandee_uidx
-  ON notes_frais_reglement_annulation_demandes (operation_id)
-  WHERE statut = 'DEMANDEE' AND operation_id IS NOT NULL;
+  ON notes_frais_reglement_annulation_demandes ("operationId")
+  WHERE statut = 'DEMANDEE' AND "operationId" IS NOT NULL;
 ```
 
 ### Notifications de règlement (lot 4.5 — local, flag off)
@@ -219,7 +223,7 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
 
 ## Non livré / futur
 - Lot **4.9** archivage financier RGPD (journal + reports) — local, flag off.
-- Migration dépôt / activation après politiques trésorier + index partiels 4.8.
+- Migration dépôt versionnée (voir `MIGRATIONS-4x.md`) / activation après politiques trésorier (P1/P2/P3) — index partiels 4.8 inclus dans `notes_frais_4x_integrity`, non encore déployés en prod.
 - Index partiel unique choix ACTIF.
 - CHECK SQL polymorphes sur `notes_frais_reglement_lignes` et opérations MIXTE.
 - API v1, mobile notes de frais.

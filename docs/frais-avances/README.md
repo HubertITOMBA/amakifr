@@ -24,10 +24,11 @@
 
 Voir [GUIDE.md](./GUIDE.md) et [CHANGELOG.md](./CHANGELOG.md).
 
-**Pas de migration créée/appliquée.** Flag off par défaut.
-**Trois politiques** (P1 fichiers, P2 archive privée, P3 journal) : allowlists vides — injections tests uniquement.
+**Migrations versionnées 4.0–4.9 en dépôt, non appliquées en production.** Flag off par défaut.
+Voir [`MIGRATIONS-4x.md`](./MIGRATIONS-4x.md) (`prisma migrate deploy` ≠ `db push` de test PG).
+**Trois politiques** (P1 fichiers, P2 archive privée, P3 journal) : allowlists **vides** — bloquent l’activation ; injections tests uniquement.
 **Archive privée** ≠ journal financier détaché ≠ reports de période (synthèse).
 **Décision VALIDEE** = reconnaissance de charge (`Depense` origine `FRAIS_AVANCE`) ≠ décaissement bancaire.
 **Choix de règlement** ≠ exécution financière ≠ création d'`Avoir`.
-**Lot 4.9** : détachement RGPD + journal + reports — flag off ; pas de migration dépôt ; décisions trésorier/juridique ouvertes.
-**Lots suivants** : migration dépôt / activation après validation politiques.
+**Lot 4.9** : détachement RGPD + journal + reports — flag off ; migrations dépôt **prêtes mais non déployées** ; décisions trésorier/juridique (P1/P2/P3) ouvertes.
+**Suite** : appliquer `migrate deploy` puis activer seulement après validation des politiques.

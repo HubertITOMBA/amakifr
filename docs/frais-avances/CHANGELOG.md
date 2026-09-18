@@ -2,19 +2,27 @@
 
 ## 0.4.9-archivage-financier-rgpd — 2026-09-18
 
-### Ajouté (lot 4.9 — local, flag off, **pas de migration dépôt**)
+### Ajouté (migrations dépôt 4.0–4.9 — **non appliquées en prod**, flag off)
+
+- Trois migrations versionnées : `notes_frais_4x_foundation`, `notes_frais_4x_backfill_seed`, `notes_frais_4x_integrity`.
+- Seed idempotent `TypeDepense.code=FRAIS_AVANCE` (`createdBy=NULL`) ; index partiels ACTIF/DEMANDEE ; CHECK XOR documentés.
+- Triggers différés MIXTE/corrections **reportés** (gardes TX + tests PG).
+- Doc : `docs/frais-avances/MIGRATIONS-4x.md` (runbook + preuve drift). Script verify local hors staging.
+
+### Ajouté (lot 4.9 — local, flag off ; migrations dépôt versionnées séparément, **non appliquées en prod**)
 - **Archive privée purgeable** (`NoteFraisArchive` + PJ) : consultation ADMIN|TRESOR|COMCPT ; **jamais** source de synthèse.
 - **Journal financier détaché** (`NoteFraisJournalFinancierEvenement`) : aucune FK identité/note/archive/live ; kinds minimaux (remb/comp/corr/restit) ; politique P3.
 - **Reports de période** (`NoteFraisReportFinancierPeriode`) : consolidation atomique des événements expirés ; synthèse = live + journal + reports.
-- Trois politiques distinctes P1/P2/P3 (allowlists vides ; injections tests).
+- Trois politiques distinctes P1/P2/P3 (allowlists **vides** — bloquent l’activation ; injections tests).
 - Détachement : Depense (`noteFraisId` null, origine FRAIS_AVANCE, libellé technique) ; Avoir/UA (ligne null, textes techniques, Utilise, hors FIFO) ; `adherentId` Avoir SetNull.
 - Acteurs audit → nullable SetNull (`createdBy` Depense, executeurs, uploaders, TypeDepense…).
 - PJ archive : pas de `nomFichierOrig` exposé ; download `justificatif-{rang}.{ext}`.
 - Synthèse stable : avant archive == après == après purge privée == après consolidation.
 - TX RGPD : prepare + user.delete ; counts assertés ; fail-closed politiques.
 
-### Non inclus
-- Migration dépôt ; activation ; durées/startsAt/periodeCle réelles (trésorier) ; index partiels 4.8.
+### Non inclus (activation)
+- Application prod (`migrate deploy`) ; activation des flags ; durées/startsAt/periodeCle réelles (trésorier) tant que P1/P2/P3 restent vides.
+- Index partiels ACTIF/DEMANDEE et CHECK XOR : **inclus** dans `20260918120200_notes_frais_4x_integrity` (versionnés, non encore déployés en prod).
 
 ## 0.4.8-annulation-double-validation — 2026-09-17
 
