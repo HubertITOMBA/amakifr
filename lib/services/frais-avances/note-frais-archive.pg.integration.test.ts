@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process";
 import { access, constants as fsConstants, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resolveAuthorizedNotesFraisPgTestUrl } from "@/lib/frais-avances/pg-test-allowlist";
+import { wipeNotesFraisPgFixtures } from "@/lib/frais-avances/pg-test-wipe";
 import { ARCHIVE_REIDENTIFIABILITY_NOTICE } from "@/lib/frais-avances/retention-policy";
 
 const STORAGE = "/tmp/amaki-notes-frais-pg-archive-storage";
@@ -117,38 +118,7 @@ describePg("intégration PG archive privée notes-frais", () => {
   });
 
   async function wipe() {
-    await prisma.utilisationAvoir.deleteMany({
-      where: { noteFraisReglementLigneId: { not: null } },
-    });
-    await prisma.avoir.deleteMany({
-      where: { noteFraisReglementLigneId: { not: null } },
-    });
-    await prisma.noteFraisReglementLigne.deleteMany({});
-    await prisma.noteFraisReglement.deleteMany({});
-    await prisma.noteFraisReglementOperation.deleteMany({});
-    await prisma.depense.deleteMany({ where: { noteFraisId: { not: null } } });
-    await prisma.noteFraisFileJob.deleteMany({});
-    await prisma.noteFraisArchiveAccessLog.deleteMany({});
-    await prisma.justificatifNoteFraisArchive.deleteMany({});
-    await prisma.noteFraisArchive.deleteMany({});
-    await prisma.noteFraisDecision.deleteMany({});
-    await prisma.noteFraisOutboxEvent.deleteMany({});
-    await prisma.justificatifNoteFrais.deleteMany({});
-    await prisma.noteFrais.deleteMany({});
-    await prisma.notification.deleteMany({
-      where: {
-        OR: [
-          { lien: { contains: "/admin/frais-avances/" } },
-          { lien: { contains: "/user/frais-avances/" } },
-        ],
-      },
-    });
-    await prisma.userAdminRole.deleteMany({
-      where: { user: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },
-    });
-    await prisma.user.deleteMany({
-      where: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } },
-    });
+    await wipeNotesFraisPgFixtures(prisma);
   }
 
   async function assertAbsent(p: string) {
@@ -301,6 +271,9 @@ describePg("intégration PG archive privée notes-frais", () => {
     if (list.success) {
       expect(list.data[0]).not.toHaveProperty("cheminRelatif");
       expect(JSON.stringify(list.data)).not.toContain("cheminRelatif");
+      expect(JSON.stringify(list.data)).not.toContain("nomFichierOrig");
+      expect(JSON.stringify(list.data)).not.toContain("piece.pdf");
+      expect(list.data[0]?.Justificatifs[0]).toHaveProperty("rang");
     }
 
     const dlPending = await downloadNotesFraisArchiveJustificatif({
@@ -310,6 +283,9 @@ describePg("intégration PG archive privée notes-frais", () => {
     });
     // already READY after worker
     expect(dlPending.success).toBe(true);
+    if (dlPending.success) {
+      expect(dlPending.data.downloadName).toBe("justificatif-1.pdf");
+    }
 
     const refused = await downloadNotesFraisArchiveJustificatif({
       userId: membre.id,

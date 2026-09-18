@@ -2,6 +2,7 @@
 
 | Version | Date | Contenu |
 |---------|------|---------|
+| 0.4.9-archivage-financier-rgpd | 2026-09-18 | Lot 4.9 : archive privée ≠ journal financier ≠ reports (flag off) |
 | 0.4.8-annulation-double-validation | 2026-09-17 | Lot 4.8 : annulation double validation (flag off) |
 | 0.4.7-restitutions-reelles | 2026-09-17 | Lot 4.7 : restitutions réelles (flag off) |
 | 0.4.6-corrections-append-only | 2026-09-17 | Lot 4.6 : corrections append-only (flag off) |
@@ -24,11 +25,9 @@
 Voir [GUIDE.md](./GUIDE.md) et [CHANGELOG.md](./CHANGELOG.md).
 
 **Pas de migration créée/appliquée.** Flag off par défaut.
-**Politique de conservation** : à valider par le trésorier — sans elle, refus de suppression si notes SOUMISE|VALIDEE|REJETEE.
-**Archive** : privée, non anonyme.
+**Trois politiques** (P1 fichiers, P2 archive privée, P3 journal) : allowlists vides — injections tests uniquement.
+**Archive privée** ≠ journal financier détaché ≠ reports de période (synthèse).
 **Décision VALIDEE** = reconnaissance de charge (`Depense` origine `FRAIS_AVANCE`) ≠ décaissement bancaire.
 **Choix de règlement** ≠ exécution financière ≠ création d'`Avoir`.
-**Lot 4.6** : corrections append-only REFERENCE / MONTANT_NEGATIF — flag off ; pas de migration dépôt.
-**Lot 4.7** : restitutions réelles (entrée bancaire) ≠ corrections — flag off ; pas de migration dépôt.
-**Lot 4.8** : annulation double validation (30 j) — flag off ; pas de migration dépôt.
-**Lots suivants** : détachement RGPD 4.9.
+**Lot 4.9** : détachement RGPD + journal + reports — flag off ; pas de migration dépôt ; décisions trésorier/juridique ouvertes.
+**Lots suivants** : migration dépôt / activation après validation politiques.

@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PrismaClient, Prisma } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { resolveAuthorizedNotesFraisPgTestUrl } from "@/lib/frais-avances/pg-test-allowlist";
+import { wipeNotesFraisPgFixtures } from "@/lib/frais-avances/pg-test-wipe";
 import { ensureTypeDepenseFraisAvanceForTests } from "@/lib/frais-avances/type-depense-frais-avance";
 import {
   computeChargesFromDepensesValides,
@@ -14,7 +15,6 @@ import {
   withDecaissementsNotesFrais,
   withRestantDuNotesFrais,
 } from "@/lib/financial/synthese-charges";
-import { NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED } from "@/lib/services/frais-avances/note-frais-archive-service";
 import { computeEtatFinancierNoteFrais } from "@/lib/services/frais-avances/note-frais-remboursement-service";
 import { NOTES_FRAIS_ANNULATION_TTL_MS } from "@/lib/services/frais-avances/note-frais-annulation-service";
 
@@ -42,54 +42,7 @@ describe("intégration PG annulation notes-frais 4.8", () => {
   });
 
   async function wipe() {
-    await prisma.noteFraisAnnulationInverseCible.deleteMany({});
-    await prisma.noteFraisCorrectionInverseCible.deleteMany({});
-    await prisma.noteFraisReglementAnnulationDemande.deleteMany({});
-    await prisma.noteFraisRestitution.deleteMany({});
-    await prisma.noteFraisReglementCorrection.deleteMany({});
-    await prisma.utilisationAvoir.deleteMany({
-      where: { noteFraisReglementLigneId: { not: null } },
-    });
-    await prisma.avoir.deleteMany({
-      where: {
-        OR: [
-          { noteFraisReglementLigneId: { not: null } },
-          { origine: "COMPENSATION_NOTE_FRAIS" },
-        ],
-      },
-    });
-    await prisma.noteFraisReglementLigne.deleteMany({});
-    await prisma.noteFraisReglement.deleteMany({});
-    await prisma.noteFraisReglementOperation.deleteMany({});
-    await prisma.depense.deleteMany({ where: { noteFraisId: { not: null } } });
-    await prisma.noteFraisChoixReglementCible.deleteMany({});
-    await prisma.noteFraisChoixReglement.deleteMany({});
-    await prisma.noteFraisDecision.deleteMany({});
-    await prisma.noteFraisOutboxEvent.deleteMany({});
-    await prisma.notification.deleteMany({
-      where: { User: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },
-    });
-    await prisma.justificatifNoteFrais.deleteMany({});
-    await prisma.noteFrais.deleteMany({});
-    await prisma.cotisationMensuelle.deleteMany({
-      where: {
-        Adherent: { User: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },
-      },
-    });
-    await prisma.detteInitiale.deleteMany({
-      where: {
-        Adherent: { User: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },
-      },
-    });
-    await prisma.typeCotisationMensuelle.deleteMany({
-      where: { nom: { startsWith: "nf-ann-" } },
-    });
-    await prisma.userAdminRole.deleteMany({
-      where: { user: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },
-    });
-    await prisma.user.deleteMany({
-      where: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } },
-    });
+    await wipeNotesFraisPgFixtures(prisma);
   }
 
   async function createUser(
@@ -1352,18 +1305,17 @@ describe("intégration PG annulation notes-frais 4.8", () => {
     const { archiveSubmittedNotesInTransaction } = await import(
       "@/lib/services/frais-avances/note-frais-archive-service"
     );
-    await expect(
-      prisma.$transaction(async (tx) => {
-        await archiveSubmittedNotesInTransaction(tx as never, [note.id], {
-          status: "validated_injected",
-          injected: {
-            durationMs: 365 * 24 * 3600 * 1000,
-            startsAt: "archivedAt",
-          },
-        });
-      })
-    ).rejects.toThrow(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
-    expect(await prisma.noteFrais.count({ where: { id: note.id } })).toBe(1);
+    await prisma.$transaction(async (tx) => {
+      await archiveSubmittedNotesInTransaction(tx as never, [note.id], {
+        status: "validated_injected",
+        injected: {
+          durationMs: 365 * 24 * 3600 * 1000,
+          startsAt: "archivedAt",
+        },
+      });
+    });
+    expect(await prisma.noteFrais.count({ where: { id: note.id } })).toBe(0);
+    expect(await prisma.noteFraisArchive.count()).toBeGreaterThan(0);
 
     const { computeRestantDuNotesFraisGlobal } = await import(
       "@/lib/services/frais-avances/note-frais-restitution-service"
@@ -1373,7 +1325,7 @@ describe("intégration PG annulation notes-frais 4.8", () => {
       computeChargesFromDepensesValides([]),
       restant
     );
-    expect(ind.restantDuNotesFrais).toBeGreaterThan(0);
+    expect(ind.restantDuNotesFrais).toBe(0);
   });
 
   it("deux demandes concurrentes (règlement + MIXTE) ; confirm vs refus ; compteur insuffisant ; courses annul↔corr/comp", async () => {

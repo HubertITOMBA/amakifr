@@ -20,7 +20,7 @@ type ArchiveDetail = {
   reidentifiabilityNotice: string;
   Justificatifs: Array<{
     id: string;
-    nomFichierOrig: string;
+    rang: number;
     typeMime: string;
     taille: number;
     statut: string;
@@ -109,7 +109,7 @@ export default function AdminFraisAvancesArchiveDetailPage() {
                     className="flex items-center justify-between gap-2 rounded border border-slate-200 px-3 py-2"
                   >
                     <span>
-                      {j.nomFichierOrig}{" "}
+                      justificatif-{j.rang}{" "}
                       <span className="text-xs text-slate-500">
                         ({j.statut})
                       </span>

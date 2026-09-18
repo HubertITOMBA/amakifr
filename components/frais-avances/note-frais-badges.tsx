@@ -155,7 +155,12 @@ export function messageErreurNoteFrais(
     case "ANNULATION_ATTESTATION_REQUIRED":
       return "Attestation obligatoire pour confirmer l'annulation.";
     case "NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED":
-      return "Historique financier présent — archivage reporté (lot 4.9).";
+    case "NOTES_FRAIS_P1_RETENTION_REQUIRED":
+    case "NOTES_FRAIS_P2_RETENTION_REQUIRED":
+    case "NOTES_FRAIS_P3_RETENTION_REQUIRED":
+    case "NOTES_FRAIS_DETACH_COUNT_MISMATCH":
+    case "NOTES_FRAIS_JOURNAL_SNAPSHOT_INCONSISTENT":
+      return "Suppression impossible : politique de conservation manquante ou état financier incohérent.";
     case "FORBIDDEN":
       return "Action non autorisée.";
     case "NOTES_FRAIS_DISABLED":

@@ -159,29 +159,39 @@ CREATE UNIQUE INDEX notes_frais_annul_demande_operation_demandee_uidx
 - **Avec politique injectée (tests) / future politique validée** : archivage privé atomique (statutFinal, montantAccepte, decideeAt — sans décideur).
 - Échec → rollback total ; pas de `Completee` RGPD.
 
+### Archive privée vs journal financier (lot 4.9)
+- **Archive privée** (`NoteFraisArchive` + PJ) : consultation ADMIN|TRESOR|COMCPT ; purgeable ; **jamais** lue par la synthèse.
+- **Journal financier détaché** : événements minimaux (REMBOURSEMENT_EXECUTE, COMPENSATION_EXECUTEE, CORRECTION_*, RESTITUTION) ; aucune FK identité/note/archive ; politique P3.
+- **Reports de période** : consolidation atomique des événements expirés ; synthèse = live + journal + reports.
+- PJ archive : pas de nom original en DTO ; download `justificatif-{rang}.{ext}`.
+- Trois politiques P1/P2/P3 (allowlists vides) ; fail-closed selon besoin (PJ → P1, archive → P2, historique → P3).
+- Décisions trésorier (durées, startsAt, periodeCle) **bloquent** migration/activation.
+
 ### Archive privée (livrée localement, **politique réelle non activée**)
 - Tables : `notes_frais_archives`, `justificatifs_note_frais_archives`, `notes_frais_archive_access_logs`.
 - Contenu structuré minimal + `statutFinal` / `montantAccepte` / `decideeAt` si décision.
 - Résumé choix éventuel : `modeReglement` / montants remboursement & compensation — **sans** IDs de cibles ni libellés libres.
 - **Pas** de libelle / description / id source / rattachement User|Adherent / décideur.
-- **Ne pas qualifier d’anonyme** : date + montant potentiellement réidentifiables ; le **`nomFichierOrig`** des justificatifs archivés reste une donnée **potentiellement personnelle** (nom de fichier choisi par l’adhérent).
+- **Ne pas qualifier d’anonyme** : date + montant potentiellement réidentifiables.
 - Accès : comptes **Actif** `ADMIN|TRESOR|COMCPT` (rôle principal **ou** additionnel).
-- Distinguer des futures pièces comptables validées (`Depense` / règlements) — **hors périmètre**.
 
 ### Politique de conservation (ouverte)
-- Durée et point de départ (**proposition** : `archivedAt`) **à valider par le trésorier**.
-- **Aucune durée réelle par défaut** ; aucune conservation indéfinie implicite.
-- Liste `VALIDATED_POLICIES` **vide** en production.
-- Tests uniquement : `injectedRetention: { durationMs, startsAt: "archivedAt" }`.
+- **P1** fichiers/PJ, **P2** archive privée, **P3** journal financier — distinctes.
+- Durée et point de départ **à valider par le trésorier**.
+- **Aucune durée réelle par défaut** ; aucune conservation détaillée indéfinie.
+- Allowlists **vides** en production.
+- Tests uniquement : `injectedRetention` / `injectedPolicies`.
 
 ### FK dans `schema.prisma` (pas encore migrées en base prod)
-- Live : Restrict User/Adherent → Note ; Restrict uploadedBy ; decideur **SetNull** ; correction **SetNull**.
-- Archive : **aucune FK** vers le compte supprimé.
+- Live : Restrict User/Adherent → Note ; acteurs audit **SetNull** (Depense.createdBy, executeurs, uploaders…).
+- Avoir.adherentId **SetNull** (survie après delete adhérent).
+- Archive / journal / reports : **aucune FK** vers le compte supprimé.
 - Access log : `onDelete: SetNull` sur actor.
 
 ### Workers / fichiers
 - Jobs MOVE/UNLINK durables ; outbox `SUBMITTED` / `DECIDED`.
 - `processNoteFraisFileJobsOnce` tourne même si le flag métier est off (durabilité).
+- Consolidation journal (`consolidateNoteFraisJournalFinancierOnce`) — indépendante de la purge archive.
 
 ## Tests PostgreSQL
 
@@ -208,7 +218,8 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
 
 
 ## Non livré / futur
-- Lot **4.9** détachement RGPD FK (historique financier dont annulations).
+- Lot **4.9** archivage financier RGPD (journal + reports) — local, flag off.
+- Migration dépôt / activation après politiques trésorier + index partiels 4.8.
 - Index partiel unique choix ACTIF.
 - CHECK SQL polymorphes sur `notes_frais_reglement_lignes` et opérations MIXTE.
 - API v1, mobile notes de frais.

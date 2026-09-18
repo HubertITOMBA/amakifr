@@ -1,14 +1,17 @@
 import { db } from "@/lib/db";
 import { absoluteFromRelative, hashIdForLog } from "@/lib/frais-avances/storage";
 import {
-  resolveEffectiveArchiveRetention,
+  isRetentionUsable,
+  resolveEffectivePoliciesBundle,
   type InjectedArchiveRetentionPolicy,
+  type InjectedNotesFraisRetentionBundle,
 } from "@/lib/frais-avances/retention-policy";
 import { archiveSubmittedNotesInTransaction } from "@/lib/services/frais-avances/note-frais-archive-service";
+import { setNullActorFksForUserInTx } from "@/lib/services/frais-avances/note-frais-detach-service";
 
 export type NotesFraisDbClient =
-  | typeof db
-  | {
+    | typeof db
+    | {
       $executeRaw: typeof db.$executeRaw;
       noteFrais: typeof db.noteFrais;
       justificatifNoteFrais: typeof db.justificatifNoteFrais;
@@ -19,6 +22,14 @@ export type NotesFraisDbClient =
       noteFraisArchive?: typeof db.noteFraisArchive;
       justificatifNoteFraisArchive?: typeof db.justificatifNoteFraisArchive;
       noteFraisArchiveAccessLog?: typeof db.noteFraisArchiveAccessLog;
+      noteFraisJournalFinancierEvenement?: typeof db.noteFraisJournalFinancierEvenement;
+      depense?: typeof db.depense;
+      avoir?: typeof db.avoir;
+      utilisationAvoir?: typeof db.utilisationAvoir;
+      noteFraisReglement?: typeof db.noteFraisReglement;
+      noteFraisReglementOperation?: typeof db.noteFraisReglementOperation;
+      typeDepense?: typeof db.typeDepense;
+      justificatifDepense?: typeof db.justificatifDepense;
     };
 
 export class NotesFraisRgpdBlockError extends Error {
@@ -168,8 +179,10 @@ export async function prepareNotesFraisForAccountDeletion(
   options?: {
     beforeUserLock?: () => Promise<void>;
     afterUserLock?: () => Promise<void>;
-    /** Politique injectée — tests uniquement ; aucune durée produit par défaut. */
+    /** Politique injectée legacy (P1=P2=P3) — tests uniquement. */
     injectedRetention?: InjectedArchiveRetentionPolicy | null;
+    /** Bundle P1/P2/P3 injecté — tests uniquement. */
+    injectedPolicies?: InjectedNotesFraisRetentionBundle | null;
   }
 ): Promise<PrepareNotesFraisResult> {
   const empty: PrepareNotesFraisResult = {
@@ -192,45 +205,42 @@ export async function prepareNotesFraisForAccountDeletion(
   }
 
   await tx.$executeRaw`
-    SELECT id FROM notes_frais WHERE "demandeurUserId" = ${userId} FOR UPDATE
+    SELECT id FROM notes_frais WHERE "demandeurUserId" = ${userId} ORDER BY id ASC FOR UPDATE
   `;
 
   const notes = await tx.noteFrais.findMany({
     where: { demandeurUserId: userId },
     select: { id: true, statut: true },
+    orderBy: { id: "asc" },
   });
 
   const protegees = notes.filter((n) =>
     n.statut === "SOUMISE" || n.statut === "VALIDEE" || n.statut === "REJETEE"
   );
-  const retention = resolveEffectiveArchiveRetention({
-    injected: options?.injectedRetention,
+  const policies = resolveEffectivePoliciesBundle({
+    injected: options?.injectedPolicies,
+    injectedRetention: options?.injectedRetention,
   });
-  const canArchive =
-    retention.status === "validated_injected" ||
-    retention.status === "validated";
 
   let archivesCreated = 0;
   let archiveMoveJobs = 0;
 
   if (protegees.length > 0) {
-    if (!canArchive) {
+    // P2 toujours requise pour notes protégées (fail-closed).
+    if (!isRetentionUsable(policies.p2)) {
       throw new NotesFraisRgpdBlockError();
-    }
-    // Politique env « validated » sans durée mappée : refuse encore (trésorier).
-    if (retention.status === "validated") {
-      throw new NotesFraisRgpdBlockError(
-        "Suppression impossible : politique listée sans durée/archivage mappé — validation trésorier requise."
-      );
     }
     const archived = await archiveSubmittedNotesInTransaction(
       tx as never,
       protegees.map((s) => s.id),
-      retention
+      policies
     );
     archivesCreated = archived.archivesCreated;
     archiveMoveJobs = archived.moveJobsEnqueued;
   }
+
+  // Acteurs du user sur objets conservés (autres notes, Depense, TypeDepense…).
+  await setNullActorFksForUserInTx(tx as never, userId);
 
   const drafts = notes.filter((n) => n.statut === "BROUILLON");
   if (drafts.length === 0) {
@@ -349,6 +359,7 @@ export async function deleteUserAtomicallyWithNotesFraisRgpd(
     beforeUserLock?: () => Promise<void>;
     afterUserLock?: () => Promise<void>;
     injectedRetention?: InjectedArchiveRetentionPolicy | null;
+    injectedPolicies?: InjectedNotesFraisRetentionBundle | null;
   }
 ): Promise<{
   notesFrais: PrepareNotesFraisResult;

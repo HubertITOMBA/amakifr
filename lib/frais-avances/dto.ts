@@ -632,10 +632,10 @@ export function enrichNoteFraisFinancierDto(
   return dto;
 }
 
-/** DTO archive privée — sans chemins ; notice de non-anonymat. */
+/** DTO archive privée — sans chemins ; sans nom original ; notice de non-anonymat. */
 export type JustificatifNoteFraisArchivePublicDto = {
   id: string;
-  nomFichierOrig: string;
+  rang: number;
   typeMime: string;
   taille: number;
   statut: string;
@@ -660,7 +660,7 @@ export type NoteFraisArchivePublicDto = {
 };
 
 /**
- * Mappe une archive vers un DTO sans chemin de stockage.
+ * Mappe une archive vers un DTO sans chemin ni nom de fichier original.
  */
 export function toNoteFraisArchivePublicDto(row: {
   id: string;
@@ -678,7 +678,8 @@ export function toNoteFraisArchivePublicDto(row: {
   reidentifiabilityNotice: string;
   Justificatifs?: Array<{
     id: string;
-    nomFichierOrig: string;
+    rang?: number;
+    nomFichierOrig?: string | null;
     typeMime: string;
     taille: number;
     statut: string;
@@ -704,9 +705,9 @@ export function toNoteFraisArchivePublicDto(row: {
     archivedAt: row.archivedAt,
     retentionEndsAt: row.retentionEndsAt,
     reidentifiabilityNotice: row.reidentifiabilityNotice,
-    Justificatifs: (row.Justificatifs ?? []).map((j) => ({
+    Justificatifs: (row.Justificatifs ?? []).map((j, i) => ({
       id: j.id,
-      nomFichierOrig: j.nomFichierOrig,
+      rang: j.rang ?? i + 1,
       typeMime: j.typeMime,
       taille: j.taille,
       statut: j.statut,

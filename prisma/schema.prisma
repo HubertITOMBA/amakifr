@@ -737,12 +737,13 @@ model TypeDepense {
   /// Code technique stable (nullable pour historiques). FRAIS_AVANCE = type notes de frais.
   code        String?  @unique @db.VarChar(32)
   actif       Boolean  @default(true)
-  createdBy   String // ID de l'admin qui a créé le type
+  /// Nullable + SetNull (lot 4.9) : ne Cascade-delete jamais un type technique.
+  createdBy   String?
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
 
   // Relations
-  CreatedBy User      @relation("TypeDepenseCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  CreatedBy User?     @relation("TypeDepenseCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   Depenses  Depense[] // Dépenses de ce type
 
   @@map("types_depense")
@@ -758,15 +759,16 @@ model Depense {
   description   String?        @db.Text
   justificatif  String?        @db.VarChar(500) // URL du fichier uploadé (conservé pour compatibilité)
   statut        String         @default("EnAttente") // EnAttente, Valide, Rejete
-  /// Classification permanente (synthèse). Inchangée si noteFraisId détaché (RGPD futur).
+  /// Classification permanente (synthèse). Inchangée si noteFraisId détaché (RGPD 4.9).
   origine       OrigineDepense @default(ORDINAIRE)
   /// Lien 1–1 note VALIDEE → charge. Restrict : pas de delete Depense tant que note live.
   noteFraisId   String?        @unique
-  createdBy     String // ID de l'admin qui a créé la dépense
+  /// Nullable + SetNull (lot 4.9) : ne Cascade-delete jamais une charge.
+  createdBy     String?
   validatedBy   String? // ID de l'admin qui a validé la dépense (null si non validée)
 
   // Relations
-  CreatedBy     User                  @relation("DepenseCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
+  CreatedBy     User?                 @relation("DepenseCreatedBy", fields: [createdBy], references: [id], onDelete: SetNull)
   ValidatedBy   User?                 @relation("DepenseValidatedBy", fields: [validatedBy], references: [id], onDelete: SetNull)
   TypeDepense   TypeDepense?          @relation(fields: [typeDepenseId], references: [id], onDelete: SetNull)
   NoteFrais     NoteFrais?            @relation("NoteFraisCharge", fields: [noteFraisId], references: [id], onDelete: Restrict)
@@ -787,11 +789,12 @@ model JustificatifDepense {
   chemin     String @db.VarChar(500) // Chemin relatif dans /public/ressources/justificatifs
   typeMime   String @db.VarChar(100) // Type MIME (application/pdf, image/jpeg, etc.)
   taille     Int // Taille en octets
-  uploadedBy String // ID de l'admin qui a uploadé le fichier
+  /// Nullable + SetNull (lot 4.9) : ne Cascade-delete jamais un justificatif comptable.
+  uploadedBy String?
 
   // Relations
   Depense    Depense @relation(fields: [depenseId], references: [id], onDelete: Cascade)
-  UploadedBy User    @relation("JustificatifUploadedBy", fields: [uploadedBy], references: [id], onDelete: Cascade)
+  UploadedBy User?   @relation("JustificatifUploadedBy", fields: [uploadedBy], references: [id], onDelete: SetNull)
 
   // Métadonnées
   createdAt DateTime @default(now())
@@ -1032,7 +1035,8 @@ enum OrigineAvoir {
 // Modèle pour les avoirs (excédents de paiement)
 model Avoir {
   id             String  @id @default(cuid())
-  adherentId     String
+  /// Nullable + SetNull (lot 4.9) : survie comptable après suppression adhérent.
+  adherentId     String?
   montant        Decimal @db.Decimal(10, 2) // Montant de l'avoir
   montantUtilise Decimal @default(0) @db.Decimal(10, 2) // Montant déjà utilisé
   montantRestant Decimal @db.Decimal(10, 2) // Montant restant disponible
@@ -1050,7 +1054,7 @@ model Avoir {
   noteFraisReglementLigneId String? @unique
 
   // Relations
-  Adherent     Adherent            @relation(fields: [adherentId], references: [id], onDelete: Cascade)
+  Adherent     Adherent?           @relation(fields: [adherentId], references: [id], onDelete: SetNull)
   Paiement     PaiementCotisation? @relation("AvoirFromPaiement", fields: [paiementId], references: [id], onDelete: SetNull)
   Utilisations UtilisationAvoir[] // Utilisations de cet avoir
   NoteFraisReglementLigne NoteFraisReglementLigne? @relation("AvoirFromNoteFraisLigne", fields: [noteFraisReglementLigneId], references: [id], onDelete: Restrict)
@@ -2910,14 +2914,15 @@ model NoteFraisReglementOperation {
   type            TypeNoteFraisReglementOperation @default(MIXTE)
   statut          StatutNoteFraisReglementOperation @default(EXECUTE)
   idempotencyKey  String                          @unique @db.VarChar(64)
-  executeurUserId String
+  /// Nullable + SetNull (lot 4.9) : ne bloque pas user.delete d'un exécuteur tiers.
+  executeurUserId String?
   /// Instant canonique partagé avec les deux règlements enfants.
   executeAt       DateTime
   createdAt       DateTime                        @default(now())
 
   NoteFrais  NoteFrais               @relation(fields: [noteFraisId], references: [id], onDelete: Restrict)
   Choix      NoteFraisChoixReglement @relation(fields: [choixId], references: [id], onDelete: Restrict)
-  Executeur  User                    @relation("NoteFraisReglementOperationExecuteur", fields: [executeurUserId], references: [id], onDelete: Restrict)
+  Executeur  User?                   @relation("NoteFraisReglementOperationExecuteur", fields: [executeurUserId], references: [id], onDelete: SetNull)
   Reglements NoteFraisReglement[]
   AnnulationDemandes NoteFraisReglementAnnulationDemande[]
 
@@ -2944,7 +2949,8 @@ model NoteFraisReglement {
   referenceNormalisee  String?                   @db.VarChar(64)
   /// Obligatoire applicativement si operationId null (4.1/4.2) ; null si enfant MIXTE.
   idempotencyKey       String?                   @unique @db.VarChar(64)
-  executeurUserId      String
+  /// Nullable + SetNull (lot 4.9) : ne bloque pas user.delete d'un exécuteur tiers.
+  executeurUserId      String?
   executeAt            DateTime
   /// Null pour règlements simples 4.1/4.2 ; renseigné pour enfants d'une opération MIXTE.
   operationId          String?
@@ -2952,7 +2958,7 @@ model NoteFraisReglement {
 
   NoteFrais NoteFrais               @relation(fields: [noteFraisId], references: [id], onDelete: Restrict)
   Choix     NoteFraisChoixReglement @relation(fields: [choixId], references: [id], onDelete: Restrict)
-  Executeur User                    @relation("NoteFraisReglementExecuteur", fields: [executeurUserId], references: [id], onDelete: Restrict)
+  Executeur User?                   @relation("NoteFraisReglementExecuteur", fields: [executeurUserId], references: [id], onDelete: SetNull)
   Operation   NoteFraisReglementOperation? @relation(fields: [operationId], references: [id], onDelete: Restrict)
   Lignes      NoteFraisReglementLigne[]
   Corrections NoteFraisReglementCorrection[]
@@ -3187,12 +3193,13 @@ model JustificatifNoteFrais {
   typeMime       String                     @db.VarChar(100)
   taille         Int
   statut         StatutJustificatifNoteFrais @default(PENDING)
-  uploadedBy     String
+  /// Nullable + SetNull (lot 4.9) : ne bloque pas user.delete d'un uploader tiers.
+  uploadedBy     String?
   createdAt      DateTime                   @default(now())
   updatedAt      DateTime                   @updatedAt
 
   NoteFrais  NoteFrais @relation(fields: [noteFraisId], references: [id], onDelete: Cascade)
-  UploadedBy User      @relation("JustificatifNoteFraisUploader", fields: [uploadedBy], references: [id], onDelete: Restrict)
+  UploadedBy User?     @relation("JustificatifNoteFraisUploader", fields: [uploadedBy], references: [id], onDelete: SetNull)
 
   @@index([noteFraisId, statut])
   @@map("justificatifs_note_frais")
@@ -3249,6 +3256,7 @@ model NoteFraisFileJob {
 
 /// Archive privée des notes SOUMISE|VALIDEE|REJETEE après suppression de compte.
 /// Données potentiellement personnelles — ne pas qualifier d'« anonyme ».
+/// Lot 4.9 : JAMAIS source de synthèse (voir NoteFraisJournalFinancierEvenement / Report).
 model NoteFraisArchive {
   id                        String    @id @default(cuid())
   dateDepense               DateTime
@@ -3279,19 +3287,23 @@ model NoteFraisArchive {
 }
 
 model JustificatifNoteFraisArchive {
-  id             String                      @id @default(cuid())
-  archiveId      String
-  nomFichierOrig String                      @db.VarChar(255)
-  cheminRelatif  String                      @db.VarChar(500)
-  typeMime       String                      @db.VarChar(100)
-  taille         Int
-  statut         StatutJustificatifNoteFrais @default(PENDING)
-  createdAt      DateTime                    @default(now())
-  updatedAt      DateTime                    @updatedAt
+  id            String                      @id @default(cuid())
+  archiveId     String
+  /// Rang d'affichage / nom technique download (pas de nom original — lot 4.9).
+  rang          Int                         @default(1)
+  /// Conservé nullable pour compat schéma ; toujours null à l'écriture 4.9.
+  nomFichierOrig String?                    @db.VarChar(255)
+  cheminRelatif String                      @db.VarChar(500)
+  typeMime      String                      @db.VarChar(100)
+  taille        Int
+  statut        StatutJustificatifNoteFrais @default(PENDING)
+  createdAt     DateTime                    @default(now())
+  updatedAt     DateTime                    @updatedAt
 
   Archive NoteFraisArchive @relation(fields: [archiveId], references: [id], onDelete: Cascade)
 
   @@index([archiveId, statut])
+  @@unique([archiveId, rang])
   @@map("justificatifs_note_frais_archives")
 }
 
@@ -3309,4 +3321,48 @@ model NoteFraisArchiveAccessLog {
   @@index([archiveId, createdAt])
   @@index([actorUserId])
   @@map("notes_frais_archive_access_logs")
+}
+
+/// Kind d'événement du journal financier détaché (lot 4.9) — synthèse uniquement.
+enum KindNoteFraisJournalFinancier {
+  REMBOURSEMENT_EXECUTE
+  COMPENSATION_EXECUTEE
+  CORRECTION_REMBOURSEMENT
+  CORRECTION_COMPENSATION
+  RESTITUTION
+}
+
+/// Journal financier détaché — aucune FK identité / note / archive / live.
+/// Source de synthèse après suppression des lignes live ; soumis à politique P3.
+model NoteFraisJournalFinancierEvenement {
+  id              String                       @id @default(cuid())
+  kind            KindNoteFraisJournalFinancier
+  occurredAt      DateTime
+  /// Clé de période comptable (ex. "2026") — injection test / politique trésorier.
+  periodeCle      String                       @db.VarChar(16)
+  /// Montant Decimal signé selon kind (positif exécution/restit ; négatif correction).
+  montant         Decimal                      @db.Decimal(10, 2)
+  retentionEndsAt DateTime
+  createdAt       DateTime                     @default(now())
+
+  @@index([retentionEndsAt])
+  @@index([periodeCle, kind])
+  @@index([occurredAt])
+  @@map("notes_frais_journal_financier_evenements")
+}
+
+/// Report comptable agrégé par période — remplace atomiquement les événements consolidés.
+/// Pas d'identité ni rattachement note ; utilisé par la synthèse.
+model NoteFraisReportFinancierPeriode {
+  id                              String   @id @default(cuid())
+  periodeCle                      String   @unique @db.VarChar(16)
+  totalDecaissementsRemboursement Decimal  @default(0) @db.Decimal(12, 2)
+  totalRestitutions               Decimal  @default(0) @db.Decimal(12, 2)
+  totalCompensationsNettes        Decimal  @default(0) @db.Decimal(12, 2)
+  consolidatedAt                  DateTime
+  createdAt                       DateTime @default(now())
+  updatedAt                       DateTime @updatedAt
+
+  @@index([consolidatedAt])
+  @@map("notes_frais_reports_financier_periode")
 }

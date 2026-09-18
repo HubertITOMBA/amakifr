@@ -1,5 +1,21 @@
 # Changelog — frais avancés
 
+## 0.4.9-archivage-financier-rgpd — 2026-09-18
+
+### Ajouté (lot 4.9 — local, flag off, **pas de migration dépôt**)
+- **Archive privée purgeable** (`NoteFraisArchive` + PJ) : consultation ADMIN|TRESOR|COMCPT ; **jamais** source de synthèse.
+- **Journal financier détaché** (`NoteFraisJournalFinancierEvenement`) : aucune FK identité/note/archive/live ; kinds minimaux (remb/comp/corr/restit) ; politique P3.
+- **Reports de période** (`NoteFraisReportFinancierPeriode`) : consolidation atomique des événements expirés ; synthèse = live + journal + reports.
+- Trois politiques distinctes P1/P2/P3 (allowlists vides ; injections tests).
+- Détachement : Depense (`noteFraisId` null, origine FRAIS_AVANCE, libellé technique) ; Avoir/UA (ligne null, textes techniques, Utilise, hors FIFO) ; `adherentId` Avoir SetNull.
+- Acteurs audit → nullable SetNull (`createdBy` Depense, executeurs, uploaders, TypeDepense…).
+- PJ archive : pas de `nomFichierOrig` exposé ; download `justificatif-{rang}.{ext}`.
+- Synthèse stable : avant archive == après == après purge privée == après consolidation.
+- TX RGPD : prepare + user.delete ; counts assertés ; fail-closed politiques.
+
+### Non inclus
+- Migration dépôt ; activation ; durées/startsAt/periodeCle réelles (trésorier) ; index partiels 4.8.
+
 ## 0.4.8-annulation-double-validation — 2026-09-17
 
 ### Ajouté (lot 4.8 — local, flag off, **pas de migration dépôt**)

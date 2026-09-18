@@ -94,17 +94,38 @@ export async function getFinancialSynthese() {
     );
     const corrAgg = await aggregateCorrectionsMontantByReglementType(prisma);
     // Nets Decimal purs (brut + corrections négatives) — pas de Number intermédiaire.
-    const rembNet = new Prisma.Decimal(
+    const rembLive = new Prisma.Decimal(
       remboursementsAgg._sum.montantTotal ?? 0
-    )
-      .plus(new Prisma.Decimal(corrAgg.remboursements))
-      .toFixed(2);
-    const compNet = new Prisma.Decimal(
+    ).plus(new Prisma.Decimal(corrAgg.remboursements));
+    const compLive = new Prisma.Decimal(
       compensationsAgg._sum.montantTotal ?? 0
-    )
-      .plus(new Prisma.Decimal(corrAgg.compensations))
+    ).plus(new Prisma.Decimal(corrAgg.compensations));
+    const restitLive = new Prisma.Decimal(
+      await aggregateRestitutionsMontant(prisma)
+    );
+
+    // Lot 4.9 : journal détaché + reports (jamais NoteFraisArchive).
+    const {
+      aggregateJournalFinancierForSynthese,
+      aggregateReportsFinancierForSynthese,
+    } = await import(
+      "@/lib/services/frais-avances/note-frais-journal-financier-service"
+    );
+    const journalAgg = await aggregateJournalFinancierForSynthese(prisma);
+    const reportsAgg = await aggregateReportsFinancierForSynthese(prisma);
+
+    const rembNet = rembLive
+      .plus(new Prisma.Decimal(journalAgg.totalDecaissementsRemboursement))
+      .plus(new Prisma.Decimal(reportsAgg.totalDecaissementsRemboursement))
       .toFixed(2);
-    const restitSum = await aggregateRestitutionsMontant(prisma);
+    const compNet = compLive
+      .plus(new Prisma.Decimal(journalAgg.totalCompensationsNettes))
+      .plus(new Prisma.Decimal(reportsAgg.totalCompensationsNettes))
+      .toFixed(2);
+    const restitSum = restitLive
+      .plus(new Prisma.Decimal(journalAgg.totalRestitutions))
+      .plus(new Prisma.Decimal(reportsAgg.totalRestitutions))
+      .toFixed(2);
     const restantDuGlobal = await computeRestantDuNotesFraisGlobal(prisma);
     const chargesIndicators = withRestantDuNotesFrais(
       withRestitutionsNotesFrais(

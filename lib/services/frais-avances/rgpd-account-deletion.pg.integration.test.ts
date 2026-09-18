@@ -17,6 +17,7 @@ import { execFileSync } from "node:child_process";
 import { access, constants as fsConstants, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { resolveAuthorizedNotesFraisPgTestUrl } from "@/lib/frais-avances/pg-test-allowlist";
+import { wipeNotesFraisPgFixtures } from "@/lib/frais-avances/pg-test-wipe";
 
 const STORAGE = "/tmp/amaki-notes-frais-pg-test-storage";
 const FIXTURE_EMAIL_SUFFIX = "@notes-frais-test.local";
@@ -121,38 +122,7 @@ describePg("intégration PG notes-frais RGPD (base Docker allowlistée)", () => 
   });
 
   async function wipeFixtures(client: PrismaClient) {
-    await client.utilisationAvoir.deleteMany({
-      where: { noteFraisReglementLigneId: { not: null } },
-    });
-    await client.avoir.deleteMany({
-      where: { noteFraisReglementLigneId: { not: null } },
-    });
-    await client.noteFraisReglementLigne.deleteMany({});
-    await client.noteFraisReglement.deleteMany({});
-    await client.noteFraisReglementOperation.deleteMany({});
-    await client.depense.deleteMany({ where: { noteFraisId: { not: null } } });
-    await client.noteFraisFileJob.deleteMany({});
-    await client.noteFraisArchiveAccessLog.deleteMany({});
-    await client.justificatifNoteFraisArchive.deleteMany({});
-    await client.noteFraisArchive.deleteMany({});
-    await client.noteFraisDecision.deleteMany({});
-    await client.noteFraisOutboxEvent.deleteMany({});
-    await client.justificatifNoteFrais.deleteMany({});
-    await client.noteFrais.deleteMany({});
-    await client.notification.deleteMany({
-      where: {
-        OR: [
-          { lien: { contains: "/admin/frais-avances/" } },
-          { lien: { contains: "/user/frais-avances/" } },
-        ],
-      },
-    });
-    await client.userAdminRole.deleteMany({
-      where: { user: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },
-    });
-    await client.user.deleteMany({
-      where: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } },
-    });
+    await wipeNotesFraisPgFixtures(client);
   }
 
   async function assertFileAbsent(p: string) {

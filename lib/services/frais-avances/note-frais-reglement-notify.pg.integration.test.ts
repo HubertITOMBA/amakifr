@@ -6,6 +6,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { PrismaClient } from "@prisma/client";
 import { randomUUID } from "node:crypto";
 import { resolveAuthorizedNotesFraisPgTestUrl } from "@/lib/frais-avances/pg-test-allowlist";
+import { wipeNotesFraisPgFixtures } from "@/lib/frais-avances/pg-test-wipe";
 
 const FIXTURE_EMAIL_SUFFIX = "@notes-frais-test.local";
 
@@ -26,51 +27,7 @@ describe("intégration PG notifications règlement (4.5)", () => {
   });
 
   async function wipe() {
-    await prisma.utilisationAvoir.deleteMany({
-      where: { noteFraisReglementLigneId: { not: null } },
-    });
-    await prisma.avoir.deleteMany({
-      where: {
-        OR: [
-          { noteFraisReglementLigneId: { not: null } },
-          { origine: "COMPENSATION_NOTE_FRAIS" },
-        ],
-      },
-    });
-    await prisma.noteFraisReglementLigne.deleteMany({});
-    await prisma.noteFraisReglement.deleteMany({});
-    await prisma.noteFraisReglementOperation.deleteMany({});
-    await prisma.depense.deleteMany({ where: { noteFraisId: { not: null } } });
-    await prisma.noteFraisChoixReglementCible.deleteMany({});
-    await prisma.noteFraisChoixReglement.deleteMany({});
-    await prisma.noteFraisDecision.deleteMany({});
-    await prisma.noteFraisOutboxEvent.deleteMany({});
-    await prisma.justificatifNoteFrais.deleteMany({});
-    await prisma.notification.deleteMany({
-      where: {
-        OR: [
-          { lien: { contains: "/user/frais-avances/" } },
-          { titre: "Règlement enregistré" },
-        ],
-      },
-    });
-    await prisma.noteFrais.deleteMany({});
-    await prisma.cotisationMensuelle.deleteMany({
-      where: {
-        Adherent: { User: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },
-      },
-    });
-    await prisma.detteInitiale.deleteMany({
-      where: {
-        Adherent: { User: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },
-      },
-    });
-    await prisma.userAdminRole.deleteMany({
-      where: { user: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } } },
-    });
-    await prisma.user.deleteMany({
-      where: { email: { endsWith: FIXTURE_EMAIL_SUFFIX } },
-    });
+    await wipeNotesFraisPgFixtures(prisma);
   }
 
   async function createUser(

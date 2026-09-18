@@ -1,3 +1,7 @@
+/**
+ * Archive privée purgeable (lot 4.9) — jamais source de synthèse.
+ * Détachement comptable + journal financier via services dédiés.
+ */
 import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -10,8 +14,10 @@ import {
 import {
   ARCHIVE_REIDENTIFIABILITY_NOTICE,
   computeRetentionEndsAt,
-  resolveEffectiveArchiveRetention,
+  isRetentionUsable,
+  resolveEffectivePoliciesBundle,
   type InjectedArchiveRetentionPolicy,
+  type InjectedNotesFraisRetentionBundle,
   type RetentionPolicyResolution,
 } from "@/lib/frais-avances/retention-policy";
 import {
@@ -20,10 +26,28 @@ import {
 } from "@/lib/frais-avances/dto";
 import { canUserReadNotesFraisArchive } from "@/lib/frais-avances/authz";
 import { cancelPendingMovesAndEnqueueUnlinks } from "@/lib/services/frais-avances/rgpd-account-deletion";
+import {
+  buildNoteFraisJournalSnapshot,
+  insertJournalEvenementsInTx,
+} from "@/lib/services/frais-avances/note-frais-journal-financier-service";
+import {
+  deleteNoteFraisLiveFinancialChainInTx,
+  detachAccountingForNoteInTx,
+  lockNoteFraisFinancialHistory,
+  type DetachDbClient,
+} from "@/lib/services/frais-avances/note-frais-detach-service";
 
-/** Blocage temporaire 4.6→4.9 : historique financier non détachable. */
+/** @deprecated Conservé pour mapping UI historiques — plus levé en 4.9. */
 export const NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED =
   "NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED";
+
+export const NOTES_FRAIS_P1_RETENTION_REQUIRED =
+  "NOTES_FRAIS_P1_RETENTION_REQUIRED";
+export const NOTES_FRAIS_P2_RETENTION_REQUIRED =
+  "NOTES_FRAIS_P2_RETENTION_REQUIRED";
+export const NOTES_FRAIS_P3_RETENTION_REQUIRED =
+  "NOTES_FRAIS_P3_RETENTION_REQUIRED";
+
 /** Payload outbox après archivage RGPD — aucun userId / texte nominatif. */
 export const NOTES_FRAIS_OUTBOX_RGPD_PURGED_PAYLOAD = {
   userIds: [] as string[],
@@ -31,12 +55,6 @@ export const NOTES_FRAIS_OUTBOX_RGPD_PURGED_PAYLOAD = {
 
 /**
  * Purge RGPD des outbox d'une note dans la TX d'archivage.
- * - PENDING|PROCESSING → FAILED + lastError rgpd_account_archived + locks nuls + payload purgé
- * - DONE|FAILED → statut conservé, payload purgé uniquement
- * - kind conservé pour audit technique
- *
- * @param tx - Client transaction
- * @param noteId - Note archivée
  */
 export async function purgeNoteFraisOutboxEventsForArchiveInTx(
   tx: {
@@ -61,7 +79,6 @@ export async function purgeNoteFraisOutboxEventsForArchiveInTx(
     },
   });
 
-  // Inclut les événements déjà terminés et ceux venant d'être passés FAILED.
   await tx.noteFraisOutboxEvent.updateMany({
     where: {
       noteFraisId: noteId,
@@ -73,50 +90,97 @@ export async function purgeNoteFraisOutboxEventsForArchiveInTx(
   });
 }
 
-export type NotesFraisArchiveDbClient = {
-  $executeRaw: typeof db.$executeRaw;
-  noteFrais: typeof db.noteFrais;
-  noteFraisReglement: typeof db.noteFraisReglement;
-  noteFraisReglementCorrection: typeof db.noteFraisReglementCorrection;
-  noteFraisRestitution: typeof db.noteFraisRestitution;
-  justificatifNoteFrais: typeof db.justificatifNoteFrais;
+export type NotesFraisArchiveDbClient = DetachDbClient & {
   noteFraisFileJob: typeof db.noteFraisFileJob;
   noteFraisOutboxEvent: typeof db.noteFraisOutboxEvent;
   notification: typeof db.notification;
   noteFraisArchive: typeof db.noteFraisArchive;
   justificatifNoteFraisArchive: typeof db.justificatifNoteFraisArchive;
   noteFraisArchiveAccessLog: typeof db.noteFraisArchiveAccessLog;
+  noteFraisJournalFinancierEvenement: typeof db.noteFraisJournalFinancierEvenement;
+  noteFraisReportFinancierPeriode?: typeof db.noteFraisReportFinancierPeriode;
 };
 
-function extFromFilename(name: string): string {
-  const m = name.match(/\.([a-z0-9]+)$/i);
-  return (m?.[1] || "bin").toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+function extFromMimeOrName(typeMime: string, fallbackName?: string | null): string {
+  const mimeMap: Record<string, string> = {
+    "application/pdf": "pdf",
+    "image/jpeg": "jpg",
+    "image/jpg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+  };
+  if (typeMime && mimeMap[typeMime.toLowerCase()]) {
+    return mimeMap[typeMime.toLowerCase()];
+  }
+  if (fallbackName) {
+    const m = fallbackName.match(/\.([a-z0-9]+)$/i);
+    if (m?.[1]) {
+      return m[1].toLowerCase().replace(/[^a-z0-9]/g, "") || "bin";
+    }
+  }
+  return "bin";
 }
 
 /**
+ * Nom technique de téléchargement — jamais le nom original.
+ */
+export function archiveJustificatifDownloadName(
+  rang: number,
+  typeMime: string
+): string {
+  return `justificatif-${rang}.${extFromMimeOrName(typeMime)}`;
+}
+
+export type ArchivePoliciesInput = {
+  p1: RetentionPolicyResolution;
+  p2: RetentionPolicyResolution;
+  p3: RetentionPolicyResolution;
+};
+
+/**
  * Archive atomique des notes SOUMISE|VALIDEE|REJETEE dans la TX de suppression compte.
- * Crée des PJ archive en PENDING + jobs MOVE durables (READY après déplacement réel).
- * Liens de correction : SetNull via FK avant suppression de la note d'origine.
+ * Crée archive privée + PJ + journal financier + détachement + suppression live.
  */
 export async function archiveSubmittedNotesInTransaction(
   tx: NotesFraisArchiveDbClient,
   noteIds: string[],
-  resolution: RetentionPolicyResolution
-): Promise<{ archivesCreated: number; moveJobsEnqueued: number }> {
-  if (noteIds.length === 0) return { archivesCreated: 0, moveJobsEnqueued: 0 };
+  resolutionOrPolicies:
+    | RetentionPolicyResolution
+    | ArchivePoliciesInput
+): Promise<{
+  archivesCreated: number;
+  moveJobsEnqueued: number;
+  journalEventsCreated: number;
+}> {
+  if (noteIds.length === 0) {
+    return { archivesCreated: 0, moveJobsEnqueued: 0, journalEventsCreated: 0 };
+  }
+
+  // Compat : ancien appel avec une seule résolution P2 → bundle legacy.
+  const policies: ArchivePoliciesInput =
+    "p1" in resolutionOrPolicies && "p2" in resolutionOrPolicies
+      ? resolutionOrPolicies
+      : { p1: resolutionOrPolicies, p2: resolutionOrPolicies, p3: resolutionOrPolicies };
+
+  if (!isRetentionUsable(policies.p2)) {
+    throw new Error(NOTES_FRAIS_P2_RETENTION_REQUIRED);
+  }
 
   const archivedAt = new Date();
-  const retentionEndsAt = computeRetentionEndsAt(archivedAt, resolution);
-  if (!retentionEndsAt) {
+  const retentionEndsAtP2 = computeRetentionEndsAt(archivedAt, policies.p2);
+  if (!retentionEndsAtP2) {
     throw new Error(
-      "Politique de conservation sans durée calculable — archivage impossible"
+      "Politique P2 archive privée sans durée calculable — archivage impossible"
     );
   }
 
   let archivesCreated = 0;
   let moveJobsEnqueued = 0;
+  let journalEventsCreated = 0;
 
   for (const noteId of noteIds) {
+    await lockNoteFraisFinancialHistory(tx, noteId);
+
     const note = await tx.noteFrais.findFirst({
       where: {
         id: noteId,
@@ -125,6 +189,7 @@ export async function archiveSubmittedNotesInTransaction(
       include: {
         Justificatifs: {
           where: { statut: "READY" },
+          orderBy: { createdAt: "asc" },
         },
         ChoixReglements: {
           where: { statut: "ACTIF" },
@@ -139,56 +204,49 @@ export async function archiveSubmittedNotesInTransaction(
     });
     if (!note || !note.soumiseAt) continue;
 
-    // Lot 4.6 → 4.9 : historique financier (règlements / corrections) non détachable.
-    // Refus explicite avant toute mutation — jamais P2003 comme mécanisme.
+    const hasPj = note.Justificatifs.length > 0;
+    if (hasPj && !isRetentionUsable(policies.p1)) {
+      throw new Error(NOTES_FRAIS_P1_RETENTION_REQUIRED);
+    }
+
     const regCount = await tx.noteFraisReglement.count({
       where: { noteFraisId: noteId },
     });
-    if (regCount > 0) {
-      throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
-    }
     const corrCount = await tx.noteFraisReglementCorrection.count({
       where: { Reglement: { noteFraisId: noteId } },
     });
-    if (corrCount > 0) {
-      throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
-    }
     const restitCount = await tx.noteFraisRestitution.count({
       where: { Reglement: { noteFraisId: noteId } },
     });
-    if (restitCount > 0) {
-      throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
+    const annulCount = await tx.noteFraisReglementAnnulationDemande.count({
+      where: {
+        OR: [
+          { Reglement: { noteFraisId: noteId } },
+          { Operation: { noteFraisId: noteId } },
+        ],
+      },
+    });
+    const hasFinancialHistory =
+      regCount > 0 || corrCount > 0 || restitCount > 0 || annulCount > 0;
+
+    if (hasFinancialHistory && !isRetentionUsable(policies.p3)) {
+      throw new Error(NOTES_FRAIS_P3_RETENTION_REQUIRED);
     }
-    const annulationDemandeCount =
-      await tx.noteFraisReglementAnnulationDemande.count({
-        where: {
-          OR: [
-            { Reglement: { noteFraisId: noteId } },
-            { Operation: { noteFraisId: noteId } },
-          ],
-        },
-      });
-    if (annulationDemandeCount > 0) {
-      throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
-    }
-    const annulationInverseCount =
-      await tx.noteFraisAnnulationInverseCible.count({
-        where: {
-          Demande: {
-            OR: [
-              { Reglement: { noteFraisId: noteId } },
-              { Operation: { noteFraisId: noteId } },
-            ],
-          },
-        },
-      });
-    if (annulationInverseCount > 0) {
-      throw new Error(NOTES_FRAIS_FINANCIAL_HISTORY_ARCHIVE_REQUIRED);
+
+    let journalEvents = 0;
+    if (hasFinancialHistory) {
+      const snapshot = await buildNoteFraisJournalSnapshot(
+        noteId,
+        tx,
+        policies.p3,
+        archivedAt
+      );
+      journalEvents = await insertJournalEvenementsInTx(tx, snapshot.events);
+      journalEventsCreated += journalEvents;
     }
 
     await cancelPendingMovesAndEnqueueUnlinks(tx as never, [noteId]);
 
-    // Détache les corrections pointant vers cette note (FK SetNull + explicite).
     await tx.noteFrais.updateMany({
       where: { corrigeNoteFraisId: noteId },
       data: { corrigeNoteFraisId: null },
@@ -208,16 +266,22 @@ export async function archiveSubmittedNotesInTransaction(
         montantRemboursementChoix: choixActif?.montantRemboursement ?? null,
         montantCompensationChoix: choixActif?.montantCompensation ?? null,
         archivedAt,
-        retentionEndsAt,
+        retentionEndsAt: retentionEndsAtP2,
         reidentifiabilityNotice: ARCHIVE_REIDENTIFIABILITY_NOTICE,
       },
     });
     archivesCreated += 1;
 
+    let rang = 0;
     for (const piece of note.Justificatifs) {
+      rang += 1;
       const justifId = randomUUID().replace(/-/g, "").slice(0, 24);
-      const ext = extFromFilename(piece.nomFichierOrig);
-      const newRel = path.posix.join("archive", archive.id, `${justifId}.${ext}`);
+      const ext = extFromMimeOrName(piece.typeMime, piece.nomFichierOrig);
+      const newRel = path.posix.join(
+        "archive",
+        archive.id,
+        `${justifId}.${ext}`
+      );
       let sourceAbs: string;
       try {
         sourceAbs = absoluteFromRelative(piece.cheminRelatif);
@@ -230,7 +294,8 @@ export async function archiveSubmittedNotesInTransaction(
         data: {
           id: justifId,
           archiveId: archive.id,
-          nomFichierOrig: piece.nomFichierOrig,
+          rang,
+          nomFichierOrig: null,
           cheminRelatif: newRel,
           typeMime: piece.typeMime,
           taille: piece.taille,
@@ -258,23 +323,18 @@ export async function archiveSubmittedNotesInTransaction(
     await tx.notification.deleteMany({ where: { lien: { in: liens } } });
     await purgeNoteFraisOutboxEventsForArchiveInTx(tx, noteId);
 
-    // Journal décision : Cascade via delete note.
-    await tx.justificatifNoteFrais.deleteMany({ where: { noteFraisId: noteId } });
-    await tx.noteFrais.deleteMany({
-      where: {
-        id: noteId,
-        statut: { in: ["SOUMISE", "VALIDEE", "REJETEE"] },
-      },
-    });
+    await detachAccountingForNoteInTx(tx, noteId);
+    await deleteNoteFraisLiveFinancialChainInTx(tx, noteId);
   }
 
   console.info("[notes-frais] rgpd_account_archive_submitted", {
     archives: archivesCreated,
     moves: moveJobsEnqueued,
-    retentionEnds: retentionEndsAt.toISOString(),
+    journalEvents: journalEventsCreated,
+    retentionEnds: retentionEndsAtP2.toISOString(),
   });
 
-  return { archivesCreated, moveJobsEnqueued };
+  return { archivesCreated, moveJobsEnqueued, journalEventsCreated };
 }
 
 /**
@@ -306,7 +366,7 @@ async function logArchiveAccess(
 }
 
 /**
- * Liste les archives (DTO sans chemins). Authz ADMIN|TRESOR|COMCPT.
+ * Liste les archives (DTO sans chemins ni nom original). Authz ADMIN|TRESOR|COMCPT.
  */
 export async function listNotesFraisArchives(input: {
   userId: string;
@@ -322,7 +382,7 @@ export async function listNotesFraisArchives(input: {
     }
     const rows = await client.noteFraisArchive.findMany({
       orderBy: { archivedAt: "desc" },
-      include: { Justificatifs: true },
+      include: { Justificatifs: { orderBy: { rang: "asc" } } },
     });
     return {
       success: true,
@@ -352,7 +412,7 @@ export async function getNotesFraisArchive(input: {
     }
     const row = await client.noteFraisArchive.findUnique({
       where: { id: input.archiveId },
-      include: { Justificatifs: true },
+      include: { Justificatifs: { orderBy: { rang: "asc" } } },
     });
     if (!row) return { success: false, error: "Archive introuvable" };
     await logArchiveAccess(client, {
@@ -368,7 +428,7 @@ export async function getNotesFraisArchive(input: {
 }
 
 /**
- * Téléchargement archive — READY uniquement ; DTO sans chemin.
+ * Téléchargement archive — READY uniquement ; nom technique.
  */
 export async function downloadNotesFraisArchiveJustificatif(input: {
   userId: string;
@@ -409,7 +469,10 @@ export async function downloadNotesFraisArchiveJustificatif(input: {
       data: {
         bytes,
         contentType: piece.typeMime,
-        downloadName: piece.nomFichierOrig,
+        downloadName: archiveJustificatifDownloadName(
+          piece.rang,
+          piece.typeMime
+        ),
       },
     };
   } catch (e) {
@@ -423,7 +486,7 @@ export async function downloadNotesFraisArchiveJustificatif(input: {
 
 /**
  * Purge des archives arrivées à échéance : cancel MOVE + UNLINK + delete DB.
- * Les jobs UNLINK survivent (pas de FK bloquante).
+ * N'affecte PAS le journal financier ni la synthèse.
  */
 export async function processNoteFraisArchivePurgeOnce(
   limit = 20,
@@ -504,4 +567,5 @@ export async function processNoteFraisArchivePurgeOnce(
   return purged;
 }
 
-export type { InjectedArchiveRetentionPolicy };
+export type { InjectedArchiveRetentionPolicy, InjectedNotesFraisRetentionBundle };
+export { resolveEffectivePoliciesBundle };
