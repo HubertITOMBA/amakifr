@@ -6,6 +6,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const processOutbox = vi.fn().mockResolvedValue(0);
 const processFiles = vi.fn().mockResolvedValue(0);
 const processArchive = vi.fn().mockResolvedValue(0);
+const processPieces = vi.fn().mockResolvedValue(0);
+const consolidateJournal = vi.fn().mockResolvedValue({ consolidatedEvents: 0 });
+const expireHolds = vi.fn().mockResolvedValue(0);
 const expirePending = vi.fn().mockResolvedValue(0);
 
 vi.mock("@/lib/services/frais-avances/note-frais-service", () => ({
@@ -15,6 +18,16 @@ vi.mock("@/lib/services/frais-avances/note-frais-service", () => ({
 
 vi.mock("@/lib/services/frais-avances/note-frais-archive-service", () => ({
   processNoteFraisArchivePurgeOnce: (...a: unknown[]) => processArchive(...a),
+  processNoteFraisPiecesPurgeOnce: (...a: unknown[]) => processPieces(...a),
+}));
+
+vi.mock("@/lib/services/frais-avances/note-frais-journal-financier-service", () => ({
+  consolidateNoteFraisJournalFinancierOnce: (...a: unknown[]) =>
+    consolidateJournal(...a),
+}));
+
+vi.mock("@/lib/services/frais-avances/note-frais-legal-hold-service", () => ({
+  expireLegalHoldsOnce: (...a: unknown[]) => expireHolds(...a),
 }));
 
 vi.mock("@/lib/services/frais-avances/note-frais-annulation-service", () => ({
@@ -32,6 +45,9 @@ describe("instrumentation-node expire tick", () => {
     processOutbox.mockClear().mockResolvedValue(0);
     processFiles.mockClear().mockResolvedValue(0);
     processArchive.mockClear().mockResolvedValue(0);
+    processPieces.mockClear().mockResolvedValue(0);
+    consolidateJournal.mockClear().mockResolvedValue({ consolidatedEvents: 0 });
+    expireHolds.mockClear().mockResolvedValue(0);
     expirePending.mockClear().mockResolvedValue(0);
   });
 

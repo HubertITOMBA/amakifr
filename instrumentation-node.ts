@@ -10,7 +10,12 @@ import {
   processNoteFraisFileJobsOnce,
   processNoteFraisOutboxOnce,
 } from "@/lib/services/frais-avances/note-frais-service";
-import { processNoteFraisArchivePurgeOnce } from "@/lib/services/frais-avances/note-frais-archive-service";
+import {
+  processNoteFraisArchivePurgeOnce,
+  processNoteFraisPiecesPurgeOnce,
+} from "@/lib/services/frais-avances/note-frais-archive-service";
+import { consolidateNoteFraisJournalFinancierOnce } from "@/lib/services/frais-avances/note-frais-journal-financier-service";
+import { expireLegalHoldsOnce } from "@/lib/services/frais-avances/note-frais-legal-hold-service";
 import { expirePendingCancellationRequests } from "@/lib/services/frais-avances/note-frais-annulation-service";
 import { hashIdForLog } from "@/lib/frais-avances/storage";
 
@@ -60,7 +65,11 @@ export async function startNotesFraisWorkers(): Promise<void> {
     try {
       await processNoteFraisOutboxOnce();
       await processNoteFraisFileJobsOnce();
+      // Legal hold expire AVANT les purges (cycle séparé fail-safe).
+      await expireLegalHoldsOnce();
+      await processNoteFraisPiecesPurgeOnce();
       await processNoteFraisArchivePurgeOnce();
+      await consolidateNoteFraisJournalFinancierOnce();
       // Lot 4.8 — expiration opportuniste (flag workers off en V1 staging).
       const expired = await expirePendingCancellationRequests({ limit: 50 });
       if (expired > 0) {

@@ -163,28 +163,27 @@ CREATE UNIQUE INDEX notes_frais_annul_demande_operation_demandee_uidx
 - **Avec politique injectée (tests) / future politique validée** : archivage privé atomique (statutFinal, montantAccepte, decideeAt — sans décideur).
 - Échec → rollback total ; pas de `Completee` RGPD.
 
-### Archive privée vs journal financier (lot 4.9)
+### Archive privée vs journal financier (lot 4.9 / 4.10)
 - **Archive privée** (`NoteFraisArchive` + PJ) : consultation ADMIN|TRESOR|COMCPT ; purgeable ; **jamais** lue par la synthèse.
-- **Journal financier détaché** : événements minimaux (REMBOURSEMENT_EXECUTE, COMPENSATION_EXECUTEE, CORRECTION_*, RESTITUTION) ; aucune FK identité/note/archive ; politique P3.
-- **Reports de période** : consolidation atomique des événements expirés ; synthèse = live + journal + reports.
-- PJ archive : pas de nom original en DTO ; download `justificatif-{rang}.{ext}`.
-- Trois politiques P1/P2/P3 (allowlists vides) ; fail-closed selon besoin (PJ → P1, archive → P2, historique → P3).
-- Décisions trésorier (durées, startsAt, periodeCle) **bloquent** migration/activation.
+- **Journal financier détaché** : événements minimaux ; aucune FK identité/note/archive ; politique P3.
+- **Reports de période** : consolidation atomique ; **sans purge automatique** tant que `reportsSansEcheance=true` (agrégats anonymes sans id / FK / texte libre). Une évolution ajoutant des dimensions fines imposera une nouvelle analyse RGPD.
+- **P1** justificatifs, **P2** archive privée, **P3** journal — échéances distinctes (années calendaires après clôture d'exercice).
+- **Fondement métier initial** : 10 ans après clôture d'exercice (défaut 31/12 configurable) pour P1/P2/P3 — **cadrage validé à confirmer** expert-comptable / DPO avant prod.
+- **Source des durées (4.10)** : la version **ACTIVE** en base (`NoteFraisRetentionPolicyVersion`, seed 10/10/10). Les anciennes variables / allowlists d'env ne pilotent **plus** les échéances runtime.
+- **Versionnement prospectif** : snapshot immuable à l'archivage ; une nouvelle version ACTIVE ne recalcule jamais les archives/journaux existants.
+- **V1** : pas de politique planifiée — `effectiveAt` ≤ maintenant à l'activation ; application immédiate ; `reportsSansEcheance=true` obligatoire (false → fail-closed).
+- **Legal hold (runbook)** : UI `/admin/frais-avances/parametres/conservation` — ADMIN pose/lève ; TRESOR/COMCPT lecture seule (sans motif/référence) ; hold ACTIF bloque P1/P2/P3 ; expiration fail-safe (levée sans purge dans la même opération).
+- Fail-closed sans politique ACTIVE valide (ni injection test).
+- Module / workers / purges : **désactivés** tant que `NOTES_FRAIS_ENABLED != "true"` (la présence du seed ACTIVE ne suffit pas).
 
-### Archive privée (livrée localement, **politique réelle non activée**)
-- Tables : `notes_frais_archives`, `justificatifs_note_frais_archives`, `notes_frais_archive_access_logs`.
-- Contenu structuré minimal + `statutFinal` / `montantAccepte` / `decideeAt` si décision.
-- Résumé choix éventuel : `modeReglement` / montants remboursement & compensation — **sans** IDs de cibles ni libellés libres.
-- **Pas** de libelle / description / id source / rattachement User|Adherent / décideur.
-- **Ne pas qualifier d’anonyme** : date + montant potentiellement réidentifiables.
-- Accès : comptes **Actif** `ADMIN|TRESOR|COMCPT` (rôle principal **ou** additionnel).
-
-### Politique de conservation (ouverte)
-- **P1** fichiers/PJ, **P2** archive privée, **P3** journal financier — distinctes.
-- Durée et point de départ **à valider par le trésorier**.
-- **Aucune durée réelle par défaut** ; aucune conservation détaillée indéfinie.
-- Allowlists **vides** en production.
-- Tests uniquement : `injectedRetention` / `injectedPolicies`.
+### Politique de conservation (lot 4.10)
+- Modèle `NoteFraisRetentionPolicyVersion` (BROUILLON | ACTIVE | REMPLACEE) ; une seule ACTIVE (index partiel).
+- Durées en **années calendaires** (pas de millisecondes métier) — lues depuis la politique ACTIVE, pas depuis l'env.
+- Index d'idempotence : `nf_ret_pol_act_idem_uidx` (nom court ≤63).
+- CHECK V1 reports : `nf_ret_pol_reports_sans_echeance_v1_chk` (nom court ≤63).
+- UI `/admin/frais-avances/parametres/conservation` : ADMIN écrit ; TRESOR/COMCPT lecture seule (+ liste holds sans motif).
+- Seed migration ACTIVE P1=P2=P3=10 ans — **n'active pas** le module ni les workers (`NOTES_FRAIS_ENABLED` reste off).
+- Validation expert-comptable / DPO toujours recommandée avant production.
 
 ### FK dans `schema.prisma` (pas encore migrées en base prod)
 - Live : Restrict User/Adherent → Note ; acteurs audit **SetNull** (Depense.createdBy, executeurs, uploaders…).
@@ -193,9 +192,10 @@ CREATE UNIQUE INDEX notes_frais_annul_demande_operation_demandee_uidx
 - Access log : `onDelete: SetNull` sur actor.
 
 ### Workers / fichiers
-- Jobs MOVE/UNLINK durables ; outbox `SUBMITTED` / `DECIDED`.
-- `processNoteFraisFileJobsOnce` tourne même si le flag métier est off (durabilité).
-- Consolidation journal (`consolidateNoteFraisJournalFinancierOnce`) — indépendante de la purge archive.
+- Jobs MOVE/UNLINK **persistés** en base (durabilité) ; outbox `SUBMITTED` / `DECIDED`.
+- Flag off (`NOTES_FRAIS_ENABLED != "true"`) : le worker Node **ne démarre pas** (`instrumentation.ts`) — file jobs et outbox restent en file, **non consommés** ; **aucun** traitement automatique (pas de MOVE/UNLINK/purge/consolidation).
+- Flag on : `startNotesFraisWorkers` consomme outbox, file jobs, holds expirés, purges P1/P2 et consolidation journal.
+- Consolidation journal (`consolidateNoteFraisJournalFinancierOnce`) — indépendante de la purge archive, mais uniquement via le worker (donc flag on).
 
 ## Tests PostgreSQL
 
@@ -217,25 +217,27 @@ TEST_DATABASE_URL=… NOTES_FRAIS_STORAGE_ROOT=/tmp/amaki-notes-frais-pg-test-st
     lib/services/frais-avances/note-frais-correction.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-restitution.pg.integration.test.ts \
     lib/services/frais-avances/note-frais-annulation.pg.integration.test.ts \
-    lib/frais-avances/pg-test-allowlist.test.ts
+    lib/services/frais-avances/note-frais-retention-410.pg.integration.test.ts \
+    lib/services/frais-avances/note-frais-retention-410-migrate.pg.integration.test.ts \
+    lib/frais-avances/pg-test-allowlist.test.ts \
+    lib/services/frais-avances/note-frais-retention-policy.test.ts \
+    lib/services/frais-avances/note-frais-legal-hold.test.ts \
+    lib/frais-avances/retention-calendar.test.ts
 ```
 
 
+
 ## Non livré / futur
-- Lot **4.9** archivage financier RGPD (journal + reports) — local, flag off.
-- Migration dépôt versionnée (voir `MIGRATIONS-4x.md`) / activation après politiques trésorier (P1/P2/P3) — index partiels 4.8 inclus dans `notes_frais_4x_integrity`, non encore déployés en prod.
-- Index partiel unique choix ACTIF.
-- CHECK SQL polymorphes sur `notes_frais_reglement_lignes` et opérations MIXTE.
+- Activation module / workers en production.
+- Migration historique éventuelle des échéances (opération séparée, auditée, confirmée explicitement) — **jamais** silencieuse.
 - API v1, mobile notes de frais.
-- Validation trésorier de la durée / point de départ + activation politique env.
-- Migration Prisma dépôt ; activation prod permanente.
 
 ## Variables
 
 | Variable | Rôle |
 |----------|------|
-| `NOTES_FRAIS_ENABLED` | Module métier (pas la protection delete) |
-| `NEXT_PUBLIC_NOTES_FRAIS_ENABLED` | Indice UI |
+| `NOTES_FRAIS_ENABLED` | Module métier + workers (off ⇒ aucun traitement auto) ; indépendant de la protection delete RGPD |
+| `NEXT_PUBLIC_NOTES_FRAIS_ENABLED` | Indice UI uniquement (jamais une autorisation serveur) |
 | `NOTES_FRAIS_STORAGE_ROOT` | Racine fichiers privés (incl. `archive/`) |
-| `NOTES_FRAIS_SUBMITTED_JUSTIFICATIF_RETENTION` | Réservé ; **aucune valeur validée** |
+| `NOTES_FRAIS_SUBMITTED_JUSTIFICATIF_RETENTION` | **Obsolète pour les durées 4.10** — réservé / non validé ; source = politique ACTIVE en base |
 | `TEST_DATABASE_URL` | PG test allowlistée uniquement |

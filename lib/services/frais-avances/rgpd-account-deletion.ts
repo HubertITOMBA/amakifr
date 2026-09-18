@@ -8,6 +8,7 @@ import {
 } from "@/lib/frais-avances/retention-policy";
 import { archiveSubmittedNotesInTransaction } from "@/lib/services/frais-avances/note-frais-archive-service";
 import { setNullActorFksForUserInTx } from "@/lib/services/frais-avances/note-frais-detach-service";
+import { getActiveRetentionPolicy } from "@/lib/services/frais-avances/note-frais-retention-policy-service";
 
 export type NotesFraisDbClient =
     | typeof db
@@ -226,8 +227,11 @@ export async function prepareNotesFraisForAccountDeletion(
   let archiveMoveJobs = 0;
 
   if (protegees.length > 0) {
-    // P2 toujours requise pour notes protégées (fail-closed).
-    if (!isRetentionUsable(policies.p2)) {
+    // P2 : injection test OU politique ACTIVE DB (fail-closed sinon).
+    const canArchive =
+      isRetentionUsable(policies.p2) ||
+      !!(await getActiveRetentionPolicy(tx as never).catch(() => null));
+    if (!canArchive) {
       throw new NotesFraisRgpdBlockError();
     }
     const archived = await archiveSubmittedNotesInTransaction(

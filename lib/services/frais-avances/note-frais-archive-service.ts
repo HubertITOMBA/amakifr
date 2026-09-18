@@ -21,6 +21,12 @@ import {
   type RetentionPolicyResolution,
 } from "@/lib/frais-avances/retention-policy";
 import {
+  buildRetentionSnapshotFromPolicy,
+  getActiveRetentionPolicy,
+  type ActiveRetentionPolicy,
+} from "@/lib/services/frais-avances/note-frais-retention-policy-service";
+import { hasActiveLegalHoldOnArchive } from "@/lib/services/frais-avances/note-frais-legal-hold-service";
+import {
   toNoteFraisArchivePublicDto,
   type NoteFraisArchivePublicDto,
 } from "@/lib/frais-avances/dto";
@@ -99,6 +105,8 @@ export type NotesFraisArchiveDbClient = DetachDbClient & {
   noteFraisArchiveAccessLog: typeof db.noteFraisArchiveAccessLog;
   noteFraisJournalFinancierEvenement: typeof db.noteFraisJournalFinancierEvenement;
   noteFraisReportFinancierPeriode?: typeof db.noteFraisReportFinancierPeriode;
+  noteFraisRetentionPolicyVersion?: typeof db.noteFraisRetentionPolicyVersion;
+  noteFraisLegalHold?: typeof db.noteFraisLegalHold;
 };
 
 function extFromMimeOrName(typeMime: string, fallbackName?: string | null): string {
@@ -135,11 +143,19 @@ export type ArchivePoliciesInput = {
   p1: RetentionPolicyResolution;
   p2: RetentionPolicyResolution;
   p3: RetentionPolicyResolution;
+  /**
+   * Politique ACTIVE DB (lot 4.10) — snapshot calendaire immuable.
+   * Prioritaire sur les durées injectées pour les échéances persistées.
+   */
+  dbPolicy?: ActiveRetentionPolicy | null;
 };
 
 /**
  * Archive atomique des notes SOUMISE|VALIDEE|REJETEE dans la TX de suppression compte.
  * Crée archive privée + PJ + journal financier + détachement + suppression live.
+ *
+ * Règle P2-avant-P1 (la plus protectrice) : si P2 purge avant P1, la purge P2
+ * unlink systématiquement les fichiers restants — aucun orphelin disque.
  */
 export async function archiveSubmittedNotesInTransaction(
   tx: NotesFraisArchiveDbClient,
@@ -162,21 +178,36 @@ export async function archiveSubmittedNotesInTransaction(
       ? resolutionOrPolicies
       : { p1: resolutionOrPolicies, p2: resolutionOrPolicies, p3: resolutionOrPolicies };
 
-  if (!isRetentionUsable(policies.p2)) {
+  const injectedUsable = isRetentionUsable(policies.p2);
+  let dbPolicy: ActiveRetentionPolicy | null = policies.dbPolicy ?? null;
+  if (
+    !injectedUsable &&
+    !dbPolicy &&
+    tx.noteFraisRetentionPolicyVersion
+  ) {
+    dbPolicy = await getActiveRetentionPolicy(tx as never);
+  }
+
+  const useDb = !injectedUsable && !!dbPolicy;
+  if (!injectedUsable && !useDb) {
     throw new Error(NOTES_FRAIS_P2_RETENTION_REQUIRED);
   }
 
   const archivedAt = new Date();
-  const retentionEndsAtP2 = computeRetentionEndsAt(archivedAt, policies.p2);
-  if (!retentionEndsAtP2) {
-    throw new Error(
-      "Politique P2 archive privée sans durée calculable — archivage impossible"
-    );
+  let retentionEndsAtP2Injected: Date | null = null;
+  if (!useDb) {
+    retentionEndsAtP2Injected = computeRetentionEndsAt(archivedAt, policies.p2);
+    if (!retentionEndsAtP2Injected) {
+      throw new Error(
+        "Politique P2 archive privée sans durée calculable — archivage impossible"
+      );
+    }
   }
 
   let archivesCreated = 0;
   let moveJobsEnqueued = 0;
   let journalEventsCreated = 0;
+  let lastRetentionEndsIso: string | null = null;
 
   for (const noteId of noteIds) {
     await lockNoteFraisFinancialHistory(tx, noteId);
@@ -205,7 +236,7 @@ export async function archiveSubmittedNotesInTransaction(
     if (!note || !note.soumiseAt) continue;
 
     const hasPj = note.Justificatifs.length > 0;
-    if (hasPj && !isRetentionUsable(policies.p1)) {
+    if (!useDb && hasPj && !isRetentionUsable(policies.p1)) {
       throw new Error(NOTES_FRAIS_P1_RETENTION_REQUIRED);
     }
 
@@ -229,19 +260,38 @@ export async function archiveSubmittedNotesInTransaction(
     const hasFinancialHistory =
       regCount > 0 || corrCount > 0 || restitCount > 0 || annulCount > 0;
 
-    if (hasFinancialHistory && !isRetentionUsable(policies.p3)) {
+    if (!useDb && hasFinancialHistory && !isRetentionUsable(policies.p3)) {
       throw new Error(NOTES_FRAIS_P3_RETENTION_REQUIRED);
     }
 
+    const snapshot = useDb
+      ? buildRetentionSnapshotFromPolicy(dbPolicy!, note.dateDepense)
+      : null;
+
+    const retentionEndsAtP2 =
+      snapshot?.retentionEndsAtP2 ?? retentionEndsAtP2Injected!;
+    const retentionEndsAtP1 =
+      snapshot?.retentionEndsAtP1 ??
+      (hasPj ? computeRetentionEndsAt(archivedAt, policies.p1) : null);
+    lastRetentionEndsIso = retentionEndsAtP2.toISOString();
+
     let journalEvents = 0;
     if (hasFinancialHistory) {
-      const snapshot = await buildNoteFraisJournalSnapshot(
+      const journalSnap = await buildNoteFraisJournalSnapshot(
         noteId,
         tx,
         policies.p3,
-        archivedAt
+        archivedAt,
+        snapshot
+          ? {
+              retentionEndsAt: snapshot.retentionEndsAtP3,
+              policyVersionId: snapshot.policyVersionId,
+              exerciceClotureAt: snapshot.exerciceClotureAt,
+              resolvePeriodeCle: (d: Date) => String(d.getUTCFullYear()),
+            }
+          : undefined
       );
-      journalEvents = await insertJournalEvenementsInTx(tx, snapshot.events);
+      journalEvents = await insertJournalEvenementsInTx(tx, journalSnap.events);
       journalEventsCreated += journalEvents;
     }
 
@@ -267,6 +317,9 @@ export async function archiveSubmittedNotesInTransaction(
         montantCompensationChoix: choixActif?.montantCompensation ?? null,
         archivedAt,
         retentionEndsAt: retentionEndsAtP2,
+        policyVersionId: snapshot?.policyVersionId ?? null,
+        exerciceClotureAt: snapshot?.exerciceClotureAt ?? null,
+        retentionEndsAtP1: retentionEndsAtP1,
         reidentifiabilityNotice: ARCHIVE_REIDENTIFIABILITY_NOTICE,
       },
     });
@@ -300,6 +353,7 @@ export async function archiveSubmittedNotesInTransaction(
           typeMime: piece.typeMime,
           taille: piece.taille,
           statut: "PENDING",
+          retentionEndsAtP1: retentionEndsAtP1,
         },
       });
 
@@ -331,7 +385,8 @@ export async function archiveSubmittedNotesInTransaction(
     archives: archivesCreated,
     moves: moveJobsEnqueued,
     journalEvents: journalEventsCreated,
-    retentionEnds: retentionEndsAtP2.toISOString(),
+    retentionEnds: lastRetentionEndsIso,
+    policySource: useDb ? "db" : "injected",
   });
 
   return { archivesCreated, moveJobsEnqueued, journalEventsCreated };
@@ -485,8 +540,110 @@ export async function downloadNotesFraisArchiveJustificatif(input: {
 }
 
 /**
- * Purge des archives arrivées à échéance : cancel MOVE + UNLINK + delete DB.
+ * Purge P1 autonome : fichiers + lignes PJ arrivés à échéance P1.
+ * Ne supprime PAS l'archive P2.
+ * Bloqué par legal hold ACTIF sur l'archive.
+ *
+ * Règle protectrice P2-avant-P1 : si P2 a déjà purgé l'archive, les PJ
+ * n'existent plus (cascade) — ce worker est no-op. Si P2 purge alors que
+ * P1 n'est pas due, P2 unlink tous les fichiers restants (pas d'orphelin).
+ */
+export async function processNoteFraisPiecesPurgeOnce(
+  limit = 20,
+  client: typeof db = db,
+  now = new Date()
+): Promise<number> {
+  const due = await client.justificatifNoteFraisArchive.findMany({
+    where: { retentionEndsAtP1: { lte: now } },
+    take: limit,
+    orderBy: { retentionEndsAtP1: "asc" },
+    select: {
+      id: true,
+      archiveId: true,
+      cheminRelatif: true,
+    },
+  });
+
+  let purged = 0;
+  for (const piece of due) {
+    if (await hasActiveLegalHoldOnArchive(piece.archiveId, client)) {
+      continue;
+    }
+
+    const didPurge = await client.$transaction(async (tx) => {
+      // Re-check hold in TX
+      if (await hasActiveLegalHoldOnArchive(piece.archiveId, tx as never)) {
+        return false;
+      }
+
+      const still = await tx.justificatifNoteFraisArchive.findUnique({
+        where: { id: piece.id },
+      });
+      if (!still) return false;
+
+      const pendingMoves = await tx.noteFraisFileJob.findMany({
+        where: {
+          archiveJustificatifId: piece.id,
+          operation: "MOVE",
+          status: { in: ["PENDING", "PROCESSING"] },
+        },
+        select: { id: true, sourcePath: true, targetPath: true },
+      });
+
+      if (pendingMoves.length > 0) {
+        await tx.noteFraisFileJob.updateMany({
+          where: { id: { in: pendingMoves.map((m) => m.id) } },
+          data: {
+            status: "FAILED",
+            lastError: "p1_purge_cancelled_move",
+            lockedAt: null,
+            lockedBy: null,
+            processedAt: new Date(),
+          },
+        });
+      }
+
+      const paths = new Set<string>();
+      try {
+        paths.add(absoluteFromRelative(still.cheminRelatif));
+      } catch {
+        /* ignore */
+      }
+      for (const m of pendingMoves) {
+        if (m.sourcePath) paths.add(m.sourcePath);
+        if (m.targetPath) paths.add(m.targetPath);
+      }
+
+      for (const p of paths) {
+        await tx.noteFraisFileJob.create({
+          data: {
+            archiveJustificatifId: piece.id,
+            operation: "UNLINK",
+            sourcePath: null,
+            targetPath: p,
+            status: "PENDING",
+          },
+        });
+      }
+
+      await tx.justificatifNoteFraisArchive.delete({ where: { id: piece.id } });
+      return true;
+    });
+    if (didPurge) purged += 1;
+  }
+
+  if (purged > 0) {
+    console.info("[notes-frais] p1_pieces_purge", { purged });
+  }
+  return purged;
+}
+
+/**
+ * Purge P2 des archives arrivées à échéance : cancel MOVE + UNLINK + delete DB.
  * N'affecte PAS le journal financier ni la synthèse.
+ * Bloqué par legal hold ACTIF.
+ *
+ * Si P2 arrive avant P1 : unlink de tous les fichiers restants (règle protectrice).
  */
 export async function processNoteFraisArchivePurgeOnce(
   limit = 20,
@@ -502,8 +659,22 @@ export async function processNoteFraisArchivePurgeOnce(
 
   let purged = 0;
   for (const archive of due) {
-    await client.$transaction(async (tx) => {
-      for (const piece of archive.Justificatifs) {
+    if (await hasActiveLegalHoldOnArchive(archive.id, client)) {
+      continue;
+    }
+
+    const didPurge = await client.$transaction(async (tx) => {
+      if (await hasActiveLegalHoldOnArchive(archive.id, tx as never)) {
+        return false;
+      }
+
+      const still = await tx.noteFraisArchive.findUnique({
+        where: { id: archive.id },
+        include: { Justificatifs: true },
+      });
+      if (!still) return false;
+
+      for (const piece of still.Justificatifs) {
         const pendingMoves = await tx.noteFraisFileJob.findMany({
           where: {
             archiveJustificatifId: piece.id,
@@ -550,6 +721,17 @@ export async function processNoteFraisArchivePurgeOnce(
         }
       }
 
+      const holdActif = await tx.noteFraisLegalHold.count({
+        where: { archiveId: archive.id, statut: "ACTIF" },
+      });
+      if (holdActif > 0) return false;
+
+      // Détache holds LEVE (append-only conservé, archiveId nullisé).
+      await tx.noteFraisLegalHold.updateMany({
+        where: { archiveId: archive.id, statut: "LEVE" },
+        data: { archiveId: null },
+      });
+
       await tx.noteFraisArchiveAccessLog.deleteMany({
         where: { archiveId: archive.id },
       });
@@ -557,8 +739,9 @@ export async function processNoteFraisArchivePurgeOnce(
         where: { archiveId: archive.id },
       });
       await tx.noteFraisArchive.delete({ where: { id: archive.id } });
+      return true;
     });
-    purged += 1;
+    if (didPurge) purged += 1;
   }
 
   if (purged > 0) {

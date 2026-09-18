@@ -8,6 +8,7 @@ export const FRAIS_AVANCES_SEEDED_MENU_LIENS = [
   "/user/frais-avances",
   "/admin/frais-avances",
   "/admin/frais-avances/comptabilite",
+  "/admin/frais-avances/parametres/conservation",
 ] as const;
 
 /**

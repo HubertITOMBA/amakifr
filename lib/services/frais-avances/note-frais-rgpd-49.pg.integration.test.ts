@@ -437,8 +437,9 @@ describePg("intégration PG lot 4.9 archivage financier RGPD", () => {
     expect(after.solde).toBe(before.solde);
   });
 
-  it("fail-closed sans politique ; exécuteur tiers SetNull", async () => {
+  it("fail-closed sans politique ACTIVE ; exécuteur tiers SetNull", async () => {
     await wipe();
+    await prisma.noteFraisRetentionPolicyVersion.deleteMany({});
     const dem = await createUser("dem-fc");
     const tres = await createUser("tres-fc", "TRESOR");
     await ensureTypeDepenseFraisAvanceForTests(prisma, tres.id);

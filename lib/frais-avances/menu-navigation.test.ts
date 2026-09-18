@@ -7,8 +7,8 @@ import {
 import { upsertFraisAvancesMenusIdempotent } from "../../scripts/frais-avances-menus-upsert";
 
 describe("menus frais avancés — seed et hint", () => {
-  it("seed contient exactement 3 entrées et rôles attendus", () => {
-    expect(FRAIS_AVANCES_MENU_SEEDS).toHaveLength(3);
+  it("seed contient exactement 4 entrées et rôles attendus", () => {
+    expect(FRAIS_AVANCES_MENU_SEEDS).toHaveLength(4);
     const byLien = Object.fromEntries(
       FRAIS_AVANCES_MENU_SEEDS.map((m) => [m.lien, m])
     );
@@ -21,6 +21,9 @@ describe("menus frais avancés — seed et hint", () => {
     expect(byLien["/admin/frais-avances/comptabilite"].roles.sort()).toEqual(
       ["ADMIN", "COMCPT", "TRESOR"].sort()
     );
+    expect(
+      byLien["/admin/frais-avances/parametres/conservation"].roles.sort()
+    ).toEqual(["ADMIN", "COMCPT", "TRESOR"].sort());
     expect(byLien["/admin/frais-avances"].roles).not.toContain("COMCPT");
     expect(byLien["/admin/frais-avances/comptabilite"].roles).not.toContain(
       "PRESID"
@@ -91,12 +94,12 @@ describe("menus frais avancés — seed et hint", () => {
     };
 
     const first = await upsertFraisAvancesMenusIdempotent(client as never);
-    expect(first.created).toBe(3);
+    expect(first.created).toBe(4);
     expect(first.updated).toBe(0);
     const second = await upsertFraisAvancesMenusIdempotent(client as never);
     expect(second.created).toBe(0);
-    expect(second.updated).toBe(3);
-    expect(client.menu.create).toHaveBeenCalledTimes(3);
+    expect(second.updated).toBe(4);
+    expect(client.menu.create).toHaveBeenCalledTimes(4);
   });
 });
 

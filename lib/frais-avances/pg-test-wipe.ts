@@ -52,12 +52,42 @@ export async function wipeNotesFraisPgFixtures(
     },
   });
   await client.noteFraisFileJob.deleteMany({});
+  // 4.10 legal holds avant archives (FK Restrict)
+  if ("noteFraisLegalHold" in client) {
+    await (client as PrismaClient).noteFraisLegalHold.deleteMany({});
+  }
   await client.noteFraisArchiveAccessLog.deleteMany({});
   await client.justificatifNoteFraisArchive.deleteMany({});
   await client.noteFraisArchive.deleteMany({});
   // 4.9 journal / reports
   await client.noteFraisJournalFinancierEvenement.deleteMany({});
   await client.noteFraisReportFinancierPeriode.deleteMany({});
+  // 4.10 — reset politiques à la seed ACTIVE (pas d'accumulation de brouillons)
+  if ("noteFraisRetentionPolicyVersion" in client) {
+    const c = client as PrismaClient;
+    await c.noteFraisRetentionPolicyVersion.deleteMany({});
+    await c.noteFraisRetentionPolicyVersion.create({
+      data: {
+        id: "nf_ret_pol_v1_seed_4x10",
+        version: 1,
+        statut: "ACTIVE",
+        p1Years: 10,
+        p2Years: 10,
+        p3Years: 10,
+        exerciceClotureMois: 12,
+        exerciceClotureJour: 31,
+        reportsSansEcheance: true,
+        motif:
+          "Migration 4.10 — politique initiale métier validée (seed test wipe).",
+        createdByUserId: null,
+        activatedByUserId: null,
+        activatedAt: new Date(),
+        effectiveAt: new Date("2026-09-18T00:00:00.000Z"),
+        activationIdempotencyKey: "seed-4x10-retention-v1",
+        occVersion: 1,
+      },
+    });
+  }
   await client.noteFraisDecision.deleteMany({});
   await client.noteFraisOutboxEvent.deleteMany({});
   await client.justificatifNoteFrais.deleteMany({});

@@ -8,6 +8,7 @@ import {
   computeRetentionEndsAt,
   type RetentionPolicyResolution,
 } from "@/lib/frais-avances/retention-policy";
+import { hasActiveLegalHoldOnPeriode } from "@/lib/services/frais-avances/note-frais-legal-hold-service";
 
 export type KindJournal =
   | "REMBOURSEMENT_EXECUTE"
@@ -22,6 +23,8 @@ export type JournalEvenementDraft = {
   periodeCle: string;
   montant: Prisma.Decimal;
   retentionEndsAt: Date;
+  policyVersionId?: string | null;
+  exerciceClotureAt?: Date | null;
 };
 
 export type JournalSnapshotTotals = {
@@ -41,13 +44,21 @@ export const NOTES_FRAIS_JOURNAL_SNAPSHOT_INCONSISTENT =
 export const NOTES_FRAIS_JOURNAL_COUNT_MISMATCH =
   "NOTES_FRAIS_JOURNAL_COUNT_MISMATCH";
 
+export type JournalRetentionOverride = {
+  retentionEndsAt: Date;
+  policyVersionId: string;
+  exerciceClotureAt: Date;
+  resolvePeriodeCle?: (occurredAt: Date) => string;
+};
+
 /**
  * Calcule le snapshot journal d'une note (EXECUTE only, MIXTE enfants only).
  *
  * @param noteId - Note live
  * @param tx - Client TX
- * @param p3 - Politique P3 usable
- * @param archivedAt - Instant d'archivage (rétention)
+ * @param p3 - Politique P3 usable (injection) — ignorée si override fourni
+ * @param archivedAt - Instant d'archivage (rétention injectée)
+ * @param override - Snapshot calendaire 4.10 (immuable)
  */
 export async function buildNoteFraisJournalSnapshot(
   noteId: string,
@@ -57,16 +68,31 @@ export async function buildNoteFraisJournalSnapshot(
     };
   },
   p3: RetentionPolicyResolution,
-  archivedAt: Date
+  archivedAt: Date,
+  override?: JournalRetentionOverride
 ): Promise<JournalSnapshotTotals> {
-  const retentionEndsAt = computeRetentionEndsAt(archivedAt, p3);
-  if (!retentionEndsAt || p3.status !== "validated_injected") {
-    throw new Error(
-      "Politique P3 journal sans durée calculable — archivage financier impossible"
-    );
+  let retentionEndsAt: Date;
+  let policyVersionId: string | null = null;
+  let exerciceClotureAt: Date | null = null;
+  let resolvePeriodeCle: (d: Date) => string;
+
+  if (override) {
+    retentionEndsAt = override.retentionEndsAt;
+    policyVersionId = override.policyVersionId;
+    exerciceClotureAt = override.exerciceClotureAt;
+    resolvePeriodeCle =
+      override.resolvePeriodeCle ?? ((d: Date) => String(d.getUTCFullYear()));
+  } else {
+    const computed = computeRetentionEndsAt(archivedAt, p3);
+    if (!computed || p3.status !== "validated_injected") {
+      throw new Error(
+        "Politique P3 journal sans durée calculable — archivage financier impossible"
+      );
+    }
+    retentionEndsAt = computed;
+    resolvePeriodeCle =
+      p3.resolvePeriodeCle ?? ((d: Date) => String(d.getUTCFullYear()));
   }
-  const resolvePeriodeCle =
-    p3.resolvePeriodeCle ?? ((d: Date) => String(d.getUTCFullYear()));
 
   const reglements = await tx.noteFraisReglement.findMany({
     where: { noteFraisId: noteId, statut: "EXECUTE" },
@@ -108,6 +134,8 @@ export async function buildNoteFraisJournalSnapshot(
         periodeCle,
         montant: brut,
         retentionEndsAt,
+        policyVersionId,
+        exerciceClotureAt,
       });
       remb = remb.plus(brut);
       for (const c of r.Corrections) {
@@ -121,6 +149,8 @@ export async function buildNoteFraisJournalSnapshot(
           periodeCle: resolvePeriodeCle(c.createdAt),
           montant: m,
           retentionEndsAt,
+          policyVersionId,
+          exerciceClotureAt,
         });
         remb = remb.plus(m);
       }
@@ -135,6 +165,8 @@ export async function buildNoteFraisJournalSnapshot(
           periodeCle: resolvePeriodeCle(s.dateRestitution),
           montant: m,
           retentionEndsAt,
+          policyVersionId,
+          exerciceClotureAt,
         });
         restit = restit.plus(m);
       }
@@ -148,6 +180,8 @@ export async function buildNoteFraisJournalSnapshot(
         periodeCle,
         montant: brut,
         retentionEndsAt,
+        policyVersionId,
+        exerciceClotureAt,
       });
       comp = comp.plus(brut);
       for (const c of r.Corrections) {
@@ -161,6 +195,8 @@ export async function buildNoteFraisJournalSnapshot(
           periodeCle: resolvePeriodeCle(c.createdAt),
           montant: m,
           retentionEndsAt,
+          policyVersionId,
+          exerciceClotureAt,
         });
         comp = comp.plus(m);
       }
@@ -204,6 +240,8 @@ export async function insertJournalEvenementsInTx(
       periodeCle: e.periodeCle,
       montant: e.montant,
       retentionEndsAt: e.retentionEndsAt,
+      policyVersionId: e.policyVersionId ?? null,
+      exerciceClotureAt: e.exerciceClotureAt ?? null,
     })),
   });
   return res.count;
@@ -238,12 +276,19 @@ export async function consolidateNoteFraisJournalFinancierOnce(
 ): Promise<{ consolidatedEvents: number; periodsTouched: number }> {
   return (client as typeof db).$transaction(async (tx) => {
     // Verrouiller un batch déterministe d'événements expirés.
+    // Exclure les périodes sous legal hold ACTIF (P3).
     const locked = await tx.$queryRaw<Array<{ id: string }>>`
-      SELECT id FROM notes_frais_journal_financier_evenements
-      WHERE "retentionEndsAt" <= ${now}
-      ORDER BY "retentionEndsAt" ASC, id ASC
+      SELECT e.id FROM notes_frais_journal_financier_evenements e
+      WHERE e."retentionEndsAt" <= ${now}
+        AND NOT EXISTS (
+          SELECT 1 FROM notes_frais_legal_holds h
+          WHERE h."statut" = 'ACTIF'
+            AND h."cibleType" = 'JOURNAL_PERIODE'
+            AND h."periodeCle" = e."periodeCle"
+        )
+      ORDER BY e."retentionEndsAt" ASC, e.id ASC
       LIMIT ${limit}
-      FOR UPDATE
+      FOR UPDATE OF e
     `;
     if (locked.length === 0) {
       return { consolidatedEvents: 0, periodsTouched: 0 };
@@ -263,13 +308,26 @@ export async function consolidateNoteFraisJournalFinancierOnce(
       throw new Error(NOTES_FRAIS_JOURNAL_COUNT_MISMATCH);
     }
 
+    // Double-check holds (course) — skip périodes holdées
+    const filtered: typeof events = [];
+    for (const e of events) {
+      if (await hasActiveLegalHoldOnPeriode(e.periodeCle, tx as never)) {
+        continue;
+      }
+      filtered.push(e);
+    }
+    if (filtered.length === 0) {
+      return { consolidatedEvents: 0, periodsTouched: 0 };
+    }
+    const filteredIds = filtered.map((e) => e.id);
+
     type Acc = {
       remb: Prisma.Decimal;
       restit: Prisma.Decimal;
       comp: Prisma.Decimal;
     };
     const byPeriod = new Map<string, Acc>();
-    for (const e of events) {
+    for (const e of filtered) {
       let acc = byPeriod.get(e.periodeCle);
       if (!acc) {
         acc = { remb: money(0), restit: money(0), comp: money(0) };
@@ -331,14 +389,14 @@ export async function consolidateNoteFraisJournalFinancierOnce(
     }
 
     const del = await tx.noteFraisJournalFinancierEvenement.deleteMany({
-      where: { id: { in: ids } },
+      where: { id: { in: filteredIds } },
     });
-    if (del.count !== ids.length) {
+    if (del.count !== filteredIds.length) {
       throw new Error(NOTES_FRAIS_JOURNAL_COUNT_MISMATCH);
     }
 
     return {
-      consolidatedEvents: ids.length,
+      consolidatedEvents: filteredIds.length,
       periodsTouched: byPeriod.size,
     };
   });

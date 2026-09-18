@@ -1,5 +1,20 @@
 # Changelog — frais avancés
 
+## 0.4.10-retention-legal-hold — 2026-09-18
+
+### Ajouté (lot 4.10 — local, flag off ; migration versionnée, **non appliquée en prod**)
+- Politiques versionnées `NoteFraisRetentionPolicyVersion` (BROUILLON|ACTIVE|REMPLACEE) ; une seule ACTIVE (index partiel).
+- Fondement métier : P1/P2/P3 = **10 ans calendaires après clôture d'exercice** (défaut 31/12 configurable).
+- V1 : `effectiveAt` ≤ now à l'activation (pas de planification) ; `reportsSansEcheance=true` obligatoire (CHECK SQL + fail-closed).
+- Snapshot immuable ; P1 autonome ; legal hold + **UI opérationnelle** conservation (pose/levée ADMIN).
+- Index idempotence court `nf_ret_pol_act_idem_uidx` ; CHECK reports `nf_ret_pol_reports_sans_echeance_v1_chk` (noms ≤63).
+- Seed ACTIVE technique — **n'active pas** le module.
+- Migration `20260918130000_notes_frais_4x10_retention_policies_legal_hold`.
+- Preuve PG migrate historique 45→46 (fixtures) + courses P1∥P2.
+
+### Non inclus
+- Activation flags / workers prod ; `migrate deploy` prod ; réduction rétroactive des échéances historiques.
+
 ## 0.4.9-archivage-financier-rgpd — 2026-09-18
 
 ### Ajouté (migrations dépôt 4.0–4.9 — **non appliquées en prod**, flag off)

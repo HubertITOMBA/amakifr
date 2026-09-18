@@ -200,10 +200,11 @@ describePg("intégration PG archive privée notes-frais", () => {
     return { note, abs, rel };
   }
 
-  it("sans politique injectée : SOUMISE bloque toujours", async () => {
+  it("sans politique ACTIVE ni injection : SOUMISE bloque toujours", async () => {
     const { deleteUserAtomicallyWithNotesFraisRgpd, NotesFraisRgpdBlockError } =
       await import("@/lib/services/frais-avances/rgpd-account-deletion");
     await wipe();
+    await prisma.noteFraisRetentionPolicyVersion.deleteMany({});
     const user = await createUser("block");
     await createSoumiseWithFile(user);
     await expect(

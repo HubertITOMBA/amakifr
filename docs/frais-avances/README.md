@@ -2,6 +2,7 @@
 
 | Version | Date | Contenu |
 |---------|------|---------|
+| 0.4.10-retention-legal-hold | 2026-09-18 | Lot 4.10 : politiques dynamiques + legal hold (flag off) |
 | 0.4.9-archivage-financier-rgpd | 2026-09-18 | Lot 4.9 : archive privée ≠ journal financier ≠ reports (flag off) |
 | 0.4.8-annulation-double-validation | 2026-09-17 | Lot 4.8 : annulation double validation (flag off) |
 | 0.4.7-restitutions-reelles | 2026-09-17 | Lot 4.7 : restitutions réelles (flag off) |
@@ -24,11 +25,10 @@
 
 Voir [GUIDE.md](./GUIDE.md) et [CHANGELOG.md](./CHANGELOG.md).
 
-**Migrations versionnées 4.0–4.9 en dépôt, non appliquées en production.** Flag off par défaut.
+**Migrations versionnées 4.0–4.10 en dépôt, non appliquées en production.** Flag off par défaut.
 Voir [`MIGRATIONS-4x.md`](./MIGRATIONS-4x.md) (`prisma migrate deploy` ≠ `db push` de test PG).
-**Trois politiques** (P1 fichiers, P2 archive privée, P3 journal) : allowlists **vides** — bloquent l’activation ; injections tests uniquement.
+**Lot 4.10** : politique ACTIVE seed (10 ans après clôture) + legal hold — **n'active pas** le module ; validation expert-comptable/DPO recommandée avant prod.
 **Archive privée** ≠ journal financier détaché ≠ reports de période (synthèse).
 **Décision VALIDEE** = reconnaissance de charge (`Depense` origine `FRAIS_AVANCE`) ≠ décaissement bancaire.
 **Choix de règlement** ≠ exécution financière ≠ création d'`Avoir`.
-**Lot 4.9** : détachement RGPD + journal + reports — flag off ; migrations dépôt **prêtes mais non déployées** ; décisions trésorier/juridique (P1/P2/P3) ouvertes.
-**Suite** : appliquer `migrate deploy` puis activer seulement après validation des politiques.
+**Suite** : appliquer `migrate deploy` puis activer seulement après validation métier.

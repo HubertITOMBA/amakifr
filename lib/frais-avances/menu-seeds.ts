@@ -55,4 +55,16 @@ export const FRAIS_AVANCES_MENU_SEEDS: FraisAvancesMenuSeed[] = [
     electoral: false,
     parent: null,
   },
+  {
+    libelle: "Conservation frais",
+    description: "Politiques de conservation et legal hold (notes de frais)",
+    lien: "/admin/frais-avances/parametres/conservation",
+    niveau: "SIDEBAR",
+    roles: ["ADMIN", "TRESOR", "COMCPT"],
+    icone: "Shield",
+    statut: true,
+    ordre: 83,
+    electoral: false,
+    parent: null,
+  },
 ];

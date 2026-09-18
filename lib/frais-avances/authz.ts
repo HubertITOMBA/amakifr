@@ -463,3 +463,43 @@ export async function canUserReadNotesFraisArchive(
     ARCHIVE_READER_ROLES.has(loaded.userRole) || loaded.extras.length > 0
   );
 }
+
+/**
+ * Lecture des paramètres de conservation (lot 4.10).
+ * ADMIN|TRESOR|COMCPT actifs — lecture seule pour TRESOR/COMCPT.
+ */
+export async function canUserReadNotesFraisRetentionPolicy(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  return canUserReadNotesFraisArchive(userId, client);
+}
+
+/**
+ * Écriture / activation politique de conservation — ADMIN actif uniquement.
+ * Jamais MEMBRE/PRESID/SECRET/TRESOR/COMCPT.
+ */
+export async function canUserWriteNotesFraisRetentionPolicy(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  const loaded = await loadActifUserWithExtras(userId, client, [
+    AdminRole.ADMIN,
+  ]);
+  if (!loaded) return false;
+  if (loaded.primaryRole === "ADMIN") return true;
+  return (
+    loaded.userRole === UserRole.ADMIN ||
+    loaded.extras.some((e) => e.role === AdminRole.ADMIN || e.role === "ADMIN")
+  );
+}
+
+/**
+ * Pose / levée legal hold — ADMIN actif uniquement (écriture sensible).
+ */
+export async function canUserManageNotesFraisLegalHold(
+  userId: string,
+  client: AuthzClient = db
+): Promise<boolean> {
+  return canUserWriteNotesFraisRetentionPolicy(userId, client);
+}

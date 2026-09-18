@@ -585,8 +585,9 @@ describe("intégration PG décision notes-frais", () => {
     if (!auto.success) expect(auto.code).toBe("AUTO_DECISION_FORBIDDEN");
   });
 
-  it("REJETEE immuable + correction + RGPD refuse sans politique", async () => {
+  it("REJETEE immuable + correction + RGPD refuse sans politique ACTIVE", async () => {
     await wipe();
+    await prisma.noteFraisRetentionPolicyVersion.deleteMany({});
     await ensureTypeFa();
     const dem = await createUser("demrej", "MEMBRE");
     const tres = await createUser("tresrej", "TRESOR");

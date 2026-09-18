@@ -317,6 +317,10 @@ model User {
   notesFraisAnnulationDemandesConfirmateur NoteFraisReglementAnnulationDemande[] @relation("NoteFraisAnnulationConfirmateur")
   justificatifsNoteFraisUploades JustificatifNoteFrais[]     @relation("JustificatifNoteFraisUploader")
   notesFraisArchiveAccessLogs   NoteFraisArchiveAccessLog[]  @relation("NoteFraisArchiveAccessActor")
+  notesFraisRetentionPoliciesCreated NoteFraisRetentionPolicyVersion[] @relation("NoteFraisRetentionPolicyCreatedBy")
+  notesFraisRetentionPoliciesActivated NoteFraisRetentionPolicyVersion[] @relation("NoteFraisRetentionPolicyActivatedBy")
+  notesFraisLegalHoldsPoses     NoteFraisLegalHold[]         @relation("NoteFraisLegalHoldPosePar")
+  notesFraisLegalHoldsLeves     NoteFraisLegalHold[]         @relation("NoteFraisLegalHoldLevePar")
 
   lastLogin  DateTime? @updatedAt
   loginCount Int       @default(0) // Nombre de connexions au portail
@@ -3257,6 +3261,7 @@ model NoteFraisFileJob {
 /// Archive privée des notes SOUMISE|VALIDEE|REJETEE après suppression de compte.
 /// Données potentiellement personnelles — ne pas qualifier d'« anonyme ».
 /// Lot 4.9 : JAMAIS source de synthèse (voir NoteFraisJournalFinancierEvenement / Report).
+/// Lot 4.10 : snapshot politique immuable (policyVersionId + échéances calendaires).
 model NoteFraisArchive {
   id                        String    @id @default(cuid())
   dateDepense               DateTime
@@ -3271,7 +3276,13 @@ model NoteFraisArchive {
   montantRemboursementChoix Decimal?  @db.Decimal(10, 2)
   montantCompensationChoix  Decimal?  @db.Decimal(10, 2)
   archivedAt                DateTime
+  /// Échéance P2 (archive privée) — figée au snapshot.
   retentionEndsAt           DateTime
+  /// Snapshot politique ACTIVE au moment de l'archivage (nullable = archive pré-4.10).
+  policyVersionId           String?
+  exerciceClotureAt         DateTime?
+  /// Échéance P1 figée (justificatifs) — peut différer de P2.
+  retentionEndsAtP1         DateTime?
   /// Notice figée — date+montant potentiellement réidentifiables.
   reidentifiabilityNotice   String    @db.VarChar(80)
   createdAt                 DateTime  @default(now())
@@ -3279,10 +3290,14 @@ model NoteFraisArchive {
 
   Justificatifs JustificatifNoteFraisArchive[]
   AccessLogs    NoteFraisArchiveAccessLog[]
+  PolicyVersion NoteFraisRetentionPolicyVersion? @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
+  LegalHolds    NoteFraisLegalHold[]
 
   @@index([retentionEndsAt])
+  @@index([retentionEndsAtP1])
   @@index([archivedAt])
   @@index([statutFinal])
+  @@index([policyVersionId])
   @@map("notes_frais_archives")
 }
 
@@ -3297,12 +3312,15 @@ model JustificatifNoteFraisArchive {
   typeMime      String                      @db.VarChar(100)
   taille        Int
   statut        StatutJustificatifNoteFrais @default(PENDING)
+  /// Échéance P1 autonome (nullable = pré-4.10 ou sans PJ datée).
+  retentionEndsAtP1 DateTime?
   createdAt     DateTime                    @default(now())
   updatedAt     DateTime                    @updatedAt
 
   Archive NoteFraisArchive @relation(fields: [archiveId], references: [id], onDelete: Cascade)
 
   @@index([archiveId, statut])
+  @@index([retentionEndsAtP1])
   @@unique([archiveId, rang])
   @@map("justificatifs_note_frais_archives")
 }
@@ -3343,16 +3361,23 @@ model NoteFraisJournalFinancierEvenement {
   /// Montant Decimal signé selon kind (positif exécution/restit ; négatif correction).
   montant         Decimal                      @db.Decimal(10, 2)
   retentionEndsAt DateTime
+  /// Snapshot politique (nullable = pré-4.10).
+  policyVersionId   String?
+  exerciceClotureAt DateTime?
   createdAt       DateTime                     @default(now())
+
+  PolicyVersion NoteFraisRetentionPolicyVersion? @relation(fields: [policyVersionId], references: [id], onDelete: Restrict)
 
   @@index([retentionEndsAt])
   @@index([periodeCle, kind])
   @@index([occurredAt])
+  @@index([policyVersionId])
   @@map("notes_frais_journal_financier_evenements")
 }
 
 /// Report comptable agrégé par période — remplace atomiquement les événements consolidés.
 /// Pas d'identité ni rattachement note ; utilisé par la synthèse.
+/// Sans échéance de purge automatique tant que reportsSansEcheance=true (anonymes agrégés).
 model NoteFraisReportFinancierPeriode {
   id                              String   @id @default(cuid())
   periodeCle                      String   @unique @db.VarChar(16)
@@ -3365,4 +3390,97 @@ model NoteFraisReportFinancierPeriode {
 
   @@index([consolidatedAt])
   @@map("notes_frais_reports_financier_periode")
+}
+
+/// Statut d'une version de politique de conservation (lot 4.10).
+enum NoteFraisRetentionPolicyStatut {
+  BROUILLON
+  ACTIVE
+  REMPLACEE
+}
+
+/// Version immuable d'une politique P1/P2/P3 (années calendaires, pas de ms).
+/// Une seule ACTIVE garantie par index partiel SQL.
+model NoteFraisRetentionPolicyVersion {
+  id                    String                         @id @default(cuid())
+  version               Int
+  statut                NoteFraisRetentionPolicyStatut @default(BROUILLON)
+  /// Durées en années calendaires strictement positives.
+  p1Years               Int
+  p2Years               Int
+  p3Years               Int
+  /// Mois de clôture d'exercice (1–12).
+  exerciceClotureMois   Int                            @default(12)
+  /// Jour de clôture (1–31) — 29/02 autorisé (résolu en 28/02 hors bissextile).
+  exerciceClotureJour   Int                            @default(31)
+  /// Reports agrégés anonymes : pas de purge automatique.
+  reportsSansEcheance   Boolean                        @default(true)
+  /// Motif / commentaire obligatoire.
+  motif                 String                         @db.Text
+  createdByUserId       String?
+  activatedByUserId     String?
+  createdAt             DateTime                       @default(now())
+  activatedAt           DateTime?
+  /// Date d'effet métier (prospectif).
+  effectiveAt           DateTime
+  /// Clé d'idempotence d'activation (OCC / double-clic).
+  /// map court : éviter la troncature PG 63 caractères (drift migrate diff).
+  activationIdempotencyKey String?                     @unique(map: "nf_ret_pol_act_idem_uidx") @db.VarChar(64)
+  /// Version occupée pour OCC optimiste (incrémentée à chaque transition).
+  occVersion            Int                            @default(1)
+
+  CreatedBy User? @relation("NoteFraisRetentionPolicyCreatedBy", fields: [createdByUserId], references: [id], onDelete: SetNull)
+  ActivatedBy User? @relation("NoteFraisRetentionPolicyActivatedBy", fields: [activatedByUserId], references: [id], onDelete: SetNull)
+  Archives  NoteFraisArchive[]
+  JournalEvents NoteFraisJournalFinancierEvenement[]
+
+  @@unique([version])
+  @@index([statut])
+  @@index([effectiveAt])
+  @@index([createdByUserId])
+  @@index([activatedByUserId])
+  @@map("notes_frais_retention_policy_versions")
+}
+
+enum NoteFraisLegalHoldStatut {
+  ACTIF
+  LEVE
+}
+
+enum NoteFraisLegalHoldCibleType {
+  ARCHIVE
+  JOURNAL_PERIODE
+}
+
+/// Legal hold append-only / audité — aucune suppression physique.
+/// Un seul ACTIF par cible via index partiel SQL.
+model NoteFraisLegalHold {
+  id                String                     @id @default(cuid())
+  cibleType         NoteFraisLegalHoldCibleType
+  archiveId         String?
+  /// Période journal (ex. "2026") — hold P3 sur consolidation.
+  periodeCle        String?                    @db.VarChar(16)
+  statut            NoteFraisLegalHoldStatut   @default(ACTIF)
+  motif             String                     @db.Text
+  /// Référence dossier facultative — pas de donnée sensible inutile.
+  referenceDossier  String?                    @db.VarChar(120)
+  poseParUserId     String?
+  leveParUserId     String?
+  posedAt           DateTime                   @default(now())
+  leveAt            DateTime?
+  /// Expiration facultative — levée fail-safe sans purge dans la même TX.
+  expiresAt         DateTime?
+  createdAt         DateTime                   @default(now())
+
+  Archive   NoteFraisArchive? @relation(fields: [archiveId], references: [id], onDelete: Restrict)
+  PosePar   User?             @relation("NoteFraisLegalHoldPosePar", fields: [poseParUserId], references: [id], onDelete: SetNull)
+  LevePar   User?             @relation("NoteFraisLegalHoldLevePar", fields: [leveParUserId], references: [id], onDelete: SetNull)
+
+  @@index([statut, cibleType])
+  @@index([archiveId])
+  @@index([periodeCle])
+  @@index([expiresAt])
+  @@index([poseParUserId])
+  @@index([leveParUserId])
+  @@map("notes_frais_legal_holds")
 }

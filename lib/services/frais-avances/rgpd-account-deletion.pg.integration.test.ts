@@ -315,11 +315,12 @@ describePg("intégration PG notes-frais RGPD (base Docker allowlistée)", () => 
     expect(await prisma.user.findUnique({ where: { id: user.id } })).not.toBeNull();
   });
 
-  it("4 — SOUMISE sans politique : refus sans écritures partielles", async () => {
+  it("4 — SOUMISE sans politique ACTIVE : refus sans écritures partielles", async () => {
     const { deleteUserAtomicallyWithNotesFraisRgpd, NotesFraisRgpdBlockError } =
       await import("@/lib/services/frais-avances/rgpd-account-deletion");
 
     await wipeFixtures(prisma);
+    await prisma.noteFraisRetentionPolicyVersion.deleteMany({});
     delete process.env.NOTES_FRAIS_SUBMITTED_JUSTIFICATIF_RETENTION;
     const user = await createUser("s4");
     const { note } = await createDraft(user, true);
@@ -345,6 +346,7 @@ describePg("intégration PG notes-frais RGPD (base Docker allowlistée)", () => 
       await import("@/lib/services/frais-avances/rgpd-account-deletion");
 
     await wipeFixtures(prisma);
+    await prisma.noteFraisRetentionPolicyVersion.deleteMany({});
     process.env.NOTES_FRAIS_ENABLED = "false";
     const user = await createUser("s5");
     const { note } = await createDraft(user, true);
@@ -454,6 +456,7 @@ describePg("intégration PG notes-frais RGPD (base Docker allowlistée)", () => 
     );
 
     await wipeFixtures(prisma);
+    await prisma.noteFraisRetentionPolicyVersion.deleteMany({});
     process.env.NOTES_FRAIS_ENABLED = "true";
     delete process.env.NOTES_FRAIS_SUBMITTED_JUSTIFICATIF_RETENTION;
 

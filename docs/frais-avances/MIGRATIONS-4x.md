@@ -1,8 +1,9 @@
-# Migrations Prisma notes de frais 4.0–4.9
+# Migrations Prisma notes de frais 4.0–4.10
 
 **État** : migrations **versionnées en dépôt**, **non appliquées en production**.
 **Flags** : `NOTES_FRAIS_ENABLED` / `NEXT_PUBLIC_NOTES_FRAIS_ENABLED` restent off.
-**Politiques P1/P2/P3** : allowlists **vides** — bloquent l’activation RGPD réelle (injections tests uniquement).
+**Politique ACTIVE seed 4.10** : source des durées P1/P2/P3 en base (10/10/10 ans) — **n'active pas** le module ni les workers tant que `NOTES_FRAIS_ENABLED != "true"`.
+Les anciennes variables / allowlists d'env ne sont **plus** la source runtime des échéances (snapshot immuable à l'archivage).
 
 ## `db push` (tests) ≠ `migrate deploy` (déploiement)
 
@@ -18,8 +19,20 @@
 | `20260918120000_notes_frais_4x_foundation` | Enums, tables 4.0–4.9, colonnes additives, FK SetNull/Restrict, index/uniques Prisma |
 | `20260918120100_notes_frais_4x_backfill_seed` | Backfill `origine`, `NOT NULL`, seed idempotent `TypeDepense.code=FRAIS_AVANCE` (`createdBy=NULL`) |
 | `20260918120200_notes_frais_4x_integrity` | Index partiels ACTIF/DEMANDEE + CHECK XOR documentés |
+| `20260918130000_notes_frais_4x10_retention_policies_legal_hold` | Politiques versionnées, snapshots, legal hold, seed ACTIVE 10 ans |
 
 `DetteInitiale.montantRestant` GENERATED : **non touché** (migration `20260301120000` déjà présente).
+
+### Index / CHECK SQL 4.10 (manuels hors Prisma pur)
+
+- `notes_frais_retention_policy_one_active`
+- `nf_ret_pol_act_idem_uidx` (unique activationIdempotencyKey — nom ≤63)
+- `nf_ret_pol_reports_sans_echeance_v1_chk` (CHECK V1 reportsSansEcheance=true — nom ≤63)
+- `notes_frais_legal_hold_one_active_archive` / `notes_frais_legal_hold_one_active_periode`
+- CHECK durées 1–50 ; clôture mois/jour ; cible hold
+- CHECK V1 `reportsSansEcheance = true`
+
+**Legal hold (runbook opérationnel)** : voir `docs/frais-avances/GUIDE.md` § Archive privée / Politique de conservation (UI pose/levée, authz ADMIN, blocage P1/P2/P3) — ne pas dupliquer ici.
 
 ## Objets SQL manuels (intégrité)
 
@@ -49,9 +62,9 @@ Gardes : transactions applicatives + tests PG. Préflight MIXTE incomplet échou
 4. **Contrôles SQL** post-migrate (seed `FRAIS_AVANCE`, index partiels, CHECK, FK SetNull/Restrict, GENERATED dettes).
 5. **Déploiement code** (HEAD avec feature flags encore **off**).
 6. **Seed menus** (`scripts/seed-menus.ts` / upsert menus frais-avances).
-7. **Smoke test flag off** (routes indisponibles, pas d’écriture métier notes).
-8. **Validation politiques P1/P2/P3** (allowlists encore vides → activation **refusée** tant qu’elles le restent).
-9. **Activation progressive** des flags uniquement après décisions trésorier/juridique.
+7. **Smoke test flag off** (routes indisponibles, pas d’écriture métier notes ; file jobs persistés mais **non consommés** — aucun traitement automatique).
+8. **Contrôle politique ACTIVE** en base (seed 4.10 : P1=P2=P3=10 ans après clôture) : source des durées pour les **nouveaux** snapshots ; les archives/journaux existants restent immuables. Ce n’est **pas** une activation du module.
+9. **Activation progressive** des flags (`NOTES_FRAIS_ENABLED=true`) uniquement après décisions trésorier / expert-comptable / DPO — workers et consommation des file jobs inclus.
 
 ## Drift Prisma (preuve locale, 2026-09-18)
 

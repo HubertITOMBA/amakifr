@@ -43,7 +43,14 @@ type ActorNullClient = Partial<
     | "justificatifDepense"
     | "typeDepense"
   >
->;
+> & {
+  noteFraisRetentionPolicyVersion?: {
+    updateMany: typeof db.noteFraisRetentionPolicyVersion.updateMany;
+  };
+  noteFraisLegalHold?: {
+    updateMany: typeof db.noteFraisLegalHold.updateMany;
+  };
+};
 
 /**
  * SetNull des acteurs du user sur objets comptables conservés (hors notes à supprimer).
@@ -93,6 +100,26 @@ export async function setNullActorFksForUserInTx(
     });
   }
   // Corrections / restitutions / annulations / access logs : déjà SetNull en schéma
+  if (tx.noteFraisRetentionPolicyVersion?.updateMany) {
+    await tx.noteFraisRetentionPolicyVersion.updateMany({
+      where: { createdByUserId: userId },
+      data: { createdByUserId: null },
+    });
+    await tx.noteFraisRetentionPolicyVersion.updateMany({
+      where: { activatedByUserId: userId },
+      data: { activatedByUserId: null },
+    });
+  }
+  if (tx.noteFraisLegalHold?.updateMany) {
+    await tx.noteFraisLegalHold.updateMany({
+      where: { poseParUserId: userId },
+      data: { poseParUserId: null },
+    });
+    await tx.noteFraisLegalHold.updateMany({
+      where: { leveParUserId: userId },
+      data: { leveParUserId: null },
+    });
+  }
 }
 
 async function assertCount(
