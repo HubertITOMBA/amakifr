@@ -185,10 +185,26 @@ assert_notes_frais_flags_off() {
   done
   if [[ -n "$pm2_name" ]] && command -v pm2 >/dev/null 2>&1; then
     local dump
-    dump="$(pm2 env "$(pm2 id "$pm2_name" 2>/dev/null | head -1)" 2>/dev/null || true)"
+    if ! dump="$(pm2 jlist 2>/dev/null | python3 -c '
+import json, sys
+
+name = sys.argv[1]
+data = json.load(sys.stdin)
+app = next((p for p in data if p.get("name") == name), None)
+if app is None:
+    raise SystemExit(2)
+pm2_env = app.get("pm2_env") or {}
+nested = pm2_env.get("env") or {}
+for key in ("NOTES_FRAIS_ENABLED", "NEXT_PUBLIC_NOTES_FRAIS_ENABLED"):
+    value = nested.get(key, pm2_env.get(key))
+    if value is not None:
+        print(f"{key}={str(value).strip().lower()}")
+' "$pm2_name")"; then
+      fail_guard "environnement PM2 '$pm2_name' illisible"
+      return 1
+    fi
     for key in NOTES_FRAIS_ENABLED NEXT_PUBLIC_NOTES_FRAIS_ENABLED; do
-      if echo "$dump" | grep -E "^${key}:[[:space:]]*true$" >/dev/null 2>&1 \
-        || echo "$dump" | grep -E "^${key}=true$" >/dev/null 2>&1; then
+      if echo "$dump" | grep -E "^${key}=true$" >/dev/null 2>&1; then
         fail_guard "PM2 $pm2_name : $key=true"
         return 1
       fi

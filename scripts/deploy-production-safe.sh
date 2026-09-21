@@ -23,7 +23,7 @@
 #   EXPECTED_GIT_SHA=<40 hex>   # exactement origin/main après fetch
 #   MAINTENANCE_CHECK_URL=https://amaki.fr/
 #   SMOKE_URL=https://amaki.fr/   # même rigueur d’hôte/schéma
-#   INTERNAL_SMOKE_URL=http://127.0.0.1:9060/  # vérifier le port PM2 réel
+#   INTERNAL_SMOKE_URL=http://127.0.0.1:9060/  # port PM2 vérifié sur le VPS
 #
 # En échec : maintenance reste ON ; PM2 n’est pas redémarré automatiquement
 # (sauf si restart déjà réussi — alors maint ON si save/smoke échoue).

@@ -85,15 +85,9 @@ pushd_quiet "$TMP"
 mkdir -p "$TMP/bin"
 cat > "$TMP/bin/pm2" <<'EOF'
 #!/bin/bash
-if [[ "$1" == "id" ]]; then echo 0; exit 0; fi
-if [[ "$1" == "env" ]]; then
-  echo "NOTES_FRAIS_ENABLED=true"
-  echo "NEXT_PUBLIC_NOTES_FRAIS_ENABLED=false"
-  exit 0
-fi
 if [[ "$1" == "describe" ]]; then exit 0; fi
 if [[ "$1" == "jlist" ]]; then
-  echo '[{"name":"amakifr","pm2_env":{"status":"online","pm_cwd":"/sites/amakifr"}}]'
+  echo '[{"name":"amakifr","pm_id":0,"pm2_env":{"status":"online","pm_cwd":"/sites/amakifr","env":{"NOTES_FRAIS_ENABLED":"true","NEXT_PUBLIC_NOTES_FRAIS_ENABLED":"false"}}}]'
   exit 0
 fi
 exit 0
@@ -101,8 +95,34 @@ EOF
 chmod +x "$TMP/bin/pm2"
 push_path "$TMP/bin"
 assert_fail "flag PM2 NOTES true" assert_notes_frais_flags_off amakifr
+assert_ok "garde PM2 via jlist" bash -c 'grep -q "pm2 jlist" "'"$ROOT"'/scripts/lib/deploy-guards.sh"'
+assert_ok "garde PM2 sans pm2 id/env" bash -c '! grep -E "pm2 (id|env)" "'"$ROOT"'/scripts/lib/deploy-guards.sh"'
 pop_path
 popd_quiet
+
+mkdir -p "$TMP/bin-pm2-flags"
+cat > "$TMP/bin-pm2-flags/pm2" <<'EOF'
+#!/bin/bash
+if [[ "$1" == "jlist" ]]; then
+  case "${MOCK_PM2_CASE:-false}" in
+    false) echo '[{"name":"amakifr","pm_id":0,"pm2_env":{"env":{"NOTES_FRAIS_ENABLED":"false"}}}]' ;;
+    missing) echo '[{"name":"other","pm_id":0,"pm2_env":{}}]' ;;
+    invalid) echo 'not-json' ;;
+  esac
+  exit 0
+fi
+exit 0
+EOF
+chmod +x "$TMP/bin-pm2-flags/pm2"
+push_path "$TMP/bin-pm2-flags"
+export MOCK_PM2_CASE=false
+assert_ok "flags PM2 false" assert_notes_frais_flags_off amakifr
+export MOCK_PM2_CASE=missing
+assert_fail "application PM2 absente" assert_notes_frais_flags_off amakifr
+export MOCK_PM2_CASE=invalid
+assert_fail "jlist PM2 illisible" assert_notes_frais_flags_off amakifr
+unset MOCK_PM2_CASE
+pop_path
 
 # Mock PM2 cwd / stopped
 mkdir -p "$TMP/bin2"
