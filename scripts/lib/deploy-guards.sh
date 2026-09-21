@@ -289,6 +289,41 @@ assert_git_cwd() {
   return 0
 }
 
+# Le script peut venir d'un worktree récent tandis que le checkout PM2 est
+# encore ancien. Les deux doivent appartenir au même dépôt Git et la source du
+# script doit être exactement le commit demandé (jamais un brouillon local).
+assert_deploy_source_checkout() {
+  local source_root="${1:-}" app_root="${2:-}" expected="${3:-}"
+  local source_common app_common source_head source_dirty
+  [[ -n "$source_root" && -n "$app_root" ]] || return 1
+  assert_git_sha_format "$expected" || return 1
+  source_common="$(git -C "$source_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+  app_common="$(git -C "$app_root" rev-parse --path-format=absolute --git-common-dir 2>/dev/null)" || return 1
+  [[ "$(realpath "$source_common")" == "$(realpath "$app_common")" ]] || {
+    fail_guard "Le script et l'application proviennent de dépôts différents"
+    return 1
+  }
+  source_head="$(git -C "$source_root" rev-parse HEAD 2>/dev/null)" || return 1
+  [[ "$source_head" == "$expected" ]] || {
+    fail_guard "Le script ne provient pas du commit EXPECTED_GIT_SHA"
+    return 1
+  }
+  source_dirty="$(git -C "$source_root" status --porcelain=v1 2>/dev/null | grep -vE '^\?\?|^!!' || true)"
+  [[ -z "$source_dirty" ]] || {
+    fail_guard "Le checkout source du script contient des changements suivis"
+    return 1
+  }
+  return 0
+}
+
+# Smoke interne pendant maintenance nginx : jamais un hôte distant ou nginx.
+assert_internal_smoke_url_shape() {
+  local url="${1:-}" port
+  [[ "$url" =~ ^http://127[.]0[.]0[.]1:([0-9]{1,5})/$ ]] || return 1
+  port="${BASH_REMATCH[1]}"
+  (( 10#$port >= 1 && 10#$port <= 65535 )) || return 1
+}
+
 # ---------------------------------------------------------------------------
 # Backup / checksum / TOC
 # ---------------------------------------------------------------------------
@@ -645,7 +680,9 @@ assert_deploy_git_controls_before_mutations() {
   fi
   local line_git_dirty line_maint line_pm2_stop line_backup
   line_git_dirty="$(grep -n 'assert_git_workdir_clean' "$script" | head -1 | cut -d: -f1)"
-  line_maint="$(grep -n 'maintenance-on\.sh' "$script" | head -1 | cut -d: -f1)"
+  # Le helper de retour en maintenance est défini plus haut : repérer l'étape
+  # d'activation initiale, pas la définition du helper.
+  line_maint="$(grep -n 'step "3/15 — Maintenance ON' "$script" | head -1 | cut -d: -f1)"
   # Ignorer commentaires et messages step() contenant « pm2 stop »
   line_pm2_stop="$(grep -nE '^[[:space:]]*pm2 stop' "$script" | head -1 | cut -d: -f1)"
   line_backup="$(grep -n 'db-backup-restore\.sh backup' "$script" | head -1 | cut -d: -f1)"

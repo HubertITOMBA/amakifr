@@ -23,6 +23,7 @@
 #   EXPECTED_GIT_SHA=<40 hex>   # exactement origin/main après fetch
 #   MAINTENANCE_CHECK_URL=https://amaki.fr/
 #   SMOKE_URL=https://amaki.fr/   # même rigueur d’hôte/schéma
+#   INTERNAL_SMOKE_URL=http://127.0.0.1:9060/  # vérifier le port PM2 réel
 #
 # En échec : maintenance reste ON ; PM2 n’est pas redémarré automatiquement
 # (sauf si restart déjà réussi — alors maint ON si save/smoke échoue).
@@ -41,7 +42,12 @@ NC='\033[0m'
 PM2_APP_NAME="${PM2_APP_NAME:-amakifr}"
 GIT_BRANCH="${GIT_BRANCH:-main}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+SCRIPT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd -P)"
+ROOT_DIR="$(cd "${DEPLOY_APP_ROOT:-$SCRIPT_ROOT}" && pwd -P)"
+if [[ "$ROOT_DIR" != "/sites/amakifr" ]]; then
+  echo "Refus: DEPLOY_APP_ROOT doit désigner /sites/amakifr (répertoire applicatif)." >&2
+  exit 1
+fi
 cd "$ROOT_DIR"
 
 # shellcheck source=lib/deploy-guards.sh
@@ -72,6 +78,16 @@ fail_after_restart() {
   exit 1
 }
 
+fail_after_release() {
+  local reason="$1"
+  echo -e "${RED}$reason — remise en maintenance${NC}" >&2
+  if ! printf 'o\n' | bash scripts/maintenance-on.sh; then
+    fail_after_restart "CRITIQUE : impossible de réactiver la maintenance"
+  fi
+  assert_maintenance_http "$MAINTENANCE_CHECK_URL" || fail_after_restart "CRITIQUE : nginx ne renvoie pas 503"
+  fail_after_restart "$reason ; nginx repassé en maintenance"
+}
+
 BACKUP_FILE=""
 SHA_FILE=""
 MAINTENANCE_ON=0
@@ -98,6 +114,7 @@ set +a
 [[ -n "${EXPECTED_GIT_SHA:-}" ]] || fail "EXPECTED_GIT_SHA obligatoire (40 hex)."
 [[ -n "${MAINTENANCE_CHECK_URL:-}" ]] || fail "MAINTENANCE_CHECK_URL obligatoire."
 [[ -n "${SMOKE_URL:-}" ]] || fail "SMOKE_URL obligatoire."
+[[ -n "${INTERNAL_SMOKE_URL:-}" ]] || fail "INTERNAL_SMOKE_URL obligatoire."
 
 if [[ "$PM2_APP_NAME" != "amakifr" ]]; then
   fail "PM2_APP_NAME doit être 'amakifr' (reçu: $PM2_APP_NAME)"
@@ -120,9 +137,7 @@ START_TIME=$(date +%s)
 
 # ─── 1. Contrôles Git AVANT toute mutation (pas de maint / stop / dump) ───────
 step "1/15 — Contrôles Git (avant maintenance / PM2 / backup)"
-if [[ "${OVERRIDE_GIT_CWD_CHECK:-}" != "1" ]]; then
-  assert_git_cwd "/sites/amakifr" || fail "cwd Git production"
-fi
+assert_git_cwd "/sites/amakifr" || fail "cwd Git production"
 [[ -d .git ]] || fail "Pas de dépôt Git"
 assert_git_workdir_clean || fail "Tracked/index dirty — abandon sans indisponibilité"
 echo -e "${CYAN}Fichiers non suivis (inventaire, non supprimés) :${NC}"
@@ -132,6 +147,7 @@ assert_git_sha_format "$EXPECTED_GIT_SHA" || fail "Format EXPECTED_GIT_SHA"
 git fetch origin "$GIT_BRANCH" || fail "git fetch a échoué"
 assert_git_sha_exists "$EXPECTED_GIT_SHA" || fail "SHA inexistant"
 assert_git_sha_is_origin_main "$EXPECTED_GIT_SHA" "$GIT_BRANCH" || fail "SHA != origin/${GIT_BRANCH}"
+assert_deploy_source_checkout "$SCRIPT_ROOT" "$ROOT_DIR" "$EXPECTED_GIT_SHA" || fail "Source du script != commit cible du dépôt applicatif"
 echo -e "${GREEN}✅ Contrôles Git OK (pas encore de checkout)${NC}"
 
 # ─── 2. Préflight runtime ────────────────────────────────────────────────────
@@ -139,6 +155,7 @@ step "2/15 — Préflight (PM2 / flags / disque / orpheline / URLs)"
 assert_orphan_migration_absent || fail "Dossier orphelin présent"
 assert_maintenance_url_shape "$MAINTENANCE_CHECK_URL" || fail "URL maintenance invalide"
 assert_smoke_url_shape "$SMOKE_URL" || fail "SMOKE_URL invalide"
+assert_internal_smoke_url_shape "$INTERNAL_SMOKE_URL" || fail "URL smoke interne invalide"
 assert_pm2_process_exists "$PM2_APP_NAME" || fail "Préflight PM2"
 assert_pm2_cwd "$PM2_APP_NAME" "/sites/amakifr" || fail "Préflight cwd PM2"
 assert_notes_frais_flags_off "$PM2_APP_NAME" || fail "Préflight flags"
@@ -151,7 +168,7 @@ echo -e "${GREEN}✅ Préflight OK${NC}"
 step "3/15 — Maintenance ON + HTTP 503"
 [[ -f scripts/maintenance-on.sh ]] || fail "scripts/maintenance-on.sh manquant"
 if [[ "${ASSUME_YES:-}" == "1" ]]; then
-  yes o | head -1 | bash scripts/maintenance-on.sh || fail "maintenance-on a échoué"
+  printf 'o\n' | bash scripts/maintenance-on.sh || fail "maintenance-on a échoué"
 else
   bash scripts/maintenance-on.sh || fail "maintenance-on a échoué"
 fi
@@ -201,6 +218,9 @@ npx prisma generate || fail "prisma generate"
 
 step "9/15 — build (flags off)"
 assert_notes_frais_flags_off "$PM2_APP_NAME" || fail "flags avant build"
+# nginx maintient le 503 public ; le build et PM2 doivent servir normalement
+# en interne pour pouvoir être vérifiés avant d'ouvrir nginx.
+export MAINTENANCE_MODE=false
 if [[ -f scripts/optimize-build.sh ]]; then
   bash scripts/optimize-build.sh || fail "build"
 else
@@ -230,6 +250,21 @@ if [[ -d prisma/migrations/20260918130000_notes_frais_4x10_retention_policies_le
   psql "$URL_SAFE" -v ON_ERROR_STOP=1 -Atc "
   SELECT CASE WHEN to_regclass('public.notes_frais_retention_policy_versions') IS NULL THEN 'MISS' ELSE 'OK' END;
   " | grep -q OK || fail "table retention 4.10 absente après migrate"
+  psql "$URL_SAFE" -v ON_ERROR_STOP=1 -Atc "
+  SELECT CASE WHEN
+    (SELECT count(*) FROM public._prisma_migrations
+     WHERE migration_name IN (
+       '20260918120000_notes_frais_4x_foundation',
+       '20260918120100_notes_frais_4x_backfill_seed',
+       '20260918120200_notes_frais_4x_integrity',
+       '20260918130000_notes_frais_4x10_retention_policies_legal_hold'
+     ) AND finished_at IS NOT NULL AND rolled_back_at IS NULL) = 4
+    AND NOT EXISTS (SELECT 1 FROM public._prisma_migrations
+                    WHERE finished_at IS NULL AND rolled_back_at IS NULL)
+    AND (SELECT count(*) FROM public.notes_frais_retention_policy_versions
+         WHERE statut = 'ACTIVE') = 1
+  THEN 'OK' ELSE 'FAIL' END;
+  " | grep -qx OK || fail "migrations 4.x / politique ACTIVE invalides"
 fi
 echo -e "${GREEN}✅ Contrôles SQL OK${NC}"
 
@@ -248,36 +283,44 @@ fi
 # ─── 13. Restart + pm2 save bloquant ─────────────────────────────────────────
 step "13/15 — Restart PM2 + pm2 save (bloquant)"
 assert_notes_frais_flags_off "$PM2_APP_NAME" || fail "flags avant restart"
-pm2 restart "$PM2_APP_NAME" --update-env || fail "pm2 restart"
+MAINTENANCE_MODE=false pm2 restart "$PM2_APP_NAME" --update-env || fail "pm2 restart"
 PM2_RESTARTED=1
 PM2_STOPPED=0
 if ! pm2 save; then
   fail_after_restart "pm2 save a échoué — process redémarré, persistance PM2 non garantie"
 fi
 
-# ─── 14. Smoke ───────────────────────────────────────────────────────────────
-step "14/15 — Smoke (SMOKE_URL validée) — STOP si échec"
+# ─── 14. Smoke interne sous nginx 503 ────────────────────────────────────────
+step "14/15 — Smoke interne sous maintenance — STOP si échec"
 assert_smoke_url_shape "$SMOKE_URL" || fail_after_restart "SMOKE_URL invalide après restart"
+assert_internal_smoke_url_shape "$INTERNAL_SMOKE_URL" || fail_after_restart "URL interne invalide après restart"
 assert_notes_frais_flags_off "$PM2_APP_NAME" || fail_after_restart "flags après restart"
 sleep 2
 if ! command -v curl >/dev/null 2>&1; then
   fail_after_restart "curl introuvable pour smoke"
 fi
-code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$SMOKE_URL" || echo 000)"
-[[ "$code" =~ ^(200|301|302|303|307|308)$ ]] || fail_after_restart "SMOKE_URL HTTP=$code"
-npm run deploy:check || fail_after_restart "deploy:check a échoué"
-echo -e "${GREEN}✅ Smoke flags off OK${NC}"
+assert_maintenance_http "$MAINTENANCE_CHECK_URL" || fail_after_restart "nginx n'est plus en maintenance"
+code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$INTERNAL_SMOKE_URL" || echo 000)"
+[[ "$code" =~ ^(200|301|302|303|307|308)$ ]] || fail_after_restart "smoke interne HTTP=$code"
+echo -e "${GREEN}✅ Application vérifiée en interne ; nginx toujours à 503${NC}"
 
 # ─── 15. Maintenance OFF ─────────────────────────────────────────────────────
 step "15/15 — Maintenance OFF"
 if [[ -f scripts/maintenance-off.sh ]]; then
   if [[ "${ASSUME_YES:-}" == "1" ]]; then
-    yes o | head -1 | bash scripts/maintenance-off.sh || fail_after_restart "maintenance-off"
+    printf 'o\n' | bash scripts/maintenance-off.sh || fail_after_release "maintenance-off a échoué"
   else
-    bash scripts/maintenance-off.sh || fail_after_restart "maintenance-off"
+    bash scripts/maintenance-off.sh || fail_after_release "maintenance-off a échoué"
   fi
 else
-  fail_after_restart "maintenance-off.sh manquant"
+  fail_after_release "maintenance-off.sh manquant"
+fi
+[[ ! -f maintenance.flag ]] || fail_after_release "maintenance.flag encore présent"
+
+# Si le smoke public échoue après ouverture, nginx repasse immédiatement à 503.
+code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$SMOKE_URL" || echo 000)"
+if [[ ! "$code" =~ ^(200|301|302|303|307|308)$ ]]; then
+  fail_after_release "Smoke public HTTP=$code en échec"
 fi
 MAINTENANCE_ON=0
 

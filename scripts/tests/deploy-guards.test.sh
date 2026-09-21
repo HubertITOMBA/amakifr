@@ -193,6 +193,49 @@ assert_fail "index dirty" assert_git_workdir_clean
 popd_quiet
 cd "$ROOT"
 
+# Script issu d'un worktree au commit cible, application encore sur ancien HEAD.
+APP_REPO="$TMP/app-checkout"
+SOURCE_REPO="$TMP/source-checkout"
+mkdir -p "$APP_REPO"
+git -C "$APP_REPO" init -q
+git -C "$APP_REPO" config user.email t@t.t
+git -C "$APP_REPO" config user.name t
+echo original > "$APP_REPO/version.txt"
+git -C "$APP_REPO" add version.txt
+git -C "$APP_REPO" commit -qm old
+echo target > "$APP_REPO/version.txt"
+git -C "$APP_REPO" commit -qam target
+TARGET_SHA="$(git -C "$APP_REPO" rev-parse HEAD)"
+git -C "$APP_REPO" worktree add -q --detach "$SOURCE_REPO" "$TARGET_SHA"
+git -C "$APP_REPO" switch -q --detach HEAD~1
+assert_ok "source worktree cible, app ancienne" assert_deploy_source_checkout "$SOURCE_REPO" "$APP_REPO" "$TARGET_SHA"
+assert_fail "script ancien refusé" assert_deploy_source_checkout "$APP_REPO" "$APP_REPO" "$TARGET_SHA"
+echo dirty >> "$SOURCE_REPO/version.txt"
+assert_fail "source suivie dirty refusée" assert_deploy_source_checkout "$SOURCE_REPO" "$APP_REPO" "$TARGET_SHA"
+git -C "$SOURCE_REPO" restore version.txt
+OTHER_REPO="$TMP/other-repo"
+mkdir -p "$OTHER_REPO"
+git -C "$OTHER_REPO" init -q
+assert_fail "source hors dépôt refusée" assert_deploy_source_checkout "$SOURCE_REPO" "$OTHER_REPO" "$TARGET_SHA"
+assert_fail "SHA source faux refusé" assert_deploy_source_checkout "$SOURCE_REPO" "$APP_REPO" "$(git -C "$APP_REPO" rev-parse HEAD)"
+assert_ok "script impose cwd prod" bash -c 'grep -q "ROOT_DIR.*!=.*\/sites\/amakifr" "'"$DEPLOY_SCRIPT"'"'
+assert_ok "script vérifie sa source" bash -c 'grep -q assert_deploy_source_checkout "'"$DEPLOY_SCRIPT"'"'
+assert_ok "URL interne locale" assert_internal_smoke_url_shape 'http://127.0.0.1:9052/'
+assert_fail "URL interne publique refusée" assert_internal_smoke_url_shape 'https://amaki.fr/'
+assert_fail "URL interne hostname refusée" assert_internal_smoke_url_shape 'http://localhost:9052/'
+assert_fail "URL interne sans port refusée" assert_internal_smoke_url_shape 'http://127.0.0.1/'
+assert_fail "URL interne port invalide refusée" assert_internal_smoke_url_shape 'http://127.0.0.1:65536/'
+assert_ok "URL interne requise par deploy" bash -c 'grep -q "INTERNAL_SMOKE_URL obligatoire" "'"$DEPLOY_SCRIPT"'"'
+assert_ok "contrôle SQL migrations quatre" bash -c 'grep -q "migrations 4.x / politique ACTIVE invalides" "'"$DEPLOY_SCRIPT"'"'
+assert_ok "deploy:check incompatible écarté" bash -c '! grep -q "npm run deploy:check" "'"$DEPLOY_SCRIPT"'"'
+assert_ok "smoke interne avant maintenance-off" bash -c '
+  internal=$(grep -n "curl.*INTERNAL_SMOKE_URL" "'"$DEPLOY_SCRIPT"'" | tail -1 | cut -d: -f1)
+  off=$(grep -n "bash scripts/maintenance-off.sh" "'"$DEPLOY_SCRIPT"'" | tail -1 | cut -d: -f1)
+  public=$(grep -n "curl.*SMOKE_URL" "'"$DEPLOY_SCRIPT"'" | tail -1 | cut -d: -f1)
+  [[ -n "$internal" && -n "$off" && -n "$public" && $internal -lt $off && $off -lt $public ]]
+'
+assert_ok "réactivation sur échec après ouverture" bash -c 'grep -q "fail_after_release.*Smoke public" "'"$DEPLOY_SCRIPT"'"'
+
 # --- maintenance URL shape ---
 assert_fail "maint URL vide" assert_maintenance_url_shape ""
 assert_fail "maint credentials" assert_maintenance_url_shape "https://user:pass@amaki.fr/"
