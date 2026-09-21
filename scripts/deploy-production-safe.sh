@@ -190,7 +190,7 @@ step "5/15 — Sauvegarde custom atomique (mktemp) + SHA-256 + TOC"
 export DATABASE_URL
 export BACKUP_DIR
 BACKUP_FILE="$(
-  bash scripts/db-backup-restore.sh backup -t custom -b "$BACKUP_DIR" --print-path
+  bash "$SCRIPT_DIR/db-backup-restore.sh" backup -t custom -b "$BACKUP_DIR" --print-path
 )" || fail "Échec sauvegarde"
 [[ -n "$BACKUP_FILE" ]] || fail "Chemin dump vide"
 assert_backup_file_ok "$BACKUP_FILE" || fail "Dump invalide"

@@ -240,6 +240,7 @@ assert_fail "source hors dépôt refusée" assert_deploy_source_checkout "$SOURC
 assert_fail "SHA source faux refusé" assert_deploy_source_checkout "$SOURCE_REPO" "$APP_REPO" "$(git -C "$APP_REPO" rev-parse HEAD)"
 assert_ok "script impose cwd prod" bash -c 'grep -q "ROOT_DIR.*!=.*\/sites\/amakifr" "'"$DEPLOY_SCRIPT"'"'
 assert_ok "script vérifie sa source" bash -c 'grep -q assert_deploy_source_checkout "'"$DEPLOY_SCRIPT"'"'
+assert_ok "backup utilise le script source" grep -Fq 'bash "$SCRIPT_DIR/db-backup-restore.sh" backup' "$DEPLOY_SCRIPT"
 assert_ok "URL interne locale" assert_internal_smoke_url_shape 'http://127.0.0.1:9052/'
 assert_fail "URL interne publique refusée" assert_internal_smoke_url_shape 'https://amaki.fr/'
 assert_fail "URL interne hostname refusée" assert_internal_smoke_url_shape 'http://localhost:9052/'

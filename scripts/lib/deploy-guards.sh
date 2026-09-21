@@ -701,7 +701,7 @@ assert_deploy_git_controls_before_mutations() {
   line_maint="$(grep -n 'step "3/15 — Maintenance ON' "$script" | head -1 | cut -d: -f1)"
   # Ignorer commentaires et messages step() contenant « pm2 stop »
   line_pm2_stop="$(grep -nE '^[[:space:]]*pm2 stop' "$script" | head -1 | cut -d: -f1)"
-  line_backup="$(grep -n 'db-backup-restore\.sh backup' "$script" | head -1 | cut -d: -f1)"
+  line_backup="$(grep -nE 'db-backup-restore\.sh"?[[:space:]]+backup' "$script" | head -1 | cut -d: -f1)"
   if [[ -z "$line_git_dirty" || -z "$line_maint" || -z "$line_pm2_stop" || -z "$line_backup" ]]; then
     fail_guard "marqueurs d'ordre introuvables dans $script"
     return 1
