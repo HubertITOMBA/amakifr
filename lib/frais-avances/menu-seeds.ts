@@ -1,5 +1,5 @@
 /**
- * Définition seed des 3 menus frais avancés (provisionnement explicite uniquement).
+ * Définition seed des 4 menus frais avancés (provisionnement explicite uniquement).
  * Aucune écriture runtime depuis les pages.
  */
 export type FraisAvancesMenuSeed = {
@@ -16,7 +16,7 @@ export type FraisAvancesMenuSeed = {
 };
 
 /**
- * Trois entrées attendues pour la future activation (seed uniquement).
+ * Quatre entrées attendues pour la future activation (seed uniquement).
  */
 export const FRAIS_AVANCES_MENU_SEEDS: FraisAvancesMenuSeed[] = [
   {

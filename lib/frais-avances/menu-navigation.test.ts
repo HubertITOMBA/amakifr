@@ -109,9 +109,13 @@ describe("filterMenusByNotesFraisPublicHint", () => {
     { lien: "/user/frais-avances", libelle: "Mes frais" },
     { lien: "/admin/frais-avances", libelle: "Live" },
     { lien: "/admin/frais-avances/comptabilite", libelle: "Compta" },
+    {
+      lien: "/admin/frais-avances/parametres/conservation",
+      libelle: "Conservation",
+    },
   ];
 
-  it("flag public off masque les trois liens", () => {
+  it("flag public off masque les quatre liens", () => {
     const prev = process.env.NEXT_PUBLIC_NOTES_FRAIS_ENABLED;
     delete process.env.NEXT_PUBLIC_NOTES_FRAIS_ENABLED;
     const filtered = filterMenusByNotesFraisPublicHint(menus);
@@ -125,7 +129,7 @@ describe("filterMenusByNotesFraisPublicHint", () => {
     const prev = process.env.NEXT_PUBLIC_NOTES_FRAIS_ENABLED;
     process.env.NEXT_PUBLIC_NOTES_FRAIS_ENABLED = "true";
     const filtered = filterMenusByNotesFraisPublicHint(menus);
-    expect(filtered).toHaveLength(4);
+    expect(filtered).toHaveLength(5);
     if (prev === undefined) delete process.env.NEXT_PUBLIC_NOTES_FRAIS_ENABLED;
     else process.env.NEXT_PUBLIC_NOTES_FRAIS_ENABLED = prev;
   });

@@ -8,7 +8,7 @@ import { FRAIS_AVANCES_MENU_SEEDS } from "../lib/frais-avances/menu-seeds";
 type MenuClient = Pick<PrismaClient, "menu">;
 
 /**
- * Aligne les 3 entrées (lien + niveau) sans doublon opportuniste runtime.
+ * Aligne les 4 entrées (lien + niveau) sans doublon opportuniste runtime.
  *
  * @param client - Client Prisma
  */

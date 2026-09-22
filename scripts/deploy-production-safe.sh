@@ -273,9 +273,8 @@ step "12/15 — Seeds (ALLOW_SEEDS=1 requis ; échec = STOP)"
 if [[ "${ALLOW_SEEDS:-0}" == "1" ]]; then
   npm run db:seed-connexion-badges || fail "seed badges"
   npm run db:add-connexions-adherents-menu || fail "menu connexions"
-  if [[ -f scripts/frais-avances-menus-upsert.ts ]]; then
-    npx tsx scripts/frais-avances-menus-upsert.ts || fail "menus frais"
-  fi
+  [[ -f scripts/frais-avances-menus-seed.ts ]] || fail "script menus frais absent"
+  npx tsx scripts/frais-avances-menus-seed.ts || fail "menus frais"
 else
   echo "Seeds ignorés (ALLOW_SEEDS!=1) — OK"
 fi

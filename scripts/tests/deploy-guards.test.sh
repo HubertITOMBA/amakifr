@@ -241,6 +241,10 @@ assert_fail "SHA source faux refusé" assert_deploy_source_checkout "$SOURCE_REP
 assert_ok "script impose cwd prod" bash -c 'grep -q "ROOT_DIR.*!=.*\/sites\/amakifr" "'"$DEPLOY_SCRIPT"'"'
 assert_ok "script vérifie sa source" bash -c 'grep -q assert_deploy_source_checkout "'"$DEPLOY_SCRIPT"'"'
 assert_ok "backup utilise le script source" grep -Fq 'bash "$SCRIPT_DIR/db-backup-restore.sh" backup' "$DEPLOY_SCRIPT"
+assert_ok "deploy exécute le CLI menus frais" grep -Fq 'npx tsx scripts/frais-avances-menus-seed.ts' "$DEPLOY_SCRIPT"
+assert_ok "deploy refuse le CLI menus absent" grep -Fq 'fail "script menus frais absent"' "$DEPLOY_SCRIPT"
+assert_ok "CLI menus appelle upsert" grep -Fq 'await upsertFraisAvancesMenusIdempotent(prisma)' "$ROOT/scripts/frais-avances-menus-seed.ts"
+assert_ok "CLI menus déconnecte Prisma" grep -Fq 'await prisma.$disconnect()' "$ROOT/scripts/frais-avances-menus-seed.ts"
 assert_ok "URL interne locale" assert_internal_smoke_url_shape 'http://127.0.0.1:9052/'
 assert_fail "URL interne publique refusée" assert_internal_smoke_url_shape 'https://amaki.fr/'
 assert_fail "URL interne hostname refusée" assert_internal_smoke_url_shape 'http://localhost:9052/'

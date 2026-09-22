@@ -631,7 +631,7 @@ async function seedMenus() {
     const totalMenus = allParentMenus.length + navbarElectoralSubmenus.length;
     console.log(`\n🎉 ${totalMenus} menus créés avec succès!`);
 
-    // Idempotent : aligne les 3 entrées frais avancés (future activation, pas runtime pages).
+    // Idempotent : aligne les 4 entrées frais avancés (future activation, pas runtime pages).
     await upsertFraisAvancesMenusIdempotent(prisma);
     
     // Afficher un résumé
