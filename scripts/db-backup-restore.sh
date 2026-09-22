@@ -126,10 +126,13 @@ finalize_atomic_dump() {
     fi
   fi
 
-  sha256sum "$tmp" > "$tmp_sha"
+  local dump_hash final_abs
+  dump_hash="$(sha256sum "$tmp" | awk '{print $1}')"
+  final_abs="$(realpath -m "$final")"
+  printf '%s  %s\n' "$dump_hash" "$final_abs" > "$tmp_sha"
   chmod 600 "$tmp_sha"
 
-  # Renommage atomique (même FS) : dump puis checksum
+  # Renommage atomique (même FS) : dump puis checksum référençant le nom final.
   mv -f "$tmp" "$final"
   mv -f "$tmp_sha" "$final_sha"
   BACKUP_TMP_ACTIVE=""

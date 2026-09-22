@@ -318,6 +318,61 @@ echo "wrong  $TMP/a.dump" > "$TMP/a.dump.sha256"
 assert_fail "checksum faux" assert_sha256_file_matches "$TMP/a.dump" "$TMP/a.dump.sha256"
 sha256sum "$TMP/a.dump" > "$TMP/a.dump.sha256"
 assert_ok "checksum match" assert_sha256_file_matches "$TMP/a.dump" "$TMP/a.dump.sha256"
+
+
+# Test bout-en-bout du backup atomique : le .sha256 doit référencer le dump final.
+BACKUP_E2E="$TMP/backup-e2e"
+mkdir -p "$BACKUP_E2E/bin" "$BACKUP_E2E/work"
+
+cat > "$BACKUP_E2E/bin/pg_dump" <<'EOF'
+#!/usr/bin/env bash
+set -euo pipefail
+out=""
+while (($#)); do
+  case "$1" in
+    -f)
+      out="$2"
+      shift 2
+      ;;
+    *)
+      shift
+      ;;
+  esac
+done
+[[ -n "$out" ]]
+printf 'mock-custom-dump\n' > "$out"
+EOF
+
+cat > "$BACKUP_E2E/bin/pg_restore" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+
+chmod +x "$BACKUP_E2E/bin/pg_dump" "$BACKUP_E2E/bin/pg_restore"
+
+pushd_quiet "$BACKUP_E2E/work"
+push_path "$BACKUP_E2E/bin"
+
+E2E_DUMP="$(
+  DATABASE_URL='postgresql://test@localhost:5432/test' \
+  bash "$ROOT/scripts/db-backup-restore.sh" \
+    backup -t custom -b ./backups --print-path
+)"
+E2E_SHA="${E2E_DUMP}.sha256"
+E2E_RECORDED_PATH="$(awk '{$1=""; sub(/^ +/, ""); print}' "$E2E_SHA")"
+E2E_FINAL_PATH="$(realpath "$E2E_DUMP")"
+
+assert_ok "backup e2e crée dump et checksum" \
+  bash -c '[[ -s "$1" && -s "$2" ]]' _ "$E2E_DUMP" "$E2E_SHA"
+
+assert_ok "checksum e2e vérifiable standard" \
+  sha256sum -c "$E2E_SHA"
+
+assert_ok "checksum e2e référence le nom final" \
+  bash -c '[[ "$1" == "$2" ]]' _ "$E2E_RECORDED_PATH" "$E2E_FINAL_PATH"
+
+pop_path
+popd_quiet
 echo not-a-dump > "$TMP/bad.dump"
 assert_fail "TOC invalide" assert_pg_restore_toc "$TMP/bad.dump"
 
