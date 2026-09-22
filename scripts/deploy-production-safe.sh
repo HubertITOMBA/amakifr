@@ -300,9 +300,10 @@ if ! command -v curl >/dev/null 2>&1; then
   fail_after_restart "curl introuvable pour smoke"
 fi
 assert_maintenance_http "$MAINTENANCE_CHECK_URL" || fail_after_restart "nginx n'est plus en maintenance"
-code="$(curl -sS -o /dev/null -w '%{http_code}' --max-time 20 "$INTERNAL_SMOKE_URL" || echo 000)"
-[[ "$code" =~ ^(200|301|302|303|307|308)$ ]] || fail_after_restart "smoke interne HTTP=$code"
-echo -e "${GREEN}✅ Application vérifiée en interne ; nginx toujours à 503${NC}"
+if ! code="$(wait_for_http_ready "$INTERNAL_SMOKE_URL" 6 20 5)"; then
+  fail_after_restart "smoke interne épuisé après 6 tentatives ; dernier HTTP=$code"
+fi
+echo -e "${GREEN}✅ Application vérifiée en interne (HTTP=$code) ; nginx toujours à 503${NC}"
 
 # ─── 15. Maintenance OFF ─────────────────────────────────────────────────────
 step "15/15 — Maintenance OFF"

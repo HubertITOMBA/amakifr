@@ -340,6 +340,42 @@ assert_internal_smoke_url_shape() {
   (( 10#$port >= 1 && 10#$port <= 65535 )) || return 1
 }
 
+# Attend une réponse HTTP exploitable avec un nombre de tentatives borné.
+# stdout contient uniquement le dernier code HTTP ; la progression va sur stderr.
+wait_for_http_ready() {
+  local url="${1:-}"
+  local attempts="${2:-6}"
+  local timeout_seconds="${3:-20}"
+  local delay_seconds="${4:-5}"
+  local attempt code="000"
+
+  [[ "$attempts" =~ ^[1-9][0-9]*$ ]] || return 1
+  [[ "$timeout_seconds" =~ ^[1-9][0-9]*$ ]] || return 1
+  [[ "$delay_seconds" =~ ^[0-9]+$ ]] || return 1
+
+  for ((attempt = 1; attempt <= attempts; attempt++)); do
+    code="$(
+      curl -sS -o /dev/null -w '%{http_code}'         --max-time "$timeout_seconds" "$url" 2>/dev/null ||
+      true
+    )"
+    code="${code:-000}"
+
+    if [[ "$code" =~ ^(200|301|302|303|307|308)$ ]]; then
+      printf '%s\n' "$code"
+      return 0
+    fi
+
+    printf 'Smoke HTTP tentative %d/%d : HTTP=%s\n'       "$attempt" "$attempts" "$code" >&2
+
+    if (( attempt < attempts )); then
+      sleep "$delay_seconds"
+    fi
+  done
+
+  printf '%s\n' "$code"
+  return 1
+}
+
 # ---------------------------------------------------------------------------
 # Backup / checksum / TOC
 # ---------------------------------------------------------------------------

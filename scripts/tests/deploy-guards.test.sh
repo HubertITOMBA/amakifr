@@ -247,13 +247,51 @@ assert_fail "URL interne hostname refusée" assert_internal_smoke_url_shape 'htt
 assert_fail "URL interne sans port refusée" assert_internal_smoke_url_shape 'http://127.0.0.1/'
 assert_fail "URL interne port invalide refusée" assert_internal_smoke_url_shape 'http://127.0.0.1:65536/'
 assert_ok "URL interne requise par deploy" bash -c 'grep -q "INTERNAL_SMOKE_URL obligatoire" "'"$DEPLOY_SCRIPT"'"'
+
+# --- readiness HTTP bornée ---
+mkdir -p "$TMP/http-bin"
+cat > "$TMP/http-bin/curl" <<'EOF'
+#!/usr/bin/env bash
+count=0
+[[ -f "$MOCK_CURL_STATE" ]] && count="$(cat "$MOCK_CURL_STATE")"
+count=$((count + 1))
+printf '%s\n' "$count" > "$MOCK_CURL_STATE"
+if [[ "${MOCK_CURL_MODE:-fail}" == "eventual-success" && "$count" -ge 3 ]]; then
+  printf '200'
+  exit 0
+fi
+printf '000'
+exit 28
+EOF
+cat > "$TMP/http-bin/sleep" <<'EOF'
+#!/usr/bin/env bash
+exit 0
+EOF
+chmod +x "$TMP/http-bin/curl" "$TMP/http-bin/sleep"
+
+export MOCK_CURL_STATE="$TMP/http-state"
+export MOCK_CURL_MODE="eventual-success"
+rm -f "$MOCK_CURL_STATE"
+push_path "$TMP/http-bin"
+assert_ok "readiness réussit après retries" wait_for_http_ready "http://127.0.0.1:9060/" 4 1 0
+assert_ok "readiness a tenté trois fois" bash -c '[[ "$(cat "$MOCK_CURL_STATE")" == "3" ]]'
+
+export MOCK_CURL_MODE="fail"
+rm -f "$MOCK_CURL_STATE"
+assert_fail "readiness échoue après épuisement" wait_for_http_ready "http://127.0.0.1:9060/" 3 1 0
+assert_ok "readiness borne les tentatives" bash -c '[[ "$(cat "$MOCK_CURL_STATE")" == "3" ]]'
+pop_path
+unset MOCK_CURL_STATE MOCK_CURL_MODE
 assert_ok "contrôle SQL migrations quatre" bash -c 'grep -q "migrations 4.x / politique ACTIVE invalides" "'"$DEPLOY_SCRIPT"'"'
 assert_ok "deploy:check incompatible écarté" bash -c '! grep -q "npm run deploy:check" "'"$DEPLOY_SCRIPT"'"'
 assert_ok "smoke interne avant maintenance-off" bash -c '
-  internal=$(grep -n "curl.*INTERNAL_SMOKE_URL" "'"$DEPLOY_SCRIPT"'" | tail -1 | cut -d: -f1)
+  internal=$(grep -n "wait_for_http_ready.*INTERNAL_SMOKE_URL" "'"$DEPLOY_SCRIPT"'" | tail -1 | cut -d: -f1)
   off=$(grep -n "bash scripts/maintenance-off.sh" "'"$DEPLOY_SCRIPT"'" | tail -1 | cut -d: -f1)
   public=$(grep -n "curl.*SMOKE_URL" "'"$DEPLOY_SCRIPT"'" | tail -1 | cut -d: -f1)
   [[ -n "$internal" && -n "$off" && -n "$public" && $internal -lt $off && $off -lt $public ]]
+'
+assert_ok "smoke interne utilise retry borné" bash -c '
+  grep -q "wait_for_http_ready.*INTERNAL_SMOKE_URL.*6 20 5" "'"$DEPLOY_SCRIPT"'"
 '
 assert_ok "réactivation sur échec après ouverture" bash -c 'grep -q "fail_after_release.*Smoke public" "'"$DEPLOY_SCRIPT"'"'
 
