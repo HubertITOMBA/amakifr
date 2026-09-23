@@ -96,7 +96,7 @@ export default function UserNoteFraisDetailPage() {
   const [error, setError] = useState<string | null>(null);
   const [idempotencyKey] = useState(() => `submit-${noteId}-${Date.now()}`);
   const [choixKey, setChoixKey] = useState(
-    () => `choix-${noteId}-${Date.now()}`
+    () => `choix-${noteId}-${Date.now()}`,
   );
   const [cibles, setCibles] = useState<CibleEligible[]>([]);
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -150,7 +150,7 @@ export default function UserNoteFraisDetailPage() {
     setChoixInitialMode(
       replace && note.ChoixReglementActif
         ? (note.ChoixReglementActif.mode as ModeChoix)
-        : "REMBOURSEMENT"
+        : "REMBOURSEMENT",
     );
     setChoixOpen(true);
   }
@@ -160,14 +160,25 @@ export default function UserNoteFraisDetailPage() {
   const hasReglements = (note?.historiqueReglements?.length ?? 0) > 0;
   const canReplace =
     note?.canReplaceChoix === true && note.ChoixReglementActif != null;
+  const readyJustificatifsCount =
+    note?.Justificatifs?.filter((j) => j.statut === "READY").length ?? 0;
+  const hasPendingJustificatif =
+    note?.Justificatifs?.some((j) => j.statut === "PENDING") ?? false;
+  const canSubmit = readyJustificatifsCount > 0 && !hasPendingJustificatif;
 
   if (!enabledHint) {
     return (
       <div className="min-h-screen p-4 sm:p-8">
-        <p className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3" role="status">
+        <p
+          className="text-sm text-amber-800 bg-amber-50 border border-amber-200 rounded-md p-3"
+          role="status"
+        >
           Module indisponible.
         </p>
-        <Link href="/user/frais-avances" className="text-sm text-blue-700 underline mt-3 inline-block">
+        <Link
+          href="/user/frais-avances"
+          className="text-sm text-blue-700 underline mt-3 inline-block"
+        >
           Retour
         </Link>
       </div>
@@ -237,13 +248,13 @@ export default function UserNoteFraisDetailPage() {
                     <NoteFraisMontantBadge
                       label="Remboursé"
                       value={String(
-                        note.ChoixReglementActif.montantRembourseUtilise
+                        note.ChoixReglementActif.montantRembourseUtilise,
                       )}
                     />
                     <NoteFraisMontantBadge
                       label="Compensé"
                       value={String(
-                        note.ChoixReglementActif.montantCompensationUtilise
+                        note.ChoixReglementActif.montantCompensationUtilise,
                       )}
                     />
                     {note.restantDu != null ? (
@@ -369,24 +380,42 @@ export default function UserNoteFraisDetailPage() {
                   ))}
                 </ul>
                 {note.statut === "BROUILLON" ? (
-                  <div className="flex flex-col sm:flex-row gap-2 pt-1">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="h-9 border-slate-300"
-                      onClick={() => setUploadOpen(true)}
+                  <div className="space-y-2 pt-1">
+                    <p
+                      id="notes-frais-submit-requirement"
+                      className={
+                        canSubmit
+                          ? "text-xs text-slate-600"
+                          : "text-xs font-medium text-amber-700"
+                      }
                     >
-                      <Paperclip className="h-4 w-4 mr-2" />
-                      Ajouter un justificatif
-                    </Button>
-                    <Button
-                      type="button"
-                      onClick={() => setSubmitOpen(true)}
-                      className="h-9 bg-gradient-to-r from-blue-600 to-blue-500 text-white"
-                    >
-                      <Send className="h-4 w-4 mr-2" />
-                      Soumettre
-                    </Button>
+                      Au moins un justificatif finalisé est obligatoire avant la
+                      soumission.
+                      {hasPendingJustificatif
+                        ? " Attendez la fin de sa finalisation."
+                        : ""}
+                    </p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                      <Button
+                        type="button"
+                        variant="outline"
+                        className="h-9 border-slate-300"
+                        onClick={() => setUploadOpen(true)}
+                      >
+                        <Paperclip className="h-4 w-4 mr-2" />
+                        Ajouter un justificatif
+                      </Button>
+                      <Button
+                        type="button"
+                        onClick={() => setSubmitOpen(true)}
+                        disabled={!canSubmit}
+                        aria-describedby="notes-frais-submit-requirement"
+                        className="h-9 bg-gradient-to-r from-blue-600 to-blue-500 text-white"
+                      >
+                        <Send className="h-4 w-4 mr-2" />
+                        Soumettre
+                      </Button>
+                    </div>
                   </div>
                 ) : null}
               </section>

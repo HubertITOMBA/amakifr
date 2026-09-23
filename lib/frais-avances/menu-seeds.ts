@@ -33,7 +33,8 @@ export const FRAIS_AVANCES_MENU_SEEDS: FraisAvancesMenuSeed[] = [
   },
   {
     libelle: "Frais avancés",
-    description: "Notes de frais soumises et décision / exécution",
+    description:
+      "Consultation des notes soumises ; décision et exécution réservées à ADMIN/TRESOR",
     lien: "/admin/frais-avances",
     niveau: "SIDEBAR",
     roles: ["ADMIN", "PRESID", "SECRET", "TRESOR"],

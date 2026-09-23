@@ -141,8 +141,8 @@ vi.mock("@/lib/frais-avances/storage", async () => {
     }),
     moveFileDurable: vi.fn().mockResolvedValue(undefined),
     unlinkQuiet: vi.fn().mockResolvedValue(undefined),
-    absoluteFromRelative: vi.fn((rel: string) =>
-      `/tmp/amaki-notes-test-root/${rel}`
+    absoluteFromRelative: vi.fn(
+      (rel: string) => `/tmp/amaki-notes-test-root/${rel}`,
     ),
   };
 });
@@ -313,7 +313,7 @@ describe("métier notes-frais (mocks)", () => {
         where: expect.objectContaining({
           statut: { in: ["SOUMISE", "VALIDEE", "REJETEE"] },
         }),
-      })
+      }),
     );
   });
 
@@ -375,14 +375,12 @@ describe("métier notes-frais (mocks)", () => {
   });
 
   it("soumission TX : READY requis, notifs + outbox uniques", async () => {
-    noteFindFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValue({
-        id: "n1",
-        demandeurUserId: "u1",
-        statut: "BROUILLON",
-        version: 2,
-      });
+    noteFindFirst.mockResolvedValueOnce(null).mockResolvedValue({
+      id: "n1",
+      demandeurUserId: "u1",
+      statut: "BROUILLON",
+      version: 2,
+    });
     justifCount.mockResolvedValueOnce(0).mockResolvedValueOnce(1);
     noteUpdateMany.mockResolvedValue({ count: 1 });
     noteFindUnique.mockResolvedValue({
@@ -412,15 +410,38 @@ describe("métier notes-frais (mocks)", () => {
     expect(outboxArg.data.eventKey).toBe("note:n1:submitted");
   });
 
+  it("soumission refuse sans justificatif READY", async () => {
+    noteFindFirst.mockResolvedValueOnce(null).mockResolvedValue({
+      id: "n1",
+      demandeurUserId: "u1",
+      statut: "BROUILLON",
+      version: 1,
+    });
+    justifCount.mockResolvedValueOnce(0).mockResolvedValueOnce(0);
+
+    const res = await submitNoteFrais({
+      userId: "u1",
+      noteId: "n1",
+      idempotencyKey: "idem-key-no-ready",
+      expectedVersion: 1,
+    });
+
+    expect(res.success).toBe(false);
+    if (!res.success) {
+      expect(res.error).toMatch(/pièce jointe prête/i);
+    }
+    expect(noteUpdateMany).not.toHaveBeenCalled();
+    expect(notificationCreateMany).not.toHaveBeenCalled();
+    expect(outboxCreate).not.toHaveBeenCalled();
+  });
+
   it("soumission refuse si PENDING restant", async () => {
-    noteFindFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValue({
-        id: "n1",
-        demandeurUserId: "u1",
-        statut: "BROUILLON",
-        version: 1,
-      });
+    noteFindFirst.mockResolvedValueOnce(null).mockResolvedValue({
+      id: "n1",
+      demandeurUserId: "u1",
+      statut: "BROUILLON",
+      version: 1,
+    });
     justifCount.mockResolvedValueOnce(1);
 
     const res = await submitNoteFrais({
@@ -476,7 +497,7 @@ describe("métier notes-frais (mocks)", () => {
     expect(fileJobCreate).toHaveBeenCalledWith(
       expect.objectContaining({
         data: expect.objectContaining({ operation: "UNLINK" }),
-      })
+      }),
     );
   });
 
@@ -484,24 +505,26 @@ describe("métier notes-frais (mocks)", () => {
     const { readFile } = await import("node:fs/promises");
     const serviceSrc = await readFile(
       "/soft/dev/nextjs/amakifr/lib/services/frais-avances/note-frais-service.ts",
-      "utf8"
+      "utf8",
     );
     const decisionSrc = await readFile(
       "/soft/dev/nextjs/amakifr/lib/services/frais-avances/note-frais-decision-service.ts",
-      "utf8"
+      "utf8",
     );
     const choixSrc = await readFile(
       "/soft/dev/nextjs/amakifr/lib/services/frais-avances/note-frais-choix-reglement-service.ts",
-      "utf8"
+      "utf8",
     );
     // Soumission / service : toujours hors Depense / Avoir / Paiement
     expect(serviceSrc).not.toMatch(/\bDepense\b|\bAvoir\b|PaiementCotisation/);
     // Décision lot 4.0 : Depense charge autorisée ; pas d'exécution trésorerie
     expect(decisionSrc).toMatch(/depense\.create|origine:\s*"FRAIS_AVANCE"/);
-    expect(decisionSrc).not.toMatch(/\bAvoir\b|UtilisationAvoir|PaiementCotisation/);
+    expect(decisionSrc).not.toMatch(
+      /\bAvoir\b|UtilisationAvoir|PaiementCotisation/,
+    );
     // Choix : toujours hors Depense / Avoir / Paiement (accord seul)
     expect(choixSrc).not.toMatch(
-      /\bDepense\b|\bAvoir\b|UtilisationAvoir|PaiementCotisation/
+      /\bDepense\b|\bAvoir\b|UtilisationAvoir|PaiementCotisation/,
     );
   });
 });
