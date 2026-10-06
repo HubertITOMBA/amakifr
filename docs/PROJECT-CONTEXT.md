@@ -215,6 +215,14 @@ Ordre de priorité validé :
 - Ne pas utiliser `/tmp` pour les nouveaux artefacts AMAKI lorsque `/soft/SAS_AMAKIFR` est disponible.
 - Ne jamais y écrire de secrets ou de contenu intégral de `.env`.
 - Cette règle ne change pas à elle seule la configuration des logs runtime PM2/Next.js du VPS.
+- Renvoi du code de confirmation d’inscription : réponse non énumérante (même message que le compte existe ou non), cooldown serveur minimal, et aucun email/code/token dans les logs applicatifs.
+- Confirmation d’email d’inscription (code dépôt, pas encore livré en production) :
+  - vérification liée à `email + code` (plus de lookup par code seul) ;
+  - un seul `VerificationToken` actif par email (contrainte UNIQUE) ;
+  - plafond persistant de 3 erreurs (`failedAttempts` / `lockedAt`) côté DB ;
+  - cooldown de renvoi persistant 60 s basé sur `createdAt` ;
+  - `status` Inactif reste distinct de `emailVerified` (jamais modifié par la vérification) ;
+  - migration dédiée `verification_token_security` à appliquer au déploiement.
 - Pour chaque nouveau chantier :
   1. diagnostiquer ;
   2. produire la preuve ;
@@ -245,6 +253,7 @@ Ordre de priorité validé :
 - **2026-10** : application Android `fr.amaki.app` version `1.0.0` validée en Production Google Play.
 - **2026-10** : priorités suivantes enregistrées : inscription web, authentification mobile, rapports de réunions, rappels financiers et origine des connexions.
 - **2026-10** : déploiement sécurisé aligné sur Notes de frais actifs (gardes `assert_notes_frais_flags_on` + `assert_notes_frais_storage_ready`) — code dépôt à déployer ; baseline production inchangée tant que non livré.
+- **2026-10** : sécurisation persistante du code de confirmation email (unique email, plafond 3 erreurs, cooldown 60 s, vérification email+code) — code dépôt à déployer ; baseline production inchangée tant que non livré.
 
 ---
 

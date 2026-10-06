@@ -51,6 +51,28 @@ export const TwoFactorSchema = z.object({
     })
 });
 
+/**
+ * Vérification email d'inscription : email + code à 6 chiffres.
+ * Distinct de TwoFactorSchema (2FA connexion).
+ */
+export const EmailVerificationSchema = z.object({
+    email: z.string().email({
+        message: "Une adresse e-mail valide est requise",
+    }),
+    code: z
+        .string()
+        .regex(/^\d{6}$/, {
+            message: "Le code doit contenir exactement 6 chiffres",
+        }),
+});
+
+/** Demande de renvoi du code de confirmation d'inscription. */
+export const ResendVerificationSchema = z.object({
+    email: z.string().email({
+        message: "Une adresse e-mail valide est requise",
+    }),
+});
+
 export const NewPasswordSchema = z.object({
     password: z.string().min(6, {
         message: "Un minimum de 6 caractères requis"

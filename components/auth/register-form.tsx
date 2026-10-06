@@ -36,6 +36,7 @@ export const RegisterForm = () => {
     const router = useRouter();
     const [error, setError] = useState<string | undefined>("");
     const [success, setSuccess] = useState<string | undefined>("");
+    const [deliveryFailed, setDeliveryFailed] = useState(false);
     const [isPending, startTransition] = useTransition();
     const [showTwoFactor, setShowTwoFactor] = useState(false);
     const [showConditions, setShowConditions] = useState(false);
@@ -66,9 +67,9 @@ export const RegisterForm = () => {
     };
 
     const onSubmit = (data: z.infer<typeof RegisterSchema>) => {
-        console.log(data);
         setError("");
         setSuccess("");
+        setDeliveryFailed(false);
         startTransition(async () => {
             try {
                 const response = await register(data);
@@ -78,6 +79,13 @@ export const RegisterForm = () => {
                     if (response.error.includes("accepter les conditions")) {
                         focusAcceptConditions();
                     }
+                } else if (response?.deliveryFailed && response?.verificationRequired) {
+                    // Compte créé mais email non livré — ne pas vider le formulaire
+                    setDeliveryFailed(true);
+                    setError(
+                        response.message ||
+                            "Compte créé, mais l'envoi du code a échoué. Demandez un nouveau code depuis la page de vérification.",
+                    );
                 } else if (response?.twoFactor) {
                     form.reset({
                         email: "",
@@ -111,7 +119,7 @@ export const RegisterForm = () => {
                 }
             } catch (error: any) {
                 // Gérer les erreurs de manière plus robuste
-                console.error("Erreur lors de l'inscription:", error);
+                console.error("Erreur lors de l'inscription");
                 
                 // Vérifier si c'est une erreur de redirection Next.js (qui est normale)
                 if (error?.digest?.startsWith('NEXT_REDIRECT') || 
@@ -123,7 +131,7 @@ export const RegisterForm = () => {
                     return;
                 }
                 
-                setError(error?.message || "Une erreur s'est produite lors de l'inscription");
+                setError("Une erreur s'est produite lors de l'inscription");
             }
         })
      };
@@ -315,6 +323,19 @@ export const RegisterForm = () => {
 
                         <FormError message={error}/>
                         <FormSuccess message={success} />
+                        {deliveryFailed && (
+                            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+                                <p className="mb-2 font-medium">
+                                    Compte créé, mais le code n&apos;a pas pu être envoyé.
+                                </p>
+                                <Link
+                                    href="/auth/new-verification"
+                                    className="font-semibold text-blue-600 underline hover:text-blue-800 dark:text-blue-400"
+                                >
+                                    Aller à la page de vérification pour demander un nouveau code
+                                </Link>
+                            </div>
+                        )}
                         
                         <Button
                             disabled={isPending}

@@ -3,6 +3,7 @@
 import { useForm } from "react-hook-form"
 import { useState, useTransition } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
+import Link from "next/link"
 import * as z from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoginSchema } from "@/schemas"
@@ -26,9 +27,14 @@ import { RegisterButton } from "@/components/auth/register-button"
 import { ResetButton } from "@/components/auth/reset-button"
 import { toast } from "react-toastify"
 
+/**
+ * Formulaire de connexion. Gère explicitement verificationRequired / deliveryFailed
+ * pour les comptes non confirmés (lien /auth/new-verification sans email en query).
+ */
 export default function LoginForm() {
   const [error, setError] = useState<string | undefined>("")
   const [success, setSuccess] = useState<string | undefined>("")
+  const [deliveryFailed, setDeliveryFailed] = useState(false)
   const [isPending, startTransition] = useTransition()
   const [showTwoFactor, setShowTwoFactor] = useState(false)
 
@@ -51,6 +57,7 @@ export default function LoginForm() {
   const onSubmit = (data: z.infer<typeof LoginSchema>) => {
     setError("")
     setSuccess("")
+    setDeliveryFailed(false)
     startTransition(async () => {
       try {
         const result = await login(data, null)
@@ -59,6 +66,16 @@ export default function LoginForm() {
           setError(result.error)
           toast.error(result.error, { position: "top-center", autoClose: 5000 })
           form.reset()
+          return
+        }
+
+        if (result?.deliveryFailed && result?.verificationRequired) {
+          // Ne pas vider les champs — l'utilisateur peut réessayer / aller vérifier
+          setDeliveryFailed(true)
+          setError(
+            result.message ||
+              "Votre compte n'est pas encore confirmé. L'envoi du code a échoué. Vous pouvez demander un nouveau code depuis la page de vérification.",
+          )
           return
         }
 
@@ -74,8 +91,8 @@ export default function LoginForm() {
 
           try {
             await updateSession()
-          } catch (sessionError) {
-            console.warn("[login-form] Erreur session:", sessionError)
+          } catch {
+            console.warn("[login-form]", { category: "session_update_error" })
           }
 
           router.refresh()
@@ -88,7 +105,7 @@ export default function LoginForm() {
           }
         }
       } catch (err: unknown) {
-        console.error("Erreur de connexion:", err)
+        console.error("[login-form]", { category: "exception" })
         const errObj = err as {
           digest?: string
           message?: string
@@ -109,8 +126,7 @@ export default function LoginForm() {
           return
         }
         setError(
-          (errObj?.message as string) ||
-            "Une erreur s'est produite lors de la connexion !"
+          "Une erreur s'est produite lors de la connexion !"
         )
       }
     })
@@ -199,6 +215,19 @@ export default function LoginForm() {
 
           <FormError message={error || urlError} />
           <FormSuccess message={success} />
+          {deliveryFailed && (
+            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+              <p className="mb-2 font-medium">
+                Compte non confirmé : l&apos;envoi du code a échoué.
+              </p>
+              <Link
+                href="/auth/new-verification"
+                className="font-semibold text-blue-600 underline hover:text-blue-800 dark:text-blue-400"
+              >
+                Aller à la page de vérification pour demander un nouveau code
+              </Link>
+            </div>
+          )}
           <Button disabled={isPending} type="submit" className="w-full">
             Connexion
           </Button>

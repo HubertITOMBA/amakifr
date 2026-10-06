@@ -99,22 +99,39 @@ export const register = async (
             // Ne pas bloquer l'inscription si l'envoi d'email échoue
         }
        
-        const verificationToken = await generateVerificationToken(normalizedEmail)
-        
-        // Envoyer l'email de vérification (non bloquant)
+        const generation = await generateVerificationToken(normalizedEmail, "initial")
+        if (generation.status !== "created") {
+            console.warn(
+                "[register] génération token de vérification refusée — compte conservé",
+            )
+            return {
+                verificationRequired: true,
+                deliveryFailed: true,
+                message:
+                    "Votre compte a été créé, mais l'envoi du code de confirmation a échoué. Vous pouvez demander un nouveau code depuis la page de vérification.",
+            }
+        }
+
         const emailSent = await sendTwoFactorTokenEmail(
-            verificationToken.email,
-            verificationToken.token,
+            generation.token.email,
+            generation.token.token,
         )
 
         if (!emailSent) {
-            console.warn("[register] L'envoi de l'email de vérification a échoué, mais l'inscription continue");
-            // Ne pas bloquer l'inscription si l'email échoue
+            console.warn(
+                "[register] échec envoi code de vérification (provider) — compte conservé",
+            )
+            return {
+                verificationRequired: true,
+                deliveryFailed: true,
+                message:
+                    "Votre compte a été créé, mais l'envoi du code de confirmation a échoué. Vous pouvez demander un nouveau code depuis la page de vérification.",
+            }
         }
 
         return { 
-            success: emailSent ? "Code OTP envoyé !" : "Inscription réussie (l'envoi de l'email a échoué, veuillez contacter l'administrateur)", 
-            twoFactor: true 
+            success: "Code OTP envoyé !",
+            twoFactor: true,
         }
     } catch (error: any) {
         // Gérer l'erreur de contrainte unique sur le nom

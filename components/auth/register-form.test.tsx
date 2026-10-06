@@ -128,6 +128,32 @@ describe.each([
     expect(payload.name).toBe("Jean Dupont");
   });
 
+  it("échec livraison email : message + lien vérification sans query email", async () => {
+    registerMock.mockResolvedValue({
+      verificationRequired: true,
+      deliveryFailed: true,
+      message:
+        "Votre compte a été créé, mais l'envoi du code de confirmation a échoué.",
+    });
+    const user = userEvent.setup();
+    render(<Component />);
+    await fillRequiredFields(user);
+    await user.click(screen.getByRole("checkbox"));
+    await user.click(screen.getByRole("button", { name: /créer mon compte/i }));
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(/n['']a pas pu être envoyé|envoi du code a échoué/i),
+      ).toBeTruthy();
+    });
+    const link = screen.getByRole("link", {
+      name: /page de vérification/i,
+    });
+    expect(link.getAttribute("href")).toBe("/auth/new-verification");
+    expect(link.getAttribute("href")).not.toMatch(/email=/i);
+    expect(screen.getByDisplayValue("Jean Dupont")).toBeTruthy();
+  });
+
   it("cliquer un lien légal ne coche pas la case et n'appelle pas register", async () => {
     const user = userEvent.setup();
     render(<Component />);

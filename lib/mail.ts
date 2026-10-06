@@ -36,70 +36,65 @@ function cleanUrl(url: string | undefined | null): string | undefined {
  * @returns true si l'email a été envoyé avec succès, false sinon
  */
 export async function sendEmail(options: EmailOptions, throwOnError: boolean = true): Promise<boolean> {
+  const safeCodeCategory = (code: unknown): string | null => {
+    if (typeof code === "number" && Number.isFinite(code)) {
+      return `code_${code}`
+    }
+    if (typeof code === "string") {
+      const known = ["EAUTH", "ESOCKET", "ECONNECTION", "ETIMEDOUT", "EENVELOPE"]
+      if (known.includes(code)) return code
+    }
+    return null
+  }
+
   try {
-    console.log("[sendEmail] Début de l'envoi d'email à:", options.to);
-    console.log("[sendEmail] Sujet:", options.subject);
+    console.log("[sendEmail]", { category: "start" })
     
     const provider = await getEmailProvider();
-    console.log("[sendEmail] Provider obtenu avec succès");
+    console.log("[sendEmail]", { category: "provider_ready" })
     
     const result = await provider.send(options);
-    console.log("[sendEmail] Résultat de l'envoi:", { success: result.success, error: result.error });
     
     if (!result.success) {
-      const errorMessage = result.error?.message || result.error || "Erreur inconnue lors de l'envoi de l'email";
       const errorCode = result.error && typeof result.error === 'object' && 'code' in result.error ? result.error.code : null;
       const responseCode = result.error && typeof result.error === 'object' && 'responseCode' in result.error ? result.error.responseCode : null;
+      const codeCat = safeCodeCategory(errorCode)
+      const responseCat =
+        typeof responseCode === "number" && Number.isFinite(responseCode)
+          ? `response_${responseCode}`
+          : null
+
+      console.error("[sendEmail]", {
+        category: codeCat || responseCat || "provider_error",
+      })
       
-      console.error("[sendEmail] Erreur lors de l'envoi:", {
-        error: result.error,
-        errorMessage,
-        errorCode,
-        responseCode,
-        to: options.to,
-        subject: options.subject,
-      });
-      
-      // Détecter les erreurs d'authentification SMTP (EAUTH, 401, 535)
-      const isAuthError = 
-        errorCode === 'EAUTH' || 
-        errorCode === 401 || 
-        responseCode === 401 || 
-        responseCode === 535 ||
-        (typeof errorMessage === 'string' && (
-          errorMessage.includes('Invalid login') ||
-          errorMessage.includes('Username and Password not accepted') ||
-          errorMessage.includes('BadCredentials')
-        ));
+      const isAuthError =
+        errorCode === "EAUTH" ||
+        errorCode === 401 ||
+        responseCode === 401 ||
+        responseCode === 535
       
       if (isAuthError) {
-        console.error("[sendEmail] EMAIL_AUTH_ERROR: Les credentials du provider email sont invalides. Vérifiez les variables d'environnement SMTP_EMAIL, SMTP_PASSWORD, etc.");
+        console.error("[sendEmail]", { category: "auth_error" })
       }
       
       if (throwOnError) {
-        throw new Error(errorMessage);
+        throw new Error("email_send_failed")
       } else {
-        console.warn("[sendEmail] Erreur non bloquante - l'application continue malgré l'échec de l'envoi d'email");
+        console.warn("[sendEmail]", { category: "non_blocking_failure" })
         return false;
       }
     }
     
-    console.log("[sendEmail] Email envoyé avec succès à:", options.to);
+    console.log("[sendEmail]", { category: "success" })
     return true;
-  } catch (error: any) {
-    // Logger l'erreur complète pour le débogage
-    console.error("[sendEmail] Exception lors de l'envoi d'email:", {
-      message: error?.message,
-      error: error,
-      stack: error?.stack,
-      to: options.to,
-      subject: options.subject,
-    });
+  } catch (error: unknown) {
+    console.error("[sendEmail]", { category: "exception" })
     
     if (throwOnError) {
       throw error;
     } else {
-      console.warn("[sendEmail] Erreur non bloquante - l'application continue malgré l'échec de l'envoi d'email");
+      console.warn("[sendEmail]", { category: "non_blocking_failure" })
       return false;
     }
   }
@@ -345,26 +340,25 @@ export const sendTwoFactorTokenEmail = async(
 ): Promise<boolean> => {
     const content = `
       <div style="text-align: center;">
-        <h1 style="color: #4a90e2; margin-bottom: 12px; margin-top: 0; font-size: 20px;">Authentification à deux facteurs</h1>
-        <p style="color: #666; margin-bottom: 12px; font-size: 14px;">Veuillez copier votre code OTP ci-dessous :</p>
+        <h1 style="color: #4a90e2; margin-bottom: 12px; margin-top: 0; font-size: 20px;">Confirmez votre inscription</h1>
+        <p style="color: #666; margin-bottom: 12px; font-size: 14px;">Veuillez saisir le code ci-dessous pour confirmer votre adresse e-mail :</p>
         <div style="display: inline-block; margin: 12px 0;">
           <div style="background-color: #4a90e2; color: #ffffff; padding: 12px 24px; border-radius: 5px; font-size: 22px; font-weight: bold; letter-spacing: 3px;">
             ${token}
           </div>
         </div>
         <p style="color: #999; font-size: 11px; margin-top: 12px;">
-          Ce code est valide pendant 5 minutes. Ne le partagez avec personne.
+          Ce code est valable pendant une durée limitée. Ne le partagez avec personne.
         </p>
       </div>
     `;
 
-    // Ne pas bloquer l'application si l'envoi d'email échoue (erreurs SMTP, etc.)
     return await sendEmail({
         from: "webmaster@amaki.fr",
         to: email,
-        subject: "Authentification à deux facteurs",
+        subject: "Confirmez votre inscription AMAKI",
         html: wrapEmailContent(content)
-      }, false); // throwOnError = false pour ne pas bloquer
+      }, false);
 }
 
 

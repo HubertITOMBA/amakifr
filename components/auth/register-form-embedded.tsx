@@ -35,6 +35,7 @@ import { RegisterAcceptConditionsField } from "@/components/auth/register-accept
 export const RegisterFormEmbedded = () => {
     const [error, setError] = useState<string | undefined>("");
     const [success, setSuccess] = useState<string | undefined>("");
+    const [deliveryFailed, setDeliveryFailed] = useState(false);
     const [isPending, startTransition] = useTransition();
     const [showTwoFactor, setShowTwoFactor] = useState(false);
     const [showConditions, setShowConditions] = useState(false);
@@ -68,6 +69,7 @@ export const RegisterFormEmbedded = () => {
     const onSubmit = (data: z.infer<typeof RegisterSchema>) => {
         setError("");
         setSuccess("");
+        setDeliveryFailed(false);
         startTransition(() => {
             register(data)
                 .then((response) => {
@@ -76,6 +78,15 @@ export const RegisterFormEmbedded = () => {
                         if (response.error.includes("accepter les conditions")) {
                             focusAcceptConditions();
                         }
+                        return;
+                    }
+
+                    if (response.deliveryFailed && response.verificationRequired) {
+                        setDeliveryFailed(true);
+                        setError(
+                            response.message ||
+                                "Compte créé, mais l'envoi du code a échoué. Demandez un nouveau code depuis la page de vérification.",
+                        );
                         return;
                     }
 
@@ -104,7 +115,7 @@ export const RegisterFormEmbedded = () => {
                         setSuccess(response.success);
                     }
                 })
-                .catch((error) => {
+                .catch(() => {
                     setError("Une erreur s'est produite lors de l'inscription")
                 })
         })
@@ -274,6 +285,19 @@ export const RegisterFormEmbedded = () => {
 
                         <FormError message={error}/>
                         <FormSuccess message={success} />
+                        {deliveryFailed && (
+                            <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900 dark:border-amber-700 dark:bg-amber-950/40 dark:text-amber-100">
+                                <p className="mb-2 font-medium">
+                                    Compte créé, mais le code n&apos;a pas pu être envoyé.
+                                </p>
+                                <Link
+                                    href="/auth/new-verification"
+                                    className="font-semibold text-blue-600 underline hover:text-blue-800 dark:text-blue-400"
+                                >
+                                    Aller à la page de vérification pour demander un nouveau code
+                                </Link>
+                            </div>
+                        )}
                         
                         <Button
                             disabled={isPending}

@@ -2,10 +2,9 @@
 
 import { LoginSchema } from "@/schemas"
 import * as z from "zod"
-import { getUserByEmail } from "."
+import { getUserByEmail } from "@/actions/auth/index"
 import { generateVerificationToken } from "@/lib/token"
 import { sendTwoFactorTokenEmail } from "@/lib/mail"
-import { DEFAULT_LOGIN_REDIRECT } from "@/routes"
 import { AuthError } from "next-auth"
 import { signIn } from "@/auth"
 import { normalizeEmail } from "@/lib/utils"
@@ -39,20 +38,57 @@ export const login = async (
     }
 
     if(!existingUser.emailVerified) {
-        const verificationToken = await generateVerificationToken(existingUser.email)
+        try {
+            const generation = await generateVerificationToken(
+                existingUser.email,
+                "resend",
+            )
 
-        // Envoyer l'email de vérification (non bloquant)
-        const emailSent = await sendTwoFactorTokenEmail(
-            verificationToken.email,
-            verificationToken.token
-        )
+            if (generation.status === "cooldown") {
+                // Ne pas renvoyer d'email ; ne pas prétendre qu'un nouveau code a été envoyé.
+                return {
+                    verificationRequired: true,
+                    twoFactor: true,
+                    success:
+                        "Un code de confirmation a déjà été demandé récemment. Vérifiez votre e-mail ou réessayez dans une minute.",
+                }
+            }
 
-        if (!emailSent) {
-            console.warn("[login] L'envoi de l'email de vérification a échoué, mais la connexion continue");
-            // Ne pas bloquer la connexion si l'email échoue
+            if (generation.status !== "created") {
+                console.warn("[login]", { category: "token_generation_refused" })
+                return {
+                    verificationRequired: true,
+                    deliveryFailed: true,
+                    message:
+                        "Votre compte n'est pas encore confirmé. L'envoi du code a échoué. Vous pouvez demander un nouveau code depuis la page de vérification.",
+                }
+            }
+
+            const emailSent = await sendTwoFactorTokenEmail(
+                generation.token.email,
+                generation.token.token,
+            )
+
+            if (!emailSent) {
+                console.warn("[login]", { category: "provider_error" })
+                return {
+                    verificationRequired: true,
+                    deliveryFailed: true,
+                    message:
+                        "Votre compte n'est pas encore confirmé. L'envoi du code a échoué. Vous pouvez demander un nouveau code depuis la page de vérification.",
+                }
+            }
+
+            return { twoFactor: true, success: "Code OTP envoyé !" }
+        } catch {
+            console.error("[login]", { category: "verification_exception" })
+            return {
+                verificationRequired: true,
+                deliveryFailed: true,
+                message:
+                    "Votre compte n'est pas encore confirmé. L'envoi du code a échoué. Vous pouvez demander un nouveau code depuis la page de vérification.",
+            }
         }
-
-        return { twoFactor: true, success: emailSent ? "Code OTP envoyé !" : "Code OTP généré (l'envoi de l'email a échoué, veuillez contacter l'administrateur)" }
     }
 
     try {

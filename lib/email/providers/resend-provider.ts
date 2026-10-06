@@ -15,7 +15,7 @@ export class ResendProvider implements EmailProviderInterface {
     this.resend = new Resend(apiKey);
   }
 
-  async send(options: EmailOptions): Promise<{ success: boolean; error?: any }> {
+  async send(options: EmailOptions): Promise<{ success: boolean; error?: unknown }> {
     try {
       const bcc = options.bcc
         ? (Array.isArray(options.bcc) ? options.bcc : [options.bcc]).filter(Boolean)
@@ -34,15 +34,15 @@ export class ResendProvider implements EmailProviderInterface {
       });
 
       if (error) {
-        console.error("RESEND_ERROR", error);
+        // Catégorie bornée uniquement — jamais message/objet provider brut
+        console.error("RESEND_ERROR", { category: "provider_error" });
         return { success: false, error };
       }
 
       return { success: true };
-    } catch (error) {
-      console.error("RESEND_ERROR", error);
-      return { success: false, error };
+    } catch {
+      console.error("RESEND_ERROR", { category: "exception" });
+      return { success: false, error: { category: "exception" } };
     }
   }
 }
-
