@@ -1,0 +1,15 @@
+---
+description: Lire le contexte permanent AMAKI avant toute opération
+alwaysApply: true
+---
+
+# Contexte obligatoire AMAKI
+
+Avant toute analyse, modification, test, commit, déploiement ou opération de production concernant AMAKI :
+
+1. Lire intégralement `docs/PROJECT-CONTEXT.md`.
+2. Respecter les décisions et procédures qui y sont marquées comme validées.
+3. Ne pas recommencer un audit déjà conclu sans anomalie nouvelle ou demande explicite.
+4. Si le document contredit le dépôt ou l’état observé, arrêter et signaler précisément la contradiction.
+5. Après une nouvelle décision permanente validée, proposer une mise à jour ciblée de `docs/PROJECT-CONTEXT.md`.
+6. Ne jamais ajouter de secret ou de donnée personnelle dans ce document.

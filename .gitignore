@@ -58,6 +58,7 @@ data/notes-frais/
 !docs/interview.md
 !docs/interview_Mastor.md
 !docs/frais-avances/**/*.md
+!docs/PROJECT-CONTEXT.md
 .cursorrules
 
 # vercel
