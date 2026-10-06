@@ -11,7 +11,7 @@
 #   6. git switch --detach EXPECTED_GIT_SHA (sans -f)
 #   7. npm ci
 #   8. prisma generate
-#   9. build (flags off)
+#   9. build (flags Notes de frais actifs)
 #  10. prisma migrate deploy
 #  11. contrôles SQL post-migration
 #  12. seeds si ALLOW_SEEDS=1 (STOP si échec)
@@ -158,7 +158,8 @@ assert_smoke_url_shape "$SMOKE_URL" || fail "SMOKE_URL invalide"
 assert_internal_smoke_url_shape "$INTERNAL_SMOKE_URL" || fail "URL smoke interne invalide"
 assert_pm2_process_exists "$PM2_APP_NAME" || fail "Préflight PM2"
 assert_pm2_cwd "$PM2_APP_NAME" "/sites/amakifr" || fail "Préflight cwd PM2"
-assert_notes_frais_flags_off "$PM2_APP_NAME" || fail "Préflight flags"
+assert_notes_frais_flags_on "$PM2_APP_NAME" || fail "Préflight flags Notes de frais actifs"
+assert_notes_frais_storage_ready || fail "Préflight stockage Notes de frais"
 AVAIL_KB="$(df -Pk . | awk 'NR==2{print $4}')"
 [[ "${AVAIL_KB:-0}" -gt 1048576 ]] || fail "Espace disque insuffisant (<1 Go libre)"
 mkdir -p "$BACKUP_DIR"
@@ -216,8 +217,8 @@ npm ci || fail "npm ci"
 step "8/15 — prisma generate"
 npx prisma generate || fail "prisma generate"
 
-step "9/15 — build (flags off)"
-assert_notes_frais_flags_off "$PM2_APP_NAME" || fail "flags avant build"
+step "9/15 — build (flags Notes de frais actifs)"
+assert_notes_frais_flags_on "$PM2_APP_NAME" || fail "flags actifs avant build"
 # nginx maintient le 503 public ; le build et PM2 doivent servir normalement
 # en interne pour pouvoir être vérifiés avant d'ouvrir nginx.
 export MAINTENANCE_MODE=false
@@ -281,7 +282,7 @@ fi
 
 # ─── 13. Restart + pm2 save bloquant ─────────────────────────────────────────
 step "13/15 — Restart PM2 + pm2 save (bloquant)"
-assert_notes_frais_flags_off "$PM2_APP_NAME" || fail "flags avant restart"
+assert_notes_frais_flags_on "$PM2_APP_NAME" || fail "flags actifs avant restart"
 MAINTENANCE_MODE=false pm2 restart "$PM2_APP_NAME" --update-env || fail "pm2 restart"
 PM2_RESTARTED=1
 PM2_STOPPED=0
@@ -293,7 +294,7 @@ fi
 step "14/15 — Smoke interne sous maintenance — STOP si échec"
 assert_smoke_url_shape "$SMOKE_URL" || fail_after_restart "SMOKE_URL invalide après restart"
 assert_internal_smoke_url_shape "$INTERNAL_SMOKE_URL" || fail_after_restart "URL interne invalide après restart"
-assert_notes_frais_flags_off "$PM2_APP_NAME" || fail_after_restart "flags après restart"
+assert_notes_frais_flags_on "$PM2_APP_NAME" || fail_after_restart "flags actifs après restart (PM2)"
 sleep 2
 if ! command -v curl >/dev/null 2>&1; then
   fail_after_restart "curl introuvable pour smoke"

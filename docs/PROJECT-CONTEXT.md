@@ -107,6 +107,9 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - Déploiement sécurisé : `scripts/deploy-production-safe.sh`.
 - Gardes : `scripts/lib/deploy-guards.sh`.
 - Tests des gardes : `scripts/tests/deploy-guards.test.sh`.
+- Le déploiement sécurisé de production **exige et préserve** les deux flags Notes de frais actifs (`NOTES_FRAIS_ENABLED=true` et `NEXT_PUBLIC_NOTES_FRAIS_ENABLED=true`) en shell, fichiers env applicables et PM2 — contrôles au préflight, avant build, avant restart et après restart.
+- Le préflight refuse un stockage privé Notes de frais absent ou invalide (`NOTES_FRAIS_STORAGE_ROOT=/sites/amakifr-data/notes-frais`, répertoires `tmp`/`notes`/`archive`, pas de symlink, accès lecture/écriture/traversée).
+- Aucun contournement de ces gardes n’est autorisé ; il est interdit de désactiver temporairement le module pour déployer.
 - Une restauration en production exige une décision humaine et la double confirmation prévue par les gardes.
 - Les bases de rehearsal doivent respecter le préfixe :
   `amakifr_migration_rehearsal_4x_`.
@@ -207,6 +210,11 @@ Ordre de priorité validé :
   - contradiction avec le code ou la production ;
   - changement de dépendance, infrastructure ou exigence ;
   - demande explicite de l’utilisateur.
+- Sur le poste de développement AMAKI, les captures de sortie, rapports de tests, diffs de revue et journaux opérationnels générés pendant le travail doivent être écrits sous `/soft/SAS_AMAKIFR`.
+- Ne pas les créer dans le dépôt.
+- Ne pas utiliser `/tmp` pour les nouveaux artefacts AMAKI lorsque `/soft/SAS_AMAKIFR` est disponible.
+- Ne jamais y écrire de secrets ou de contenu intégral de `.env`.
+- Cette règle ne change pas à elle seule la configuration des logs runtime PM2/Next.js du VPS.
 - Pour chaque nouveau chantier :
   1. diagnostiquer ;
   2. produire la preuve ;
@@ -236,6 +244,7 @@ Ordre de priorité validé :
 - **2026-09** : rôles Notes de frais confirmés ; justificatif obligatoire à la soumission.
 - **2026-10** : application Android `fr.amaki.app` version `1.0.0` validée en Production Google Play.
 - **2026-10** : priorités suivantes enregistrées : inscription web, authentification mobile, rapports de réunions, rappels financiers et origine des connexions.
+- **2026-10** : déploiement sécurisé aligné sur Notes de frais actifs (gardes `assert_notes_frais_flags_on` + `assert_notes_frais_storage_ready`) — code dépôt à déployer ; baseline production inchangée tant que non livré.
 
 ---
 

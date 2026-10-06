@@ -124,6 +124,192 @@ assert_fail "jlist PM2 illisible" assert_notes_frais_flags_off amakifr
 unset MOCK_PM2_CASE
 pop_path
 
+# --- flags actifs (module Notes de frais en production) ---
+# Jamais le vrai .env de production : uniquement $TMP.
+FLAGS_ON_TMP="$TMP/flags-on"
+mkdir -p "$FLAGS_ON_TMP"
+pushd_quiet "$FLAGS_ON_TMP"
+rm -f .env .env.local .env.production .env.production.local
+unset NOTES_FRAIS_ENABLED NEXT_PUBLIC_NOTES_FRAIS_ENABLED || true
+
+export NOTES_FRAIS_ENABLED=true
+export NEXT_PUBLIC_NOTES_FRAIS_ENABLED=true
+printf '%s\n' \
+  'NOTES_FRAIS_ENABLED=true' \
+  'NEXT_PUBLIC_NOTES_FRAIS_ENABLED=true' > .env
+assert_ok "flags_on shell true/true + .env" assert_notes_frais_flags_on
+
+unset NEXT_PUBLIC_NOTES_FRAIS_ENABLED || true
+assert_fail "flags_on NEXT_PUBLIC shell absent" assert_notes_frais_flags_on
+export NEXT_PUBLIC_NOTES_FRAIS_ENABLED=true
+
+export NOTES_FRAIS_ENABLED=false
+assert_fail "flags_on shell false" assert_notes_frais_flags_on
+export NOTES_FRAIS_ENABLED=TRUE
+assert_fail "flags_on shell TRUE (casse)" assert_notes_frais_flags_on
+export NOTES_FRAIS_ENABLED=" true "
+assert_fail "flags_on shell ambigu" assert_notes_frais_flags_on
+export NOTES_FRAIS_ENABLED=true
+
+rm -f .env
+assert_fail "flags_on .env absent" assert_notes_frais_flags_on
+printf '%s\n' 'NEXT_PUBLIC_NOTES_FRAIS_ENABLED=true' > .env
+assert_fail "flags_on clé NOTES absente dans .env" assert_notes_frais_flags_on
+printf '%s\n' \
+  'NOTES_FRAIS_ENABLED=true' \
+  'NOTES_FRAIS_ENABLED=true' \
+  'NEXT_PUBLIC_NOTES_FRAIS_ENABLED=true' > .env
+assert_fail "flags_on doublon .env" assert_notes_frais_flags_on
+printf '%s\n' \
+  'NOTES_FRAIS_ENABLED=true' \
+  'NEXT_PUBLIC_NOTES_FRAIS_ENABLED=true' > .env
+
+printf '%s\n' 'NOTES_FRAIS_ENABLED=false' > .env.local
+assert_fail "flags_on surcharge .env.local false" assert_notes_frais_flags_on
+rm -f .env.local
+printf '%s\n' 'NOTES_FRAIS_ENABLED=true' > .env.local
+assert_ok "flags_on surcharge .env.local true" assert_notes_frais_flags_on
+rm -f .env.local
+
+printf '%s\n' 'NEXT_PUBLIC_NOTES_FRAIS_ENABLED=false' > .env.production
+assert_fail "flags_on surcharge .env.production false" assert_notes_frais_flags_on
+rm -f .env.production
+
+printf '%s\n' 'NOTES_FRAIS_ENABLED=false' > .env.production.local
+assert_fail "flags_on surcharge .env.production.local false" assert_notes_frais_flags_on
+rm -f .env.production.local
+
+printf '%s\n' \
+  'NOTES_FRAIS_ENABLED=true' \
+  'NEXT_PUBLIC_NOTES_FRAIS_ENABLED=true' > .env.production.local
+assert_ok "flags_on surcharge .env.production.local true/true" assert_notes_frais_flags_on
+rm -f .env.production.local
+
+printf '%s\n' \
+  'NOTES_FRAIS_ENABLED=true' \
+  'NOTES_FRAIS_ENABLED=true' > .env.local
+assert_fail "flags_on doublon surcharge .env.local" assert_notes_frais_flags_on
+rm -f .env.local
+popd_quiet
+
+mkdir -p "$TMP/bin-pm2-flags-on"
+cat > "$TMP/bin-pm2-flags-on/pm2" <<'EOF'
+#!/bin/bash
+if [[ "$1" == "jlist" ]]; then
+  case "${MOCK_PM2_ON_CASE:-both_true}" in
+    both_true)
+      echo '[{"name":"amakifr","pm_id":0,"pm2_env":{"env":{"NOTES_FRAIS_ENABLED":"true","NEXT_PUBLIC_NOTES_FRAIS_ENABLED":"true"}}}]'
+      ;;
+    one_false)
+      echo '[{"name":"amakifr","pm_id":0,"pm2_env":{"env":{"NOTES_FRAIS_ENABLED":"true","NEXT_PUBLIC_NOTES_FRAIS_ENABLED":"false"}}}]'
+      ;;
+    missing_key)
+      echo '[{"name":"amakifr","pm_id":0,"pm2_env":{"env":{"NOTES_FRAIS_ENABLED":"true"}}}]'
+      ;;
+    missing_app)
+      echo '[{"name":"other","pm_id":0,"pm2_env":{}}]'
+      ;;
+    invalid)
+      echo 'not-json'
+      ;;
+  esac
+  exit 0
+fi
+exit 0
+EOF
+chmod +x "$TMP/bin-pm2-flags-on/pm2"
+pushd_quiet "$FLAGS_ON_TMP"
+push_path "$TMP/bin-pm2-flags-on"
+export NOTES_FRAIS_ENABLED=true
+export NEXT_PUBLIC_NOTES_FRAIS_ENABLED=true
+printf '%s\n' \
+  'NOTES_FRAIS_ENABLED=true' \
+  'NEXT_PUBLIC_NOTES_FRAIS_ENABLED=true' > .env
+export MOCK_PM2_ON_CASE=both_true
+assert_ok "flags_on PM2 true/true" assert_notes_frais_flags_on amakifr
+export MOCK_PM2_ON_CASE=one_false
+assert_fail "flags_on PM2 false" assert_notes_frais_flags_on amakifr
+export MOCK_PM2_ON_CASE=missing_key
+assert_fail "flags_on PM2 clé absente" assert_notes_frais_flags_on amakifr
+export MOCK_PM2_ON_CASE=missing_app
+assert_fail "flags_on application PM2 absente" assert_notes_frais_flags_on amakifr
+export MOCK_PM2_ON_CASE=invalid
+assert_fail "flags_on jlist PM2 illisible" assert_notes_frais_flags_on amakifr
+unset MOCK_PM2_ON_CASE
+pop_path
+popd_quiet
+unset NOTES_FRAIS_ENABLED NEXT_PUBLIC_NOTES_FRAIS_ENABLED || true
+
+# --- stockage Notes de frais (racine paramétrable, jamais /sites réel) ---
+STORAGE_ROOT="$TMP/notes-frais-storage"
+rm -rf "$STORAGE_ROOT"
+export NOTES_FRAIS_STORAGE_ROOT="$STORAGE_ROOT"
+assert_fail "storage racine absente" assert_notes_frais_storage_ready "$STORAGE_ROOT"
+
+mkdir -p "$STORAGE_ROOT"
+chmod 700 "$STORAGE_ROOT"
+assert_fail "storage sous-répertoires absents" assert_notes_frais_storage_ready "$STORAGE_ROOT"
+
+mkdir -p "$STORAGE_ROOT/tmp" "$STORAGE_ROOT/notes" "$STORAGE_ROOT/archive"
+chmod 700 "$STORAGE_ROOT" "$STORAGE_ROOT/tmp" "$STORAGE_ROOT/notes" "$STORAGE_ROOT/archive"
+assert_ok "storage racine valide (test)" assert_notes_frais_storage_ready "$STORAGE_ROOT"
+
+export NOTES_FRAIS_STORAGE_ROOT="/tmp/wrong-notes-frais"
+assert_fail "storage chemin shell différent" assert_notes_frais_storage_ready "$STORAGE_ROOT"
+export NOTES_FRAIS_STORAGE_ROOT="$STORAGE_ROOT"
+
+rm -rf "$STORAGE_ROOT/archive"
+assert_fail "storage archive manquant" assert_notes_frais_storage_ready "$STORAGE_ROOT"
+mkdir -p "$STORAGE_ROOT/archive"
+chmod 700 "$STORAGE_ROOT/archive"
+
+SYMLINK_ROOT="$TMP/notes-frais-symlink"
+rm -rf "$SYMLINK_ROOT"
+ln -s "$STORAGE_ROOT" "$SYMLINK_ROOT"
+export NOTES_FRAIS_STORAGE_ROOT="$SYMLINK_ROOT"
+assert_fail "storage symlink refusé" assert_notes_frais_storage_ready "$SYMLINK_ROOT"
+export NOTES_FRAIS_STORAGE_ROOT="$STORAGE_ROOT"
+
+chmod 755 "$STORAGE_ROOT"
+assert_fail "storage racine mode 755 refusée" assert_notes_frais_storage_ready "$STORAGE_ROOT"
+chmod 700 "$STORAGE_ROOT"
+chmod 755 "$STORAGE_ROOT/notes"
+assert_fail "storage sous-répertoire mode 755 refusé" assert_notes_frais_storage_ready "$STORAGE_ROOT"
+chmod 700 "$STORAGE_ROOT/notes"
+assert_ok "storage retour mode 700 accepté" assert_notes_frais_storage_ready "$STORAGE_ROOT"
+
+# Accessibilité : retirer le droit d'écriture si possible (pas root).
+if [[ "$(id -u)" -ne 0 ]]; then
+  chmod a-w "$STORAGE_ROOT/tmp"
+  assert_fail "storage sous-répertoire non accessible en écriture" \
+    assert_notes_frais_storage_ready "$STORAGE_ROOT"
+  chmod 700 "$STORAGE_ROOT/tmp"
+fi
+unset NOTES_FRAIS_STORAGE_ROOT || true
+
+# --- script deploy : flags actifs + stockage avant maintenance ---
+assert_ok "deploy sans flags_off" bash -c '! grep -q assert_notes_frais_flags_off "'"$DEPLOY_SCRIPT"'"'
+assert_ok "deploy flags_on aux 4 emplacements" bash -c '
+  n=$(grep -c assert_notes_frais_flags_on "'"$DEPLOY_SCRIPT"'")
+  [[ "$n" -eq 4 ]]
+'
+assert_ok "deploy stockage avant maintenance" bash -c '
+  s=$(grep -n assert_notes_frais_storage_ready "'"$DEPLOY_SCRIPT"'" | head -1 | cut -d: -f1)
+  # Première activation maintenance du flux deploy (étape 3/15), pas fail_after_release
+  m=$(grep -n "step \"3/15 — Maintenance ON" "'"$DEPLOY_SCRIPT"'" | head -1 | cut -d: -f1)
+  [[ -n "$s" && -n "$m" && "$s" -lt "$m" ]]
+'
+assert_ok "deploy build/restart/smoke flags actifs" bash -c '
+  grep -q "flags actifs avant build" "'"$DEPLOY_SCRIPT"'" && \
+  grep -q "flags actifs avant restart" "'"$DEPLOY_SCRIPT"'" && \
+  grep -q "flags actifs après restart" "'"$DEPLOY_SCRIPT"'" && \
+  grep -q "build (flags Notes de frais actifs)" "'"$DEPLOY_SCRIPT"'"
+'
+assert_ok "deploy sans contournement flags_on" bash -c '
+  ! grep -E "assert_notes_frais_flags_on.*\|\|[[:space:]]*true" "'"$DEPLOY_SCRIPT"'" && \
+  ! grep -E "SKIP_NOTES_FRAIS|BYPASS_NOTES_FRAIS|NOTES_FRAIS_SKIP" "'"$DEPLOY_SCRIPT"'"
+'
+
 # Mock PM2 cwd / stopped
 mkdir -p "$TMP/bin2"
 cat > "$TMP/bin2/pm2" <<'EOF'

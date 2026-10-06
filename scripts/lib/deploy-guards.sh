@@ -4,7 +4,7 @@
 
 # shellcheck disable=SC2034
 
-DEPLOY_GUARDS_VERSION=2
+DEPLOY_GUARDS_VERSION=3
 
 # Checksum historique de la ligne orpheline (référence documentaire uniquement).
 # Le dossier migration.sql correspondant NE DOIT PAS être présent dans le dépôt.
@@ -130,6 +130,9 @@ for p in data:
 # Flags NOTES_FRAIS
 # ---------------------------------------------------------------------------
 
+# Racine de stockage privée attendue en production (valeur non secrète).
+NOTES_FRAIS_STORAGE_ROOT_EXPECTED_DEFAULT="/sites/amakifr-data/notes-frais"
+
 # Lit une clé KEY=value dans un fichier env sans echo des autres clés.
 # Affiche uniquement : ABSENT | EMPTY | true | false | OTHER_NON_TRUE
 read_env_flag_status() {
@@ -162,7 +165,25 @@ read_env_flag_status() {
   fi
 }
 
+# Nombre d'occurrences d'une clé KEY= dans un fichier env (0 si absent).
+# N'affiche jamais les valeurs.
+count_env_key_occurrences() {
+  local file="$1" key="$2"
+  local count
+  if [[ ! -f "$file" ]]; then
+    echo 0
+    return 0
+  fi
+  count="$(grep -cE "^[[:space:]]*${key}=" "$file" 2>/dev/null || true)"
+  if [[ -z "$count" ]]; then
+    echo 0
+  else
+    echo "$count"
+  fi
+}
+
 # STOP si NOTES_FRAIS_ENABLED ou NEXT_PUBLIC_NOTES_FRAIS_ENABLED == true
+# Conservée pour usages/tests historiques (module désactivé).
 assert_notes_frais_flags_off() {
   local pm2_name="${1:-}"
   local f status key
@@ -210,6 +231,195 @@ for key in ("NOTES_FRAIS_ENABLED", "NEXT_PUBLIC_NOTES_FRAIS_ENABLED"):
       fi
     done
   fi
+  return 0
+}
+
+# Exige les deux flags Notes de frais exactement à true (shell, .env, surcharges, PM2).
+# N'affiche jamais le contenu général des fichiers env ni de secrets.
+# Usage: assert_notes_frais_flags_on [pm2_app_name]
+assert_notes_frais_flags_on() {
+  local pm2_name="${1:-}"
+  local key f status count
+  local -a overlay_files=(.env.local .env.production .env.production.local)
+
+  if [[ "${NOTES_FRAIS_ENABLED:-}" != "true" ]]; then
+    fail_guard "shell NOTES_FRAIS_ENABLED doit être exactement true"
+    return 1
+  fi
+  if [[ "${NEXT_PUBLIC_NOTES_FRAIS_ENABLED:-}" != "true" ]]; then
+    fail_guard "shell NEXT_PUBLIC_NOTES_FRAIS_ENABLED doit être exactement true"
+    return 1
+  fi
+
+  if [[ ! -f .env ]]; then
+    fail_guard ".env absent — flags Notes de frais requis"
+    return 1
+  fi
+
+  for key in NOTES_FRAIS_ENABLED NEXT_PUBLIC_NOTES_FRAIS_ENABLED; do
+    count="$(count_env_key_occurrences .env "$key")"
+    if [[ "$count" -eq 0 ]]; then
+      fail_guard ".env : $key absent"
+      return 1
+    fi
+    if [[ "$count" -ne 1 ]]; then
+      fail_guard ".env : $key en doublon ($count occurrences)"
+      return 1
+    fi
+    status="$(read_env_flag_status .env "$key")"
+    if [[ "$status" != "true" ]]; then
+      fail_guard ".env : $key doit valoir exactement true"
+      return 1
+    fi
+  done
+
+  for f in "${overlay_files[@]}"; do
+    [[ -f "$f" ]] || continue
+    for key in NOTES_FRAIS_ENABLED NEXT_PUBLIC_NOTES_FRAIS_ENABLED; do
+      count="$(count_env_key_occurrences "$f" "$key")"
+      if [[ "$count" -eq 0 ]]; then
+        continue
+      fi
+      if [[ "$count" -ne 1 ]]; then
+        fail_guard "$f : $key en doublon ($count occurrences)"
+        return 1
+      fi
+      status="$(read_env_flag_status "$f" "$key")"
+      if [[ "$status" != "true" ]]; then
+        fail_guard "$f : $key présent mais pas exactement true"
+        return 1
+      fi
+    done
+  done
+
+  if [[ -n "$pm2_name" ]]; then
+    if ! command -v pm2 >/dev/null 2>&1; then
+      fail_guard "pm2 introuvable pour vérifier les flags de '$pm2_name'"
+      return 1
+    fi
+    local dump
+    if ! dump="$(pm2 jlist 2>/dev/null | python3 -c '
+import json, sys
+
+name = sys.argv[1]
+data = json.load(sys.stdin)
+app = next((p for p in data if p.get("name") == name), None)
+if app is None:
+    raise SystemExit(2)
+pm2_env = app.get("pm2_env") or {}
+nested = pm2_env.get("env") or {}
+for key in ("NOTES_FRAIS_ENABLED", "NEXT_PUBLIC_NOTES_FRAIS_ENABLED"):
+    value = nested.get(key, pm2_env.get(key))
+    if value is None:
+        raise SystemExit(3)
+    text = str(value).strip()
+    if text != "true":
+        raise SystemExit(4)
+    print(f"{key}=true")
+' "$pm2_name")"; then
+      fail_guard "environnement PM2 '$pm2_name' : flags Notes de frais absents, faux ou illisibles"
+      return 1
+    fi
+    for key in NOTES_FRAIS_ENABLED NEXT_PUBLIC_NOTES_FRAIS_ENABLED; do
+      if ! echo "$dump" | grep -E "^${key}=true$" >/dev/null 2>&1; then
+        fail_guard "PM2 $pm2_name : $key doit être exactement true"
+        return 1
+      fi
+    done
+  fi
+  return 0
+}
+
+# Vérifie le stockage privé Notes de frais (lecture seule — aucune création).
+# Usage: assert_notes_frais_storage_ready [expected_root]
+# expected_root par défaut : /sites/amakifr-data/notes-frais
+# La variable NOTES_FRAIS_STORAGE_ROOT doit égaler exactement expected_root.
+assert_notes_frais_storage_ready() {
+  local expected="${1:-$NOTES_FRAIS_STORAGE_ROOT_EXPECTED_DEFAULT}"
+  local actual="${NOTES_FRAIS_STORAGE_ROOT:-}"
+  local sub subdir_path canonical_actual canonical_expected uid mode
+  local -a required_subs=(tmp notes archive)
+
+  if [[ -z "$actual" ]]; then
+    fail_guard "NOTES_FRAIS_STORAGE_ROOT absent"
+    return 1
+  fi
+  if [[ "$actual" != "$expected" ]]; then
+    fail_guard "NOTES_FRAIS_STORAGE_ROOT ne correspond pas à la racine attendue"
+    return 1
+  fi
+  if [[ "$actual" != /* ]]; then
+    fail_guard "NOTES_FRAIS_STORAGE_ROOT doit être un chemin absolu"
+    return 1
+  fi
+  if [[ ! -e "$actual" ]]; then
+    fail_guard "stockage Notes de frais inexistant"
+    return 1
+  fi
+  if [[ -L "$actual" ]]; then
+    fail_guard "stockage Notes de frais ne doit pas être un lien symbolique"
+    return 1
+  fi
+  if [[ ! -d "$actual" ]]; then
+    fail_guard "stockage Notes de frais n'est pas un répertoire"
+    return 1
+  fi
+
+  canonical_actual="$(realpath "$actual" 2>/dev/null || true)"
+  canonical_expected="$(realpath "$expected" 2>/dev/null || true)"
+  if [[ -z "$canonical_actual" || -z "$canonical_expected" ]]; then
+    fail_guard "impossible de résoudre le chemin canonique du stockage"
+    return 1
+  fi
+  if [[ "$canonical_actual" != "$canonical_expected" ]]; then
+    fail_guard "chemin canonique du stockage invalide"
+    return 1
+  fi
+
+  if [[ ! -r "$actual" || ! -w "$actual" || ! -x "$actual" ]]; then
+    fail_guard "stockage Notes de frais inaccessible (lecture/écriture/traversée)"
+    return 1
+  fi
+
+  uid="$(id -u)"
+  if [[ "$(stat -c '%u' "$actual" 2>/dev/null || true)" != "$uid" ]]; then
+    fail_guard "propriétaire du stockage Notes de frais incorrect pour l'utilisateur de déploiement"
+    return 1
+  fi
+  mode="$(stat -c '%a' "$actual" 2>/dev/null || true)"
+  if [[ "$mode" != "700" ]]; then
+    fail_guard "mode stockage Notes de frais invalide (attendu 700)"
+    return 1
+  fi
+
+  for sub in "${required_subs[@]}"; do
+    subdir_path="$actual/$sub"
+    if [[ ! -e "$subdir_path" ]]; then
+      fail_guard "sous-répertoire stockage manquant: $sub"
+      return 1
+    fi
+    if [[ -L "$subdir_path" ]]; then
+      fail_guard "sous-répertoire stockage ne doit pas être un lien symbolique: $sub"
+      return 1
+    fi
+    if [[ ! -d "$subdir_path" ]]; then
+      fail_guard "sous-répertoire stockage invalide: $sub"
+      return 1
+    fi
+    if [[ ! -r "$subdir_path" || ! -w "$subdir_path" || ! -x "$subdir_path" ]]; then
+      fail_guard "sous-répertoire stockage inaccessible: $sub"
+      return 1
+    fi
+    if [[ "$(stat -c '%u' "$subdir_path" 2>/dev/null || true)" != "$uid" ]]; then
+      fail_guard "propriétaire incorrect pour le sous-répertoire: $sub"
+      return 1
+    fi
+    mode="$(stat -c '%a' "$subdir_path" 2>/dev/null || true)"
+    if [[ "$mode" != "700" ]]; then
+      fail_guard "mode sous-répertoire stockage invalide (attendu 700): $sub"
+      return 1
+    fi
+  done
   return 0
 }
 
