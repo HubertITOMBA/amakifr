@@ -13,12 +13,24 @@ import { normalizeEmail } from "@/lib/utils"
 export const register = async (
     values: z.infer<typeof RegisterSchema>
 ) => {
+    // Validation complète (dont acceptConditions === true) avant bcrypt / DB
     const validatedFields = RegisterSchema.safeParse(values)
 
     if(!validatedFields.success) {
+        const acceptIssue = validatedFields.error.issues.find(
+            (issue) => issue.path[0] === "acceptConditions",
+        )
+        if (acceptIssue) {
+            return {
+                error:
+                    acceptIssue.message ||
+                    "Vous devez accepter les conditions pour créer votre compte.",
+            }
+        }
         return { error: "Informations de connexion invalides !" }
     }
 
+    // acceptConditions validé mais non persisté
     const { email, password, name, anneePromotion, pays, ville } = validatedFields.data
     
     // Normaliser l'email en minuscules pour éviter les doublons case-insensitive

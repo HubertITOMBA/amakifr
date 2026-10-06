@@ -25,6 +25,17 @@ export const RegisterSchema = z.object({
     anneePromotion: z.string().optional(), // Année de promotion (ex: "2010" ou "Je ne suis pas ancien élève")
     pays: z.string().optional(), // Pays de résidence
     ville: z.string().optional(), // Ville de résidence
+    acceptConditions: z
+        .boolean({
+            required_error:
+                "Vous devez accepter les conditions pour créer votre compte.",
+            invalid_type_error:
+                "Vous devez accepter les conditions pour créer votre compte.",
+        })
+        .refine((value) => value === true, {
+            message:
+                "Vous devez accepter les conditions pour créer votre compte.",
+        }),
 }) 
 
 export const ResetSchema = z.object({

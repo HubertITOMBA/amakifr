@@ -26,10 +26,10 @@ import { register } from "@/actions/auth/register";
 import { Conditions } from "@/components/conditions";
 import { StatuAmaki } from "@/components/statuamaki";
 import { CheckCircle, FileText, Shield, Info } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { CountryAutocomplete } from "@/components/forms/country-autocomplete";
 import { CityAutocomplete } from "@/components/forms/city-autocomplete";
 import { Social } from "@/components/auth/social";
+import { RegisterAcceptConditionsField } from "@/components/auth/register-accept-conditions-field";
 
 
 export const RegisterFormEmbedded = () => {
@@ -39,7 +39,6 @@ export const RegisterFormEmbedded = () => {
     const [showTwoFactor, setShowTwoFactor] = useState(false);
     const [showConditions, setShowConditions] = useState(false);
     const [showStatut, setShowStatut] = useState(false);
-    const [acceptConditions, setAcceptConditions] = useState(false);
     const [countryCode, setCountryCode] = useState<string>("");
     const router = useRouter();
 
@@ -52,28 +51,57 @@ export const RegisterFormEmbedded = () => {
             anneePromotion: "",
             pays: "",
             ville: "",
+            acceptConditions: false,
         },
     });
 
-    const onSubmit = (data: z.infer<typeof RegisterSchema>) => {
-        if (!acceptConditions) {
-            setError("Vous devez accepter les conditions d'utilisation pour créer un compte");
-            return;
-        }
+    const focusAcceptConditions = () => {
+        form.setFocus("acceptConditions");
+    };
 
+    const onInvalid = (errors: Record<string, unknown>) => {
+        if (errors.acceptConditions) {
+            focusAcceptConditions();
+        }
+    };
+
+    const onSubmit = (data: z.infer<typeof RegisterSchema>) => {
         setError("");
         setSuccess("");
         startTransition(() => {
             register(data)
                 .then((response) => {
                     if (response.error) {
-                        form.reset()
                         setError(response.error)
+                        if (response.error.includes("accepter les conditions")) {
+                            focusAcceptConditions();
+                        }
+                        return;
                     }
 
                     if(response.twoFactor) {
+                        form.reset({
+                            email: "",
+                            password: "",
+                            name: "",
+                            anneePromotion: "",
+                            pays: "",
+                            ville: "",
+                            acceptConditions: false,
+                        });
                         setShowTwoFactor(true)
                         router.push('/auth/new-verification');
+                    } else if (response.success) {
+                        form.reset({
+                            email: "",
+                            password: "",
+                            name: "",
+                            anneePromotion: "",
+                            pays: "",
+                            ville: "",
+                            acceptConditions: false,
+                        });
+                        setSuccess(response.success);
                     }
                 })
                 .catch((error) => {
@@ -95,7 +123,7 @@ export const RegisterFormEmbedded = () => {
             <CardContent className="space-y-5">
                 <Form {...form}>
                     <form 
-                        onSubmit={form.handleSubmit(onSubmit)}
+                        onSubmit={form.handleSubmit(onSubmit, onInvalid)}
                         className="space-y-5"
                     >
                         <div className="space-y-4">
@@ -235,36 +263,12 @@ export const RegisterFormEmbedded = () => {
 
                             {/* Acceptation des conditions */}
                             <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
-                                <div className="flex items-start space-x-3">
-                                    <Checkbox
-                                        id="acceptConditions"
-                                        checked={acceptConditions}
-                                        onCheckedChange={(checked) => setAcceptConditions(checked === true)}
-                                        className="mt-1"
-                                    />
-                                    <label
-                                        htmlFor="acceptConditions"
-                                        className="text-xs text-gray-600 dark:text-gray-400 leading-relaxed cursor-pointer"
-                                    >
-                                        En créant un compte, vous acceptez nos{" "}
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowConditions(true)}
-                                            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                                        >
-                                            Conditions d'utilisation
-                                        </button>
-                                        {" "}et notre{" "}
-                                        <button
-                                            type="button"
-                                            onClick={() => setShowStatut(true)}
-                                            className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                                        >
-                                            Statut juridique
-                                        </button>
-                                        . Vos données sont protégées et ne seront jamais partagées sans votre accord.
-                                    </label>
-                                </div>
+                                <RegisterAcceptConditionsField
+                                    control={form.control}
+                                    disabled={isPending}
+                                    onOpenConditions={() => setShowConditions(true)}
+                                    onOpenStatut={() => setShowStatut(true)}
+                                />
                             </div>
                         </div>
 
@@ -272,7 +276,7 @@ export const RegisterFormEmbedded = () => {
                         <FormSuccess message={success} />
                         
                         <Button
-                            disabled={isPending || !acceptConditions}
+                            disabled={isPending}
                             type="submit"
                             className="w-full bg-blue-600 hover:bg-blue-700 text-white text-base py-6"
                         >

@@ -26,10 +26,10 @@ import { register } from "@/actions/auth/register";
 import { Conditions } from "@/components/conditions";
 import { StatuAmaki } from "@/components/statuamaki";
 import { CheckCircle, FileText, Shield, Info } from "lucide-react";
-import { Checkbox } from "@/components/ui/checkbox";
 import { CountryAutocomplete } from "@/components/forms/country-autocomplete";
 import { CityAutocomplete } from "@/components/forms/city-autocomplete";
 import { LoginButton } from "@/components/auth/login-button";
+import { RegisterAcceptConditionsField } from "@/components/auth/register-accept-conditions-field";
 
 
 export const RegisterForm = () => {
@@ -40,7 +40,6 @@ export const RegisterForm = () => {
     const [showTwoFactor, setShowTwoFactor] = useState(false);
     const [showConditions, setShowConditions] = useState(false);
     const [showStatut, setShowStatut] = useState(false);
-    const [acceptConditions, setAcceptConditions] = useState(false);
     const [countryCode, setCountryCode] = useState<string>("");
 
     const form = useForm<z.infer<typeof RegisterSchema>>({
@@ -52,15 +51,21 @@ export const RegisterForm = () => {
             anneePromotion: "",
             pays: "",
             ville: "",
+            acceptConditions: false,
         },
     });
 
-    const onSubmit = (data: z.infer<typeof RegisterSchema>) => {
-        if (!acceptConditions) {
-            setError("Vous devez accepter les conditions d'utilisation pour créer un compte");
-            return;
-        }
+    const focusAcceptConditions = () => {
+        form.setFocus("acceptConditions");
+    };
 
+    const onInvalid = (errors: Record<string, unknown>) => {
+        if (errors.acceptConditions) {
+            focusAcceptConditions();
+        }
+    };
+
+    const onSubmit = (data: z.infer<typeof RegisterSchema>) => {
         console.log(data);
         setError("");
         setSuccess("");
@@ -69,11 +74,31 @@ export const RegisterForm = () => {
                 const response = await register(data);
                 
                 if (response?.error) {
-                    form.reset();
                     setError(response.error);
+                    if (response.error.includes("accepter les conditions")) {
+                        focusAcceptConditions();
+                    }
                 } else if (response?.twoFactor) {
+                    form.reset({
+                        email: "",
+                        password: "",
+                        name: "",
+                        anneePromotion: "",
+                        pays: "",
+                        ville: "",
+                        acceptConditions: false,
+                    });
                     setShowTwoFactor(true);
                 } else if (response?.success) {
+                    form.reset({
+                        email: "",
+                        password: "",
+                        name: "",
+                        anneePromotion: "",
+                        pays: "",
+                        ville: "",
+                        acceptConditions: false,
+                    });
                     setSuccess(response.success || "Inscription réussie !");
                     // Fermer le modal après un court délai si on est dans un modal
                     setTimeout(() => {
@@ -131,7 +156,7 @@ export const RegisterForm = () => {
             >
                 <Form {...form}>
                     <form 
-                        onSubmit={form.handleSubmit(onSubmit)}
+                        onSubmit={form.handleSubmit(onSubmit, onInvalid)}
                         className="space-y-3"
                     >
                         <div className="space-y-3">
@@ -279,51 +304,20 @@ export const RegisterForm = () => {
 
                         {/* Conditions légales */}
                         <div className="space-y-2 pt-3 border-t-2 border-gray-200 dark:border-gray-700">
-                            <div className="flex items-start gap-2">
-                                <Checkbox
-                                    id="accept-conditions"
-                                    checked={acceptConditions}
-                                    onCheckedChange={(checked) => setAcceptConditions(checked === true)}
-                                    className="mt-1"
-                                />
-                                <label 
-                                    htmlFor="accept-conditions"
-                                    className="text-xs text-gray-800 dark:text-gray-200 leading-relaxed cursor-pointer"
-                                >
-                                    En créant un compte, vous acceptez les{" "}
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowConditions(true)}
-                                        className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                                    >
-                                        conditions d'adhésion et d'utilisation d'Amaki France
-                                    </button>
-                                    . Consultez notre{" "}
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowStatut(true)}
-                                        className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                                    >
-                                        statut juridique
-                                    </button>
-                                    {" "}et notre{" "}
-                                    <button
-                                        type="button"
-                                        onClick={() => setShowConditions(true)}
-                                        className="text-blue-600 dark:text-blue-400 hover:underline font-medium"
-                                    >
-                                        déclaration de confidentialité
-                                    </button>
-                                    .
-                                </label>
-                            </div>
+                            <RegisterAcceptConditionsField
+                                control={form.control}
+                                disabled={isPending}
+                                variant="compact"
+                                onOpenConditions={() => setShowConditions(true)}
+                                onOpenStatut={() => setShowStatut(true)}
+                            />
                         </div>
 
                         <FormError message={error}/>
                         <FormSuccess message={success} />
                         
                         <Button
-                            disabled={isPending || !acceptConditions}
+                            disabled={isPending}
                             type="submit"
                             className="w-full bg-blue-600 hover:bg-blue-700"
                         >
