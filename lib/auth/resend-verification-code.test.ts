@@ -22,10 +22,8 @@ vi.mock("@/lib/mail", () => ({
     sendTwoFactorTokenEmail(...args),
 }));
 
-import {
-  RESEND_VERIFICATION_PUBLIC_OK,
-  resendVerificationCode,
-} from "@/actions/auth/resend-verification-code";
+import { resendVerificationCode } from "@/actions/auth/resend-verification-code";
+import { RESEND_VERIFICATION_PUBLIC_OK } from "@/lib/auth/verification-messages";
 
 const PUBLIC_OK = { ...RESEND_VERIFICATION_PUBLIC_OK };
 

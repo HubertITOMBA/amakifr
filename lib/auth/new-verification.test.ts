@@ -14,10 +14,8 @@ vi.mock("@/lib/db", () => ({
   },
 }));
 
-import {
-  EMAIL_VERIFICATION_GENERIC_ERROR,
-  newVerification,
-} from "@/actions/auth/new-verification";
+import { newVerification } from "@/actions/auth/new-verification";
+import { EMAIL_VERIFICATION_GENERIC_ERROR } from "@/lib/auth/verification-messages";
 
 function mockTx() {
   transaction.mockImplementation(

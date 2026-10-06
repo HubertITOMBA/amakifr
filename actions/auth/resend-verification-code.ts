@@ -6,23 +6,10 @@ import { getUserByEmail } from "@/actions/auth"
 import { sendTwoFactorTokenEmail } from "@/lib/mail"
 import { generateVerificationToken } from "@/lib/token"
 import { normalizeEmail } from "@/lib/utils"
-
-/** Message unique — ne révèle pas l'existence ni l'état du compte. */
-export const RESEND_VERIFICATION_GENERIC_MESSAGE =
-  "Si un compte non confirmé correspond à cette adresse, un nouveau code sera envoyé."
-
-/** Forme publique constante pour toute demande valide (anti-énumération). */
-export const RESEND_VERIFICATION_PUBLIC_OK = {
-  accepted: true as const,
-  message: RESEND_VERIFICATION_GENERIC_MESSAGE,
-  retryAfter: 60 as const,
-}
-
-export type ResendVerificationResult =
-  | typeof RESEND_VERIFICATION_PUBLIC_OK
-  | {
-      error: string
-    }
+import {
+  RESEND_VERIFICATION_PUBLIC_OK,
+  type ResendVerificationResult,
+} from "@/lib/auth/verification-messages"
 
 /**
  * Demande un nouveau code de confirmation d'inscription.

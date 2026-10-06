@@ -9,10 +9,7 @@ import {
   VERIFICATION_MAX_FAILED_ATTEMPTS,
   verificationCodesEqual,
 } from "@/lib/token"
-
-/** Message unique — aucune énumération (token/utilisateur/expiration/verrou). */
-export const EMAIL_VERIFICATION_GENERIC_ERROR =
-  "Code invalide, expiré ou indisponible. Demandez un nouveau code."
+import { EMAIL_VERIFICATION_GENERIC_ERROR } from "@/lib/auth/verification-messages"
 
 const VERIFICATION_TX_MAX_ATTEMPTS = 3
 
