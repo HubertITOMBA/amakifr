@@ -1,7 +1,7 @@
 # AMAKI — Contexte permanent du projet
 
-Dernière mise à jour : 2026-10-06
-Baseline validée : commit `6634eeaa59e8decfc3e0a75a56460301a7d59fa1`
+Dernière mise à jour : 2026-10-07
+Baseline validée : commit `cfbe06fb9e0c9984c8a1d059249bacf871db4911`
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
 
@@ -216,13 +216,15 @@ Ordre de priorité validé :
 - Ne jamais y écrire de secrets ou de contenu intégral de `.env`.
 - Cette règle ne change pas à elle seule la configuration des logs runtime PM2/Next.js du VPS.
 - Renvoi du code de confirmation d’inscription : réponse non énumérante (même message que le compte existe ou non), cooldown serveur minimal, et aucun email/code/token dans les logs applicatifs.
-- Confirmation d’email d’inscription (code dépôt, pas encore livré en production) :
+- Confirmation d’email d’inscription — **livrée et validée en production** (baseline `cfbe06fb…`) :
   - vérification liée à `email + code` (plus de lookup par code seul) ;
   - un seul `VerificationToken` actif par email (contrainte UNIQUE) ;
   - plafond persistant de 3 erreurs (`failedAttempts` / `lockedAt`) côté DB ;
-  - cooldown de renvoi persistant 60 s basé sur `createdAt` ;
-  - `status` Inactif reste distinct de `emailVerified` (jamais modifié par la vérification) ;
-  - migration dédiée `verification_token_security` à appliquer au déploiement.
+  - cooldown de renvoi persistant 60 s basé sur `createdAt`.
+- Règle permanente : **email confirmé ≠ compte actif**.
+  - `emailVerified` confirme l’adresse ; `status` Inactif reste distinct et n’est pas modifié par la vérification.
+  - L’activation administrative est obligatoire avant l’accès membre complet.
+  - L’utilisateur est averti de l’attente et notifié par e-mail après activation.
 - Pour chaque nouveau chantier :
   1. diagnostiquer ;
   2. produire la preuve ;
@@ -253,7 +255,9 @@ Ordre de priorité validé :
 - **2026-10** : application Android `fr.amaki.app` version `1.0.0` validée en Production Google Play.
 - **2026-10** : priorités suivantes enregistrées : inscription web, authentification mobile, rapports de réunions, rappels financiers et origine des connexions.
 - **2026-10** : déploiement sécurisé aligné sur Notes de frais actifs (gardes `assert_notes_frais_flags_on` + `assert_notes_frais_storage_ready`) — code dépôt à déployer ; baseline production inchangée tant que non livré.
-- **2026-10** : sécurisation persistante du code de confirmation email (unique email, plafond 3 erreurs, cooldown 60 s, vérification email+code) — code dépôt à déployer ; baseline production inchangée tant que non livré.
+- **2026-10** : sécurisation persistante du code de confirmation email (unique email, plafond 3 erreurs, cooldown 60 s, vérification email+code) — livrée et validée en production (`cfbe06fb…`).
+- **2026-10** : email confirmé ≠ compte actif ; activation administrative obligatoire ; utilisateur averti de l’attente et notifié après activation.
+- **2026-10** : UX confirmation email (champ unique et attente administrative) : correctif préparé et testé, non encore livré en production ; baseline production `cfbe06fb…`.
 
 ---
 

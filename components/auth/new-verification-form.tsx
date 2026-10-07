@@ -12,20 +12,16 @@ import { resendVerificationCode } from "@/actions/auth/resend-verification-code"
 import {
     Form,
     FormControl,
+    FormDescription,
     FormField,
     FormItem,
     FormLabel,
     FormMessage
 } from '@/components/ui/form'
-import {
-    InputOTP,
-    InputOTPGroup,
-    InputOTPSeparator,
-    InputOTPSlot
-} from '@/components/ui/input-otp'
 import { Input } from "@/components/ui/input";
 import { Button } from '@/components/ui/button'
 import { LoginButton } from "@/components/auth/login-button";
+import { toast } from "react-toastify";
 import { 
     Shield, 
     Mail, 
@@ -37,8 +33,21 @@ import {
     Lock
 } from "lucide-react"
 
-const VERIFY_GENERIC =
-  "Code invalide, expiré ou indisponible. Demandez un nouveau code.";
+const SUCCESS_MESSAGE =
+  "Email confirmé. Votre adhésion attend maintenant la validation d'un administrateur.";
+
+const RESEND_BANNER_MESSAGE =
+  "Si un compte non confirmé correspond à cette adresse, un nouveau code sera envoyé. L'ancien code n'est plus valable.";
+
+const RESEND_TOAST_MESSAGE =
+  "Demande de renvoi enregistrée. Vérifiez votre boîte mail.";
+
+const TOO_MANY_ATTEMPTS_MESSAGE = "Trop de tentatives. Demandez un nouveau code.";
+
+/** Filtre une saisie pour ne garder que des chiffres (max 6). */
+function digitsOnlyCode(raw: string): string {
+  return raw.replace(/\D/g, "").slice(0, 6);
+}
 
 /**
  * Page de saisie du code de confirmation + demande de renvoi.
@@ -85,7 +94,7 @@ export const NewVerificationForm = () => {
         setIsAnimating(true);
 
         if (attempts >= maxAttempts) {
-            setError("Trop de tentatives. Veuillez demander un nouveau code.");
+            setError(TOO_MANY_ATTEMPTS_MESSAGE);
             setIsAnimating(false);
             return;
         }
@@ -98,9 +107,7 @@ export const NewVerificationForm = () => {
                         setAttempts((prev) => {
                             const next = prev + 1;
                             if (next >= maxAttempts) {
-                                setError(
-                                    `${VERIFY_GENERIC} Demandez un nouveau code via le bouton ci-dessous.`,
-                                );
+                                setError(TOO_MANY_ATTEMPTS_MESSAGE);
                             } else {
                                 setError(response.error);
                             }
@@ -110,7 +117,7 @@ export const NewVerificationForm = () => {
 
                     if (response.success) {
                         form.reset({ email: data.email, code: "" });
-                        setSuccess(response.success);
+                        setSuccess(SUCCESS_MESSAGE);
                         setTimeout(() => {
                             window.location.href = '/auth/onboarding';
                         }, 1500);
@@ -148,9 +155,14 @@ export const NewVerificationForm = () => {
                         return;
                     }
                     if ("accepted" in response && response.accepted) {
-                        setResendMessage(response.message);
+                        form.setValue("code", "");
                         setAttempts(0);
                         setTimeLeft(60);
+                        setResendMessage(RESEND_BANNER_MESSAGE);
+                        toast.info(RESEND_TOAST_MESSAGE, {
+                            position: "top-center",
+                            autoClose: 5000,
+                        });
                     }
                 })
                 .catch(() => {
@@ -164,7 +176,7 @@ export const NewVerificationForm = () => {
 
     return (
         <div className="min-h-screen bg-transparent flex items-center justify-center p-4">
-            <div className="w-full max-w-md transform transition-all duration-500 ease-out">
+            <div className="w-full max-w-md">
                 <CardWrapper
                     labelBox="Vérification de sécurité"
                     headerLabel="Entrez le code de vérification"
@@ -260,52 +272,34 @@ export const NewVerificationForm = () => {
                                         <FormItem>
                                             <FormLabel className="text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 flex items-center space-x-1.5 sm:space-x-2">
                                                 <Lock className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-                                                <span>Code de vérification</span>
+                                                <span>Code de confirmation</span>
                                             </FormLabel>
                                             <FormControl>
-                                                <div className="flex items-center justify-center gap-1 sm:gap-2 flex-wrap">
-                                                    <div className="transform transition-all duration-300 hover:scale-105 w-full flex justify-center">
-                                                        <InputOTP 
-                                                            maxLength={6} 
-                                                            {...field}
-                                                            containerClassName="justify-center w-full max-w-fit"
-                                                        >
-                                                            <InputOTPGroup className="gap-0.5 sm:gap-1">
-                                                                <InputOTPSlot 
-                                                                    index={0} 
-                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
-                                                                />
-                                                                <InputOTPSlot 
-                                                                    index={1} 
-                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
-                                                                />
-                                                            </InputOTPGroup>
-                                                            <InputOTPSeparator className="mx-0.5 sm:mx-1 text-gray-400 font-bold text-xs sm:text-sm">-</InputOTPSeparator>
-                                                            <InputOTPGroup className="gap-0.5 sm:gap-1">
-                                                                <InputOTPSlot 
-                                                                    index={2} 
-                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
-                                                                />
-                                                                <InputOTPSlot 
-                                                                    index={3} 
-                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
-                                                                />
-                                                            </InputOTPGroup>
-                                                            <InputOTPSeparator className="mx-0.5 sm:mx-1 text-gray-400 font-bold text-xs sm:text-sm">-</InputOTPSeparator>
-                                                            <InputOTPGroup className="gap-0.5 sm:gap-1">
-                                                                <InputOTPSlot 
-                                                                    index={4} 
-                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
-                                                                />
-                                                                <InputOTPSlot 
-                                                                    index={5} 
-                                                                    className="h-9 w-9 sm:h-11 sm:w-11 text-sm sm:text-base font-bold border-2 border-gray-300 dark:border-gray-600 rounded-lg transition-all duration-300 hover:border-blue-500 hover:shadow-lg focus:border-blue-500 focus:ring-2 focus:ring-blue-200 dark:focus:ring-blue-800 bg-white dark:bg-gray-800" 
-                                                                />
-                                                            </InputOTPGroup>
-                                                        </InputOTP>
-                                                    </div>
-                                                </div>
+                                                <Input
+                                                    name={field.name}
+                                                    ref={field.ref}
+                                                    onBlur={field.onBlur}
+                                                    value={field.value}
+                                                    type="text"
+                                                    inputMode="numeric"
+                                                    pattern="[0-9]*"
+                                                    maxLength={6}
+                                                    autoComplete="one-time-code"
+                                                    disabled={isPending || isResending}
+                                                    placeholder="••••••"
+                                                    aria-describedby="verification-code-helper"
+                                                    onChange={(e) => {
+                                                        field.onChange(digitsOnlyCode(e.target.value));
+                                                    }}
+                                                    className="h-12 w-full text-center font-mono text-2xl tracking-[0.35em] border-2 border-gray-300 dark:border-gray-600 rounded-xl focus-visible:border-blue-500 focus-visible:ring-2 focus-visible:ring-blue-200 dark:focus-visible:ring-blue-800 bg-white dark:bg-gray-800"
+                                                />
                                             </FormControl>
+                                            <FormDescription
+                                                id="verification-code-helper"
+                                                className="text-center text-xs sm:text-sm text-gray-600 dark:text-gray-400"
+                                            >
+                                                Saisissez ou collez le code à 6 chiffres reçu par e-mail.
+                                            </FormDescription>
                                             <FormMessage />
                                         </FormItem>
                                     )}
@@ -320,14 +314,21 @@ export const NewVerificationForm = () => {
                                     )}
                                     
                                     {success && (
-                                        <div className="flex items-center space-x-2 sm:space-x-3 text-green-600 bg-green-50 dark:bg-green-900/20 p-3 sm:p-4 rounded-xl border border-green-200 dark:border-green-800 shadow-sm">
+                                        <div
+                                            role="status"
+                                            aria-live="polite"
+                                            className="flex items-center space-x-2 sm:space-x-3 text-green-600 bg-green-50 dark:bg-green-900/20 p-3 sm:p-4 rounded-xl border border-green-200 dark:border-green-800 shadow-sm"
+                                        >
                                             <CheckCircle2 className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                                             <span className="text-xs sm:text-sm font-medium">{success}</span>
                                         </div>
                                     )}
                                     
                                     {error && (
-                                        <div className="flex items-center space-x-2 sm:space-x-3 text-red-600 bg-red-50 dark:bg-red-900/20 p-3 sm:p-4 rounded-xl border border-red-200 dark:border-red-800 shadow-sm">
+                                        <div
+                                            role="alert"
+                                            className="flex items-center space-x-2 sm:space-x-3 text-red-600 bg-red-50 dark:bg-red-900/20 p-3 sm:p-4 rounded-xl border border-red-200 dark:border-red-800 shadow-sm"
+                                        >
                                             <AlertCircle className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" />
                                             <span className="text-xs sm:text-sm font-medium">{error}</span>
                                         </div>
@@ -359,12 +360,19 @@ export const NewVerificationForm = () => {
                                 Vous n&apos;avez pas reçu le code ? Utilisez l&apos;e-mail saisi ci-dessus pour en demander un nouveau.
                             </p>
                             {resendMessage && (
-                                <p className="text-xs sm:text-sm text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2.5">
+                                <p
+                                    role="status"
+                                    aria-live="polite"
+                                    className="text-xs sm:text-sm text-green-700 dark:text-green-300 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg p-2.5"
+                                >
                                     {resendMessage}
                                 </p>
                             )}
                             {resendError && (
-                                <p className="text-xs sm:text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-2.5">
+                                <p
+                                    role="alert"
+                                    className="text-xs sm:text-sm text-red-700 dark:text-red-300 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-2.5"
+                                >
                                     {resendError}
                                 </p>
                             )}
