@@ -1,17 +1,17 @@
 import { Stack } from "expo-router";
+import { AmakiStackHeader } from "@/components/layout/amaki-stack-header";
 import { AmakiColors } from "@/constants/theme";
 
 /**
- * Stack Profil — hub + sections lazy (hors bottom tabs).
+ * Stack Profil — hub sans header Stack ; sous-écrans dégradé partagé.
  */
 export default function ProfilLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: AmakiColors.primary },
-        headerTintColor: AmakiColors.surface,
-        headerTitleStyle: { fontWeight: "600" },
-        headerBackTitle: "Profil",
+        header: (props) => <AmakiStackHeader {...props} />,
+        headerShadowVisible: false,
+        contentStyle: { backgroundColor: AmakiColors.background },
       }}
     >
       <Stack.Screen name="index" options={{ headerShown: false }} />

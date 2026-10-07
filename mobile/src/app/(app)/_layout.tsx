@@ -1,5 +1,7 @@
 import { Tabs } from "expo-router";
+import { Pressable, StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { AmakiStackHeader } from "@/components/layout/amaki-stack-header";
 import { TabBarIcon } from "@/components/tab-bar-icon";
 import { formatTabUnreadBadge } from "@/api/notifications-state";
 import { AmakiColors } from "@/constants/theme";
@@ -9,15 +11,17 @@ import { PushNotificationsBootstrap } from "@/hooks/push-notifications-bootstrap
 function AppTabs() {
   const insets = useSafeAreaInsets();
   const { unreadCount, refreshUnreadCount } = useUnreadCount();
-  const tabBarHeight = 56 + Math.max(insets.bottom, 8);
+  const tabBarHeight = 64 + Math.max(insets.bottom, 8);
   const badge = formatTabUnreadBadge(unreadCount);
 
   return (
     <Tabs
       screenOptions={{
-        headerStyle: { backgroundColor: AmakiColors.primary },
+        header: (props) => <AmakiStackHeader {...props} />,
         headerTintColor: AmakiColors.surface,
         headerTitleStyle: { fontWeight: "600" },
+        headerShadowVisible: false,
+        sceneStyle: { backgroundColor: AmakiColors.background },
         tabBarActiveTintColor: AmakiColors.primary,
         tabBarInactiveTintColor: AmakiColors.textMuted,
         tabBarStyle: {
@@ -35,7 +39,32 @@ function AppTabs() {
         options={{
           title: "Accueil",
           headerShown: false,
-          tabBarIcon: ({ color }) => <TabBarIcon name="home" color={color} />,
+          tabBarIcon: ({ focused }) => (
+            <View
+              style={[
+                styles.homeIconWrap,
+                focused ? styles.homeIconActive : styles.homeIconIdle,
+              ]}
+            >
+              <TabBarIcon
+                name="home"
+                color={focused ? AmakiColors.surface : AmakiColors.primary}
+              />
+            </View>
+          ),
+          tabBarButton: (props) => (
+            <Pressable
+              accessibilityRole={props.accessibilityRole}
+              accessibilityState={props.accessibilityState}
+              accessibilityLabel={props.accessibilityLabel}
+              testID={props.testID}
+              onPress={props.onPress}
+              onLongPress={props.onLongPress}
+              style={styles.homeTabButton}
+            >
+              {props.children}
+            </Pressable>
+          ),
         }}
         listeners={{
           focus: () => {
@@ -46,7 +75,8 @@ function AppTabs() {
       <Tabs.Screen
         name="cotisations"
         options={{
-          title: "Cotisations",
+          title: "Mes cotisations",
+          tabBarLabel: "Cotisations",
           tabBarIcon: ({ color }) => (
             <TabBarIcon name="cotisations" color={color} />
           ),
@@ -170,3 +200,32 @@ export default function AppLayout() {
     </UnreadCountProvider>
   );
 }
+
+const styles = StyleSheet.create({
+  homeTabButton: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  homeIconWrap: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: -10,
+  },
+  homeIconActive: {
+    backgroundColor: AmakiColors.primary,
+    shadowColor: "#0f172a",
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 4,
+  },
+  homeIconIdle: {
+    backgroundColor: AmakiColors.primarySoft,
+    borderWidth: 1,
+    borderColor: AmakiColors.primaryBorder,
+  },
+});

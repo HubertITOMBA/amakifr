@@ -10,7 +10,6 @@ import {
 } from "react-native";
 import { SymbolView } from "expo-symbols";
 import { router } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import {
   getMyCotisationLines,
   getMyCotisationYear,
@@ -277,7 +276,7 @@ export default function CotisationsScreen() {
   if (mode === "loading" && !hasDataRef.current) return <LoadingState />;
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <View style={styles.safe}>
       <ScrollView
         contentContainerStyle={styles.container}
         refreshControl={
@@ -288,10 +287,9 @@ export default function CotisationsScreen() {
           />
         }
       >
-        <Text style={styles.screenTitle}>Mes cotisations</Text>
         <Text style={styles.screenSubtitle}>
           Situation financière. Les paiements Wero/virement sont vérifiés par
-          l'association.
+          l&apos;association.
         </Text>
 
         <View style={styles.yearModeRow}>
@@ -528,7 +526,7 @@ export default function CotisationsScreen() {
           }}
         />
       ) : null}
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -854,11 +852,6 @@ const styles = StyleSheet.create({
   container: {
     padding: AmakiSpacing.lg,
     paddingBottom: AmakiSpacing["2xl"],
-  },
-  screenTitle: {
-    ...AmakiTypography.title,
-    color: AmakiColors.text,
-    marginBottom: AmakiSpacing.xs,
   },
   screenSubtitle: {
     ...AmakiTypography.caption,

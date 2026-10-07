@@ -9,7 +9,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import {
   getMyReunions,
@@ -126,7 +125,7 @@ export default function ReunionsScreen() {
   if (mode === "loading") return <LoadingState />;
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <View style={styles.safe}>
       <ScrollView
         contentContainerStyle={styles.container}
         refreshControl={
@@ -137,7 +136,6 @@ export default function ReunionsScreen() {
           />
         }
       >
-        <Text style={styles.screenTitle}>Les réunions</Text>
         <Text style={styles.screenSubtitle}>
           Calendrier collectif des réunions mensuelles de l&apos;association.
         </Text>
@@ -209,7 +207,7 @@ export default function ReunionsScreen() {
           </>
         ) : null}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -411,11 +409,6 @@ const styles = StyleSheet.create({
   container: {
     padding: AmakiSpacing.lg,
     paddingBottom: AmakiSpacing["2xl"],
-  },
-  screenTitle: {
-    ...AmakiTypography.title,
-    color: AmakiColors.text,
-    marginBottom: AmakiSpacing.xs,
   },
   screenSubtitle: {
     ...AmakiTypography.caption,

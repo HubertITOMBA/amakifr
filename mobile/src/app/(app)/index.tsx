@@ -1,67 +1,88 @@
-import { useCallback, useEffect, useState } from "react";
-import { Image } from "expo-image";
-import { router, type Href, useFocusEffect } from "expo-router";
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { useFocusEffect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
-import amakiLogo from "@/assets/images/amaki-logo-full.png";
-import { Pressable, ScrollView, StyleSheet, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  Platform,
+  ScrollView,
+  StatusBar as RNStatusBar,
+  StyleSheet,
+  Text,
+  View,
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
 import { useAuth } from "@/auth/auth-context";
 import { getMySurveysSummary } from "@/api/sondages";
-import { shouldShowHomeSurveyCta } from "@/api/sondages-state";
 import { getMyEventsSummary } from "@/api/evenements";
-import { shouldShowHomeEventsBanner } from "@/api/evenements-state";
 import { getMyElectionsSummary } from "@/api/elections";
-import {
-  shouldShowHomeCandidaciesHint,
-  shouldShowHomeElectionsBanner,
-} from "@/api/elections-state";
 import { getMyChatUnreadCount } from "@/api/chat";
-import { shouldShowHomeChatBadge } from "@/api/chat-state";
 import { subscribeChatPushRefresh } from "@/api/push-events";
+import {
+  HOME_SCROLL_SECTION_ORDER,
+  buildHomeHighlightSlides,
+  buildHomeMenuItems,
+  buildHomeQuickActions,
+  homeScrollBottomPadding,
+} from "@/features/home/home-model";
+import { homeWelcomeMarginTop } from "@/features/home/home-header-layout";
+import {
+  resolveHeaderStatusInset,
+} from "@/features/layout/gradient-header-model";
 import { formatDateTimeFr } from "@/utils/profile-helpers";
-import { AmakiDarkBackground } from "@/components/ui/amaki-dark-background";
+import { MobileHomeHeader } from "@/components/home/mobile-home-header";
+import { WelcomeCard } from "@/components/home/welcome-card";
+import { QuickActionCard } from "@/components/home/quick-action-card";
+import { HomeHighlightBanner } from "@/components/home/home-highlight-banner";
+import { HomeMenuModal } from "@/components/home/home-menu-modal";
 import { useUnreadCount } from "@/hooks/unread-count";
 import {
   AmakiColors,
-  AmakiRadius,
   AmakiSpacing,
   AmakiTypography,
 } from "@/constants/theme";
 
-const SERVICES: {
-  id: string;
-  label: string;
-  hint?: string;
-  href?: Href;
-}[] = [
-  { id: "documents", label: "Documents", hint: "Voir mes documents", href: "/documents" },
-  { id: "passeport", label: "Passeport", hint: "Mon passeport", href: "/passeport" },
-  { id: "taches", label: "Tâches", hint: "Mes tâches", href: "/taches" },
-  { id: "reunions", label: "Réunions", hint: "Mes réunions", href: "/reunions" },
-  { id: "evenements", label: "Événements", hint: "Agenda", href: "/evenements" },
-  { id: "elections", label: "Élections", hint: "Votes", href: "/elections" as Href },
-  { id: "messages", label: "Messages", hint: "Chat", href: "/messages" as Href },
-];
-
 /**
- * Accueil — hub compact, fond sombre cohérent login.
+ * Accueil V2 — header edge-to-edge, actions compactes, À la une conditionnelle.
  */
 export default function AccueilScreen() {
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const { unreadCount } = useUnreadCount();
-  const displayName = user?.name?.trim() || "adhérent";
+  const [menuOpen, setMenuOpen] = useState(false);
   const [surveyCount, setSurveyCount] = useState(0);
   const [eventsCount, setEventsCount] = useState(0);
   const [electionsCount, setElectionsCount] = useState(0);
-  const [candidaciesOpenCount, setCandidaciesOpenCount] = useState(0);
   const [chatUnread, setChatUnread] = useState(0);
   const [nextEventTitle, setNextEventTitle] = useState<string | null>(null);
   const [nextEventWhen, setNextEventWhen] = useState<string | null>(null);
-  const showSurveyCta = shouldShowHomeSurveyCta(surveyCount);
-  const showEventsBanner = shouldShowHomeEventsBanner(eventsCount);
-  const showElectionsBanner = shouldShowHomeElectionsBanner(electionsCount);
-  const showCandidaciesHint = shouldShowHomeCandidaciesHint(candidaciesOpenCount);
-  const showChatBadge = shouldShowHomeChatBadge(chatUnread);
+
+  const quickActions = useMemo(
+    () => buildHomeQuickActions(unreadCount, chatUnread),
+    [unreadCount, chatUnread]
+  );
+  const menuItems = useMemo(
+    () => buildHomeMenuItems(surveyCount),
+    [surveyCount]
+  );
+  const highlightSlides = useMemo(
+    () =>
+      buildHomeHighlightSlides({
+        electionsCount,
+        surveyCount,
+        eventsCount,
+        nextEventTitle,
+        nextEventWhen,
+      }),
+    [
+      electionsCount,
+      surveyCount,
+      eventsCount,
+      nextEventTitle,
+      nextEventWhen,
+    ]
+  );
 
   const loadSurveySummary = useCallback(async () => {
     try {
@@ -75,8 +96,9 @@ export default function AccueilScreen() {
   const loadEventsSummary = useCallback(async () => {
     try {
       const summary = await getMyEventsSummary();
-      setEventsCount(summary.upcomingCount);
-      if (summary.nextEvent) {
+      const count = summary.upcomingCount;
+      setEventsCount(count);
+      if (count > 0 && summary.nextEvent) {
         setNextEventTitle(summary.nextEvent.titre);
         setNextEventWhen(formatDateTimeFr(summary.nextEvent.dateDebut));
       } else {
@@ -84,7 +106,9 @@ export default function AccueilScreen() {
         setNextEventWhen(null);
       }
     } catch {
-      // conserver dernière valeur
+      setEventsCount(0);
+      setNextEventTitle(null);
+      setNextEventWhen(null);
     }
   }, []);
 
@@ -92,10 +116,8 @@ export default function AccueilScreen() {
     try {
       const summary = await getMyElectionsSummary();
       setElectionsCount(summary.aVoterCount);
-      setCandidaciesOpenCount(summary.candidaciesOpenCount ?? 0);
     } catch {
       setElectionsCount(0);
-      setCandidaciesOpenCount(0);
     }
   }, []);
 
@@ -128,319 +150,144 @@ export default function AccueilScreen() {
     });
   }, [loadChatUnread]);
 
-  const baseServices = SERVICES.map((s) => {
-    if (s.id === "elections" && showCandidaciesHint && !showElectionsBanner) {
-      return { ...s, hint: "Candidatures ouvertes" };
+  /** expo-status-bar 57 : pas de props translucent/backgroundColor — API RN Android. */
+  useEffect(() => {
+    if (Platform.OS === "android") {
+      RNStatusBar.setTranslucent(true);
+      RNStatusBar.setBackgroundColor("transparent");
+      RNStatusBar.setBarStyle("light-content");
     }
-    if (s.id === "messages" && showChatBadge) {
-      return {
-        ...s,
-        hint: `${chatUnread} non lu${chatUnread > 1 ? "s" : ""}`,
-      };
-    }
-    return s;
-  });
+  }, []);
 
-  const serviceTiles = showSurveyCta
-    ? [
-        ...baseServices,
-        {
-          id: "sondages",
-          label: "Sondages",
-          hint: `${surveyCount} à compléter`,
-          href: "/sondages" as Href,
-        },
-      ]
-    : baseServices;
+  const scrollPaddingBottom = homeScrollBottomPadding(insets.bottom);
+  const statusInset = resolveHeaderStatusInset(
+    insets.top,
+    Platform.OS === "android" ? RNStatusBar.currentHeight : null
+  );
+  /** Chevauchement dégradé plafonné pour ne pas entrer dans les commandes. */
+  const welcomeMarginTop = homeWelcomeMarginTop(statusInset);
 
   return (
-    <AmakiDarkBackground>
+    <View style={styles.root}>
       <StatusBar style="light" />
-      <SafeAreaView style={styles.safe} edges={["top"]}>
-        <ScrollView contentContainerStyle={styles.container}>
-          <View style={styles.identity}>
-            <Image
-              source={amakiLogo}
-              style={styles.logo}
-              accessibilityLabel="AMAKI France"
-              alt="AMAKI France"
-              contentFit="contain"
-            />
-            <Text style={styles.hello}>Bonjour</Text>
-            <Text style={styles.name}>{displayName}</Text>
-            <View style={styles.metaRow}>
-              <Text style={styles.meta}>{user?.role ?? "—"}</Text>
-              <Text style={styles.metaDot}>·</Text>
-              <Text style={styles.meta}>{user?.status ?? "—"}</Text>
+      <SafeAreaView style={styles.safe} edges={["left", "right"]}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.container,
+            { paddingBottom: scrollPaddingBottom, flexGrow: 1 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          style={styles.scroll}
+          contentInsetAdjustmentBehavior="never"
+          bounces={false}
+          alwaysBounceVertical={false}
+          overScrollMode="never"
+        >
+          <View
+            style={styles.heroBlock}
+            testID={`home-section-${HOME_SCROLL_SECTION_ORDER[0]}`}
+          >
+            <View style={styles.headerSlot}>
+              <MobileHomeHeader
+                unreadCount={unreadCount}
+                onOpenMenu={() => setMenuOpen(true)}
+              />
             </View>
-            <Text style={styles.member}>Membre AMAKI France</Text>
+            <View style={[styles.welcomeWrap, { marginTop: welcomeMarginTop }]}>
+              <WelcomeCard
+                name={user?.name}
+                role={user?.role}
+                status={user?.status}
+              />
+            </View>
           </View>
 
-          {showSurveyCta ? (
-            <Pressable
-              style={styles.surveyBanner}
-              onPress={() => router.push("/sondages")}
-              accessibilityRole="button"
-              accessibilityLabel={`Sondages, ${surveyCount} à compléter`}
-            >
-              <Text style={styles.surveyTitle}>Sondages</Text>
-              <Text style={styles.surveyHint}>
-                Vous avez {surveyCount} sondage
-                {surveyCount !== 1 ? "s" : ""} à compléter
-              </Text>
-            </Pressable>
-          ) : null}
-
-          {showEventsBanner ? (
-            <Pressable
-              style={styles.eventsBanner}
-              onPress={() => router.push("/evenements")}
-              accessibilityRole="button"
-              accessibilityLabel={`Événements, ${eventsCount} à venir`}
-            >
-              <Text style={styles.surveyTitle}>Événements</Text>
-              <Text style={styles.surveyHint}>
-                {eventsCount} événement{eventsCount !== 1 ? "s" : ""} à venir
-                {nextEventTitle
-                  ? ` — prochain : ${nextEventTitle}${nextEventWhen ? ` (${nextEventWhen})` : ""}`
-                  : ""}
-              </Text>
-            </Pressable>
-          ) : null}
-
-          {showElectionsBanner ? (
-            <Pressable
-              style={styles.electionsBanner}
-              onPress={() => router.push("/elections" as Href)}
-              accessibilityRole="button"
-              accessibilityLabel="Vous avez un vote à effectuer"
-            >
-              <Text style={styles.surveyTitle}>Élections</Text>
-              <Text style={styles.surveyHint}>
-                Vous avez un vote à effectuer
-                {electionsCount > 1 ? ` (${electionsCount} scrutins)` : ""}
-              </Text>
-            </Pressable>
-          ) : null}
-
-          <View style={styles.summaryRow}>
-            <Pressable
-              style={styles.summaryCard}
-              onPress={() => router.push("/cotisations")}
-              accessibilityRole="button"
-              accessibilityLabel="Voir mes cotisations"
-            >
-              <Text style={styles.summaryTitle}>Cotisations</Text>
-              <Text style={styles.summaryHint}>Voir mes cotisations</Text>
-            </Pressable>
-            <Pressable
-              style={styles.summaryCard}
-              onPress={() => router.push("/notifications")}
-              accessibilityRole="button"
-              accessibilityLabel={
-                unreadCount > 0
-                  ? `Notifications, ${unreadCount} non lues`
-                  : "Notifications, aucune non lue"
-              }
-            >
-              <Text style={styles.summaryTitle}>Notifications</Text>
-              <Text style={styles.summaryHint}>
-                {unreadCount > 0
-                  ? `${unreadCount} non lue${unreadCount !== 1 ? "s" : ""}`
-                  : "Aucune non lue"}
-              </Text>
-            </Pressable>
+          <View testID={`home-section-${HOME_SCROLL_SECTION_ORDER[1]}`}>
+            <Text style={styles.sectionTitle}>Actions rapides</Text>
+            <View style={styles.quickGrid}>
+              {quickActions.map((action) => (
+                <QuickActionCard
+                  key={action.id}
+                  label={action.label}
+                  href={action.href}
+                  icon={action.icon}
+                  iconColor={action.iconColor}
+                  iconBg={action.iconBg}
+                  badge={action.badge}
+                />
+              ))}
+            </View>
           </View>
 
-          <Text style={styles.sectionTitle}>Mes services</Text>
-          <View style={styles.grid}>
-            {serviceTiles.map((service) =>
-              service.href ? (
-                <Pressable
-                  key={service.id}
-                  style={styles.tileActive}
-                  onPress={() => router.push(service.href!)}
-                  accessibilityRole="button"
-                  accessibilityLabel={service.label}
-                >
-                  <Text style={styles.tileLabelActive}>{service.label}</Text>
-                  <Text style={styles.tileHint}>{service.hint ?? "Voir"}</Text>
-                </Pressable>
-              ) : (
-                <View
-                  key={service.id}
-                  style={styles.tile}
-                  accessibilityRole="text"
-                  accessibilityLabel={`${service.label}, bientôt`}
-                >
-                  <Text style={styles.tileLabel}>{service.label}</Text>
-                  <Text style={styles.tileSoon}>Bientôt</Text>
-                </View>
-              )
-            )}
+          <View
+            style={styles.highlightInFlow}
+            testID={`home-section-${HOME_SCROLL_SECTION_ORDER[2]}`}
+          >
+            <HomeHighlightBanner slides={highlightSlides} />
           </View>
         </ScrollView>
+
+        <HomeMenuModal
+          visible={menuOpen}
+          onClose={() => setMenuOpen(false)}
+          items={menuItems}
+          unreadCount={unreadCount}
+          chatUnread={chatUnread}
+        />
       </SafeAreaView>
-    </AmakiDarkBackground>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
+  root: {
+    flex: 1,
+    backgroundColor: AmakiColors.background,
+  },
   safe: {
     flex: 1,
     backgroundColor: "transparent",
   },
+  scroll: {
+    flex: 1,
+    overflow: "visible",
+  },
   container: {
     paddingHorizontal: AmakiSpacing.lg,
-    paddingBottom: AmakiSpacing.xl,
+    overflow: "visible",
   },
-  identity: {
-    backgroundColor: AmakiColors.onDarkSoft,
-    borderRadius: AmakiRadius.lg,
-    padding: AmakiSpacing.lg,
-    marginBottom: AmakiSpacing.lg,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.18)",
-  },
-  logo: {
-    width: 64,
-    height: 64,
-    borderRadius: AmakiRadius.md,
-    marginBottom: AmakiSpacing.sm,
-    backgroundColor: AmakiColors.surface,
-  },
-  hello: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.onDarkMuted,
-  },
-  name: {
-    ...AmakiTypography.display,
-    color: AmakiColors.onDark,
-    marginTop: AmakiSpacing.xs,
-  },
-  metaRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginTop: AmakiSpacing.sm,
-    gap: AmakiSpacing.xs,
-  },
-  meta: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.onDark,
-    fontWeight: "600",
-  },
-  metaDot: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.onDarkMuted,
-  },
-  member: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.onDarkMuted,
-    marginTop: AmakiSpacing.xs,
-  },
-  surveyBanner: {
-    backgroundColor: AmakiColors.primarySoft,
-    borderRadius: AmakiRadius.md,
-    borderWidth: 1,
-    borderColor: AmakiColors.primaryBorder,
-    padding: AmakiSpacing.md,
+  heroBlock: {
+    position: "relative",
+    overflow: "visible",
+    marginHorizontal: -AmakiSpacing.lg,
     marginBottom: AmakiSpacing.lg,
   },
-  eventsBanner: {
-    backgroundColor: "#ecfdf5",
-    borderRadius: AmakiRadius.md,
-    borderWidth: 1,
-    borderColor: "#a7f3d0",
-    padding: AmakiSpacing.md,
-    marginBottom: AmakiSpacing.lg,
+  headerSlot: {
+    position: "relative",
+    zIndex: 0,
+    elevation: 0,
   },
-  electionsBanner: {
-    backgroundColor: "#fef3c7",
-    borderRadius: AmakiRadius.md,
-    borderWidth: 1,
-    borderColor: "#fcd34d",
-    padding: AmakiSpacing.md,
-    marginBottom: AmakiSpacing.lg,
-  },
-  surveyTitle: {
-    ...AmakiTypography.heading,
-    color: AmakiColors.primaryStrong,
-  },
-  surveyHint: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.textSecondary,
-    marginTop: AmakiSpacing.xs,
-  },
-  summaryRow: {
-    flexDirection: "row",
-    gap: AmakiSpacing.sm,
-    marginBottom: AmakiSpacing.xl,
-  },
-  summaryCard: {
-    flex: 1,
-    backgroundColor: AmakiColors.cardOnDark,
-    borderRadius: AmakiRadius.md,
-    borderWidth: 1,
-    borderColor: AmakiColors.border,
-    padding: AmakiSpacing.md,
-    minHeight: 88,
-  },
-  summaryTitle: {
-    ...AmakiTypography.heading,
-    color: AmakiColors.text,
-    marginBottom: AmakiSpacing.xs,
-  },
-  summaryHint: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.primary,
+  welcomeWrap: {
+    position: "relative",
+    zIndex: 10,
+    elevation: 12,
+    /** marginTop dynamique : homeWelcomeMarginTop(statusInset). */
+    marginHorizontal: AmakiSpacing.lg,
+    marginBottom: AmakiSpacing.md,
   },
   sectionTitle: {
     ...AmakiTypography.title,
-    color: AmakiColors.onDark,
+    color: AmakiColors.text,
     marginBottom: AmakiSpacing.md,
   },
-  grid: {
+  quickGrid: {
     flexDirection: "row",
     flexWrap: "wrap",
-    gap: AmakiSpacing.sm,
+    gap: AmakiSpacing.md,
   },
-  tile: {
-    width: "48%",
-    flexGrow: 1,
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: AmakiRadius.md,
-    padding: AmakiSpacing.md,
-    borderWidth: 1,
-    borderColor: "rgba(255,255,255,0.15)",
-    opacity: 0.85,
-    minHeight: 72,
-  },
-  tileActive: {
-    width: "48%",
-    flexGrow: 1,
-    backgroundColor: AmakiColors.cardOnDark,
-    borderRadius: AmakiRadius.md,
-    padding: AmakiSpacing.md,
-    borderWidth: 1,
-    borderColor: AmakiColors.border,
-    minHeight: 72,
-  },
-  tileLabel: {
-    ...AmakiTypography.heading,
-    color: AmakiColors.onDarkMuted,
-  },
-  tileLabelActive: {
-    ...AmakiTypography.heading,
-    color: AmakiColors.text,
-  },
-  tileSoon: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.onDarkMuted,
-    marginTop: AmakiSpacing.xs,
-  },
-  tileHint: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.primary,
-    marginTop: AmakiSpacing.xs,
+  highlightInFlow: {
+    marginTop: AmakiSpacing.md,
+    /** Gap tab bar = paddingBottom ScrollView seul (HOME_HIGHLIGHT_TAB_GAP). */
+    marginBottom: 0,
   },
 });

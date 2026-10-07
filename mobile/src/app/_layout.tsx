@@ -16,17 +16,22 @@ function RootNavigator() {
   }
 
   return (
-    <>
-      <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false }}>
-        <Stack.Protected guard={status === "authenticated"}>
-          <Stack.Screen name="(app)" />
-        </Stack.Protected>
-        <Stack.Protected guard={status !== "authenticated"}>
-          <Stack.Screen name="sign-in" />
-        </Stack.Protected>
-      </Stack>
-    </>
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Protected guard={status === "authenticated"}>
+        <Stack.Screen name="(app)" />
+      </Stack.Protected>
+      <Stack.Protected guard={status !== "authenticated"}>
+        <Stack.Screen
+          name="sign-in"
+          options={{
+            statusBarStyle: "light",
+            statusBarTranslucent: true,
+            statusBarBackgroundColor: "transparent",
+            contentStyle: { backgroundColor: "#f8fafc" },
+          }}
+        />
+      </Stack.Protected>
+    </Stack>
   );
 }
 

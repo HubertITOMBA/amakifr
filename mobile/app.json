@@ -35,9 +35,10 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#208AEF",
-          "image": "./assets/images/splash-icon.png",
-          "imageWidth": 200
+          "backgroundColor": "#E8F4FC",
+          "image": "./assets/images/splash-amaki-logo.png",
+          "imageWidth": 220,
+          "resizeMode": "contain"
         }
       ],
       "expo-secure-store",

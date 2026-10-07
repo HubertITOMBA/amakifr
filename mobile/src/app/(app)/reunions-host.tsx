@@ -7,7 +7,6 @@ import {
   Text,
   View,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
 import {
   getMyReunionYear,
   proposeMyselfAsReunionHost,
@@ -179,7 +178,7 @@ export default function ReunionsHostScreen() {
   if (mode === "loading" && !yearData) return <LoadingState />;
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <View style={styles.safe}>
       <ScrollView
         contentContainerStyle={styles.container}
         refreshControl={
@@ -190,7 +189,6 @@ export default function ReunionsHostScreen() {
           />
         }
       >
-        <Text style={styles.screenTitle}>Accueillir une réunion</Text>
         <Text style={styles.screenSubtitle}>
           Choisissez un mois disponible. Une proposition est soumise à
           validation administrative. Un seul accueil par année en
@@ -246,7 +244,7 @@ export default function ReunionsHostScreen() {
           />
         ))}
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -327,11 +325,6 @@ const styles = StyleSheet.create({
   container: {
     padding: AmakiSpacing.lg,
     paddingBottom: AmakiSpacing["2xl"],
-  },
-  screenTitle: {
-    ...AmakiTypography.title,
-    color: AmakiColors.text,
-    marginBottom: AmakiSpacing.xs,
   },
   screenSubtitle: {
     ...AmakiTypography.caption,

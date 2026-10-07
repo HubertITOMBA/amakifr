@@ -1,16 +1,16 @@
 import { Stack } from "expo-router";
+import { AmakiStackHeader } from "@/components/layout/amaki-stack-header";
 import { AmakiColors } from "@/constants/theme";
 
 /**
- * Stack Élections / Vote.
+ * Stack Élections — header dégradé partagé.
  */
 export default function ElectionsLayout() {
   return (
     <Stack
       screenOptions={{
-        headerStyle: { backgroundColor: AmakiColors.primary },
-        headerTintColor: AmakiColors.surface,
-        headerTitleStyle: { fontWeight: "600" },
+        header: (props) => <AmakiStackHeader {...props} />,
+        headerShadowVisible: false,
         contentStyle: { backgroundColor: AmakiColors.background },
       }}
     >

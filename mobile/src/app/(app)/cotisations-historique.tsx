@@ -7,7 +7,6 @@ import {
   View,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { getMyPayments } from "@/api/cotisations";
 import { paymentStatusLabel } from "@/api/payment-account-state";
 import {
@@ -99,7 +98,7 @@ export default function CotisationsHistoriqueScreen() {
   if (loading && items.length === 0) return <LoadingState />;
 
   return (
-    <SafeAreaView style={styles.safe} edges={["bottom"]}>
+    <View style={styles.safe}>
       <FlatList
         data={items}
         keyExtractor={(item) => item.id}
@@ -113,7 +112,6 @@ export default function CotisationsHistoriqueScreen() {
         }
         ListHeaderComponent={
           <View style={styles.headerBlock}>
-            <Text style={styles.title}>Historique des paiements</Text>
             <Text style={styles.subtitle}>
               {filterYear
                 ? `Année ${filterYear}`
@@ -157,7 +155,7 @@ export default function CotisationsHistoriqueScreen() {
           ) : null
         }
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -197,11 +195,6 @@ const styles = StyleSheet.create({
     paddingBottom: AmakiSpacing["2xl"],
   },
   headerBlock: { marginBottom: AmakiSpacing.md },
-  title: {
-    ...AmakiTypography.title,
-    color: AmakiColors.text,
-    marginBottom: AmakiSpacing.xs,
-  },
   subtitle: {
     ...AmakiTypography.caption,
     color: AmakiColors.textMuted,

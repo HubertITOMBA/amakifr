@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { Image } from "expo-image";
 import { router, useFocusEffect } from "expo-router";
-import { SafeAreaView } from "react-native-safe-area-context";
 import { SymbolView } from "expo-symbols";
 import * as WebBrowser from "expo-web-browser";
 import { useAuth } from "@/auth/auth-context";
@@ -19,6 +18,7 @@ import {
 } from "@/api/profile";
 import { PROFILE_MENU_ITEMS } from "@/api/profile-menu";
 import { ApiClientError } from "@/api/types";
+import { AmakiGradientHeader } from "@/components/layout/amaki-gradient-header";
 import { Card } from "@/components/ui/card";
 import { ErrorBanner } from "@/components/ui/error-banner";
 import { LoadingState } from "@/components/ui/loading-state";
@@ -105,11 +105,12 @@ export default function ProfilHubScreen() {
   const hasImage = Boolean(summary?.image);
 
   return (
-    <SafeAreaView style={styles.safe} edges={["top"]}>
+    <View style={styles.safe}>
+      <AmakiGradientHeader
+        title="Mon profil"
+        subtitle="Choisissez une rubrique"
+      />
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.screenTitle}>Mon profil</Text>
-        <Text style={styles.screenSubtitle}>Choisissez une rubrique</Text>
-
         {error ? <ErrorBanner message={error} /> : null}
 
         <Card style={styles.identityCard}>
@@ -202,7 +203,7 @@ export default function ProfilHubScreen() {
           </Text>
         </Pressable>
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -214,16 +215,6 @@ const styles = StyleSheet.create({
   container: {
     padding: AmakiSpacing.lg,
     paddingBottom: AmakiSpacing["2xl"],
-  },
-  screenTitle: {
-    ...AmakiTypography.title,
-    color: AmakiColors.text,
-    marginBottom: AmakiSpacing.xs,
-  },
-  screenSubtitle: {
-    ...AmakiTypography.caption,
-    color: AmakiColors.textMuted,
-    marginBottom: AmakiSpacing.lg,
   },
   identityCard: {
     alignItems: "center",
