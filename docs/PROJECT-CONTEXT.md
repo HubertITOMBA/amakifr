@@ -1,7 +1,7 @@
 # AMAKI — Contexte permanent du projet
 
 Dernière mise à jour : 2026-10-07
-Baseline validée : commit `ddf4f9ecb830af82cb965abe7afc3d7e56270e86`
+Baseline validée : commit `2b11725`
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
 
@@ -140,6 +140,23 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - Aucun droit Android inattendu n’a été demandé.
 - Le module Notes de frais mobile n’est pas considéré comme livré tant qu’un lot API/mobile spécifique ne l’a pas explicitement validé.
 
+**UI mobile (Accueil, LoginPage, headers) — commitée, non publiée sur le Play Store**
+
+État au 2026-10-07 (baseline `2b11725`) :
+
+- Refonte mobile Accueil, LoginPage et headers dégradés : commitée et poussée sur `origin/main`.
+- UI validée sur téléphone via **AMAKI Dev** (Metro / binaire de développement).
+- Afficher/masquer le mot de passe : livré et validé sur AMAKI Dev.
+- Nouveau splash validé dans un binaire AMAKI Dev :
+  - fond bleu clair ;
+  - logo centré et transparent ;
+  - proportions correctes ;
+  - transition vers la LoginPage correcte.
+- Build Expo Dev de recette : `798d66ff-1f90-4b18-8505-e8c2603e2258`.
+- Application publique Play Store `fr.amaki.app` : toujours en version `1.0.0`, inchangée.
+- Aucune nouvelle version Android de production n’a été publiée.
+- Le nouveau design **n’est pas** publié sur le Play Store.
+
 ---
 
 ## 7. Décisions de sécurité et produit
@@ -175,12 +192,19 @@ Ordre de priorité validé :
   - d’une règle serveur.
 - Commencer par un diagnostic ; ne pas corriger sans preuve.
 
+Ordre des priorités encore ouvertes (après le P0 inscription web) :
+
+1. mot de passe oublié mobile ;
+2. comptes rendus/rapports des réunions mobiles ;
+3. rappels mensuels cotisations/dettes ;
+4. identification de l’origine des connexions.
+
 ### P1 — Authentification mobile
 
-- Ajouter afficher/masquer le mot de passe sur l’écran de connexion.
 - Ajouter un parcours sécurisé « mot de passe oublié ».
 - Réutiliser autant que possible le mécanisme web existant s’il est correct.
 - Ne jamais envoyer un mot de passe existant.
+- Afficher/masquer le mot de passe : déjà livré et validé (AMAKI Dev, 2026-10-07).
 
 ### P1 — Réunions sur mobile
 
@@ -258,6 +282,7 @@ Ordre de priorité validé :
 - **2026-10** : sécurisation persistante du code de confirmation email (unique email, plafond 3 erreurs, cooldown 60 s, vérification email+code) — livrée et validée en production (`cfbe06fb…`).
 - **2026-10** : email confirmé ≠ compte actif ; activation administrative obligatoire ; utilisateur averti de l’attente et notifié après activation.
 - **2026-10** : UX confirmation email (champ unique, collage filtré, renvoi explicite et attente administrative) — livrée et validée en production (`ddf4f9e…`).
+- **2026-10-07** : refonte UI mobile Accueil / LoginPage / headers dégradés + œil MDP + splash — commitée/poussée (`2b11725`), validée sur téléphone via AMAKI Dev (build Expo Dev `798d66ff-1f90-4b18-8505-e8c2603e2258`) ; Play Store `fr.amaki.app` `1.0.0` inchangé, aucune publication production Android.
 
 ---
 
