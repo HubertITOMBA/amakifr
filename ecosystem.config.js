@@ -70,7 +70,8 @@ module.exports = {
       env: {
         NODE_ENV: 'production',
         PORT: 9060,
-        HOSTNAME: '0.0.0.0',
+        // Next écoute uniquement en loopback ; Nginx (443) est l'entrée publique.
+        HOSTNAME: '127.0.0.1',
         NEXT_PUBLIC_APP_URL: process.env.AMAKIFR_URL || 'https://amaki.fr',
       },
       // Options de redémarrage

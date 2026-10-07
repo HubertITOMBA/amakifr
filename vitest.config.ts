@@ -13,6 +13,7 @@ export default defineConfig({
       "lib/**/*.spec.ts",
       "app/api/v1/**/*.test.ts",
       "app/api/admin/**/*.test.ts",
+      "actions/**/*.test.ts",
       "components/**/*.test.tsx",
     ],
     exclude: ["node_modules", ".next", "templates"],

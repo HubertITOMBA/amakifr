@@ -346,14 +346,51 @@ model VerificationToken {
   @@map("verification_tokens")
 }
 
-model PasswordResetToken {
-  id      String   @id @default(cuid())
-  email   String
-  token   String   @unique
-  expires DateTime
+/// Challenge de réinitialisation MDP (code 8 chiffres HMAC). Distinct de VerificationToken.
+enum PasswordResetChallengeStatus {
+  PENDING
+  ACTIVE
+}
 
-  @@unique([email, token])
+model PasswordResetToken {
+  id              String                        @id @default(cuid())
+  email           String                        @unique
+  /// HMAC-SHA-256 du code ACTIVE (jamais le code en clair).
+  codeHash        String                        @unique
+  /// Hash du code en cours d'envoi — jamais consommable tant que non activé.
+  pendingCodeHash String?
+  pendingExpires  DateTime?
+  status          PasswordResetChallengeStatus  @default(PENDING)
+  createdAt       DateTime                      @default(now())
+  /// Dernière demande (cooldown) — indépendant de createdAt du challenge ACTIVE.
+  lastRequestAt   DateTime                      @default(now())
+  expires         DateTime
+  failedAttempts  Int                           @default(0)
+  lockedAt        DateTime?
+
   @@map("password_reset_tokens")
+}
+
+/// Compteurs rate-limit password-reset (PostgreSQL, pas Redis).
+/// keyHash = HMAC — jamais email/IP en clair.
+enum PasswordResetRateLimitScope {
+  IP
+  EMAIL
+  COMBINATION
+}
+
+model PasswordResetRateLimit {
+  id              String                       @id @default(cuid())
+  keyHash         String                       @unique
+  scope           PasswordResetRateLimitScope
+  windowStartedAt DateTime
+  attempts        Int                          @default(0)
+  expiresAt       DateTime
+  createdAt       DateTime                     @default(now())
+  updatedAt       DateTime                     @updatedAt
+
+  @@index([expiresAt])
+  @@map("password_reset_rate_limits")
 }
 
 model TwoFactorToken {

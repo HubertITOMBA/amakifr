@@ -13,7 +13,7 @@ vi.mock("@/lib/token", () => ({
     generateVerificationToken(...args),
   VERIFICATION_TOKEN_TTL_MS: 300_000,
   VERIFICATION_RESEND_COOLDOWN_MS: 60_000,
-  PASSWORD_RESET_TOKEN_TTL_MS: 300_000,
+  PASSWORD_RESET_TOKEN_TTL_MS: 600_000,
 }));
 
 vi.mock("@/lib/mail", () => ({

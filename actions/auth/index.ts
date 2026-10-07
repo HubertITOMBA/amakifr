@@ -124,30 +124,30 @@ export const getVerificationTokenByToken = async (token: string) => {
 }
 
 
+/**
+ * Challenge reset par email (un seul actif — email @unique).
+ *
+ * @param email - Email normalisé
+ */
 export const getPasswordResetTokenByEmail = async (email: string) => {
-
     try {
-        const passwordResetToken = await db.passwordResetToken.findFirst({
-            where: {
-                email
-            }
-        })
-        return passwordResetToken
-    } catch (error) {
-        return null
+        return await db.passwordResetToken.findUnique({
+            where: { email },
+        });
+    } catch {
+        return null;
     }
 }
 
-export const getPasswordResetTokenByToken = async (token: string) => {
+/**
+ * @deprecated Lookup par codeHash uniquement (plus de token UUID en clair).
+ */
+export const getPasswordResetTokenByToken = async (codeHash: string) => {
     try {
-        const passwordResetToken = await db.passwordResetToken.findUnique({
-            where: {
-                token
-            }
-        })
-
-        return passwordResetToken
-    } catch (error) {
-        return null
+        return await db.passwordResetToken.findUnique({
+            where: { codeHash },
+        });
+    } catch {
+        return null;
     }
 }

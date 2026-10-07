@@ -4,7 +4,7 @@
 
 # shellcheck disable=SC2034
 
-DEPLOY_GUARDS_VERSION=3
+DEPLOY_GUARDS_VERSION=4
 
 # Checksum historique de la ligne orpheline (référence documentaire uniquement).
 # Le dossier migration.sql correspondant NE DOIT PAS être présent dans le dépôt.
@@ -326,6 +326,282 @@ for key in ("NOTES_FRAIS_ENABLED", "NEXT_PUBLIC_NOTES_FRAIS_ENABLED"):
         return 1
       fi
     done
+  fi
+  return 0
+}
+
+# ---------------------------------------------------------------------------
+# Password reset HMAC secret (longueur uniquement — jamais la valeur)
+# ---------------------------------------------------------------------------
+
+PASSWORD_RESET_HMAC_SECRET_MIN_BYTES=32
+
+# Lit la longueur UTF-8 d'une clé env (shell puis .env) sans echo de la valeur.
+# Affiche un entier >= 0, ou -1 si absente/vide.
+_password_reset_hmac_secret_byte_length() {
+  local val="" line
+  if [[ -n "${PASSWORD_RESET_HMAC_SECRET+x}" ]]; then
+    val="${PASSWORD_RESET_HMAC_SECRET}"
+  elif [[ -f .env ]]; then
+    line="$(grep -E "^[[:space:]]*PASSWORD_RESET_HMAC_SECRET=" .env 2>/dev/null | head -1 || true)"
+    if [[ -n "$line" ]]; then
+      val="${line#*=}"
+      val="${val%$'\r'}"
+      val="${val#\"}"
+      val="${val%\"}"
+      val="${val#\'}"
+      val="${val%\'}"
+    fi
+  fi
+  if [[ -z "$val" ]]; then
+    echo -1
+    return 0
+  fi
+  python3 -c 'import os,sys; v=sys.argv[1]; print(len(v.encode("utf-8")))' "$val"
+}
+
+# Exige PASSWORD_RESET_HMAC_SECRET ≥ 32 octets UTF-8 (shell ou .env).
+# Aucune valeur par défaut. N'affiche jamais le secret.
+# Usage: assert_password_reset_hmac_secret_ready
+assert_password_reset_hmac_secret_ready() {
+  local blen
+  blen="$(_password_reset_hmac_secret_byte_length)"
+  if [[ "$blen" -lt 0 ]]; then
+    fail_guard "PASSWORD_RESET_HMAC_SECRET absent ou vide (requis ≥ ${PASSWORD_RESET_HMAC_SECRET_MIN_BYTES} octets)"
+    return 1
+  fi
+  if [[ "$blen" -lt "$PASSWORD_RESET_HMAC_SECRET_MIN_BYTES" ]]; then
+    fail_guard "PASSWORD_RESET_HMAC_SECRET trop court (${blen} < ${PASSWORD_RESET_HMAC_SECRET_MIN_BYTES} octets)"
+    return 1
+  fi
+  return 0
+}
+
+# Port interne Next production (loopback uniquement).
+NEXT_PROD_LISTEN_PORT="${NEXT_PROD_LISTEN_PORT:-9060}"
+NGINX_PROD_CONF_REL="${NGINX_PROD_CONF_REL:-deploy/nginx/amaki.conf}"
+
+# Vérifie que package.json démarre Next sur 127.0.0.1:9060 (pas 0.0.0.0).
+# Usage: assert_next_prod_start_binds_loopback [package.json]
+assert_next_prod_start_binds_loopback() {
+  local pkg="${1:-package.json}"
+  local line
+  if [[ ! -f "$pkg" ]]; then
+    fail_guard "package.json introuvable pour vérifier le bind production"
+    return 1
+  fi
+  line="$(grep -E '"start"[[:space:]]*:' "$pkg" | head -1 || true)"
+  if [[ -z "$line" ]]; then
+    fail_guard "script npm start introuvable dans package.json"
+    return 1
+  fi
+  if echo "$line" | grep -qE '0\.0\.0\.0'; then
+    fail_guard "npm start ne doit pas binder 0.0.0.0 (Next prod = 127.0.0.1:${NEXT_PROD_LISTEN_PORT})"
+    return 1
+  fi
+  if ! echo "$line" | grep -qE '127\.0\.0\.1'; then
+    fail_guard "npm start doit contenir -H 127.0.0.1 (port ${NEXT_PROD_LISTEN_PORT})"
+    return 1
+  fi
+  if ! echo "$line" | grep -qE -- "-p[[:space:]]+${NEXT_PROD_LISTEN_PORT}|-p[[:space:]]*${NEXT_PROD_LISTEN_PORT}"; then
+    # Accepte aussi "-p 9060" collé
+    if ! echo "$line" | grep -q "${NEXT_PROD_LISTEN_PORT}"; then
+      fail_guard "npm start doit cibler le port ${NEXT_PROD_LISTEN_PORT}"
+      return 1
+    fi
+  fi
+  return 0
+}
+
+# Preuve Nginx production versionnée (référence dépôt — insuffisante pour TRUST_PROXY).
+# Ne pas utiliser amakifr-dev.conf comme preuve production.
+# Usage: assert_nginx_prod_x_real_ip_configured [chemin]
+assert_nginx_prod_x_real_ip_configured() {
+  local conf="${1:-$NGINX_PROD_CONF_REL}"
+  if [[ ! -f "$conf" ]]; then
+    fail_guard "Nginx production versionné introuvable ($conf)"
+    return 1
+  fi
+  if ! grep -qE 'proxy_set_header[[:space:]]+X-Real-IP[[:space:]]+\$remote_addr' "$conf"; then
+    fail_guard "Nginx prod doit contenir: proxy_set_header X-Real-IP \$remote_addr;"
+    return 1
+  fi
+  if ! grep -qE 'proxy_set_header[[:space:]]+X-Forwarded-For[[:space:]]+\$proxy_add_x_forwarded_for' "$conf"; then
+    fail_guard "Nginx prod doit contenir: proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;"
+    return 1
+  fi
+  if ! grep -qE '127\.0\.0\.1:9060' "$conf"; then
+    fail_guard "Nginx prod doit proxifier vers 127.0.0.1:9060"
+    return 1
+  fi
+  # Refus d'utiliser le conf DEV comme preuve
+  if [[ "$conf" == *amakifr-dev.conf ]]; then
+    fail_guard "amakifr-dev.conf n'est pas une preuve Nginx production"
+    return 1
+  fi
+  return 0
+}
+
+# Conf Nginx EFFECTIVE (VPS) via nginx -T — lecture seule.
+# Autorise TRUST_PROXY uniquement si le bloc amaki.fr → 127.0.0.1:9060
+# écrase X-Real-IP avec $remote_addr (pas $http_x_real_ip).
+# Fixtures tests : NGINX_T_SNAPSHOT_FILE ou NGINX_T_SNAPSHOT.
+# N'affiche jamais certificats PEM ni dump complet.
+# Usage: assert_nginx_effective_amaki_proxy_headers
+assert_nginx_effective_amaki_proxy_headers() {
+  local checker="" dump_file="" rc=0
+  local script_dir
+  script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+  checker="${NGINX_EFFECTIVE_CHECKER:-$script_dir/check-nginx-effective-amaki.py}"
+
+  if [[ ! -f "$checker" ]]; then
+    fail_guard "check-nginx-effective-amaki.py introuvable"
+    return 1
+  fi
+  if ! command -v python3 >/dev/null 2>&1; then
+    fail_guard "python3 introuvable pour parser nginx -T"
+    return 1
+  fi
+
+  if [[ -n "${NGINX_T_SNAPSHOT_FILE:-}" ]]; then
+    if [[ ! -f "$NGINX_T_SNAPSHOT_FILE" ]]; then
+      fail_guard "NGINX_T_SNAPSHOT_FILE introuvable"
+      return 1
+    fi
+    python3 "$checker" "$NGINX_T_SNAPSHOT_FILE" >/dev/null || {
+      rc=$?
+      if [[ "$rc" -eq 2 ]]; then
+        fail_guard "nginx effective ambiguë ou dump invalide"
+      else
+        fail_guard "nginx effective : headers/upstream amaki.fr → 9060 non conformes"
+      fi
+      return 1
+    }
+    return 0
+  fi
+
+  if [[ -n "${NGINX_T_SNAPSHOT+x}" ]]; then
+    dump_file="$(mktemp)"
+    printf '%s\n' "$NGINX_T_SNAPSHOT" >"$dump_file"
+    python3 "$checker" "$dump_file" >/dev/null || {
+      rc=$?
+      rm -f "$dump_file"
+      if [[ "$rc" -eq 2 ]]; then
+        fail_guard "nginx effective ambiguë ou dump invalide"
+      else
+        fail_guard "nginx effective : headers/upstream amaki.fr → 9060 non conformes"
+      fi
+      return 1
+    }
+    rm -f "$dump_file"
+    return 0
+  fi
+
+  # Live : nginx -T (lecture seule). Échec explicite si inaccessible.
+  if ! command -v nginx >/dev/null 2>&1; then
+    fail_guard "nginx introuvable — impossible de vérifier la conf effective (nginx -T)"
+    return 1
+  fi
+
+  dump_file="$(mktemp)"
+  # Capturer stdout+stderr ; ne jamais les réafficher (certs / secrets possibles)
+  if ! nginx -T >"$dump_file" 2>/dev/null; then
+    # Certains VPS exigent root pour -T ; tenter sudo non interactif
+    if command -v sudo >/dev/null 2>&1; then
+      if ! sudo -n nginx -T >"$dump_file" 2>/dev/null; then
+        rm -f "$dump_file"
+        fail_guard "nginx -T inaccessible (droits insuffisants ou erreur) — TRUST_PROXY refusé"
+        return 1
+      fi
+    else
+      rm -f "$dump_file"
+      fail_guard "nginx -T inaccessible — TRUST_PROXY refusé"
+      return 1
+    fi
+  fi
+
+  if [[ ! -s "$dump_file" ]]; then
+    rm -f "$dump_file"
+    fail_guard "nginx -T a produit un dump vide — ambigu"
+    return 1
+  fi
+
+  python3 "$checker" "$dump_file" >/dev/null || {
+    rc=$?
+    rm -f "$dump_file"
+    if [[ "$rc" -eq 2 ]]; then
+      fail_guard "nginx effective ambiguë (locations/upstream) — TRUST_PROXY refusé"
+    else
+      fail_guard "nginx effective non conforme (X-Real-IP / upstream 9060) — TRUST_PROXY refusé"
+    fi
+    return 1
+  }
+  rm -f "$dump_file"
+  return 0
+}
+
+# Après restart : Next doit écouter uniquement 127.0.0.1:9060.
+# Refuse 0.0.0.0:9060, [::]:9060, *:9060.
+# Snapshot injectable pour tests : NEXT_PROD_LISTEN_SNAPSHOT
+# Usage: assert_next_prod_listen_loopback_only [port]
+assert_next_prod_listen_loopback_only() {
+  local port="${1:-$NEXT_PROD_LISTEN_PORT}"
+  local listen_out=""
+
+  if [[ -n "${NEXT_PROD_LISTEN_SNAPSHOT+x}" ]]; then
+    listen_out="${NEXT_PROD_LISTEN_SNAPSHOT}"
+  elif command -v ss >/dev/null 2>&1; then
+    listen_out="$(ss -ltnH 2>/dev/null || ss -ltn 2>/dev/null || true)"
+  elif command -v netstat >/dev/null 2>&1; then
+    listen_out="$(netstat -ltn 2>/dev/null || true)"
+  else
+    fail_guard "ss/netstat introuvable pour vérifier l'écoute ${port}"
+    return 1
+  fi
+
+  if echo "$listen_out" | grep -E "(^|[[:space:]])0\.0\.0\.0:${port}([[:space:]]|$)|\[::\]:${port}([[:space:]]|$)|([^0-9]|^)\*:${port}([[:space:]]|$)" >/dev/null; then
+    fail_guard "port ${port} exposé sur 0.0.0.0 / [::] / * — Next doit écouter 127.0.0.1 uniquement"
+    return 1
+  fi
+
+  if ! echo "$listen_out" | grep -E "127\.0\.0\.1:${port}([[:space:]]|$)" >/dev/null; then
+    fail_guard "écoute 127.0.0.1:${port} introuvable après restart"
+    return 1
+  fi
+  return 0
+}
+
+# Exige TRUST_PROXY=true + garde réseau.
+# Obligatoire : bind start loopback + Nginx EFFECTIVE (nginx -T).
+# Le fichier versionné deploy/nginx/amaki.conf est insuffisant à lui seul.
+# Si ASSERT_NEXT_PROD_LISTEN=1 (après restart uniquement) : écoute live loopback.
+# Ne pas déduire la confiance de NODE_ENV. N'affiche jamais d'autres secrets.
+# Usage: assert_password_reset_trust_proxy_ready
+assert_password_reset_trust_proxy_ready() {
+  local val="" line
+  if [[ -n "${TRUST_PROXY+x}" ]]; then
+    val="${TRUST_PROXY}"
+  elif [[ -f .env ]]; then
+    line="$(grep -E "^[[:space:]]*TRUST_PROXY=" .env 2>/dev/null | head -1 || true)"
+    if [[ -n "$line" ]]; then
+      val="${line#*=}"
+      val="${val%$'\r'}"
+      val="${val#\"}"
+      val="${val%\"}"
+      val="$(echo "$val" | tr -d '[:space:]')"
+    fi
+  fi
+  if [[ "$val" != "true" ]]; then
+    fail_guard "TRUST_PROXY doit être exactement true (X-Real-IP Nginx pour password-reset)"
+    return 1
+  fi
+
+  # TRUST_PROXY n'est accepté que si la chaîne réseau EFFECTIVE est sécurisée
+  assert_next_prod_start_binds_loopback || return 1
+  assert_nginx_effective_amaki_proxy_headers || return 1
+
+  if [[ "${ASSERT_NEXT_PROD_LISTEN:-}" == "1" ]]; then
+    assert_next_prod_listen_loopback_only || return 1
   fi
   return 0
 }

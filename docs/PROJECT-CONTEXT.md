@@ -58,6 +58,10 @@ Ne jamais afficher ni versionner les secrets de `.env`.
   - `scripts/maintenance-off.sh`
 - Toujours vérifier le `503` public avant d’arrêter PM2.
 - Smoke interne : `http://127.0.0.1:9060/`.
+- Next production doit écouter uniquement `127.0.0.1:9060` (`next start -H 127.0.0.1 -p 9060`) — jamais `0.0.0.0:9060`.
+- Nginx est l’unique entrée publique. `TRUST_PROXY` exige la conf **effective** (`nginx -T`), pas seulement le fichier versionné.
+- `deploy/nginx/amaki.conf` est une **référence / checklist** : le déploiement ne la copie pas automatiquement vers `/etc/nginx` (risque d’écraser TLS/maintenance plus riches).
+- Fermeture `9060/tcp` firewalld : étape **humaine contrôlée** après preuve loopback (documentée, non automatisée).
 - Le smoke interne utilise des tentatives bornées car Next.js peut démarrer en plus de 20 secondes.
 - Après ouverture, vérifier plusieurs réponses publiques `200/3xx` ; en cas d’échec, restaurer immédiatement le flag de maintenance.
 
@@ -283,6 +287,7 @@ Ordre des priorités encore ouvertes (après le P0 inscription web) :
 - **2026-10** : email confirmé ≠ compte actif ; activation administrative obligatoire ; utilisateur averti de l’attente et notifié après activation.
 - **2026-10** : UX confirmation email (champ unique, collage filtré, renvoi explicite et attente administrative) — livrée et validée en production (`ddf4f9e…`).
 - **2026-10-07** : refonte UI mobile Accueil / LoginPage / headers dégradés + œil MDP + splash — commitée/poussée (`2b11725`), validée sur téléphone via AMAKI Dev (build Expo Dev `798d66ff-1f90-4b18-8505-e8c2603e2258`) ; Play Store `fr.amaki.app` `1.0.0` inchangé, aucune publication production Android.
+- **2026-10-07** : parcours « mot de passe oublié » S0/S1 (HMAC 8 chiffres, rate-limit PG, bind `127.0.0.1:9060`, `TRUST_PROXY` conditionné à Nginx **effective** `nginx -T`, rate-limit REQUEST/CONFIRM séparés) — **préparé / non livré** ; baseline validée inchangée (`2b11725`) jusqu’à commit + déploiement VPS contrôlé.
 
 ---
 

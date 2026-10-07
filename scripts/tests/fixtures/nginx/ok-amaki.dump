@@ -1,0 +1,19 @@
+# configuration file /etc/nginx/nginx.conf:
+http {
+upstream amakifr_prod_backend {
+    server 127.0.0.1:9060;
+}
+server {
+    listen 443 ssl;
+    server_name amaki.fr www.amaki.fr;
+    ssl_certificate /etc/letsencrypt/live/amaki.fr/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/amaki.fr/privkey.pem;
+    # fake pem should be redacted by checker if present
+    location / {
+        proxy_pass http://amakifr_prod_backend;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header Host $host;
+    }
+}
+}

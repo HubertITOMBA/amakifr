@@ -2,7 +2,6 @@
 import * as z from "zod";
 import { useForm } from "react-hook-form"
 import { useState, useTransition } from "react"
-import { useSearchParams } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { NewPasswordSchema } from "@/schemas";
 import { Input } from "@/components/ui/input";
@@ -22,11 +21,11 @@ import { FormSuccess } from '@/components/global/form-success';
 import { newPassword } from "@/actions/auth/new-password";
 import { LoginButton } from "@/components/auth/login-button";
 
-
+/**
+ * Formulaire web nouveau mot de passe : email + code 8 chiffres + MDP + confirmation.
+ * Aucun secret dans l'URL (pas de ?token=).
+ */
 export const NewPasswordForm = () => {
-    const searchParams = useSearchParams();
-    const token = searchParams.get("token")
-
     const [error, setError] = useState<string | undefined>("");
     const [success, setSuccess] = useState<string | undefined>("");
     const [isPending, startTransition] = useTransition();
@@ -34,20 +33,21 @@ export const NewPasswordForm = () => {
     const form = useForm<z.infer<typeof NewPasswordSchema>>({
         resolver: zodResolver(NewPasswordSchema),
         defaultValues: {
-            password: ""
+            email: "",
+            code: "",
+            password: "",
+            confirmPassword: "",
          },
     });
 
     const onSubmit = (data: z.infer<typeof NewPasswordSchema>) => {
-        // console.log(data);
         setError("")
         setSuccess("")
 
         startTransition(() => {
-            newPassword(data, token)
+            newPassword(data)
                 .then((response) => {
                     if(response.error){
-                        form.reset()
                         setError(response.error)
                     }
 
@@ -62,7 +62,7 @@ export const NewPasswordForm = () => {
     return (
         <CardWrapper
             labelBox= "Nouveau mot de passe"
-            headerLabel="Entrez votre nouveau mot de passe ?"
+            headerLabel="Saisissez votre e-mail, le code reçu et votre nouveau mot de passe."
             backButtonLabel="Retour à la connexion"
             backButtonComponent={
                 <LoginButton mode="modal">
@@ -85,20 +85,78 @@ export const NewPasswordForm = () => {
                         <div className="space-y-4">
                             <FormField
                                control={form.control}
+                               name="email"
+                               render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Adresse e-mail</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                {...field}
+                                                disabled={isPending}
+                                                type="email"
+                                                autoComplete="email"
+                                                autoFocus
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                               control={form.control}
+                               name="code"
+                               render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Code à 8 chiffres</FormLabel>
+                                        <FormControl>
+                                            <Input
+                                                {...field}
+                                                disabled={isPending}
+                                                inputMode="numeric"
+                                                autoComplete="one-time-code"
+                                                maxLength={8}
+                                                placeholder="********"
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
+                            />
+                            <FormField
+                               control={form.control}
                                name="password"
                                render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Mot de passe</FormLabel>
+                                        <FormLabel>Nouveau mot de passe</FormLabel>
                                         <FormControl>
                                             <PasswordInput 
                                                 {...field}
                                                  disabled={isPending}
                                                  placeholder="******"
+                                                 autoComplete="new-password"
                                             />
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
                                 )}   
+                            />
+                            <FormField
+                               control={form.control}
+                               name="confirmPassword"
+                               render={({ field }) => (
+                                    <FormItem>
+                                        <FormLabel>Confirmation</FormLabel>
+                                        <FormControl>
+                                            <PasswordInput
+                                                {...field}
+                                                disabled={isPending}
+                                                placeholder="******"
+                                                autoComplete="new-password"
+                                            />
+                                        </FormControl>
+                                        <FormMessage />
+                                    </FormItem>
+                                )}
                             />
                         </div> 
                         <FormError message={error}/>

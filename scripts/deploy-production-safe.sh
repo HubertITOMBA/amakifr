@@ -4,7 +4,8 @@
 #
 # Ordre garanti :
 #   1. Contrôles Git (cwd, fetch, SHA==origin/main, dirty, inventaire) — AVANT mutation
-#   2. Préflight PM2 / flags / disque / orpheline / URLs
+#   2. Préflight : HMAC, TRUST_PROXY, Nginx EFFECTIVE (nginx -T), PM2 / flags / URLs
+#      (écoute live ss NON exigée ici — l'ancienne prod peut encore être sur 0.0.0.0)
 #   3. Maintenance ON + HTTP 503
 #   4. pm2 stop amakifr + vérification stopped
 #   5. Backup custom atomique (mktemp) + SHA-256 + TOC
@@ -15,9 +16,11 @@
 #  10. prisma migrate deploy
 #  11. contrôles SQL post-migration
 #  12. seeds si ALLOW_SEEDS=1 (STOP si échec)
-#  13. pm2 restart + pm2 save (bloquant)
-#  14. smoke (SMOKE_URL validée) + deploy:check
+#  13. pm2 restart (écoute 127.0.0.1:9060) + pm2 save (bloquant)
+#  14. garde live ss (loopback only) + smoke interne ; puis smoke public
 #  15. maintenance OFF uniquement si tout vert
+# Ne copie JAMAIS automatiquement deploy/nginx/amaki.conf vers /etc/nginx.
+# Fermeture firewalld 9060/tcp : étape humaine séparée (non exécutée ici).
 #
 # Obligatoire :
 #   EXPECTED_GIT_SHA=<40 hex>   # exactement origin/main après fetch
@@ -160,6 +163,11 @@ assert_pm2_process_exists "$PM2_APP_NAME" || fail "Préflight PM2"
 assert_pm2_cwd "$PM2_APP_NAME" "/sites/amakifr" || fail "Préflight cwd PM2"
 assert_notes_frais_flags_on "$PM2_APP_NAME" || fail "Préflight flags Notes de frais actifs"
 assert_notes_frais_storage_ready || fail "Préflight stockage Notes de frais"
+assert_password_reset_hmac_secret_ready || fail "Préflight PASSWORD_RESET_HMAC_SECRET"
+assert_next_prod_start_binds_loopback || fail "Préflight bind Next 127.0.0.1:9060 (package.json)"
+assert_nginx_prod_x_real_ip_configured || fail "Préflight référence dépôt deploy/nginx/amaki.conf"
+assert_nginx_effective_amaki_proxy_headers || fail "Préflight Nginx EFFECTIVE (nginx -T) amaki.fr → 9060"
+assert_password_reset_trust_proxy_ready || fail "Préflight TRUST_PROXY (nécessite Nginx effective)"
 AVAIL_KB="$(df -Pk . | awk 'NR==2{print $4}')"
 [[ "${AVAIL_KB:-0}" -gt 1048576 ]] || fail "Espace disque insuffisant (<1 Go libre)"
 mkdir -p "$BACKUP_DIR"
@@ -219,6 +227,8 @@ npx prisma generate || fail "prisma generate"
 
 step "9/15 — build (flags Notes de frais actifs)"
 assert_notes_frais_flags_on "$PM2_APP_NAME" || fail "flags actifs avant build"
+assert_password_reset_hmac_secret_ready || fail "PASSWORD_RESET_HMAC_SECRET avant build"
+assert_password_reset_trust_proxy_ready || fail "TRUST_PROXY avant build"
 # nginx maintient le 503 public ; le build et PM2 doivent servir normalement
 # en interne pour pouvoir être vérifiés avant d'ouvrir nginx.
 export MAINTENANCE_MODE=false
@@ -283,6 +293,11 @@ fi
 # ─── 13. Restart + pm2 save bloquant ─────────────────────────────────────────
 step "13/15 — Restart PM2 + pm2 save (bloquant)"
 assert_notes_frais_flags_on "$PM2_APP_NAME" || fail "flags actifs avant restart"
+assert_password_reset_hmac_secret_ready || fail "PASSWORD_RESET_HMAC_SECRET avant restart"
+assert_next_prod_start_binds_loopback || fail "bind Next avant restart"
+assert_nginx_effective_amaki_proxy_headers || fail "Nginx effective avant restart"
+# Pas de garde ss ici : l'ancienne écoute 0.0.0.0 peut encore être active avant restart
+assert_password_reset_trust_proxy_ready || fail "TRUST_PROXY avant restart"
 MAINTENANCE_MODE=false pm2 restart "$PM2_APP_NAME" --update-env || fail "pm2 restart"
 PM2_RESTARTED=1
 PM2_STOPPED=0
@@ -290,8 +305,8 @@ if ! pm2 save; then
   fail_after_restart "pm2 save a échoué — process redémarré, persistance PM2 non garantie"
 fi
 
-# ─── 14. Smoke interne sous nginx 503 ────────────────────────────────────────
-step "14/15 — Smoke interne sous maintenance — STOP si échec"
+# ─── 14. Garde live ss + smoke interne (sous nginx 503) ──────────────────────
+step "14/15 — Écoute loopback + smoke interne — STOP si échec"
 assert_smoke_url_shape "$SMOKE_URL" || fail_after_restart "SMOKE_URL invalide après restart"
 assert_internal_smoke_url_shape "$INTERNAL_SMOKE_URL" || fail_after_restart "URL interne invalide après restart"
 assert_notes_frais_flags_on "$PM2_APP_NAME" || fail_after_restart "flags actifs après restart (PM2)"
@@ -300,10 +315,14 @@ if ! command -v curl >/dev/null 2>&1; then
   fail_after_restart "curl introuvable pour smoke"
 fi
 assert_maintenance_http "$MAINTENANCE_CHECK_URL" || fail_after_restart "nginx n'est plus en maintenance"
+# Obligatoire APRÈS restart et AVANT maintenance-off
+assert_next_prod_listen_loopback_only || fail_after_restart "écoute Next non loopback (9060 exposé?)"
+ASSERT_NEXT_PROD_LISTEN=1 assert_password_reset_trust_proxy_ready || fail_after_restart "TRUST_PROXY / chaîne proxy après restart"
 if ! code="$(wait_for_http_ready "$INTERNAL_SMOKE_URL" 6 20 5)"; then
   fail_after_restart "smoke interne épuisé après 6 tentatives ; dernier HTTP=$code"
 fi
-echo -e "${GREEN}✅ Application vérifiée en interne (HTTP=$code) ; nginx toujours à 503${NC}"
+echo -e "${GREEN}✅ Application vérifiée en interne (HTTP=$code) ; bind 127.0.0.1:9060 OK ; nginx toujours à 503${NC}"
+# Firewalld 9060/tcp : NE PAS exécuter ici — étape humaine contrôlée (voir docs/auth/PASSWORD-RESET.txt)
 
 # ─── 15. Maintenance OFF ─────────────────────────────────────────────────────
 step "15/15 — Maintenance OFF"

@@ -310,6 +310,117 @@ assert_ok "deploy sans contournement flags_on" bash -c '
   ! grep -E "SKIP_NOTES_FRAIS|BYPASS_NOTES_FRAIS|NOTES_FRAIS_SKIP" "'"$DEPLOY_SCRIPT"'"
 '
 
+# --- PASSWORD_RESET_HMAC_SECRET (longueur uniquement) ---
+unset PASSWORD_RESET_HMAC_SECRET || true
+pushd_quiet "$TMP"
+rm -f .env
+assert_fail "hmac secret absent" assert_password_reset_hmac_secret_ready
+echo 'PASSWORD_RESET_HMAC_SECRET=short' > .env
+assert_fail "hmac secret trop court (.env)" assert_password_reset_hmac_secret_ready
+echo 'PASSWORD_RESET_HMAC_SECRET=12345678901234567890123456789012' > .env
+assert_ok "hmac secret 32 octets (.env)" assert_password_reset_hmac_secret_ready
+rm -f .env
+export PASSWORD_RESET_HMAC_SECRET='12345678901234567890123456789012'
+assert_ok "hmac secret 32 octets (shell)" assert_password_reset_hmac_secret_ready
+export PASSWORD_RESET_HMAC_SECRET='tooshort'
+assert_fail "hmac secret trop court (shell)" assert_password_reset_hmac_secret_ready
+unset PASSWORD_RESET_HMAC_SECRET || true
+popd_quiet
+assert_ok "deploy appelle hmac secret" bash -c '
+  n=$(grep -c assert_password_reset_hmac_secret_ready "'"$DEPLOY_SCRIPT"'")
+  [[ "$n" -ge 3 ]]
+'
+
+# --- TRUST_PROXY + garde réseau + Nginx EFFECTIVE (password-reset IP) ---
+unset TRUST_PROXY ASSERT_NEXT_PROD_LISTEN NEXT_PROD_LISTEN_SNAPSHOT \
+  NGINX_T_SNAPSHOT NGINX_T_SNAPSHOT_FILE || true
+FIX_NGINX="$ROOT/scripts/tests/fixtures/nginx"
+pushd_quiet "$TMP"
+rm -f .env package.json
+mkdir -p deploy/nginx
+# Stubs chaîne réseau (référence dépôt + effective via fixture)
+printf '%s\n' '{"scripts":{"start":"next start -H 127.0.0.1 -p 9060"}}' > package.json
+cat > deploy/nginx/amaki.conf <<'NGX'
+upstream amakifr_prod_backend { server 127.0.0.1:9060; }
+location / {
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+NGX
+export NGINX_T_SNAPSHOT_FILE="$FIX_NGINX/ok-amaki.dump"
+
+assert_ok "start binds loopback" assert_next_prod_start_binds_loopback
+assert_ok "nginx prod X-Real-IP (fichier)" assert_nginx_prod_x_real_ip_configured
+assert_ok "nginx effective OK" assert_nginx_effective_amaki_proxy_headers
+
+# Fixtures nginx -T
+export NGINX_T_SNAPSHOT_FILE="$FIX_NGINX/missing-x-real-ip.dump"
+assert_fail "nginx effective X-Real-IP absent" assert_nginx_effective_amaki_proxy_headers
+export NGINX_T_SNAPSHOT_FILE="$FIX_NGINX/client-controlled-x-real-ip.dump"
+assert_fail "nginx effective X-Real-IP client" assert_nginx_effective_amaki_proxy_headers
+export NGINX_T_SNAPSHOT_FILE="$FIX_NGINX/bad-upstream.dump"
+assert_fail "nginx effective mauvais upstream" assert_nginx_effective_amaki_proxy_headers
+export NGINX_T_SNAPSHOT_FILE="$FIX_NGINX/ambiguous-locations.dump"
+assert_fail "nginx effective locations ambiguës" assert_nginx_effective_amaki_proxy_headers
+
+# nginx indisponible (pas de fixture, PATH sans nginx)
+unset NGINX_T_SNAPSHOT_FILE NGINX_T_SNAPSHOT || true
+mkdir -p "$TMP/bin-nonginx"
+# PATH sans nginx
+push_path "$TMP/bin-nonginx"
+assert_fail "nginx commande indisponible" assert_nginx_effective_amaki_proxy_headers
+pop_path
+export NGINX_T_SNAPSHOT_FILE="$FIX_NGINX/ok-amaki.dump"
+
+# start exposé → refus
+printf '%s\n' '{"scripts":{"start":"next start -H 0.0.0.0 -p 9060"}}' > package.json
+assert_fail "start 0.0.0.0 refusé" assert_next_prod_start_binds_loopback
+printf '%s\n' '{"scripts":{"start":"next start -H 127.0.0.1 -p 9060"}}' > package.json
+
+# écoute live : loopback OK / exposition refusée
+export NEXT_PROD_LISTEN_SNAPSHOT=$'LISTEN 0 511 127.0.0.1:9060 0.0.0.0:*\n'
+assert_ok "listen loopback only" assert_next_prod_listen_loopback_only
+export NEXT_PROD_LISTEN_SNAPSHOT=$'LISTEN 0 511 0.0.0.0:9060 0.0.0.0:*\n'
+assert_fail "listen 0.0.0.0:9060 refusé" assert_next_prod_listen_loopback_only
+export NEXT_PROD_LISTEN_SNAPSHOT=$'LISTEN 0 511 [::]:9060 :::*\n'
+assert_fail "listen [::]:9060 refusé" assert_next_prod_listen_loopback_only
+export NEXT_PROD_LISTEN_SNAPSHOT=$'LISTEN 0 511 127.0.0.1:9060 0.0.0.0:*\n'
+
+rm -f .env
+assert_fail "trust_proxy absent" assert_password_reset_trust_proxy_ready
+echo 'TRUST_PROXY=false' > .env
+assert_fail "trust_proxy false" assert_password_reset_trust_proxy_ready
+echo 'TRUST_PROXY=true' > .env
+assert_ok "trust_proxy true (.env) + nginx effective" assert_password_reset_trust_proxy_ready
+rm -f .env
+export TRUST_PROXY=true
+assert_ok "trust_proxy true (shell) + nginx effective" assert_password_reset_trust_proxy_ready
+
+# TRUST_PROXY + live listen exposé → refus (après restart seulement)
+export ASSERT_NEXT_PROD_LISTEN=1
+export NEXT_PROD_LISTEN_SNAPSHOT=$'LISTEN 0 511 0.0.0.0:9060 0.0.0.0:*\n'
+assert_fail "TRUST_PROXY refusé si port exposé" assert_password_reset_trust_proxy_ready
+export NEXT_PROD_LISTEN_SNAPSHOT=$'LISTEN 0 511 127.0.0.1:9060 0.0.0.0:*\n'
+assert_ok "TRUST_PROXY OK si listen loopback" assert_password_reset_trust_proxy_ready
+unset TRUST_PROXY ASSERT_NEXT_PROD_LISTEN NEXT_PROD_LISTEN_SNAPSHOT \
+  NGINX_T_SNAPSHOT NGINX_T_SNAPSHOT_FILE || true
+popd_quiet
+assert_ok "deploy appelle trust_proxy" bash -c '
+  n=$(grep -c assert_password_reset_trust_proxy_ready "'"$DEPLOY_SCRIPT"'")
+  [[ "$n" -ge 3 ]]
+'
+assert_ok "deploy appelle nginx effective en préflight" bash -c '
+  grep -q assert_nginx_effective_amaki_proxy_headers "'"$DEPLOY_SCRIPT"'"
+'
+assert_ok "deploy appelle listen loopback après restart" bash -c '
+  grep -q assert_next_prod_listen_loopback_only "'"$DEPLOY_SCRIPT"'"
+'
+assert_ok "deploy ne copie pas amaki.conf nginx" bash -c '
+  ! grep -E "cp .*deploy/nginx/amaki\.conf|/etc/nginx/conf\.d/amaki\.conf" "'"$DEPLOY_SCRIPT"'"
+'
+assert_ok "repo package.json bind loopback" assert_next_prod_start_binds_loopback "$ROOT/package.json"
+assert_ok "repo nginx prod X-Real-IP" assert_nginx_prod_x_real_ip_configured "$ROOT/deploy/nginx/amaki.conf"
+
 # Mock PM2 cwd / stopped
 mkdir -p "$TMP/bin2"
 cat > "$TMP/bin2/pm2" <<'EOF'

@@ -1,9 +1,7 @@
-import { getPasswordResetTokenByEmail } from "@/actions/auth"
 import { db } from "./db"
 import { randomInt, timingSafeEqual } from "node:crypto"
 import { Prisma } from "@prisma/client"
-
-import { v4 as uuidv4 } from "uuid"
+import { PASSWORD_RESET_TTL_MS } from "@/lib/auth/password-reset-constants"
 
 /**
  * Durée de validité du token de vérification email (ms).
@@ -13,10 +11,10 @@ import { v4 as uuidv4 } from "uuid"
 export const VERIFICATION_TOKEN_TTL_MS = 5 * 60 * 1000
 
 /**
- * Durée de validité du token de réinitialisation de mot de passe (ms).
- * Même valeur historique que précédemment (5 minutes) — constante distincte.
+ * TTL reset MDP — alias de {@link PASSWORD_RESET_TTL_MS} (10 min, code 8 chiffres).
+ * Distinct de VERIFICATION_TOKEN_TTL_MS.
  */
-export const PASSWORD_RESET_TOKEN_TTL_MS = 5 * 60 * 1000
+export const PASSWORD_RESET_TOKEN_TTL_MS = PASSWORD_RESET_TTL_MS
 
 /**
  * Délai minimum côté serveur entre deux envois de code de vérification (ms).
@@ -157,31 +155,12 @@ export async function generateVerificationToken(
 }
 
 /**
- * Génère un token de réinitialisation de mot de passe (UUID).
- *
- * @param email - Email du compte
+ * @deprecated Parcours UUID abandonné — utiliser
+ * {@link requestPasswordResetChallenge} (code 8 chiffres HMAC).
  */
 export const generatePasswordResetToken = async (email: string) => {
-  const token = uuidv4()
-  const expires = new Date(new Date().getTime() + PASSWORD_RESET_TOKEN_TTL_MS)
-
-  const existingToken = await getPasswordResetTokenByEmail(email)
-
-  if (existingToken) {
-    await db.passwordResetToken.delete({
-      where: {
-        id: existingToken.id,
-      },
-    })
-  }
-
-  const passwordResetToken = await db.passwordResetToken.create({
-    data: {
-      email,
-      token,
-      expires,
-    },
-  })
-
-  return passwordResetToken
+  void email;
+  throw new Error(
+    "generatePasswordResetToken is deprecated — use requestPasswordResetChallenge"
+  )
 }

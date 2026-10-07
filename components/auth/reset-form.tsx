@@ -3,7 +3,7 @@ import * as z from "zod";
 import * as React from "react";
 import { useForm } from "react-hook-form"
 import { useState, useTransition } from "react"
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ResetSchema } from "@/schemas";
 import { Input } from "@/components/ui/input";
@@ -23,7 +23,9 @@ import { reset } from "@/actions/auth/reset";
 import { DialogClose } from "@/components/ui/dialog";
 import Link from "next/link";
 
-
+/**
+ * Formulaire web « mot de passe oublié » — réponse générique anti-énumération.
+ */
 export const ResetForm = () => {
 
     const [error, setError] = useState<string | undefined>("");
@@ -38,11 +40,10 @@ export const ResetForm = () => {
     });
 
     const onSubmit = (data: z.infer<typeof ResetSchema>) => {
-        console.log(data);
           setError("");
           setSuccess("");
                 
-        startTransition(() => {;
+        startTransition(() => {
          reset(data)
          .then ((response) => {
                 if (response.error) {
@@ -59,14 +60,9 @@ export const ResetForm = () => {
          }) 
     }    
    
-    // Composant pour le bouton "Retour à la connexion" qui ferme ce modal et ouvre le modal de connexion
     const BackToLoginButton = () => {
         const pathname = usePathname();
-        const router = useRouter();
-        
-        // Vérifier si on est sur la page standalone (pas dans un modal)
         const isStandalonePage = pathname === "/auth/reset";
-        
         const callbackUrl = encodeURIComponent(pathname || "/");
         const href = `/auth/sign-in?callbackUrl=${callbackUrl}`;
 
@@ -83,7 +79,6 @@ export const ResetForm = () => {
             </Link>
         )
         
-        // Si on est dans un modal, utiliser DialogClose, sinon utiliser le bouton directement
         if (isStandalonePage) {
             return button;
         }
@@ -98,7 +93,7 @@ export const ResetForm = () => {
     return (
         <CardWrapper
             labelBox= "Mot de passe oublié "
-            headerLabel="Vous avez ouvblié votre mot de passe ?  Entre votre adresse email pour reinitialisez votre mot de passe ?"
+            headerLabel="Entrez votre adresse e-mail. Si un compte correspond, un code de réinitialisation vous sera envoyé."
             backButtonComponent={<BackToLoginButton />}
             >
                 <Form {...form}>
@@ -112,13 +107,14 @@ export const ResetForm = () => {
                                name="email"
                                render={({ field }) => (
                                     <FormItem>
-                                        <FormLabel>Email adresse</FormLabel>
+                                        <FormLabel>Adresse e-mail</FormLabel>
                                         <FormControl>
                                             <Input 
                                                 {...field}
                                                  disabled={isPending}
                                                  placeholder=""
                                                 type="email"
+                                                autoComplete="email"
                                                 autoFocus
                                             />
                                         </FormControl>
@@ -134,10 +130,10 @@ export const ResetForm = () => {
                             type="submit"
                             className="w-full"
                         >
-                           Envoyer un e-mail de réinitialisation  
+                           Envoyer un code de réinitialisation
                         </Button>
                     </form>
                 </Form>
         </CardWrapper>
     );    
-};    
+};

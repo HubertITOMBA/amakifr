@@ -1,61 +1,41 @@
-"use server"
-import { NewPasswordSchema } from "@/schemas"
-import * as z from "zod"
-import { getPasswordResetTokenByToken, getUserByEmail } from "."
-import bcrypt from "bcryptjs"
-import { db } from "@/lib/db"
+"use server";
 
+import { NewPasswordSchema } from "@/schemas";
+import * as z from "zod";
+import { confirmPasswordResetChallenge } from "@/lib/services/auth/password-reset-confirm";
+import { PASSWORD_RESET_CONFIRM_GENERIC_ERROR } from "@/lib/auth/password-reset-messages";
+import { isServiceError } from "@/lib/service-error";
+import { getPasswordResetClientIpFromAction } from "@/lib/auth/password-reset-client-ip";
 
-export const newPassword = async(
-    values: z.infer<typeof NewPasswordSchema>,
-    token?: string | null
+/**
+ * Confirmation web — même service que POST /api/v1/auth/password-reset/confirm.
+ *
+ * @param values - email + code 8 chiffres + password + confirmPassword
+ */
+export const newPassword = async (
+  values: z.infer<typeof NewPasswordSchema>
 ) => {
+  const validatedFields = NewPasswordSchema.safeParse(values);
+  if (!validatedFields.success) {
+    return {
+      error: validatedFields.error.errors[0]?.message || "Champs non valides !",
+    };
+  }
 
-    if(!token) {
-        return { error: "Jeton invalide !"}
+  try {
+    const clientIp = await getPasswordResetClientIpFromAction();
+    const result = await confirmPasswordResetChallenge({
+      ...validatedFields.data,
+      clientIp,
+    });
+    return { success: result.message };
+  } catch (error) {
+    if (isServiceError(error)) {
+      return { error: error.message };
     }
-
-    const validatedFields = NewPasswordSchema.safeParse(values);
-
-    if(!validatedFields.success) {
-        return { error: "Champs non valides !" }
-    }
-
-    const { password } = validatedFields.data
-
-    const existingToken = await getPasswordResetTokenByToken(token)
-
-    if (!existingToken){
-        return { error: "Jeton non valide !"}
-    }
-
-    const hasExpired = new Date() > new Date(existingToken.expires)
-
-    if(hasExpired){
-        return { error: "Le jeton a expiré !" }
-    }
-
-    const existingUser = await getUserByEmail(existingToken.email)
-
-    if(!existingUser) {
-        return { error: "L'e-mail n'existe pas !" }
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10)
-
-    await db.user.update({
-        where: { id: existingUser.id },
-        data: {
-            password: hashedPassword
-        }
-    })
-
-    await db.passwordResetToken.delete({
-        where: {
-            id: existingToken.id
-        }
-    })
-
-    return { success: "Votre Mot de passe est mis à jour "}
-
-}
+    console.error("[password-reset] web_confirm_failed", {
+      category: "unexpected",
+    });
+    return { error: PASSWORD_RESET_CONFIRM_GENERIC_ERROR };
+  }
+};

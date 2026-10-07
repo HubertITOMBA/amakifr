@@ -362,35 +362,44 @@ export const sendTwoFactorTokenEmail = async(
 }
 
 
-export const sendPasswordResetToken = async(
+/**
+ * Envoie un code numérique à 8 chiffres pour réinitialiser le mot de passe.
+ * Aucun secret dans une URL / query string. Ne jamais logger le code ni l'email.
+ *
+ * @param email - Destinataire
+ * @param code - Code en clair (uniquement pour le corps de l'email)
+ *
+ * @deprecated sendPasswordResetToken (lien UUID) — remplacé par ce template code.
+ * Dette séparée : adminResetUserPassword envoie encore un MDP temporaire en clair.
+ */
+export const sendPasswordResetCodeEmail = async (
   email: string,
-  token: string,
-  baseUrl?: string
+  code: string
 ) => {
-  // Prioriser baseUrl, puis domain (NEXT_PUBLIC_APP_URL), puis localhost en dernier recours
-  let appUrl = baseUrl || domain || 'http://localhost:9050';
-  
-  // Nettoyer l'URL
-  appUrl = cleanUrl(appUrl) || appUrl;
-  
-  const resetLink = `${appUrl}/auth/new-password?token=${token}`
+  // Lien page web SANS token ni email en query string
+  const appUrl = cleanUrl(domain) || "https://amaki.fr";
+  const resetPageUrl = `${appUrl.replace(/\/$/, "")}/auth/new-password`;
 
   const content = `
     <div style="text-align: center;">
       <h1 style="color: #4a90e2; margin-bottom: 12px; margin-top: 0; font-size: 20px;">Réinitialisation de votre mot de passe</h1>
-      <p style="color: #666; margin-bottom: 16px; font-size: 14px;">Veuillez cliquer sur le bouton ci-dessous pour réinitialiser votre mot de passe :</p>
+      <p style="color: #666; margin-bottom: 16px; font-size: 14px;">
+        Voici votre code de réinitialisation AMAKI. Saisissez-le sur la page de réinitialisation (ou dans l'application) avec votre adresse e-mail et un nouveau mot de passe.
+      </p>
+      <div style="margin: 20px 0; padding: 16px; background-color: #f0f7ff; border-radius: 8px;">
+        <p style="font-size: 28px; letter-spacing: 6px; font-weight: bold; color: #1e3a5f; margin: 0; font-family: monospace;">
+          ${code}
+        </p>
+      </div>
       <div style="margin: 16px 0;">
-        <a href="${resetLink}" style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 10px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 14px;">
-          Réinitialiser votre mot de passe
+        <a href="${resetPageUrl}" style="display: inline-block; background-color: #4a90e2; color: #ffffff; padding: 10px 24px; border-radius: 5px; text-decoration: none; font-weight: bold; font-size: 14px;">
+          Ouvrir la page de réinitialisation
         </a>
       </div>
       <p style="color: #999; font-size: 11px; margin-top: 16px;">
         Si vous n'avez pas demandé cette réinitialisation, ignorez cet email.<br />
-        Ce lien est valide pendant 1 heure.
-      </p>
-      <p style="color: #666; font-size: 11px; margin-top: 12px; word-break: break-all;">
-        Ou copiez ce lien dans votre navigateur :<br />
-        <a href="${resetLink}" style="color: #4a90e2; text-decoration: underline;">${resetLink}</a>
+        Ce code est valide pendant 10 minutes et ne peut être utilisé qu'une seule fois.<br />
+        Le lien ci-dessus ne contient aucun code secret.
       </p>
     </div>
   `;
@@ -398,10 +407,23 @@ export const sendPasswordResetToken = async(
   await sendEmail({
     from: "webmaster@amaki.fr",
     to: email,
-    subject: "Réinitialiser votre mot de passe",
-    html: wrapEmailContent(content)
+    subject: "Code de réinitialisation de mot de passe AMAKI",
+    html: wrapEmailContent(content),
   });
-}
+};
+
+/**
+ * @deprecated Utiliser {@link sendPasswordResetCodeEmail}. Conservé uniquement pour
+ * éviter les imports cassés pendant la transition ; ne plus appeler.
+ */
+export const sendPasswordResetToken = async (
+  email: string,
+  token: string,
+  baseUrl?: string
+) => {
+  void baseUrl;
+  await sendPasswordResetCodeEmail(email, token);
+};
 
 
 export const sendContactEmail = async(

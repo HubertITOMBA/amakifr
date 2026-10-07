@@ -7,7 +7,7 @@
     "maintenance:on": "bash scripts/maintenance-on.sh",
     "maintenance:off": "bash scripts/maintenance-off.sh",
     "build": "node scripts/generate-build-id.js && next build",
-    "start": "next start -H 0.0.0.0 -p 9060",
+    "start": "next start -H 127.0.0.1 -p 9060",
     "lint": "next lint",
     "test": "vitest run",
     "test:watch": "vitest",

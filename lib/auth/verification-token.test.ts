@@ -77,9 +77,9 @@ describe("verification token", () => {
     expect(VERIFICATION_TOKEN_TTL_MS).toBe(300_000);
   });
 
-  it("PASSWORD_RESET_TOKEN_TTL_MS est une constante distincte (valeur historique 5 min)", () => {
-    expect(PASSWORD_RESET_TOKEN_TTL_MS).toBe(5 * 60 * 1000);
-    expect(PASSWORD_RESET_TOKEN_TTL_MS).toBe(VERIFICATION_TOKEN_TTL_MS);
+  it("PASSWORD_RESET_TOKEN_TTL_MS est distinct (10 min) de la vérification email", () => {
+    expect(PASSWORD_RESET_TOKEN_TTL_MS).toBe(10 * 60 * 1000);
+    expect(PASSWORD_RESET_TOKEN_TTL_MS).not.toBe(VERIFICATION_TOKEN_TTL_MS);
   });
 
   it("cooldown resend = 60 secondes", () => {

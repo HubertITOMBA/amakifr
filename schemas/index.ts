@@ -73,11 +73,29 @@ export const ResendVerificationSchema = z.object({
     }),
 });
 
-export const NewPasswordSchema = z.object({
-    password: z.string().min(6, {
-        message: "Un minimum de 6 caractères requis"
+/**
+ * Nouveau mot de passe après code 8 chiffres (web + aligné API).
+ * Aucun token UUID. Politique min 6 = alignement projet (trop faible à renforcer).
+ */
+export const NewPasswordSchema = z
+  .object({
+    email: z.string().email({
+      message: "L'adresse email est obligatoire",
     }),
-});
+    code: z.string().regex(/^\d{8}$/, {
+      message: "Le code doit contenir exactement 8 chiffres",
+    }),
+    password: z.string().min(6, {
+      message: "Un minimum de 6 caractères requis",
+    }),
+    confirmPassword: z.string().min(1, {
+      message: "La confirmation du mot de passe est requise",
+    }),
+  })
+  .refine((data) => data.password === data.confirmPassword, {
+    message: "Les mots de passe ne correspondent pas",
+    path: ["confirmPassword"],
+  });
 
 export const ChangePasswordSchema = z.object({
     currentPassword: z.string().min(1, {
