@@ -140,6 +140,22 @@ describe("NewVerificationForm — UX champ unique", () => {
     expect(codeInput().value).toHaveLength(6);
   });
 
+  it("collage '12 a34-56' → 123456 (filtre avant toute troncature HTML)", async () => {
+    const user = userEvent.setup();
+    render(<NewVerificationForm />);
+    await user.click(codeInput());
+    await user.paste("12 a34-56");
+    expect(codeInput().value).toBe("123456");
+  });
+
+  it("collage '123456789' → 123456 (six premiers chiffres)", async () => {
+    const user = userEvent.setup();
+    render(<NewVerificationForm />);
+    await user.click(codeInput());
+    await user.paste("123456789");
+    expect(codeInput().value).toBe("123456");
+  });
+
   it("helper exact et attributs accessibles du champ code", () => {
     render(<NewVerificationForm />);
     expect(
@@ -150,7 +166,7 @@ describe("NewVerificationForm — UX champ unique", () => {
     const input = codeInput();
     expect(input.getAttribute("inputmode")).toBe("numeric");
     expect(input.getAttribute("pattern")).toBe("[0-9]*");
-    expect(input.getAttribute("maxlength")).toBe("6");
+    expect(input.getAttribute("maxlength")).toBeNull();
     expect(input.getAttribute("autocomplete")).toBe("one-time-code");
     expect(input.getAttribute("type")).toBe("text");
   });
