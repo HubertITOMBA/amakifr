@@ -89,11 +89,9 @@ export function passwordVisibilityToggleLabel(visible: boolean): string {
 }
 
 /**
- * Route mobile « mot de passe oublié ».
- * Audit 2026-10-07 : aucune route Expo (`forgot` / `reset-password` / etc.).
- * Ne pas inventer de lien tant qu’un écran + API mobile ne sont pas livrés.
+ * Route mobile « mot de passe oublié » (parcours natif Expo, API S0/S1).
  */
-export const MOBILE_FORGOT_PASSWORD_ROUTE: string | null = null;
+export const MOBILE_FORGOT_PASSWORD_ROUTE: string = "/forgot-password";
 
 /**
  * Affiche le lien seulement si une route mobile réelle est déclarée.

@@ -30,6 +30,16 @@ function RootNavigator() {
             contentStyle: { backgroundColor: "#f8fafc" },
           }}
         />
+        <Stack.Screen
+          name="forgot-password"
+          options={{
+            statusBarStyle: "light",
+            statusBarTranslucent: true,
+            statusBarBackgroundColor: "transparent",
+            contentStyle: { backgroundColor: "#f8fafc" },
+            animation: "slide_from_right",
+          }}
+        />
       </Stack.Protected>
     </Stack>
   );

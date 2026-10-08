@@ -55,13 +55,13 @@ describe("visibilité mot de passe", () => {
 });
 
 describe("mot de passe oublié — audit mobile", () => {
-  it("aucune route mobile déclarée → pas de lien inventé", () => {
-    expect(MOBILE_FORGOT_PASSWORD_ROUTE).toBeNull();
-    expect(shouldShowForgotPasswordLink()).toBe(false);
-    expect(shouldShowForgotPasswordLink("/forgot")).toBe(true);
+  it("route mobile déclarée → lien affiché", () => {
+    expect(MOBILE_FORGOT_PASSWORD_ROUTE).toBe("/forgot-password");
+    expect(shouldShowForgotPasswordLink()).toBe(true);
+    expect(shouldShowForgotPasswordLink(null)).toBe(false);
   });
 
-  it("aucune route forgot/reset dans app Expo", () => {
+  it("écran Expo forgot-password présent", () => {
     const appDir = join(srcDir, "../../app");
     const walk = (dir: string): string[] => {
       const out: string[] = [];
@@ -73,9 +73,7 @@ describe("mot de passe oublié — audit mobile", () => {
       return out;
     };
     const files = walk(appDir).map((f) => f.toLowerCase());
-    expect(
-      files.some((f) => /forgot|reset-password|mot-de-passe/.test(f))
-    ).toBe(false);
+    expect(files.some((f) => f.endsWith("forgot-password.tsx"))).toBe(true);
   });
 });
 
@@ -181,9 +179,10 @@ describe("écran sign-in — garde-fous", () => {
     expect(source).not.toMatch(/console\.(log|debug|info)\(\s*password\s*\)/);
   });
 
-  it("pas de lien mot de passe oublié tant que route absente", () => {
-    expect(source).not.toMatch(/Mot de passe oublié/);
-    expect(shouldShowForgotPasswordLink()).toBe(false);
+  it("lien mot de passe oublié vers la route déclarée", () => {
+    expect(source).toMatch(/Mot de passe oublié \?/);
+    expect(source).toMatch(/MOBILE_FORGOT_PASSWORD_ROUTE/);
+    expect(shouldShowForgotPasswordLink()).toBe(true);
   });
 
   it("réutilise la coque dégradé partagée (PNG via AmakiGradientShell)", () => {

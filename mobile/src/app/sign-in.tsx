@@ -11,7 +11,7 @@ import {
   View,
 } from "react-native";
 import { Image } from "expo-image";
-import { useFocusEffect } from "expo-router";
+import { router, useFocusEffect, type Href } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { SymbolView } from "expo-symbols";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -20,6 +20,8 @@ import { useAuth } from "@/auth/auth-context";
 import { ApiClientError } from "@/api/types";
 import { AmakiGradientShell } from "@/components/layout/amaki-gradient-header";
 import { PrimaryButton } from "@/components/ui/primary-button";
+import { navigateToForgotPassword } from "@/features/auth/password-reset-flow";
+import { consumePendingLoginBanner } from "@/features/auth/password-reset-model";
 import {
   AMAKI_BRAND_LOGO_SIZE,
   INITIAL_PASSWORD_VISIBLE,
@@ -29,10 +31,12 @@ import {
   LOGIN_LOGO_FRAME_RADIUS,
   LOGIN_LOGO_SHADOW,
   LOGIN_LOGO_WRAP_MARGIN_TOP,
+  MOBILE_FORGOT_PASSWORD_ROUTE,
   loginHeaderContentPaddingTop,
   nextPasswordVisible,
   passwordVisibilityToggleLabel,
   resolveLoginStatusInset,
+  shouldShowForgotPasswordLink,
 } from "@/features/auth/sign-in-model";
 import {
   AmakiColors,
@@ -55,6 +59,7 @@ export default function SignInScreen() {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successBanner, setSuccessBanner] = useState<string | null>(null);
 
   useEffect(() => {
     if (Platform.OS === "android") {
@@ -71,6 +76,11 @@ export default function SignInScreen() {
         RNStatusBar.setTranslucent(true);
         RNStatusBar.setBackgroundColor("transparent");
         RNStatusBar.setBarStyle("light-content");
+      }
+      const banner = consumePendingLoginBanner();
+      if (banner) {
+        setSuccessBanner(banner);
+        setError(null);
       }
     }, [])
   );
@@ -245,6 +255,16 @@ export default function SignInScreen() {
               </Pressable>
             </View>
 
+            {successBanner ? (
+              <Text
+                style={styles.success}
+                accessibilityRole="text"
+                accessibilityLiveRegion="polite"
+              >
+                {successBanner}
+              </Text>
+            ) : null}
+
             {error ? (
               <Text
                 style={styles.error}
@@ -253,6 +273,27 @@ export default function SignInScreen() {
               >
                 {error}
               </Text>
+            ) : null}
+
+            {shouldShowForgotPasswordLink() ? (
+              <Pressable
+                onPress={() => {
+                  setSuccessBanner(null);
+                  navigateToForgotPassword(
+                    (href) => router.push(href as Href),
+                    MOBILE_FORGOT_PASSWORD_ROUTE
+                  );
+                }}
+                accessibilityRole="link"
+                accessibilityLabel="Mot de passe oublié ?"
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.forgotBtn,
+                  pressed && styles.forgotBtnPressed,
+                ]}
+              >
+                <Text style={styles.forgotText}>Mot de passe oublié ?</Text>
+              </Pressable>
             ) : null}
 
             <PrimaryButton
@@ -390,6 +431,27 @@ const styles = StyleSheet.create({
     ...AmakiTypography.caption,
     color: AmakiColors.danger,
     marginBottom: AmakiSpacing.md,
+    fontWeight: "600",
+  },
+  success: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.success,
+    marginBottom: AmakiSpacing.md,
+    fontWeight: "700",
+  },
+  forgotBtn: {
+    alignSelf: "flex-end",
+    minHeight: 44,
+    justifyContent: "center",
+    marginBottom: AmakiSpacing.sm,
+    paddingHorizontal: AmakiSpacing.xs,
+  },
+  forgotBtnPressed: {
+    opacity: 0.7,
+  },
+  forgotText: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.primary,
     fontWeight: "600",
   },
   submit: {

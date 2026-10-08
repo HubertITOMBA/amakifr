@@ -288,6 +288,7 @@ Ordre des priorités encore ouvertes (après le P0 inscription web) :
 - **2026-10** : UX confirmation email (champ unique, collage filtré, renvoi explicite et attente administrative) — livrée et validée en production (`ddf4f9e…`).
 - **2026-10-07** : refonte UI mobile Accueil / LoginPage / headers dégradés + œil MDP + splash — commitée/poussée (`2b11725`), validée sur téléphone via AMAKI Dev (build Expo Dev `798d66ff-1f90-4b18-8505-e8c2603e2258`) ; Play Store `fr.amaki.app` `1.0.0` inchangé, aucune publication production Android.
 - **2026-10-07** : parcours « mot de passe oublié » S0/S1 (HMAC 8 chiffres, rate-limit PG, bind `127.0.0.1:9060`, `TRUST_PROXY` conditionné à Nginx **effective** `nginx -T`, rate-limit REQUEST/CONFIRM séparés) — **préparé / non livré** ; baseline validée inchangée (`2b11725`) jusqu’à commit + déploiement VPS contrôlé.
+- **2026-10-08** : lot mobile M1 « mot de passe oublié » (route `/forgot-password`, client API S0/S1) — **préparé / non livré** ; Play Store `1.0.0` inchangé ; recette intégrée réelle bloquée tant que DEV/VPS n’a pas migration + secret + `TRUST_PROXY`.
 
 ---
 
