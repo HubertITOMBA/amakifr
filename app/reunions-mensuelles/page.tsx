@@ -28,6 +28,7 @@ import {
   Phone,
   CheckCircle,
   ArrowLeft,
+  FileText,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import {
@@ -45,6 +46,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { isAdminRole } from "@/lib/utils";
 import { InlineAdherentSearchPanel } from "@/components/admin/InlineAdherentSearchPanel";
 import { getAdherentsMembres } from "@/actions/cotisations-du-mois";
+import { reunionHasLinkedRapport } from "@/lib/rapports-reunion/html-excerpt";
 
 const moisOptions = [
   { value: 1, label: "Janvier" },
@@ -164,44 +166,6 @@ export default function ReunionsMensuellesPage() {
       }
     } catch (error) {
       toast.error("Erreur lors de la création");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleConfirmDate = async () => {
-    if (!selectedReunion || !editFormData.dateReunion) {
-      toast.error("Veuillez sélectionner une date");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      const result = await updateReunionMensuelle({
-        id: selectedReunion.id,
-        dateReunion: editFormData.dateReunion,
-        typeLieu: editFormData.typeLieu,
-        adresse: editFormData.adresse,
-        nomRestaurant: editFormData.nomRestaurant,
-        commentaires: editFormData.commentaires,
-      });
-
-      if (result.success) {
-        toast.success("Date confirmée ! Les autres adhérents seront notifiés.");
-        setSelectedReunion(null);
-        setEditFormData({
-          dateReunion: "",
-          typeLieu: "Domicile",
-          adresse: "",
-          nomRestaurant: "",
-          commentaires: "",
-        });
-        loadData();
-      } else {
-        toast.error(result.error || "Erreur lors de la confirmation");
-      }
-    } catch (error) {
-      toast.error("Erreur lors de la confirmation");
     } finally {
       setLoading(false);
     }
@@ -551,6 +515,16 @@ export default function ReunionsMensuellesPage() {
                               {reunion.statut === "DateConfirmee" && !isAdmin && isReunionPassee(reunion) && (
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Présence clôturée</p>
                               )}
+                              {reunionHasLinkedRapport(reunion) && reunion.Rapport?.id ? (
+                                <Link
+                                  href={`/rapports-reunion?view=${encodeURIComponent(reunion.Rapport.id)}`}
+                                  onClick={(e) => e.stopPropagation()}
+                                  className="mt-2 inline-flex items-center justify-center gap-1 rounded-md bg-blue-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-blue-700 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400"
+                                >
+                                  <FileText className="h-3 w-3" aria-hidden />
+                                  Compte rendu disponible
+                                </Link>
+                              ) : null}
                             </>
                           ) : (
                             <p className="text-xs text-gray-500 dark:text-gray-500 mt-1">Cliquez pour choisir</p>
@@ -968,130 +942,6 @@ export default function ReunionsMensuellesPage() {
         </DialogContent>
       </Dialog>
 
-      {/* Dialog : Confirmer la date (pour l'hôte) */}
-      {selectedReunion && selectedReunion.statut === "MoisValide" && (
-        <Dialog open={!!selectedReunion && selectedReunion.statut === "MoisValide"} onOpenChange={(open) => !open && setSelectedReunion(null)}>
-          <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
-            <DialogHeader>
-              <DialogTitle>Confirmer la date de la réunion</DialogTitle>
-              <DialogDescription>
-                Le mois a été validé. Vous pouvez maintenant confirmer la date et le lieu de la réunion. La date ne peut être modifiée que si la réunion a lieu dans plus de 7 jours.
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="space-y-1.5">
-                <Label>Date (samedi) *</Label>
-                {(() => {
-                  const isHote = Boolean(user?.id && selectedReunion?.AdherentHote?.userId && user.id === selectedReunion.AdherentHote.userId);
-                  const dateLimite = new Date();
-                  dateLimite.setDate(dateLimite.getDate() + 7);
-                  dateLimite.setHours(0, 0, 0, 0);
-                  const dateDejaFixeeDansMoinsDe7Jours = selectedReunion.dateReunion && new Date(selectedReunion.dateReunion) <= dateLimite;
-                  return (
-                    <>
-                      {isHote && dateDejaFixeeDansMoinsDe7Jours && (
-                        <p className="text-sm text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-950/40 p-2 rounded">
-                          La date ne peut plus être modifiée : la réunion a lieu dans moins de 7 jours. Un administrateur peut toutefois la modifier.
-                        </p>
-                      )}
-                      <div className="rounded-md border p-2">
-                        <CalendarUI
-                          mode="single"
-                          defaultMonth={new Date(selectedReunion.annee, selectedReunion.mois - 1)}
-                          selected={confirmSelectedDate}
-                          onSelect={(d) => {
-                            setConfirmSelectedDate(d || undefined);
-                            if (d) setEditFormData((prev) => ({ ...prev, dateReunion: dateToUtcNoonIso(d) }));
-                            else setEditFormData((prev) => ({ ...prev, dateReunion: "" }));
-                          }}
-                          locale={fr}
-                          disabled={(d) => {
-                            const sameMonth = d.getFullYear() === selectedReunion.annee && d.getMonth() + 1 === selectedReunion.mois;
-                            const isSaturday = d.getDay() === 6;
-                            const dDebut = new Date(d.getFullYear(), d.getMonth(), d.getDate());
-                            const tropProche = isHote && (dDebut.getTime() < dateLimite.getTime());
-                            return !sameMonth || !isSaturday || tropProche || (isHote && !!dateDejaFixeeDansMoinsDe7Jours);
-                          }}
-                        />
-                      </div>
-                      <p className="text-xs text-gray-500">Uniquement les samedis du mois. En tant qu&apos;hôte, vous ne pouvez choisir qu&apos;une date au moins 7 jours à l&apos;avance.</p>
-                    </>
-                  );
-                })()}
-              </div>
-              <div className="space-y-1.5">
-                <Label htmlFor="editTypeLieu">Type de lieu</Label>
-                <Select
-                  value={editFormData.typeLieu}
-                  onValueChange={(v) => setEditFormData({ ...editFormData, typeLieu: v as TypeLieuReunion })}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Domicile">Domicile (par défaut)</SelectItem>
-                    <SelectItem value="Restaurant">Restaurant</SelectItem>
-                    <SelectItem value="Autre">Autre lieu</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {editFormData.typeLieu === "Restaurant" && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="editNomRestaurant">Nom du restaurant</Label>
-                  <Input
-                    id="editNomRestaurant"
-                    value={editFormData.nomRestaurant}
-                    onChange={(e) => setEditFormData({ ...editFormData, nomRestaurant: e.target.value })}
-                  />
-                </div>
-              )}
-              {(editFormData.typeLieu === "Autre" || editFormData.typeLieu === "Restaurant") && (
-                <div className="space-y-1.5">
-                  <Label htmlFor="editAdresse">Adresse complète</Label>
-                  <Textarea
-                    id="editAdresse"
-                    value={editFormData.adresse}
-                    onChange={(e) => setEditFormData({ ...editFormData, adresse: e.target.value })}
-                    rows={3}
-                    placeholder="Adresse complète du lieu de réunion"
-                  />
-                </div>
-              )}
-              <div className="space-y-1.5">
-                <Label htmlFor="editCommentaires">Commentaires</Label>
-                <Textarea
-                  id="editCommentaires"
-                  value={editFormData.commentaires}
-                  onChange={(e) => setEditFormData({ ...editFormData, commentaires: e.target.value })}
-                  rows={3}
-                  placeholder="Informations complémentaires..."
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setSelectedReunion(null)}>
-                Annuler
-              </Button>
-              <Button
-                onClick={handleConfirmDate}
-                disabled={
-                  loading ||
-                  !editFormData.dateReunion ||
-                  (() => {
-                    if (!user?.id || !selectedReunion?.AdherentHote?.userId || user.id !== selectedReunion.AdherentHote.userId || !selectedReunion.dateReunion) return false;
-                    const lim = new Date();
-                    lim.setDate(lim.getDate() + 7);
-                    lim.setHours(0, 0, 0, 0);
-                    return new Date(selectedReunion.dateReunion) <= lim;
-                  })()
-                }
-              >
-                Confirmer la date
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
-      )}
     </div>
   );
 }

@@ -396,17 +396,19 @@ export default function AdminReunionsMensuellesPage() {
         },
       }),
       columnHelper.accessor("Rapport", {
-        header: "Rapport",
+        header: "Compte rendu",
         cell: (info) => {
-          const rapport = info.getValue();
-          if (!rapport) return <span className="text-muted-foreground text-xs">—</span>;
+          const rapport = info.getValue() as { id: string; titre?: string } | null;
+          if (!rapport?.id) {
+            return <span className="text-muted-foreground text-xs">—</span>;
+          }
           return (
             <a
-              href={`/admin/rapports-reunion?view=${rapport.id}`}
-              className="inline-flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 hover:underline"
+              href={`/admin/rapports-reunion?view=${encodeURIComponent(rapport.id)}`}
+              className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded"
             >
-              <FileText className="h-3.5 w-3.5" />
-              Voir le rapport
+              <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+              Compte rendu disponible
             </a>
           );
         },
@@ -717,6 +719,16 @@ export default function AdminReunionsMensuellesPage() {
                               Hôte: {reunion.AdherentHote.firstname} {reunion.AdherentHote.lastname}
                             </p>
                           )}
+                          {reunion.Rapport?.id ? (
+                            <a
+                              href={`/admin/rapports-reunion?view=${encodeURIComponent(reunion.Rapport.id)}`}
+                              onClick={(e) => e.stopPropagation()}
+                              className="mt-1.5 inline-flex items-center justify-center gap-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-blue-700"
+                            >
+                              <FileText className="h-3 w-3" aria-hidden />
+                              Compte rendu disponible
+                            </a>
+                          ) : null}
                         </>
                       ) : (
                         <p className="text-xs text-gray-500 mt-1">Créer</p>

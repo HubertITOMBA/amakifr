@@ -602,6 +602,9 @@ export async function getAllReunionsMensuelles() {
             },
           },
         },
+        Rapport: {
+          select: { id: true, titre: true, dateReunion: true },
+        },
         CreatedBy: { select: { name: true, email: true } },
         UpdatedBy: { select: { name: true, email: true } },
       },
@@ -645,6 +648,9 @@ export async function getReunionMensuelleById(id: string) {
               },
             },
           },
+        },
+        Rapport: {
+          select: { id: true, titre: true, dateReunion: true },
         },
         CreatedBy: { select: { name: true, email: true } },
         UpdatedBy: { select: { name: true, email: true } },

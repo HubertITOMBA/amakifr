@@ -1,6 +1,7 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, Suspense, useRef } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -57,12 +58,19 @@ import {
 import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
-import DOMPurify from "isomorphic-dompurify";
 import { RichTextEditor } from "@/components/admin/rapports-reunion/RichTextEditor";
+import {
+  escapeHtmlText,
+  htmlToPlainExcerpt,
+  sanitizeRapportHtml,
+} from "@/lib/rapports-reunion/html-excerpt";
 
 const columnHelper = createColumnHelper<any>();
 
-export default function AdminRapportsReunionPage() {
+function AdminRapportsReunionContent() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const deepLinkHandled = useRef(false);
   const [rapports, setRapports] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [sorting, setSorting] = useState<SortingState>([]);
@@ -168,6 +176,29 @@ export default function AdminRapportsReunionPage() {
     loadRapports();
   }, [loadRapports]);
 
+  const handleView = useCallback(async (rapport: { id: string }) => {
+    try {
+      const result = await getRapportReunionById(rapport.id);
+      if (result.success && result.rapport) {
+        setSelectedRapport(result.rapport);
+        setShowViewDialog(true);
+      } else {
+        toast.error(result.error || "Erreur lors du chargement");
+      }
+    } catch (error) {
+      console.error("Erreur:", error);
+      toast.error("Erreur lors du chargement du rapport");
+    }
+  }, []);
+
+  useEffect(() => {
+    const viewId = searchParams.get("view")?.trim();
+    if (!viewId || loading || deepLinkHandled.current) return;
+    deepLinkHandled.current = true;
+    void handleView({ id: viewId });
+    router.replace("/admin/rapports-reunion", { scroll: false });
+  }, [searchParams, loading, handleView, router]);
+
   const loadReunions = useCallback(async () => {
     try {
       const res = await getAllReunionsMensuelles();
@@ -263,34 +294,23 @@ export default function AdminRapportsReunionPage() {
     }
   };
 
-  const handleView = async (rapport: any) => {
-    try {
-      const result = await getRapportReunionById(rapport.id);
-      if (result.success && result.rapport) {
-        setSelectedRapport(result.rapport);
-        setShowViewDialog(true);
-      } else {
-        toast.error(result.error || "Erreur lors du chargement");
-      }
-    } catch (error) {
-      console.error("Erreur:", error);
-      toast.error("Erreur lors du chargement du rapport");
-    }
-  };
-
   const handlePrint = (rapport: any) => {
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
       toast.error("Impossible d'ouvrir la fenêtre d'impression");
       return;
     }
-    const safeHtml = DOMPurify.sanitize(String(rapport.contenu || ""), { USE_PROFILES: { html: true } });
+    const safeHtml = sanitizeRapportHtml(String(rapport.contenu || ""));
+    const safeTitle = escapeHtmlText(rapport.titre);
+    const authorLabel = rapport.CreatedBy
+      ? escapeHtmlText(rapport.CreatedBy.name || rapport.CreatedBy.email || "")
+      : "";
 
     printWindow.document.write(`
       <!DOCTYPE html>
       <html>
         <head>
-          <title>${rapport.titre}</title>
+          <title>${safeTitle}</title>
           <style>
             body {
               font-family: Arial, sans-serif;
@@ -319,11 +339,11 @@ export default function AdminRapportsReunionPage() {
           </style>
         </head>
         <body>
-          <h1>${rapport.titre}</h1>
+          <h1>${safeTitle}</h1>
           <div class="meta">
             <p><strong>Date de la réunion :</strong> ${format(new Date(rapport.dateReunion), "dd MMMM yyyy", { locale: fr })}</p>
             <p><strong>Créé le :</strong> ${format(new Date(rapport.createdAt), "dd MMMM yyyy à HH:mm", { locale: fr })}</p>
-            ${rapport.CreatedBy ? `<p><strong>Créé par :</strong> ${rapport.CreatedBy.name || rapport.CreatedBy.email}</p>` : ''}
+            ${authorLabel ? `<p><strong>Créé par :</strong> ${authorLabel}</p>` : ""}
           </div>
           <div class="contenu">${safeHtml}</div>
         </body>
@@ -354,13 +374,17 @@ export default function AdminRapportsReunionPage() {
 
   // Filtrer les données
   const filteredData = useMemo(() => {
-    return rapports.filter(item => {
+    return rapports.filter((item) => {
       if (globalFilter.trim()) {
         const q = globalFilter.trim().toLowerCase();
         const searchText = [
           item.titre || "",
-          item.contenu || "",
-        ].join(" ").toLowerCase();
+          htmlToPlainExcerpt(item.contenu || "", 2000),
+          item.CreatedBy?.name || "",
+          item.CreatedBy?.email || "",
+        ]
+          .join(" ")
+          .toLowerCase();
         if (!searchText.includes(q)) return false;
       }
       return true;
@@ -370,16 +394,27 @@ export default function AdminRapportsReunionPage() {
   const columns = useMemo(() => [
     columnHelper.accessor("titre", {
       header: "Titre",
-      cell: ({ row }) => (
-        <span className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 font-medium block max-w-full md:break-words md:line-clamp-none truncate">
-          {row.getValue("titre")}
-        </span>
-      ),
+      cell: ({ row }) => {
+        const titre = row.getValue("titre") as string;
+        const excerpt = htmlToPlainExcerpt(row.original.contenu || "", 100);
+        return (
+          <div className="flex flex-col gap-0.5 min-w-0">
+            <span className="text-xs sm:text-sm text-gray-900 dark:text-gray-100 font-medium block max-w-full md:break-words md:line-clamp-none truncate">
+              {titre}
+            </span>
+            {excerpt ? (
+              <span className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1 md:hidden">
+                {excerpt}
+              </span>
+            ) : null}
+          </div>
+        );
+      },
       size: 300,
       minSize: 80,
       maxSize: 400,
       enableResizing: true,
-      meta: { forceVisible: true }, // Toujours visible, même en mode mobile
+      meta: { forceVisible: true },
     }),
     columnHelper.accessor("dateReunion", {
       header: "Date de réunion",
@@ -467,7 +502,7 @@ export default function AdminRapportsReunionPage() {
       minSize: 80,
       maxSize: 120,
     }),
-  ], []);
+  ], [handleView]);
 
   const table = useReactTable({
     data: filteredData,
@@ -536,12 +571,13 @@ export default function AdminRapportsReunionPage() {
           {/* Filtres et recherche */}
           <div className="flex flex-col sm:flex-row gap-2 mb-3 flex-shrink-0">
             <div className="relative flex-1">
-              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400" />
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3 w-3 sm:h-4 sm:w-4 text-gray-400 pointer-events-none" aria-hidden />
               <Input
                 placeholder="Rechercher un rapport..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-28 h-8 text-sm"
+                className="pl-10 h-8 text-sm"
+                aria-label="Rechercher un rapport"
               />
             </div>
           </div>
@@ -816,7 +852,7 @@ export default function AdminRapportsReunionPage() {
             <div
               className="bg-gray-50 dark:bg-gray-800 p-4 rounded-lg text-sm leading-relaxed text-slate-900 dark:text-slate-100"
               dangerouslySetInnerHTML={{
-                __html: DOMPurify.sanitize(String(selectedRapport?.contenu || ""), { USE_PROFILES: { html: true } }),
+                __html: sanitizeRapportHtml(String(selectedRapport?.contenu || "")),
               }}
             />
           </div>
@@ -840,7 +876,7 @@ export default function AdminRapportsReunionPage() {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmer la suppression</AlertDialogTitle>
             <AlertDialogDescription>
-              Êtes-vous sûr de vouloir supprimer le rapport "{selectedRapport?.titre}" ? Cette action est irréversible.
+              Êtes-vous sûr de vouloir supprimer le rapport &quot;{selectedRapport?.titre}&quot; ? Cette action est irréversible.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -852,5 +888,22 @@ export default function AdminRapportsReunionPage() {
         </AlertDialogContent>
       </AlertDialog>
     </div>
+  );
+}
+
+/**
+ * Page admin rapports — Suspense pour useSearchParams (deep-link ?view=).
+ */
+export default function AdminRapportsReunionPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 via-white to-blue-50">
+          <Loader2 className="h-8 w-8 animate-spin text-blue-600" />
+        </div>
+      }
+    >
+      <AdminRapportsReunionContent />
+    </Suspense>
   );
 }
