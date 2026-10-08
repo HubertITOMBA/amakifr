@@ -29,6 +29,11 @@ import {
 export type ForgotPasswordFlowState = {
   step: PasswordResetStep;
   email: string;
+  /**
+   * Adresse exacte passée au dernier `request` accepté (ou en cours d’envoi).
+   * Source unique pour resend / affichage confirm — jamais une valeur native RN.
+   */
+  submittedEmail: string | null;
   code: string;
   password: string;
   confirmPassword: string;
@@ -71,6 +76,7 @@ export type ForgotPasswordFlowOptions = {
 const initialState = (): ForgotPasswordFlowState => ({
   step: "request",
   email: "",
+  submittedEmail: null,
   code: "",
   password: "",
   confirmPassword: "",
@@ -117,6 +123,7 @@ export function createForgotPasswordFlow(options: ForgotPasswordFlowOptions) {
     clearSensitiveFields();
     patch({
       email: "",
+      submittedEmail: null,
       error: null,
       info: null,
       cooldownEndsAt: null,
@@ -134,6 +141,33 @@ export function createForgotPasswordFlow(options: ForgotPasswordFlowOptions) {
     }
     clearSensitiveFields();
     patch({ error: null, info: null, step: next });
+  }
+
+  /**
+   * Confirm → request pour corriger l’adresse : remet `submittedEmail` dans le champ,
+   * vide le code, aucun nouvel envoi automatique.
+   */
+  function editAddress(): void {
+    const restore =
+      state.submittedEmail ?? normalizePasswordResetEmail(state.email);
+    clearSensitiveFields();
+    patch({
+      step: "request",
+      email: restore,
+      error: null,
+      info: null,
+    });
+  }
+
+  /**
+   * Email exact qui partira / est parti en request (contrôleur uniquement).
+   * Resend : `submittedEmail` ; première demande : champ `email` courant.
+   */
+  function resolveRequestEmail(isResend: boolean): string {
+    if (isResend) {
+      return normalizePasswordResetEmail(state.submittedEmail);
+    }
+    return normalizePasswordResetEmail(state.email);
   }
 
   async function withBusyLock(fn: () => Promise<void>): Promise<boolean> {
@@ -159,12 +193,6 @@ export function createForgotPasswordFlow(options: ForgotPasswordFlowOptions) {
       patch({ info: null });
     }
 
-    const normalized = normalizePasswordResetEmail(state.email);
-    if (!isPlausiblePasswordResetEmail(normalized)) {
-      patch({ error: "Adresse e-mail invalide" });
-      return false;
-    }
-
     const remaining = passwordResetCooldownRemaining(
       state.cooldownEndsAt,
       now()
@@ -173,11 +201,27 @@ export function createForgotPasswordFlow(options: ForgotPasswordFlowOptions) {
       return false;
     }
 
+    // Recalcul immédiat avant lock (état contrôleur courant)
+    let normalized = resolveRequestEmail(isResend);
+    if (!isPlausiblePasswordResetEmail(normalized)) {
+      patch({ error: "Adresse e-mail invalide" });
+      return false;
+    }
+
     return withBusyLock(async () => {
+      // Recalcul juste avant l’API — source unique, pas de valeur native RN
+      normalized = resolveRequestEmail(isResend);
+      if (!isPlausiblePasswordResetEmail(normalized)) {
+        patch({ error: "Adresse e-mail invalide" });
+        return;
+      }
+      patch({ submittedEmail: normalized, email: normalized });
+
       try {
         const result = await options.api.request(normalized);
         patch({
           email: normalized,
+          submittedEmail: normalized,
           cooldownEndsAt: passwordResetCooldownEndsAt(
             result.retryAfter,
             now()
@@ -204,6 +248,7 @@ export function createForgotPasswordFlow(options: ForgotPasswordFlowOptions) {
             info: PASSWORD_RESET_REQUEST_GENERIC_MESSAGE,
             step: nextStepAfterRequestAccepted(),
             email: normalized,
+            submittedEmail: normalized,
           });
         }
       }
@@ -215,8 +260,11 @@ export function createForgotPasswordFlow(options: ForgotPasswordFlowOptions) {
    */
   async function confirmReset(): Promise<boolean> {
     patch({ error: null });
+    const confirmEmail = normalizePasswordResetEmail(
+      state.submittedEmail ?? state.email
+    );
     const clientErr = validatePasswordResetConfirmClient({
-      email: state.email,
+      email: confirmEmail,
       code: state.code,
       password: state.password,
       confirmPassword: state.confirmPassword,
@@ -231,7 +279,7 @@ export function createForgotPasswordFlow(options: ForgotPasswordFlowOptions) {
     return withBusyLock(async () => {
       try {
         await options.api.confirm({
-          email: normalizePasswordResetEmail(state.email),
+          email: confirmEmail,
           code: filteredCode,
           password: state.password,
           confirmPassword: state.confirmPassword,
@@ -239,6 +287,7 @@ export function createForgotPasswordFlow(options: ForgotPasswordFlowOptions) {
         clearSensitiveFields();
         patch({
           email: "",
+          submittedEmail: null,
           info: null,
           error: null,
           cooldownEndsAt: null,
@@ -279,6 +328,7 @@ export function createForgotPasswordFlow(options: ForgotPasswordFlowOptions) {
       patch({ confirmVisible: nextPasswordVisible(state.confirmVisible) }),
     requestCode,
     confirmReset,
+    editAddress,
     onBack,
     goToLogin,
     /** Force un re-render abonnés (ex. tick cooldown UI). */

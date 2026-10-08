@@ -4,10 +4,10 @@ import { router } from "expo-router";
 import { Pressable, StyleSheet, Text, View } from "react-native";
 import highlightGradient from "@/assets/images/home-highlight-gradient.png";
 import {
-  HOME_HIGHLIGHT_NEUTRAL,
   homeHighlightDotCount,
   type HomeHighlightSlide,
 } from "@/features/home/home-model";
+import { shouldRenderHomeHighlightBanner } from "@/features/home/home-highlight-sources";
 import {
   AmakiColors,
   AmakiSpacing,
@@ -19,7 +19,7 @@ type Props = {
 };
 
 /**
- * « À la une » — slides réelles, ou carte neutre non cliquable si aucune.
+ * « À la une » — uniquement des slides réelles ; sinon null (pas de fallback).
  */
 export function HomeHighlightBanner({ slides }: Props) {
   const [index, setIndex] = useState(0);
@@ -35,25 +35,8 @@ export function HomeHighlightBanner({ slides }: Props) {
     }
   }, [slides.length, index]);
 
-  if (slides.length === 0) {
-    return (
-      <View
-        style={styles.wrap}
-        accessibilityRole="text"
-        accessibilityLabel={`${HOME_HIGHLIGHT_NEUTRAL.title}. ${HOME_HIGHLIGHT_NEUTRAL.subtitle}`}
-      >
-        <Image
-          source={highlightGradient}
-          style={StyleSheet.absoluteFill}
-          contentFit="cover"
-          alt=""
-        />
-        <View style={styles.content}>
-          <Text style={styles.title}>{HOME_HIGHLIGHT_NEUTRAL.title}</Text>
-          <Text style={styles.subtitle}>{HOME_HIGHLIGHT_NEUTRAL.subtitle}</Text>
-        </View>
-      </View>
-    );
+  if (!shouldRenderHomeHighlightBanner(slides.length)) {
+    return null;
   }
 
   const safeIndex = Math.min(index, slides.length - 1);

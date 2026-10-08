@@ -267,12 +267,6 @@ export type HomeHighlightSlide = {
   a11y: string;
 };
 
-/** Carte neutre « À la une » — pas de route, pas de compteur inventé. */
-export const HOME_HIGHLIGHT_NEUTRAL = {
-  title: "Bienvenue dans votre espace AMAKI",
-  subtitle: "Retrouvez ici les actualités de votre association.",
-} as const;
-
 export type HomeHighlightInput = {
   electionsCount: number;
   surveyCount: number;

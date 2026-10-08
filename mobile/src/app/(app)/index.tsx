@@ -25,7 +25,13 @@ import {
   buildHomeMenuItems,
   buildHomeQuickActions,
   homeScrollBottomPadding,
+  type HomeHighlightInput,
 } from "@/features/home/home-model";
+import {
+  applyHomeHighlightInputIfActive,
+  loadHomeHighlightInput,
+  shouldRenderHomeHighlightBanner,
+} from "@/features/home/home-highlight-sources";
 import { homeWelcomeMarginTop } from "@/features/home/home-header-layout";
 import {
   resolveHeaderStatusInset,
@@ -58,6 +64,14 @@ export default function AccueilScreen() {
   const [nextEventTitle, setNextEventTitle] = useState<string | null>(null);
   const [nextEventWhen, setNextEventWhen] = useState<string | null>(null);
 
+  const applyHighlightInput = useCallback((input: HomeHighlightInput) => {
+    setSurveyCount(input.surveyCount);
+    setEventsCount(input.eventsCount);
+    setElectionsCount(input.electionsCount);
+    setNextEventTitle(input.nextEventTitle);
+    setNextEventWhen(input.nextEventWhen);
+  }, []);
+
   const quickActions = useMemo(
     () => buildHomeQuickActions(unreadCount, chatUnread),
     [unreadCount, chatUnread]
@@ -84,42 +98,19 @@ export default function AccueilScreen() {
     ]
   );
 
-  const loadSurveySummary = useCallback(async () => {
-    try {
-      const summary = await getMySurveysSummary();
-      setSurveyCount(summary.aCompleterCount);
-    } catch {
-      setSurveyCount(0);
-    }
-  }, []);
-
-  const loadEventsSummary = useCallback(async () => {
-    try {
-      const summary = await getMyEventsSummary();
-      const count = summary.upcomingCount;
-      setEventsCount(count);
-      if (count > 0 && summary.nextEvent) {
-        setNextEventTitle(summary.nextEvent.titre);
-        setNextEventWhen(formatDateTimeFr(summary.nextEvent.dateDebut));
-      } else {
-        setNextEventTitle(null);
-        setNextEventWhen(null);
-      }
-    } catch {
-      setEventsCount(0);
-      setNextEventTitle(null);
-      setNextEventWhen(null);
-    }
-  }, []);
-
-  const loadElectionsSummary = useCallback(async () => {
-    try {
-      const summary = await getMyElectionsSummary();
-      setElectionsCount(summary.aVoterCount);
-    } catch {
-      setElectionsCount(0);
-    }
-  }, []);
+  const loadHighlightSources = useCallback(async (isActive: () => boolean) => {
+    // Premier chargement : compteurs à 0 → slides vides → bannière null.
+    // Refresh focus : ne pas vider les compteurs avant le résultat → slides conservées.
+    const input = await loadHomeHighlightInput(
+      {
+        getSurveysSummary: getMySurveysSummary,
+        getEventsSummary: getMyEventsSummary,
+        getElectionsSummary: getMyElectionsSummary,
+      },
+      formatDateTimeFr
+    );
+    applyHomeHighlightInputIfActive(isActive, input, applyHighlightInput);
+  }, [applyHighlightInput]);
 
   const loadChatUnread = useCallback(async () => {
     try {
@@ -132,16 +123,14 @@ export default function AccueilScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      void loadSurveySummary();
-      void loadEventsSummary();
-      void loadElectionsSummary();
+      let active = true;
+      const isActive = () => active;
+      void loadHighlightSources(isActive);
       void loadChatUnread();
-    }, [
-      loadSurveySummary,
-      loadEventsSummary,
-      loadElectionsSummary,
-      loadChatUnread,
-    ])
+      return () => {
+        active = false;
+      };
+    }, [loadHighlightSources, loadChatUnread])
   );
 
   useEffect(() => {
@@ -219,12 +208,14 @@ export default function AccueilScreen() {
             </View>
           </View>
 
-          <View
-            style={styles.highlightInFlow}
-            testID={`home-section-${HOME_SCROLL_SECTION_ORDER[2]}`}
-          >
-            <HomeHighlightBanner slides={highlightSlides} />
-          </View>
+          {shouldRenderHomeHighlightBanner(highlightSlides.length) ? (
+            <View
+              style={styles.highlightInFlow}
+              testID={`home-section-${HOME_SCROLL_SECTION_ORDER[2]}`}
+            >
+              <HomeHighlightBanner slides={highlightSlides} />
+            </View>
+          ) : null}
         </ScrollView>
 
         <HomeMenuModal

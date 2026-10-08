@@ -16,6 +16,8 @@ import {
   PASSWORD_RESET_SUCCESS_LOGIN_BANNER,
   __resetPendingLoginBannerForTests,
   consumePendingLoginBanner,
+  passwordResetEmailPreview,
+  passwordResetUsedAddressLine,
   setPendingLoginBanner,
 } from "@/features/auth/password-reset-model";
 import { MOBILE_FORGOT_PASSWORD_ROUTE } from "@/features/auth/sign-in-model";
@@ -64,10 +66,20 @@ function createScreenHarness() {
     onPressRequest: () => flow.requestCode(false),
     onPressResend: () => flow.requestCode(true),
     onPressConfirm: () => flow.confirmReset(),
+    onPressEditAddress: () => flow.editAddress(),
+    onEndEditingEmail: (text: string) => flow.setEmail(text),
     onHardwareBack: () => flow.onBack(),
     onHeaderBack: () => flow.onBack(),
     getState: () => flow.getState(),
     isBusy: () => flow.isBusy(),
+    previewLine: () => {
+      const p = passwordResetEmailPreview(flow.getState().email);
+      return p ? passwordResetUsedAddressLine(p) : null;
+    },
+    confirmAddressLine: () => {
+      const s = flow.getState().submittedEmail;
+      return s ? passwordResetUsedAddressLine(s) : null;
+    },
   };
 }
 
@@ -98,11 +110,77 @@ describe("ForgotPasswordScreen harness — comportemental", () => {
       retryAfter: 60,
     });
     h.onChangeEmail("  A@B.com ");
+    expect(h.previewLine()).toBe("Adresse utilisée : a@b.com");
     await h.onPressRequest();
     expect(h.request).toHaveBeenCalledWith("a@b.com");
     expect(h.getState().step).toBe("confirm");
     expect(h.getState().info).toBe(PASSWORD_RESET_REQUEST_GENERIC_MESSAGE);
     expect(h.getState().error).toBeNull();
+    expect(h.getState().submittedEmail).toBe("a@b.com");
+    expect(h.confirmAddressLine()).toBe("Adresse utilisée : a@b.com");
+  });
+
+  it("onEndEditing synchronise le contrôleur", () => {
+    h.onChangeEmail("old@x.com");
+    h.onEndEditingEmail("  New@Y.COM ");
+    expect(h.getState().email).toBe("  New@Y.COM ");
+    expect(h.previewLine()).toBe("Adresse utilisée : new@y.com");
+  });
+
+  it("preview = payload exact (majuscules/espaces)", async () => {
+    h.request.mockResolvedValue({
+      accepted: true,
+      message: PASSWORD_RESET_REQUEST_GENERIC_MESSAGE,
+      retryAfter: 60,
+    });
+    h.onChangeEmail("  M1.Reset@Example.INVALID ");
+    const preview = h.previewLine();
+    expect(preview).toBe("Adresse utilisée : m1.reset@example.invalid");
+    await h.onPressRequest();
+    expect(h.request).toHaveBeenCalledWith("m1.reset@example.invalid");
+    expect(h.confirmAddressLine()).toBe(preview);
+  });
+
+  it("régression synthétique exact dans payload", async () => {
+    h.request.mockResolvedValue({
+      accepted: true,
+      message: PASSWORD_RESET_REQUEST_GENERIC_MESSAGE,
+      retryAfter: 60,
+    });
+    h.onChangeEmail("m1.reset@example.invalid");
+    await h.onPressRequest();
+    expect(h.request).toHaveBeenCalledWith("m1.reset@example.invalid");
+  });
+
+  it("Modifier l’adresse → request sans API", async () => {
+    h.request.mockResolvedValue({
+      accepted: true,
+      message: PASSWORD_RESET_REQUEST_GENERIC_MESSAGE,
+      retryAfter: 60,
+    });
+    h.onChangeEmail("a@b.com");
+    await h.onPressRequest();
+    h.onChangeCode("12345678");
+    const n = h.request.mock.calls.length;
+    h.onPressEditAddress();
+    expect(h.request).toHaveBeenCalledTimes(n);
+    expect(h.getState().step).toBe("request");
+    expect(h.getState().email).toBe("a@b.com");
+    expect(h.getState().code).toBe("");
+  });
+
+  it("resend ignore email champ divergent ; utilise submittedEmail", async () => {
+    h.request.mockResolvedValue({
+      accepted: true,
+      message: PASSWORD_RESET_REQUEST_GENERIC_MESSAGE,
+      retryAfter: 60,
+    });
+    h.onChangeEmail("kept@amaki.fr");
+    await h.onPressRequest();
+    h.onChangeEmail("visual@elsewhere.test");
+    h.advanceMs(61_000);
+    await h.onPressResend();
+    expect(h.request).toHaveBeenLastCalledWith("kept@amaki.fr");
   });
 
   it("collage code filtré sur le handler champ (pas de maxLength)", () => {
@@ -291,6 +369,20 @@ describe("garde source complémentaire (non principale)", () => {
     expect(src).toMatch(/inputMode="numeric"/);
     expect(src).toMatch(/autoComplete="one-time-code"/);
     expect(src).toMatch(/useForgotPasswordFlow/);
+  });
+
+  it("forgot-password : autofill email désactivé + onEndEditing sync", () => {
+    const src = readFileSync(join(appDir, "forgot-password.tsx"), "utf8");
+    expect(src).toMatch(/autoComplete:\s*"off"|autoComplete="off"/);
+    expect(src).toMatch(/importantForAutofill:\s*"no"/);
+    expect(src).toMatch(/textContentType:\s*"none"|textContentType="none"/);
+    expect(src).toMatch(/onEndEditing/);
+    expect(src).toMatch(/nativeEvent\.text/);
+    expect(src).not.toMatch(/autoComplete="email"/);
+    expect(src).toMatch(/passwordResetUsedAddressLine/);
+    expect(src).toMatch(/editAddress/);
+    // Pas de log diagnostique d’adresse
+    expect(src).not.toMatch(/console\.(log|debug|info|warn).*email/i);
   });
 
   it("sign-in : navigateToForgotPassword sans query secrets", () => {

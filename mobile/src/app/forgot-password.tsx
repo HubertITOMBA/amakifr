@@ -17,11 +17,14 @@ import { PrimaryButton } from "@/components/ui/primary-button";
 import { passwordVisibilityToggleLabel } from "@/features/auth/sign-in-model";
 import {
   PASSWORD_RESET_CODE_HELPER,
+  PASSWORD_RESET_EDIT_ADDRESS_LABEL,
   PASSWORD_RESET_REQUEST_GENERIC_MESSAGE,
   PASSWORD_RESET_REQUEST_HELP,
   PASSWORD_RESET_SCREEN_TITLE,
   passwordResetCooldownRemaining,
+  passwordResetEmailPreview,
   passwordResetResendLabel,
+  passwordResetUsedAddressLine,
 } from "@/features/auth/password-reset-model";
 import { useForgotPasswordFlow } from "@/features/auth/use-forgot-password-flow";
 import {
@@ -30,6 +33,20 @@ import {
   AmakiSpacing,
   AmakiTypography,
 } from "@/constants/theme";
+
+/** Props communes champ e-mail — autofill désactivé (sync contrôleur). */
+const emailFieldAutofillProps = {
+  autoCapitalize: "none" as const,
+  autoCorrect: false,
+  keyboardType: "email-address" as const,
+  inputMode: "email" as const,
+  /** iOS : pas de suggestion / remplissage automatique. */
+  textContentType: "none" as const,
+  autoComplete: "off" as const,
+  ...(Platform.OS === "android"
+    ? ({ importantForAutofill: "no" } as const)
+    : {}),
+};
 
 /**
  * Parcours natif « mot de passe oublié » — une seule route Expo.
@@ -61,6 +78,8 @@ export default function ForgotPasswordScreen() {
 
   const sidePad = Math.max(insets.left, insets.right, 0);
   const busy = state.loading || flow.isBusy();
+  const requestPreview = passwordResetEmailPreview(state.email);
+  const confirmAddress = state.submittedEmail;
 
   return (
     <View style={styles.root}>
@@ -93,19 +112,28 @@ export default function ForgotPasswordScreen() {
                 <Text style={styles.fieldLabel}>E-mail</Text>
                 <TextInput
                   style={styles.input}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  inputMode="email"
-                  textContentType="emailAddress"
-                  autoComplete="email"
+                  {...emailFieldAutofillProps}
                   value={state.email}
                   onChangeText={(t) => flow.setEmail(t)}
+                  onEndEditing={(e) => {
+                    flow.setEmail(e.nativeEvent.text);
+                  }}
                   editable={!busy}
                   placeholder="vous@exemple.com"
                   placeholderTextColor={AmakiColors.textMuted}
                   accessibilityLabel="E-mail"
                 />
+                {requestPreview ? (
+                  <Text
+                    style={styles.usedAddress}
+                    accessibilityRole="text"
+                    accessibilityLabel={passwordResetUsedAddressLine(
+                      requestPreview
+                    )}
+                  >
+                    {passwordResetUsedAddressLine(requestPreview)}
+                  </Text>
+                ) : null}
                 {state.error ? (
                   <Text
                     style={styles.error}
@@ -141,20 +169,35 @@ export default function ForgotPasswordScreen() {
                   {state.info ?? PASSWORD_RESET_REQUEST_GENERIC_MESSAGE}
                 </Text>
 
-                <Text style={styles.fieldLabel}>E-mail</Text>
-                <TextInput
-                  style={styles.input}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  keyboardType="email-address"
-                  inputMode="email"
-                  textContentType="emailAddress"
-                  autoComplete="email"
-                  value={state.email}
-                  onChangeText={(t) => flow.setEmail(t)}
-                  editable={!busy}
-                  accessibilityLabel="E-mail"
-                />
+                {confirmAddress ? (
+                  <Text
+                    style={styles.usedAddress}
+                    accessibilityRole="text"
+                    accessibilityLabel={passwordResetUsedAddressLine(
+                      confirmAddress
+                    )}
+                  >
+                    {passwordResetUsedAddressLine(confirmAddress)}
+                  </Text>
+                ) : null}
+
+                <Pressable
+                  onPress={() => flow.editAddress()}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel={PASSWORD_RESET_EDIT_ADDRESS_LABEL}
+                  hitSlop={8}
+                  style={({ pressed }) => [
+                    styles.linkBtn,
+                    styles.editAddressBtn,
+                    pressed && styles.linkPressed,
+                    busy && styles.linkDisabled,
+                  ]}
+                >
+                  <Text style={styles.linkText}>
+                    {PASSWORD_RESET_EDIT_ADDRESS_LABEL}
+                  </Text>
+                </Pressable>
 
                 <Text style={styles.fieldLabel}>Code</Text>
                 <Text style={styles.helper}>{PASSWORD_RESET_CODE_HELPER}</Text>
@@ -336,6 +379,12 @@ const styles = StyleSheet.create({
     marginBottom: AmakiSpacing.md,
     fontWeight: "600",
   },
+  usedAddress: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textSecondary,
+    marginBottom: AmakiSpacing.md,
+    fontWeight: "600",
+  },
   helper: {
     ...AmakiTypography.caption,
     color: AmakiColors.textMuted,
@@ -352,7 +401,7 @@ const styles = StyleSheet.create({
     borderRadius: AmakiRadius.sm,
     paddingHorizontal: AmakiSpacing.md,
     paddingVertical: AmakiSpacing.md,
-    marginBottom: AmakiSpacing.md,
+    marginBottom: AmakiSpacing.sm,
     fontSize: 16,
     color: AmakiColors.text,
     backgroundColor: AmakiColors.surfaceMuted,
@@ -403,8 +452,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
   },
+  editAddressBtn: {
+    marginTop: 0,
+    marginBottom: AmakiSpacing.md,
+  },
   linkPressed: {
     opacity: 0.7,
+  },
+  linkDisabled: {
+    opacity: 0.4,
   },
   linkText: {
     ...AmakiTypography.body,

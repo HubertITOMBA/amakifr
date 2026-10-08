@@ -31,6 +31,10 @@ describe("password-reset-model", () => {
     expect(isPlausiblePasswordResetEmail("pas-un-email")).toBe(false);
   });
 
+  it("filtre le code 8 chiffres — conserve le zéro initial 01234567", () => {
+    expect(filterPasswordResetCodeDigits("01234567")).toBe("01234567");
+  });
+
   it("filtre le code 8 chiffres (collage / trop long / lettres)", () => {
     expect(filterPasswordResetCodeDigits("12 a34-5678")).toBe("12345678");
     expect(filterPasswordResetCodeDigits("123456789012")).toBe("12345678");

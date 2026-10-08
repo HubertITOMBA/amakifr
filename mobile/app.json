@@ -7,6 +7,10 @@
     "icon": "./assets/images/icon.png",
     "scheme": "amaki",
     "userInterfaceStyle": "automatic",
+    "androidNavigationBar": {
+      "backgroundColor": "#f8fafc",
+      "barStyle": "dark-content"
+    },
     "ios": {
       "icon": "./assets/expo.icon",
       "bundleIdentifier": "fr.amaki.app"

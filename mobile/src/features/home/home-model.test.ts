@@ -3,7 +3,6 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
-  HOME_HIGHLIGHT_NEUTRAL,
   HOME_QUICK_ACTIONS,
   HOME_HIGHLIGHT_TAB_GAP,
   HOME_SCROLL_SECTION_ORDER,
@@ -19,6 +18,7 @@ import {
   resolveHomeActionBadge,
   resolveHomeMenuBadge,
 } from "@/features/home/home-model";
+import { shouldRenderHomeHighlightBanner } from "@/features/home/home-highlight-sources";
 
 const srcDir = dirname(fileURLToPath(import.meta.url));
 
@@ -200,7 +200,7 @@ describe("layout accueil", () => {
   });
 });
 
-describe("À la une — slides conditionnelles + fallback neutre", () => {
+describe("À la une — slides conditionnelles sans fallback", () => {
   const empty = {
     electionsCount: 0,
     surveyCount: 0,
@@ -209,15 +209,11 @@ describe("À la une — slides conditionnelles + fallback neutre", () => {
     nextEventWhen: null as string | null,
   };
 
-  it("0 actualité → slides vides + fallback neutre sans Événement", () => {
+  it("0 actualité → slides vides → bannière non rendue", () => {
     const slides = buildHomeHighlightSlides(empty);
     expect(slides).toEqual([]);
     expect(homeHighlightDotCount(slides)).toBe(0);
-    expect(HOME_HIGHLIGHT_NEUTRAL.title).toBe(
-      "Bienvenue dans votre espace AMAKI"
-    );
-    expect(HOME_HIGHLIGHT_NEUTRAL.title).not.toMatch(/Événement/i);
-    expect(HOME_HIGHLIGHT_NEUTRAL.subtitle).not.toMatch(/Événement/i);
+    expect(shouldRenderHomeHighlightBanner(slides.length)).toBe(false);
   });
 
   it("eventsCount = 0 → aucune actualité Événement", () => {

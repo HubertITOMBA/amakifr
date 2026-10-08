@@ -39,6 +39,9 @@ export const PASSWORD_RESET_SCREEN_TITLE = "Mot de passe oublié";
 export const PASSWORD_RESET_REQUEST_HELP =
   "Saisissez l’adresse e-mail utilisée pour votre compte.";
 
+/** Libellé action retour édition adresse (étape confirm). */
+export const PASSWORD_RESET_EDIT_ADDRESS_LABEL = "Modifier l’adresse";
+
 /**
  * Normalise un e-mail côté client (trim + minuscules) — cohérent serveur.
  */
@@ -64,6 +67,24 @@ export function filterPasswordResetCodeDigits(raw: string): string {
 export function isPlausiblePasswordResetEmail(email: string): boolean {
   const n = normalizePasswordResetEmail(email);
   return n.length > 3 && n.includes("@") && !n.includes(" ");
+}
+
+/**
+ * Preview de l’adresse réellement utilisée (contrôleur uniquement).
+ * Null si l’email local n’est pas syntaxiquement plausible.
+ */
+export function passwordResetEmailPreview(
+  email: string | null | undefined
+): string | null {
+  const n = normalizePasswordResetEmail(email);
+  return isPlausiblePasswordResetEmail(n) ? n : null;
+}
+
+/**
+ * Ligne accessible affichant l’adresse qui sera / a été envoyée.
+ */
+export function passwordResetUsedAddressLine(normalizedEmail: string): string {
+  return `Adresse utilisée : ${normalizedEmail}`;
 }
 
 /**

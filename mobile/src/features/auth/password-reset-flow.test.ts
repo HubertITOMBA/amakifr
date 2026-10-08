@@ -70,6 +70,87 @@ describe("createForgotPasswordFlow — comportemental", () => {
     expect(s.info).toBe(PASSWORD_RESET_REQUEST_GENERIC_MESSAGE);
     expect(s.error).toBeNull();
     expect(s.email).toBe("user@amaki.fr");
+    expect(s.submittedEmail).toBe("user@amaki.fr");
+  });
+
+  it("preview/payload : majuscules+espaces → normalisé ; submittedEmail = envoyé", async () => {
+    request.mockResolvedValue({
+      accepted: true,
+      message: PASSWORD_RESET_REQUEST_GENERIC_MESSAGE,
+      retryAfter: 60,
+    });
+    const flow = makeFlow();
+    flow.setEmail("  M1.Reset@Example.INVALID ");
+    await flow.requestCode(false);
+    expect(request).toHaveBeenCalledWith("m1.reset@example.invalid");
+    expect(flow.getState().submittedEmail).toBe("m1.reset@example.invalid");
+  });
+
+  it("régression payload synthétique exact m1.reset@example.invalid", async () => {
+    request.mockResolvedValue({
+      accepted: true,
+      message: PASSWORD_RESET_REQUEST_GENERIC_MESSAGE,
+      retryAfter: 60,
+    });
+    const flow = makeFlow();
+    flow.setEmail("m1.reset@example.invalid");
+    await flow.requestCode(false);
+    expect(request).toHaveBeenCalledWith("m1.reset@example.invalid");
+    expect(flow.getState().submittedEmail).toBe("m1.reset@example.invalid");
+  });
+
+  it("Modifier l’adresse → request sans API ; champ = submittedEmail ; code vidé", async () => {
+    request.mockResolvedValue({
+      accepted: true,
+      message: PASSWORD_RESET_REQUEST_GENERIC_MESSAGE,
+      retryAfter: 60,
+    });
+    const flow = makeFlow();
+    flow.setEmail("a@b.com");
+    await flow.requestCode(false);
+    flow.setCodeFromRaw("12345678");
+    flow.setEmail("visual-divergent@other.test");
+    const callsBefore = request.mock.calls.length;
+    flow.editAddress();
+    expect(request).toHaveBeenCalledTimes(callsBefore);
+    expect(flow.getState().step).toBe("request");
+    expect(flow.getState().email).toBe("a@b.com");
+    expect(flow.getState().submittedEmail).toBe("a@b.com");
+    expect(flow.getState().code).toBe("");
+  });
+
+  it("resend utilise submittedEmail malgré email champ divergent", async () => {
+    request.mockResolvedValue({
+      accepted: true,
+      message: PASSWORD_RESET_REQUEST_GENERIC_MESSAGE,
+      retryAfter: 60,
+    });
+    const flow = makeFlow();
+    flow.setEmail("real@amaki.fr");
+    await flow.requestCode(false);
+    expect(request).toHaveBeenLastCalledWith("real@amaki.fr");
+    flow.setEmail("fake-visual@elsewhere.test");
+    nowMs += 61_000;
+    await flow.requestCode(true);
+    expect(request).toHaveBeenLastCalledWith("real@amaki.fr");
+    expect(flow.getState().submittedEmail).toBe("real@amaki.fr");
+  });
+
+  it("code 01234567 — zéro initial conservé (chaîne, pas Number)", async () => {
+    confirm.mockResolvedValue({ success: true, message: "ok" });
+    const flow = makeFlow();
+    flow.setEmail("a@b.com");
+    flow.setCodeFromRaw("01234567");
+    expect(flow.getState().code).toBe("01234567");
+    flow.setPassword("secret1");
+    flow.setConfirmPassword("secret1");
+    await flow.confirmReset();
+    expect(confirm).toHaveBeenCalledWith({
+      email: "a@b.com",
+      code: "01234567",
+      password: "secret1",
+      confirmPassword: "secret1",
+    });
   });
 
   it("collage code : filtre avant troncature", () => {
