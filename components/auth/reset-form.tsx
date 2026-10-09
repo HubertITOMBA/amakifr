@@ -2,8 +2,8 @@
 import * as z from "zod";
 import * as React from "react";
 import { useForm } from "react-hook-form"
-import { useState, useTransition } from "react"
-import { usePathname } from "next/navigation";
+import { useRef, useState, useTransition } from "react"
+import { usePathname, useRouter } from "next/navigation";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { ResetSchema } from "@/schemas";
 import { Input } from "@/components/ui/input";
@@ -22,15 +22,22 @@ import { FormSuccess } from '@/components/global/form-success';
 import { reset } from "@/actions/auth/reset";
 import { DialogClose } from "@/components/ui/dialog";
 import Link from "next/link";
+import {
+    getPasswordResetConfirmPath,
+    shouldNavigateAfterResetRequest,
+} from "@/components/auth/reset-form-navigation";
 
 /**
  * Formulaire web « mot de passe oublié » — réponse générique anti-énumération.
+ * Succès → navigation vers /auth/new-password (sans secrets dans l’URL).
  */
 export const ResetForm = () => {
-
+    const router = useRouter();
     const [error, setError] = useState<string | undefined>("");
     const [success, setSuccess] = useState<string | undefined>("");
     const [isPending, startTransition] = useTransition();
+    /** Verrou anti-double-submit (complète disabled={isPending}). */
+    const inFlightRef = useRef(false);
 
     const form = useForm<z.infer<typeof ResetSchema>>({
         resolver: zodResolver(ResetSchema),
@@ -40,26 +47,35 @@ export const ResetForm = () => {
     });
 
     const onSubmit = (data: z.infer<typeof ResetSchema>) => {
-          setError("");
-          setSuccess("");
-                
+        if (inFlightRef.current) return;
+        inFlightRef.current = true;
+        setError("");
+        setSuccess("");
+
         startTransition(() => {
          reset(data)
          .then ((response) => {
                 if (response.error) {
-                    form.reset()  
+                    form.reset()
                     setError(response?.error)
+                    return;
                 }
 
-                if (response.success) {
-                    setSuccess(response?.success)
+                if (shouldNavigateAfterResetRequest(response)) {
+                    if (response.success) {
+                      setSuccess(response.success);
+                    }
+                    router.push(getPasswordResetConfirmPath());
+                    return;
                 }
-               
             })
             .catch(() => setError("Une erreur s'est produite !"))
-         }) 
-    }    
-   
+            .finally(() => {
+              inFlightRef.current = false;
+            })
+         })
+    }
+
     const BackToLoginButton = () => {
         const pathname = usePathname();
         const isStandalonePage = pathname === "/auth/reset";
@@ -78,11 +94,11 @@ export const ResetForm = () => {
                 </Button>
             </Link>
         )
-        
+
         if (isStandalonePage) {
             return button;
         }
-        
+
         return (
             <DialogClose asChild>
                 {button}
@@ -90,14 +106,17 @@ export const ResetForm = () => {
         );
     };
 
+    const confirmPath = getPasswordResetConfirmPath();
+
     return (
         <CardWrapper
             labelBox= "Mot de passe oublié "
             headerLabel="Entrez votre adresse e-mail. Si un compte correspond, un code de réinitialisation vous sera envoyé."
+            backButtonLabel="Retour à la connexion"
             backButtonComponent={<BackToLoginButton />}
             >
                 <Form {...form}>
-                    <form 
+                    <form
                         onSubmit={form.handleSubmit(onSubmit)}
                         className="space-y-6"
                     >
@@ -109,7 +128,7 @@ export const ResetForm = () => {
                                     <FormItem>
                                         <FormLabel>Adresse e-mail</FormLabel>
                                         <FormControl>
-                                            <Input 
+                                            <Input
                                                 {...field}
                                                  disabled={isPending}
                                                  placeholder=""
@@ -120,9 +139,9 @@ export const ResetForm = () => {
                                         </FormControl>
                                         <FormMessage />
                                     </FormItem>
-                                )}   
+                                )}
                             />
-                        </div> 
+                        </div>
                         <FormError message={error}/>
                         <FormSuccess message={success}/>
                         <Button
@@ -132,8 +151,15 @@ export const ResetForm = () => {
                         >
                            Envoyer un code de réinitialisation
                         </Button>
+                        <Link
+                            href={confirmPath}
+                            className="block w-full text-center text-sm font-medium text-blue-700 dark:text-blue-300 underline underline-offset-2 hover:text-blue-900 dark:hover:text-blue-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-500"
+                            aria-label="J’ai déjà un code — saisir le code de réinitialisation"
+                        >
+                            J’ai déjà un code
+                        </Link>
                     </form>
                 </Form>
         </CardWrapper>
-    );    
+    );
 };
