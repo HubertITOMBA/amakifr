@@ -421,6 +421,121 @@ assert_ok "deploy ne copie pas amaki.conf nginx" bash -c '
 assert_ok "repo package.json bind loopback" assert_next_prod_start_binds_loopback "$ROOT/package.json"
 assert_ok "repo nginx prod X-Real-IP" assert_nginx_prod_x_real_ip_configured "$ROOT/deploy/nginx/amaki.conf"
 
+# --- Pré-checkout : gardes dépôt depuis SCRIPT_ROOT (cible), pas ROOT_DIR (prod ancienne) ---
+PRE_OLD="$TMP/preflight-old-root"
+PRE_NEW="$TMP/preflight-script-root"
+PRE_BAD="$TMP/preflight-bad-target"
+rm -rf "$PRE_OLD" "$PRE_NEW" "$PRE_BAD"
+mkdir -p "$PRE_OLD" "$PRE_NEW/deploy/nginx" "$PRE_BAD/deploy/nginx"
+printf '%s\n' '{"scripts":{"start":"next start -H 0.0.0.0 -p 9060"}}' > "$PRE_OLD/package.json"
+printf '%s\n' '{"scripts":{"start":"next start -H 127.0.0.1 -p 9060"}}' > "$PRE_NEW/package.json"
+printf '%s\n' '{"scripts":{"start":"next start -H 0.0.0.0 -p 9060"}}' > "$PRE_BAD/package.json"
+cat > "$PRE_NEW/deploy/nginx/amaki.conf" <<'NGX'
+upstream amakifr_prod_backend { server 127.0.0.1:9060; }
+location / {
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+NGX
+# Conf Nginx absente / incomplète côté ROOT ancien
+mkdir -p "$PRE_OLD/deploy/nginx"
+printf '%s\n' 'server { listen 80; }' > "$PRE_OLD/deploy/nginx/amaki.conf"
+cat > "$PRE_BAD/deploy/nginx/amaki.conf" <<'NGX'
+upstream amakifr_prod_backend { server 127.0.0.1:9060; }
+location / {
+  proxy_set_header X-Real-IP $remote_addr;
+  proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+}
+NGX
+
+# Depuis ROOT_DIR ancien : bind exposé → refus
+pushd_quiet "$PRE_OLD"
+assert_fail "ROOT_DIR ancien 0.0.0.0 refusé" assert_next_prod_start_binds_loopback
+assert_fail "ROOT_DIR ancien nginx incomplet refusé" assert_nginx_prod_x_real_ip_configured
+popd_quiet
+
+# Préflight avant checkout : accepte SCRIPT_ROOT cible (même si cwd = ancien).
+# Sous-shell (cd …) comme deploy-production-safe.sh — hérite des fonctions sourcées.
+pushd_quiet "$PRE_OLD"
+_preflight_bind_ok() { (cd "$PRE_NEW" && assert_next_prod_start_binds_loopback); }
+_preflight_nginx_ok() { (cd "$PRE_NEW" && assert_nginx_prod_x_real_ip_configured); }
+_preflight_bind_bad() { (cd "$PRE_BAD" && assert_next_prod_start_binds_loopback); }
+assert_ok "préflight bind depuis SCRIPT_ROOT cible" _preflight_bind_ok
+assert_ok "préflight nginx depuis SCRIPT_ROOT cible" _preflight_nginx_ok
+assert_fail "préflight refuse SCRIPT_ROOT cible 0.0.0.0" _preflight_bind_bad
+popd_quiet
+
+# TRUST_PROXY imbriqué lit aussi package.json du cwd → préflight via SCRIPT_ROOT
+unset ASSERT_NEXT_PROD_LISTEN NEXT_PROD_LISTEN_SNAPSHOT || true
+export TRUST_PROXY=true
+export NGINX_T_SNAPSHOT_FILE="$FIX_NGINX/ok-amaki.dump"
+pushd_quiet "$PRE_OLD"
+assert_fail "TRUST_PROXY depuis ROOT_DIR ancien (0.0.0.0) refusé" \
+  assert_password_reset_trust_proxy_ready
+_preflight_trust_ok() { (cd "$PRE_NEW" && assert_password_reset_trust_proxy_ready); }
+assert_ok "TRUST_PROXY préflight via SCRIPT_ROOT cible" _preflight_trust_ok
+popd_quiet
+unset TRUST_PROXY NGINX_T_SNAPSHOT_FILE || true
+unset -f _preflight_bind_ok _preflight_nginx_ok _preflight_bind_bad _preflight_trust_ok 2>/dev/null || true
+
+# Le script deploy encapsule bien les gardes pré-checkout dans SCRIPT_ROOT
+assert_ok "deploy préflight bind via SCRIPT_ROOT" bash -c '
+  awk "
+    /step \"2\\/15/ {p=1}
+    /step \"3\\/15/ {p=0}
+    p && /cd \"\\\$SCRIPT_ROOT\" && assert_next_prod_start_binds_loopback/ {found=1}
+    END {exit found?0:1}
+  " "'"$DEPLOY_SCRIPT"'"
+'
+assert_ok "deploy préflight nginx via SCRIPT_ROOT" bash -c '
+  awk "
+    /step \"2\\/15/ {p=1}
+    /step \"3\\/15/ {p=0}
+    p && /cd \"\\\$SCRIPT_ROOT\" && assert_nginx_prod_x_real_ip_configured/ {found=1}
+    END {exit found?0:1}
+  " "'"$DEPLOY_SCRIPT"'"
+'
+assert_ok "deploy préflight TRUST_PROXY via SCRIPT_ROOT" bash -c '
+  awk "
+    /step \"2\\/15/ {p=1}
+    /step \"3\\/15/ {p=0}
+    p && /cd \"\\\$SCRIPT_ROOT\" && assert_password_reset_trust_proxy_ready/ {found=1}
+    END {exit found?0:1}
+  " "'"$DEPLOY_SCRIPT"'"
+'
+# Après checkout : gardes ROOT_DIR présentes, sans wrapper SCRIPT_ROOT
+assert_ok "post-checkout bind Next non affaibli (cwd ROOT_DIR)" bash -c '
+  awk "
+    /step \"13\\/15/ {p=1}
+    /step \"14\\/15/ {p=0}
+    p && /assert_next_prod_start_binds_loopback/ {
+      line=\$0
+      if (line ~ /SCRIPT_ROOT/) exit 1
+      found=1
+    }
+    END {exit found?0:1}
+  " "'"$DEPLOY_SCRIPT"'"
+'
+assert_ok "post-checkout TRUST_PROXY non affaibli (cwd ROOT_DIR)" bash -c '
+  awk "
+    /step \"13\\/15/ {p=1}
+    /step \"14\\/15/ {p=0}
+    p && /assert_password_reset_trust_proxy_ready/ {
+      if (\$0 ~ /SCRIPT_ROOT/) exit 1
+      found=1
+    }
+    END {exit found?0:1}
+  " "'"$DEPLOY_SCRIPT"'"
+'
+assert_ok "post-restart listen loopback toujours exigé" bash -c '
+  awk "
+    /step \"14\\/15/ {p=1}
+    /step \"15\\/15/ {p=0}
+    p && /assert_next_prod_listen_loopback_only/ {found=1}
+    END {exit found?0:1}
+  " "'"$DEPLOY_SCRIPT"'"
+'
+
 # Mock PM2 cwd / stopped
 mkdir -p "$TMP/bin2"
 cat > "$TMP/bin2/pm2" <<'EOF'

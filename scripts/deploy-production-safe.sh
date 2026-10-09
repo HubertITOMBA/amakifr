@@ -164,10 +164,17 @@ assert_pm2_cwd "$PM2_APP_NAME" "/sites/amakifr" || fail "Préflight cwd PM2"
 assert_notes_frais_flags_on "$PM2_APP_NAME" || fail "Préflight flags Notes de frais actifs"
 assert_notes_frais_storage_ready || fail "Préflight stockage Notes de frais"
 assert_password_reset_hmac_secret_ready || fail "Préflight PASSWORD_RESET_HMAC_SECRET"
-assert_next_prod_start_binds_loopback || fail "Préflight bind Next 127.0.0.1:9060 (package.json)"
-assert_nginx_prod_x_real_ip_configured || fail "Préflight référence dépôt deploy/nginx/amaki.conf"
+# Pré-checkout : package.json + amaki.conf versionnés = code CIBLE (SCRIPT_ROOT),
+# pas le checkout production encore ancien (ROOT_DIR). Nginx EFFECTIVE / HMAC /
+# TRUST_PROXY (valeur) restent sur le runtime réel ; TRUST_PROXY imbriqué
+# assert_next_prod_start_binds_loopback → donc aussi depuis SCRIPT_ROOT.
+(cd "$SCRIPT_ROOT" && assert_next_prod_start_binds_loopback) ||
+  fail "Préflight bind Next 127.0.0.1:9060 (package.json cible)"
+(cd "$SCRIPT_ROOT" && assert_nginx_prod_x_real_ip_configured) ||
+  fail "Préflight référence cible deploy/nginx/amaki.conf"
 assert_nginx_effective_amaki_proxy_headers || fail "Préflight Nginx EFFECTIVE (nginx -T) amaki.fr → 9060"
-assert_password_reset_trust_proxy_ready || fail "Préflight TRUST_PROXY (nécessite Nginx effective)"
+(cd "$SCRIPT_ROOT" && assert_password_reset_trust_proxy_ready) ||
+  fail "Préflight TRUST_PROXY (nécessite Nginx effective ; package.json cible)"
 AVAIL_KB="$(df -Pk . | awk 'NR==2{print $4}')"
 [[ "${AVAIL_KB:-0}" -gt 1048576 ]] || fail "Espace disque insuffisant (<1 Go libre)"
 mkdir -p "$BACKUP_DIR"
