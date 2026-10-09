@@ -14,6 +14,7 @@ import {
   getMyReunions,
   updateMyReunionParticipation,
 } from "@/api/reunions";
+import { canOpenPublishedReport } from "@/api/rapports-reunion-state";
 import {
   formatReunionDateTime,
   mapParticipationStatut,
@@ -229,8 +230,10 @@ function ReunionCard({
   onParticipationSuccess,
   onReload,
 }: ReunionCardProps) {
+  const router = useRouter();
   const statut = mapReunionStatut(reunion.statut);
   const participation = mapParticipationStatut(reunion.participationStatus);
+  const showReport = canOpenPublishedReport(reunion);
   const [submitting, setSubmitting] = useState<
     UpdateMyReunionParticipationInput["statut"] | null
   >(null);
@@ -290,6 +293,21 @@ function ReunionCard({
           ) : null}
         </View>
       </Pressable>
+
+      {showReport && reunion.publishedReportId ? (
+        <Pressable
+          onPress={() =>
+            router.push(
+              `/reunions/rapport/${encodeURIComponent(reunion.publishedReportId!)}`
+            )
+          }
+          accessibilityRole="button"
+          accessibilityLabel="Compte rendu disponible"
+          style={styles.reportBadge}
+        >
+          <Text style={styles.reportBadgeText}>Compte rendu disponible</Text>
+        </Pressable>
+      ) : null}
 
       {expanded ? (
         <View style={styles.details}>
@@ -466,6 +484,24 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     flexWrap: "wrap",
     gap: AmakiSpacing.sm,
+  },
+  reportBadge: {
+    marginTop: AmakiSpacing.sm,
+    minHeight: 44,
+    paddingHorizontal: AmakiSpacing.md,
+    paddingVertical: AmakiSpacing.sm,
+    borderRadius: 8,
+    backgroundColor: AmakiColors.primarySoft,
+    borderWidth: 1,
+    borderColor: AmakiColors.primaryBorder,
+    alignItems: "center",
+    justifyContent: "center",
+    alignSelf: "flex-start",
+  },
+  reportBadgeText: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.primary,
+    fontWeight: "700",
   },
   details: {
     marginTop: AmakiSpacing.md,

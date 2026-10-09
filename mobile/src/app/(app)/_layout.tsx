@@ -143,6 +143,7 @@ function AppTabs() {
         options={{
           title: "Les réunions",
           href: null,
+          headerShown: false,
         }}
       />
       <Tabs.Screen

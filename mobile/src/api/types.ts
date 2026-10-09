@@ -388,6 +388,26 @@ export type MyReunionDto = {
   participationStatus: string | null;
   canUpdateParticipation: boolean;
   commentaires: string | null;
+  /** true uniquement si un rapport PUBLISHED est lié à la réunion. */
+  hasPublishedReport: boolean;
+  /** ID du rapport publié, ou null. Jamais transmis hors route ID. */
+  publishedReportId: string | null;
+};
+
+/** Métadonnées d’un compte rendu publié (sans HTML). */
+export type MeetingReportMetaDto = {
+  id: string;
+  titre: string;
+  reunionMensuelleId: string | null;
+  dateReunion: string | null;
+  authorDisplayName: string;
+  publishedAt: string;
+  updatedAt: string;
+};
+
+/** Détail d’un compte rendu publié — contenuHtml à sanitiser avant rendu. */
+export type MeetingReportDetailDto = MeetingReportMetaDto & {
+  contenuHtml: string;
 };
 
 export type UpdateMyReunionParticipationInput = {

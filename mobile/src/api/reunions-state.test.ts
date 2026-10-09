@@ -32,6 +32,8 @@ function reunion(overrides: Partial<MyReunionDto> = {}): MyReunionDto {
     participationStatus: null,
     canUpdateParticipation: true,
     commentaires: null,
+    hasPublishedReport: false,
+    publishedReportId: null,
     ...overrides,
   };
 }
