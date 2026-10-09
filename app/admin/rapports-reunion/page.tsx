@@ -62,6 +62,7 @@ import { DataTable } from "@/components/admin/DataTable";
 import { ColumnVisibilityToggle } from "@/components/admin/ColumnVisibilityToggle";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { RichTextEditor } from "@/components/admin/rapports-reunion/RichTextEditor";
+import { UnpublishRapportDialog } from "@/components/admin/rapports-reunion/UnpublishRapportDialog";
 import {
   escapeHtmlText,
   htmlToPlainExcerpt,
@@ -134,6 +135,11 @@ function AdminRapportsReunionContent() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showViewDialog, setShowViewDialog] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [showUnpublishDialog, setShowUnpublishDialog] = useState(false);
+  const [rapportToUnpublish, setRapportToUnpublish] = useState<{
+    id: string;
+    titre: string;
+  } | null>(null);
   const [selectedRapport, setSelectedRapport] = useState<any>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -376,6 +382,14 @@ function AdminRapportsReunionContent() {
     setShowDeleteDialog(true);
   };
 
+  /**
+   * Ouvre le AlertDialog de dépublication (jamais window.confirm dans le menu Radix).
+   */
+  const openUnpublishDialog = useCallback((rapport: { id: string; titre: string }) => {
+    setRapportToUnpublish({ id: rapport.id, titre: rapport.titre });
+    setShowUnpublishDialog(true);
+  }, []);
+
   // Filtrer les données
   const filteredData = useMemo(() => {
     return rapports.filter((item) => {
@@ -528,21 +542,8 @@ function AdminRapportsReunionContent() {
                   </DropdownMenuItem>
                 ) : (
                   <DropdownMenuItem
-                    onClick={async () => {
-                      if (
-                        !confirm(
-                          "Repasser en brouillon ? Les adhérents ne pourront plus consulter ce rapport."
-                        )
-                      ) {
-                        return;
-                      }
-                      const r = await unpublishRapportReunionAction(rapport.id);
-                      if (r.success) {
-                        toast.success(r.message);
-                        loadRapports();
-                      } else {
-                        toast.error(r.error || "Action impossible");
-                      }
+                    onSelect={() => {
+                      openUnpublishDialog(rapport);
                     }}
                   >
                     Repasser en brouillon
@@ -565,7 +566,7 @@ function AdminRapportsReunionContent() {
       minSize: 80,
       maxSize: 120,
     }),
-  ], [handleView]);
+  ], [handleView, loadRapports, openUnpublishDialog]);
 
   const table = useReactTable({
     data: filteredData,
@@ -950,6 +951,19 @@ function AdminRapportsReunionContent() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <UnpublishRapportDialog
+        open={showUnpublishDialog}
+        rapport={rapportToUnpublish}
+        onOpenChange={(open) => {
+          setShowUnpublishDialog(open);
+          if (!open) setRapportToUnpublish(null);
+        }}
+        unpublishAction={unpublishRapportReunionAction}
+        onSuccess={() => {
+          void loadRapports();
+        }}
+      />
     </div>
   );
 }
