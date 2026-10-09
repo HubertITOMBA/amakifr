@@ -2,7 +2,7 @@
   "expo": {
     "name": "AMAKI",
     "slug": "amaki-mobile",
-    "version": "1.0.0",
+    "version": "1.1.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "amaki",
@@ -25,7 +25,7 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "fr.amaki.app",
-      "versionCode": 2,
+      "versionCode": 3,
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO"
       ]

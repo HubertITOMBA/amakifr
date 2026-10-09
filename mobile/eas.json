@@ -21,6 +21,10 @@
       "distribution": "store",
       "android": {
         "buildType": "app-bundle"
+      },
+      "env": {
+        "APP_ENV": "production",
+        "EXPO_PUBLIC_API_URL": "https://amaki.fr"
       }
     }
   }
