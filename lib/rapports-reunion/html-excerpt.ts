@@ -81,9 +81,21 @@ export function htmlToPlainExcerpt(
 
 /**
  * Indique si une réunion a un rapport lié (relation Prisma Rapport).
+ * @deprecated préférer reunionHasPublishedRapport pour l’UI adhérent.
  */
 export function reunionHasLinkedRapport(reunion: {
   Rapport?: { id?: string | null } | null;
 }): boolean {
   return Boolean(reunion?.Rapport?.id);
+}
+
+/**
+ * Compte rendu visible adhérent : rapport lié ET statut PUBLISHED.
+ */
+export function reunionHasPublishedRapport(reunion: {
+  Rapport?: { id?: string | null; statut?: string | null } | null;
+}): boolean {
+  return (
+    Boolean(reunion?.Rapport?.id) && reunion?.Rapport?.statut === "PUBLISHED"
+  );
 }

@@ -297,6 +297,7 @@ model User {
   mediaGalerieCrees             MediaGalerie[]               @relation("MediaGalerieCreatedBy") // Médias de galerie créés
   rapportsReunionCrees          RapportReunion[]             @relation("RapportReunionCreatedBy") // Rapports de réunion créés
   rapportsReunionModifies       RapportReunion[]             @relation("RapportReunionUpdatedBy") // Rapports de réunion modifiés
+  rapportsReunionPublies        RapportReunion[]             @relation("RapportReunionPublishedBy") // Rapports publiés par cet utilisateur
   reunionsMensuellesCrees       ReunionMensuelle[]           @relation("ReunionMensuelleCreatedBy") // Réunions mensuelles créées
   reunionsMensuellesModifiees   ReunionMensuelle[]           @relation("ReunionMensuelleUpdatedBy") // Réunions mensuelles modifiées
   menusCreated                  Menu[]                       @relation("MenuCreatedBy") // Menus créés
@@ -1742,27 +1743,41 @@ model DocumentDeletionRequest {
   @@map("document_deletion_requests")
 }
 
+/// Statut de publication d’un rapport de réunion (TipTap HTML en base).
+enum RapportReunionStatut {
+  DRAFT
+  PUBLISHED
+}
+
 // Modèle pour les rapports de réunions mensuelles (rédigé après la réunion)
 model RapportReunion {
-  id                   String   @id @default(cuid())
-  titre                String   @db.VarChar(255) // Titre du rapport (ex: "Réunion mensuelle - Janvier 2024")
+  id                   String               @id @default(cuid())
+  titre                String               @db.VarChar(255) // Titre du rapport (ex: "Réunion mensuelle - Janvier 2024")
   dateReunion          DateTime // Date de la réunion
-  contenu              String   @db.Text // Contenu du rapport (markdown ou texte)
-  reunionMensuelleId   String?  @unique // Lien optionnel vers la réunion mensuelle concernée
+  /** Contenu TipTap HTML — ne jamais logger ; sanitiser côté UI avant affichage. */
+  contenu              String               @db.Text
+  reunionMensuelleId   String?              @unique // Lien optionnel vers la réunion mensuelle concernée
+  /** DRAFT = invisible adhérents ; PUBLISHED = lisible authentifié. */
+  statut               RapportReunionStatut @default(DRAFT)
+  publishedAt          DateTime?
+  publishedBy          String?
   createdBy            String // Admin qui a créé le rapport
   updatedBy            String? // Admin qui a modifié le rapport
-  createdAt            DateTime @default(now())
-  updatedAt            DateTime @updatedAt
+  createdAt            DateTime             @default(now())
+  updatedAt            DateTime             @updatedAt
 
   // Relations
   CreatedBy        User               @relation("RapportReunionCreatedBy", fields: [createdBy], references: [id], onDelete: Cascade)
   UpdatedBy        User?              @relation("RapportReunionUpdatedBy", fields: [updatedBy], references: [id], onDelete: SetNull)
+  PublishedBy      User?              @relation("RapportReunionPublishedBy", fields: [publishedBy], references: [id], onDelete: SetNull)
   ReunionMensuelle ReunionMensuelle?  @relation(fields: [reunionMensuelleId], references: [id], onDelete: SetNull)
 
   @@index([dateReunion])
   @@index([createdAt])
   @@index([createdBy])
   @@index([reunionMensuelleId])
+  @@index([statut])
+  @@index([publishedAt])
   @@map("rapports_reunion")
 }
 

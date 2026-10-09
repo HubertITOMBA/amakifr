@@ -39,8 +39,11 @@ import {
   createRapportReunion,
   updateRapportReunion,
   deleteRapportReunion,
-  getRapportReunionById
+  getRapportReunionById,
+  publishRapportReunionAction,
+  unpublishRapportReunionAction,
 } from "@/actions/rapports-reunion";
+import { Badge } from "@/components/ui/badge";
 import { getAllReunionsMensuelles } from "@/actions/reunions-mensuelles";
 import { toast } from "sonner";
 import { isAuthorizationError } from "@/lib/utils";
@@ -94,6 +97,7 @@ function AdminRapportsReunionContent() {
             dateReunion: false,
             createdAt: false,
             CreatedBy: false,
+            statut: true,
             // titre et actions restent visibles (non définis = visible par défaut)
           };
         }
@@ -428,6 +432,29 @@ function AdminRapportsReunionContent() {
       maxSize: 150,
       enableResizing: true,
     }),
+    columnHelper.accessor("statut", {
+      header: "Statut",
+      cell: ({ row }) => {
+        const statut = row.getValue("statut") as string;
+        const published = statut === "PUBLISHED";
+        return (
+          <Badge
+            variant={published ? "default" : "secondary"}
+            className={
+              published
+                ? "bg-green-600 hover:bg-green-600 text-[10px] sm:text-xs"
+                : "bg-amber-100 text-amber-900 hover:bg-amber-100 text-[10px] sm:text-xs"
+            }
+          >
+            {published ? "Publié" : "Brouillon"}
+          </Badge>
+        );
+      },
+      size: 100,
+      minSize: 80,
+      maxSize: 120,
+      enableResizing: true,
+    }),
     columnHelper.accessor("CreatedBy", {
       header: "Créé par",
       cell: ({ row }) => {
@@ -485,6 +512,42 @@ function AdminRapportsReunionContent() {
                   <Edit className="h-4 w-4 mr-2" />
                   Modifier
                 </DropdownMenuItem>
+                {rapport.statut === "DRAFT" ? (
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      const r = await publishRapportReunionAction(rapport.id);
+                      if (r.success) {
+                        toast.success(r.message);
+                        loadRapports();
+                      } else {
+                        toast.error(r.error || "Publication impossible");
+                      }
+                    }}
+                  >
+                    Publier
+                  </DropdownMenuItem>
+                ) : (
+                  <DropdownMenuItem
+                    onClick={async () => {
+                      if (
+                        !confirm(
+                          "Repasser en brouillon ? Les adhérents ne pourront plus consulter ce rapport."
+                        )
+                      ) {
+                        return;
+                      }
+                      const r = await unpublishRapportReunionAction(rapport.id);
+                      if (r.success) {
+                        toast.success(r.message);
+                        loadRapports();
+                      } else {
+                        toast.error(r.error || "Action impossible");
+                      }
+                    }}
+                  >
+                    Repasser en brouillon
+                  </DropdownMenuItem>
+                )}
                 <DropdownMenuSeparator />
                 <DropdownMenuItem 
                   onClick={() => openDeleteDialog(rapport)}

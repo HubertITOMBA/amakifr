@@ -93,6 +93,9 @@ export async function getMyReunions(
           select: { statut: true },
           take: 1,
         },
+        Rapport: {
+          select: { id: true, statut: true },
+        },
       },
       orderBy: [
         { dateReunion: "asc" },
@@ -129,6 +132,11 @@ export async function getMyReunions(
           ? selectHostTelephones(host.Telephones)
           : null;
 
+      const publishedReport =
+        r.Rapport?.statut === "PUBLISHED" && r.Rapport.id
+          ? r.Rapport
+          : null;
+
       return {
         id: r.id,
         titre: buildTitre(r.mois, r.annee),
@@ -161,6 +169,8 @@ export async function getMyReunions(
           dateReunion: r.dateReunion,
         }),
         commentaires: r.commentaires,
+        hasPublishedReport: Boolean(publishedReport),
+        publishedReportId: publishedReport?.id ?? null,
       };
     });
   } catch (error) {

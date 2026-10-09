@@ -3,6 +3,7 @@ import {
   escapeHtmlText,
   htmlToPlainExcerpt,
   reunionHasLinkedRapport,
+  reunionHasPublishedRapport,
   sanitizeRapportHtml,
 } from "@/lib/rapports-reunion/html-excerpt";
 
@@ -48,7 +49,7 @@ describe("htmlToPlainExcerpt", () => {
   });
 });
 
-describe("reunionHasLinkedRapport", () => {
+describe("reunionHasLinkedRapport / reunionHasPublishedRapport", () => {
   it("sans rapport → false", () => {
     expect(reunionHasLinkedRapport({})).toBe(false);
     expect(reunionHasLinkedRapport({ Rapport: null })).toBe(false);
@@ -57,6 +58,19 @@ describe("reunionHasLinkedRapport", () => {
 
   it("avec rapport lié → true", () => {
     expect(reunionHasLinkedRapport({ Rapport: { id: "rapp_1" } })).toBe(true);
+  });
+
+  it("brouillon lié → pas visible adhérent", () => {
+    expect(
+      reunionHasPublishedRapport({
+        Rapport: { id: "rapp_1", statut: "DRAFT" },
+      })
+    ).toBe(false);
+    expect(
+      reunionHasPublishedRapport({
+        Rapport: { id: "rapp_1", statut: "PUBLISHED" },
+      })
+    ).toBe(true);
   });
 });
 

@@ -398,17 +398,24 @@ export default function AdminReunionsMensuellesPage() {
       columnHelper.accessor("Rapport", {
         header: "Compte rendu",
         cell: (info) => {
-          const rapport = info.getValue() as { id: string; titre?: string } | null;
+          const rapport = info.getValue() as {
+            id: string;
+            titre?: string;
+            statut?: string;
+          } | null;
           if (!rapport?.id) {
             return <span className="text-muted-foreground text-xs">—</span>;
           }
+          const published = rapport.statut === "PUBLISHED";
           return (
             <a
               href={`/admin/rapports-reunion?view=${encodeURIComponent(rapport.id)}`}
-              className="inline-flex items-center gap-1 text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded"
+              className="inline-flex flex-col items-start gap-0.5 text-xs font-medium text-blue-700 dark:text-blue-400 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-400 rounded"
             >
-              <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
-              Compte rendu disponible
+              <span className="inline-flex items-center gap-1">
+                <FileText className="h-3.5 w-3.5 shrink-0" aria-hidden />
+                {published ? "Compte rendu disponible" : "Brouillon"}
+              </span>
             </a>
           );
         },
@@ -726,7 +733,9 @@ export default function AdminReunionsMensuellesPage() {
                               className="mt-1.5 inline-flex items-center justify-center gap-1 rounded bg-blue-600 px-1.5 py-0.5 text-[10px] font-medium text-white hover:bg-blue-700"
                             >
                               <FileText className="h-3 w-3" aria-hidden />
-                              Compte rendu disponible
+                              {reunion.Rapport.statut === "PUBLISHED"
+                                ? "Compte rendu disponible"
+                                : "Brouillon"}
                             </a>
                           ) : null}
                         </>

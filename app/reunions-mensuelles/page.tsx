@@ -46,7 +46,7 @@ import { useCurrentUser } from "@/hooks/use-current-user";
 import { isAdminRole } from "@/lib/utils";
 import { InlineAdherentSearchPanel } from "@/components/admin/InlineAdherentSearchPanel";
 import { getAdherentsMembres } from "@/actions/cotisations-du-mois";
-import { reunionHasLinkedRapport } from "@/lib/rapports-reunion/html-excerpt";
+import { reunionHasPublishedRapport } from "@/lib/rapports-reunion/html-excerpt";
 
 const moisOptions = [
   { value: 1, label: "Janvier" },
@@ -515,7 +515,8 @@ export default function ReunionsMensuellesPage() {
                               {reunion.statut === "DateConfirmee" && !isAdmin && isReunionPassee(reunion) && (
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-medium">Présence clôturée</p>
                               )}
-                              {reunionHasLinkedRapport(reunion) && reunion.Rapport?.id ? (
+                              {reunionHasPublishedRapport(reunion) &&
+                              reunion.Rapport?.id ? (
                                 <Link
                                   href={`/rapports-reunion?view=${encodeURIComponent(reunion.Rapport.id)}`}
                                   onClick={(e) => e.stopPropagation()}

@@ -56,20 +56,23 @@ export async function createRapportReunion(formData: FormData) {
 
     const validatedData = CreateRapportReunionSchema.parse(rawData);
 
-    // Créer le rapport
+    // Création toujours en brouillon — aucune publication automatique.
     const rapport = await db.rapportReunion.create({
       data: {
         titre: validatedData.titre,
         dateReunion: validatedData.dateReunion,
         contenu: validatedData.contenu,
         reunionMensuelleId: validatedData.reunionMensuelleId ?? null,
+        statut: "DRAFT",
+        publishedAt: null,
+        publishedBy: null,
         createdBy: session.user.id,
       },
     });
 
     return {
       success: true,
-      message: "Rapport de réunion créé avec succès",
+      message: "Brouillon de rapport créé avec succès",
       id: rapport.id,
     };
   } catch (error) {
@@ -124,7 +127,7 @@ export async function updateRapportReunion(formData: FormData) {
       return { success: false, error: "Rapport non trouvé" };
     }
 
-    // Mettre à jour le rapport
+    // Mise à jour du contenu uniquement — ne change jamais le statut de publication.
     await db.rapportReunion.update({
       where: { id: validatedData.id },
       data: {
@@ -270,6 +273,12 @@ export async function getRapportReunionById(rapportId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
+    const { canRead } = await import("@/lib/dynamic-permissions");
+    const canAdminRead = await canRead(
+      session.user.id,
+      "getAllRapportsReunion"
+    );
+
     const rapport = await db.rapportReunion.findUnique({
       where: { id: rapportId },
       include: {
@@ -293,7 +302,8 @@ export async function getRapportReunionById(rapportId: string) {
       },
     });
 
-    if (!rapport) {
+    // Brouillon : non révélé aux adhérents (même message que ID inconnu).
+    if (!rapport || (rapport.statut !== "PUBLISHED" && !canAdminRead)) {
       return { success: false, error: "Rapport non trouvé" };
     }
 
@@ -311,10 +321,7 @@ export async function getRapportReunionById(rapportId: string) {
 }
 
 /**
- * Récupère tous les rapports de réunion pour les adhérents (lecture seule)
- * 
- * @returns Un objet avec success (boolean), rapports (array) en cas de succès, 
- * ou error (string) en cas d'échec
+ * Récupère les rapports PUBLISHED pour les adhérents (lecture seule).
  */
 export async function getRapportsReunionForAdherents() {
   try {
@@ -324,15 +331,16 @@ export async function getRapportsReunionForAdherents() {
     }
 
     const rapports = await db.rapportReunion.findMany({
-      orderBy: {
-        dateReunion: "desc",
-      },
+      where: { statut: "PUBLISHED" },
+      orderBy: [{ publishedAt: "desc" }, { dateReunion: "desc" }],
       select: {
         id: true,
         titre: true,
         dateReunion: true,
         contenu: true,
         createdAt: true,
+        publishedAt: true,
+        statut: true,
         CreatedBy: {
           select: {
             id: true,
@@ -352,5 +360,95 @@ export async function getRapportsReunionForAdherents() {
       success: false,
       error: "Erreur lors de la récupération des rapports",
     };
+  }
+}
+
+/**
+ * Publie un rapport (permission WRITE updateRapportReunion).
+ * Ne change pas le contenu TipTap.
+ */
+export async function publishRapportReunionAction(rapportId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateRapportReunion");
+    if (!hasAccess) {
+      return {
+        success: false,
+        error: "Droit de publication de rapport de réunion requis.",
+      };
+    }
+
+    const { publishRapportReunion } = await import(
+      "@/lib/services/rapports-reunion/publication"
+    );
+    const result = await publishRapportReunion(rapportId, session.user.id);
+    return {
+      success: true,
+      message: "Rapport publié. Il est visible des adhérents.",
+      statut: result.statut,
+      publishedAt: result.publishedAt.toISOString(),
+    };
+  } catch (error) {
+    const { ServiceError } = await import("@/lib/service-error");
+    if (error instanceof ServiceError) {
+      return { success: false, error: error.message };
+    }
+    console.error("Erreur lors de la publication:", error);
+    return { success: false, error: "Erreur lors de la publication" };
+  } finally {
+    revalidatePath("/admin/rapports-reunion");
+    revalidatePath("/rapports-reunion");
+    revalidatePath("/admin/reunions-mensuelles");
+    revalidatePath("/reunions-mensuelles");
+  }
+}
+
+/**
+ * Repasse un rapport en brouillon (permission WRITE updateRapportReunion).
+ * Les adhérents perdent immédiatement l’accès lecture.
+ */
+export async function unpublishRapportReunionAction(rapportId: string) {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const { canWrite } = await import("@/lib/dynamic-permissions");
+    const hasAccess = await canWrite(session.user.id, "updateRapportReunion");
+    if (!hasAccess) {
+      return {
+        success: false,
+        error: "Droit de modification de rapport de réunion requis.",
+      };
+    }
+
+    const { unpublishRapportReunion } = await import(
+      "@/lib/services/rapports-reunion/publication"
+    );
+    await unpublishRapportReunion(rapportId, session.user.id);
+    return {
+      success: true,
+      message:
+        "Rapport repassé en brouillon. Les adhérents ne peuvent plus le consulter.",
+      statut: "DRAFT" as const,
+    };
+  } catch (error) {
+    const { ServiceError } = await import("@/lib/service-error");
+    if (error instanceof ServiceError) {
+      return { success: false, error: error.message };
+    }
+    console.error("Erreur lors du retour en brouillon:", error);
+    return { success: false, error: "Erreur lors du retour en brouillon" };
+  } finally {
+    revalidatePath("/admin/rapports-reunion");
+    revalidatePath("/rapports-reunion");
+    revalidatePath("/admin/reunions-mensuelles");
+    revalidatePath("/reunions-mensuelles");
   }
 }

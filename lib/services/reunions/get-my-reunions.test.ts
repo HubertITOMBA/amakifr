@@ -99,10 +99,55 @@ describe("getMyReunions", () => {
       hostTelephones: [{ numero: "0601020304", type: "Mobile" }],
       canUpdateParticipation: true,
       dateReunion: "2027-03-14T18:00:00.000Z",
+      hasPublishedReport: false,
+      publishedReportId: null,
     });
     const json = JSON.stringify(result[0]);
     expect(json).not.toMatch(/@/);
     expect(json).not.toMatch(/Adresse\[/);
+  });
+
+  it("hasPublishedReport vrai uniquement si Rapport PUBLISHED", async () => {
+    findUniqueAdherent.mockResolvedValue({ id: "adh-1" });
+    findManyReunions.mockResolvedValue([
+      {
+        id: "r-pub",
+        annee: 2026,
+        mois: 5,
+        dateReunion: new Date("2027-05-01T18:00:00.000Z"),
+        statut: "DateConfirmee",
+        typeLieu: "Domicile",
+        adresse: null,
+        nomRestaurant: null,
+        commentaires: null,
+        AdherentHote: null,
+        Participations: [],
+        Rapport: { id: "rapp-1", statut: "PUBLISHED" },
+      },
+      {
+        id: "r-draft",
+        annee: 2026,
+        mois: 6,
+        dateReunion: new Date("2027-06-01T18:00:00.000Z"),
+        statut: "DateConfirmee",
+        typeLieu: "Domicile",
+        adresse: null,
+        nomRestaurant: null,
+        commentaires: null,
+        AdherentHote: null,
+        Participations: [],
+        Rapport: { id: "rapp-2", statut: "DRAFT" },
+      },
+    ]);
+    const result = await getMyReunions(actor());
+    expect(result[0]).toMatchObject({
+      hasPublishedReport: true,
+      publishedReportId: "rapp-1",
+    });
+    expect(result[1]).toMatchObject({
+      hasPublishedReport: false,
+      publishedReportId: null,
+    });
   });
 
   it("restaurant → adresse publique, pas d'autres adresses hôte", async () => {

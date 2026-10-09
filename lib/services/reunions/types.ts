@@ -53,6 +53,10 @@ export type MyReunionDto = {
   canUpdateParticipation: boolean;
   /** Commentaires publics de la réunion */
   commentaires: string | null;
+  /** true uniquement si un RapportReunion PUBLISHED est lié */
+  hasPublishedReport: boolean;
+  /** ID du rapport PUBLISHED lié, sinon null */
+  publishedReportId: string | null;
 };
 
 export type UpdateMyReunionParticipationInput = {
