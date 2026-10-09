@@ -49,3 +49,6 @@ play-store-assets/
 google-services.*.backup.json
 verif_mobile*.txt
 *.odt
+
+# Asset local inutilisé
+assets/images/splash-amaki-bg.png
