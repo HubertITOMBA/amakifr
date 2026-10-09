@@ -1,7 +1,16 @@
 # AMAKI — Contexte permanent du projet
 
-Dernière mise à jour : 2026-10-07
-Baseline validée : commit `2b11725`
+Dernière mise à jour : 2026-10-09
+
+## Baselines (ne pas confondre)
+
+| Portée | SHA / version | Statut |
+|--------|---------------|--------|
+| Baseline dépôt / DEV (`origin/main`) | `ea1d0de` | Validée ; contient M1 et M2 développés et validés en DEV |
+| Production web actuellement déployée (documentée) | `ddf4f9e` | UX confirmation email ; **ne pas** assimiler à M1/M2 |
+| Application Android Play Store publiée | `1.0.0` / `versionCode` `2` | Inchangée ; M1/M2 **non** publiés sur le Play Store |
+
+**Règle** : M1 (mot de passe oublié) et M2 (réunions / comptes rendus) sont **développés et validés en DEV uniquement**. Ils ne sont **pas** en production web et **pas** sur le Play Store.
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
 
@@ -20,6 +29,7 @@ Baseline validée : commit `2b11725`
 | Port interne Next.js | `9060` |
 | URL publique | `https://amaki.fr/` |
 | Base PostgreSQL de production | `amakifr` |
+| Base PostgreSQL de développement | `amakifr_db` |
 
 Ne jamais afficher ni versionner les secrets de `.env`.
 
@@ -122,13 +132,14 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ---
 
-## 6. Application mobile Android — livrée et validée
+## 6. Application mobile Android — livrée et validée (Play Store)
 
-**LIVRÉ ET VALIDÉ**
+**LIVRÉ ET VALIDÉ (piste Production Google Play)**
 
 - Package Android : `fr.amaki.app`
 - Google Play : `https://play.google.com/store/apps/details?id=fr.amaki.app`
 - Version publique validée : `1.0.0`
+- `versionCode` : `2`
 - Version de production Play Console : `2 (1.0.0)`
 - L’application est disponible sur la piste Production.
 - La recette publique stricte a été réalisée après retrait du compte de la piste interne et réinstallation depuis Google Play.
@@ -146,20 +157,25 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 **UI mobile (Accueil, LoginPage, headers) — commitée, non publiée sur le Play Store**
 
-État au 2026-10-07 (baseline `2b11725`) :
+État historique au 2026-10-07 (commit `2b11725`) :
 
 - Refonte mobile Accueil, LoginPage et headers dégradés : commitée et poussée sur `origin/main`.
 - UI validée sur téléphone via **AMAKI Dev** (Metro / binaire de développement).
-- Afficher/masquer le mot de passe : livré et validé sur AMAKI Dev.
+- Afficher/masquer le mot de passe : **livré et validé** sur AMAKI Dev (plus un chantier ouvert).
 - Nouveau splash validé dans un binaire AMAKI Dev :
   - fond bleu clair ;
   - logo centré et transparent ;
   - proportions correctes ;
   - transition vers la LoginPage correcte.
-- Build Expo Dev de recette : `798d66ff-1f90-4b18-8505-e8c2603e2258`.
-- Application publique Play Store `fr.amaki.app` : toujours en version `1.0.0`, inchangée.
-- Aucune nouvelle version Android de production n’a été publiée.
-- Le nouveau design **n’est pas** publié sur le Play Store.
+- Build Expo Dev de recette UI : `798d66ff-1f90-4b18-8505-e8c2603e2258`.
+- Application publique Play Store `fr.amaki.app` : toujours en version `1.0.0` / `versionCode` `2`, inchangée.
+- Aucune nouvelle version Android de production n’a été publiée pour M1/M2.
+- Le nouveau design et les lots M1/M2 **ne sont pas** publiés sur le Play Store.
+
+**Build AMAKI Dev (recette M1)**
+
+- Build Expo Dev validé : `36099ef3-fa3c-40d5-96db-a34166676f27`.
+- M2-D a ensuite été validé sur téléphone via **Metro** avec ce même client de développement ; aucun nouveau build EAS n’était requis pour M2-D.
 
 ---
 
@@ -168,69 +184,120 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 **DÉCISIONS D’ARCHITECTURE ET DE SÉCURITÉ**
 
 - Ne jamais récupérer, afficher ou envoyer l’ancien mot de passe.
-- Le futur parcours « mot de passe oublié » doit utiliser un code ou lien temporaire, à usage unique, expirant, permettant de définir un nouveau mot de passe.
+- Le parcours « mot de passe oublié » (M1) utilise un code temporaire à 8 chiffres, à usage unique, expirant, permettant de définir un nouveau mot de passe — **validé en DEV** ; déploiement production encore en attente (voir §8 et §11).
 - Les rappels financiers ne doivent pas exposer de montant sensible sur un écran verrouillé.
 - Les rappels mensuels doivent être idempotents et éviter tout doublon.
 - La collecte concernant l’origine des connexions doit rester proportionnée :
   plateforme Web/Mobile, type d’appareil, système, dernière activité et éventuellement IP tronquée.
 - Définir une durée de conservation avant d’ajouter de nouvelles données de connexion.
 - Ne pas transformer ce besoin en journalisation intrusive de toutes les actions utilisateur.
+- Lecture mobile des comptes rendus (M2-D) : pas de WebView ; HTML allowlisté rendu en composants React Native ; liens http/https uniquement après confirmation utilisateur ; borne stricte de taille.
 
 ---
 
-## 8. Travaux prioritaires ouverts
+## 8. M1 — Mot de passe oublié mobile (validé DEV)
 
-**TRAVAUX OUVERTS ET PRIORITÉS**
+**DÉVELOPPÉ ET VALIDÉ EN DEV — NON DÉPLOYÉ EN PRODUCTION — NON PUBLIÉ SUR LE PLAY STORE**
 
-Ordre de priorité validé :
+- Backend S0/S1 poussé sur `origin/main`.
+- Migration password-reset appliquée et validée **uniquement** sur la base DEV `amakifr_db` (pas sur la production `amakifr`).
+- Recette DEV avec Mailpit et compte synthétique dédié ; compte encore présent dans `amakifr_db` au 2026-10-09, avec procédure de nettoyage préparée mais non exécutée.
+- Parcours validé : demande → code 8 chiffres → réinitialisation → reconnexion.
+- Correctif payload email / autofill appliqué.
+- Conservation du zéro initial du code (pas de troncature numérique).
+- Barre de navigation Android corrigée pour ce parcours.
+- Build AMAKI Dev de recette : `36099ef3-fa3c-40d5-96db-a34166676f27`.
+- **Production** : non déployé. Le passage en production exigera notamment :
+  - `PASSWORD_RESET_HMAC_SECRET` présent et conforme ;
+  - `TRUST_PROXY` aligné sur la conf Nginx **effective** (`nginx -T`) ;
+  - migration password-reset appliquée sur la base de production après sauvegarde contrôlée.
 
-### P0 — Inscription web bloquée
+---
 
-- Auditer le parcours d’adhésion en ligne.
-- Le bouton « Créer mon compte » reste grisé lors d’un test utilisateur.
-- Identifier si le blocage provient :
-  - d’un champ obligatoire ;
-  - du consentement ;
-  - d’une validation client ;
-  - d’une configuration ;
-  - d’une règle serveur.
-- Commencer par un diagnostic ; ne pas corriger sans preuve.
+## 9. M2 — Réunions et comptes rendus (validé DEV)
 
-Ordre des priorités encore ouvertes (après le P0 inscription web) :
+**DÉVELOPPÉ ET VALIDÉ EN DEV — NON DÉPLOYÉ EN PRODUCTION WEB — NON PUBLIÉ SUR LE PLAY STORE**
 
-1. mot de passe oublié mobile ;
-2. comptes rendus/rapports des réunions mobiles ;
-3. rappels mensuels cotisations/dettes ;
-4. identification de l’origine des connexions.
+Ne pas écrire ni considérer que l’UX M2 ou la lecture mobile des rapports est déjà en production.
 
-### P1 — Authentification mobile
+### M2-B — Web UX rapports / réunions
 
-- Ajouter un parcours sécurisé « mot de passe oublié ».
-- Réutiliser autant que possible le mécanisme web existant s’il est correct.
-- Ne jamais envoyer un mot de passe existant.
-- Afficher/masquer le mot de passe : déjà livré et validé (AMAKI Dev, 2026-10-07).
+- Expérience web des rapports de réunion améliorée (commit `0371eb7` et suivants sur `origin/main`).
+- Présent dans la baseline dépôt `ea1d0de` ; **pas** assimilé au SHA de production web `ddf4f9e`.
 
-### P1 — Réunions sur mobile
+### M2-C — Publication DRAFT / PUBLISHED + API Bearer
 
-- Lorsqu’un compte rendu ou rapport est disponible, afficher un bouton ou badge permettant à l’adhérent de le consulter.
-- Respecter les droits d’accès et utiliser un téléchargement/affichage authentifié.
+- Statuts `DRAFT` / `PUBLISHED` ; rapports existants backfillés en `PUBLISHED` lors de la migration.
+- API Bearer lecture seule pour le détail d’un rapport publié ; protections anti-IDOR.
+- Migration appliquée **uniquement** sur `amakifr_db` (pas sur la production).
+- Workflow web validé en DEV : Brouillon → Publié → Brouillon (dépublication).
+- Hotfix dépublication : remplacement de `window.confirm` / confirm natif par `AlertDialog` — validé (commit `6284411`).
 
-### P1 — Rappels mensuels cotisations/dettes
+### M2-D — Lecteur mobile Expo
+
+- Badge « compte rendu » visible uniquement si un rapport **publié** est lié (`hasPublishedReport` + `publishedReportId`).
+- Lecteur Expo sécurisé **sans WebView**.
+- HTML TipTap : allowlist stricte → composants React Native (pas d’injection HTML brute).
+- Liens : uniquement `http:` / `https:` absolus, après action et confirmation utilisateur.
+- Borne de taille : `MAX_MEETING_REPORT_HTML_LENGTH = 200_000` caractères ; dépassement → état contrôlé « Compte rendu trop volumineux » (pas de troncature silencieuse, pas de log du contenu).
+- Dépublication : le badge disparaît et l’accès lecteur renvoie une indisponibilité générique.
+- Validé sur téléphone via **Metro** avec le client AMAKI Dev `36099ef3-fa3c-40d5-96db-a34166676f27` ; aucun nouveau build EAS requis pour cette validation.
+- **Non** publié sur le Play Store (`1.0.0` / `versionCode` `2` inchangé).
+
+---
+
+## 10. Travaux prioritaires
+
+**ÉTAT DES PRIORITÉS (2026-10-09)**
+
+| Priorité | Sujet | État |
+|----------|-------|------|
+| P0 | Inscription web | **Livré en production** (confirmation email / activation admin — voir journal) |
+| P1 | Mot de passe oublié (M1) | **Développé et validé DEV** ; production et Play Store en attente |
+| P1 | Lecture comptes rendus mobile (M2) | **Développé et validé DEV** ; production web / Play Store en attente |
+
+### Prochaines priorités restantes
+
+1. Rappels mensuels cotisations / dettes.
+2. Identification de l’origine des connexions.
+3. Futur copilote IA pour les comptes rendus — **uniquement après** stabilisation production de M1/M2. **Non livré, non commencé.**
+
+### Détail des chantiers encore ouverts
+
+#### Rappels mensuels cotisations/dettes
 
 - Fournir à l’administrateur un envoi manuel, prévisualisable et éventuellement automatisable.
 - Informer l’adhérent d’un retard de cotisation ou d’une dette et l’inviter à régulariser.
 - Définir la source de calcul, les destinataires, la date mensuelle, l’idempotence, l’historique et le contenu discret des notifications.
 
-### P2 — Origine et sessions de connexion
+#### Origine et sessions de connexion
 
 - Identifier si une connexion vient du Web ou du Mobile.
 - Préférer une vue de sessions/dernière activité à un stockage illimité de toutes les actions.
 - Définir les données collectées, la rétention et les droits de consultation.
 - Auditer l’existant avant toute migration ou suppression de journaux.
 
+#### Copilote IA comptes rendus (futur)
+
+- Hors scope actuel.
+- Ne pas démarrer avant stabilisation production de M1 et M2.
+- Ne pas le déclarer livré ni commencé.
+
 ---
 
-## 9. Méthode de travail ChatGPT/Cursor
+## 11. Déploiement à venir (M1 / M2)
+
+**PROCÉDURE ATTENDUE — NON EXÉCUTÉE À CE STADE**
+
+1. Backend / web et migrations d’abord (password-reset, DRAFT/PUBLISHED, API Bearer), avec sauvegarde PostgreSQL validée.
+2. Tests de production contrôlés (smoke, parcours métier, `TRUST_PROXY` / secrets).
+3. Android ensuite (nouvelle version Play Store seulement après disponibilité des endpoints M1/M2 côté serveur).
+4. **Ne pas** publier l’application mobile avant que les endpoints M1/M2 soient disponibles en production.
+5. À la date de rédaction : **migrations production non appliquées** (password-reset et rapports DRAFT/PUBLISHED uniquement sur `amakifr_db`).
+
+---
+
+## 12. Méthode de travail ChatGPT/Cursor
 
 - Lire ce fichier avant toute opération sur AMAKI.
 - Ne pas réauditer ce qui est marqué livré/validé sauf :
@@ -244,7 +311,7 @@ Ordre des priorités encore ouvertes (après le P0 inscription web) :
 - Ne jamais y écrire de secrets ou de contenu intégral de `.env`.
 - Cette règle ne change pas à elle seule la configuration des logs runtime PM2/Next.js du VPS.
 - Renvoi du code de confirmation d’inscription : réponse non énumérante (même message que le compte existe ou non), cooldown serveur minimal, et aucun email/code/token dans les logs applicatifs.
-- Confirmation d’email d’inscription — **livrée et validée en production** (baseline `cfbe06fb…`) :
+- Confirmation d’email d’inscription — **livrée et validée en production** (baseline historique `cfbe06fb…` puis UX `ddf4f9e…`) :
   - vérification liée à `email + code` (plus de lookup par code seul) ;
   - un seul `VerificationToken` actif par email (contrainte UNIQUE) ;
   - plafond persistant de 3 erreurs (`failedAttempts` / `lockedAt`) côté DB ;
@@ -275,20 +342,23 @@ Ordre des priorités encore ouvertes (après le P0 inscription web) :
 
 ---
 
-## 10. Journal synthétique des décisions permanentes
+## 13. Journal synthétique des décisions permanentes
 
 - **2026-09** : durcissement du déploiement, backup atomique, maintenance Nginx, smoke interne avec retry.
 - **2026-09** : migrations Notes de frais 4.x, stockage privé et activation production.
 - **2026-09** : rôles Notes de frais confirmés ; justificatif obligatoire à la soumission.
-- **2026-10** : application Android `fr.amaki.app` version `1.0.0` validée en Production Google Play.
+- **2026-10** : application Android `fr.amaki.app` version `1.0.0` / `versionCode` `2` validée en Production Google Play.
 - **2026-10** : priorités suivantes enregistrées : inscription web, authentification mobile, rapports de réunions, rappels financiers et origine des connexions.
 - **2026-10** : déploiement sécurisé aligné sur Notes de frais actifs (gardes `assert_notes_frais_flags_on` + `assert_notes_frais_storage_ready`) — livré et validé en production (`f576be2…`).
 - **2026-10** : sécurisation persistante du code de confirmation email (unique email, plafond 3 erreurs, cooldown 60 s, vérification email+code) — livrée et validée en production (`cfbe06fb…`).
 - **2026-10** : email confirmé ≠ compte actif ; activation administrative obligatoire ; utilisateur averti de l’attente et notifié après activation.
-- **2026-10** : UX confirmation email (champ unique, collage filtré, renvoi explicite et attente administrative) — livrée et validée en production (`ddf4f9e…`).
+- **2026-10** : UX confirmation email (champ unique, collage filtré, renvoi explicite et attente administrative) — livrée et validée en production (`ddf4f9e…`). **Dernière production web documentée.**
 - **2026-10-07** : refonte UI mobile Accueil / LoginPage / headers dégradés + œil MDP + splash — commitée/poussée (`2b11725`), validée sur téléphone via AMAKI Dev (build Expo Dev `798d66ff-1f90-4b18-8505-e8c2603e2258`) ; Play Store `fr.amaki.app` `1.0.0` inchangé, aucune publication production Android.
-- **2026-10-07** : parcours « mot de passe oublié » S0/S1 (HMAC 8 chiffres, rate-limit PG, bind `127.0.0.1:9060`, `TRUST_PROXY` conditionné à Nginx **effective** `nginx -T`, rate-limit REQUEST/CONFIRM séparés) — **préparé / non livré** ; baseline validée inchangée (`2b11725`) jusqu’à commit + déploiement VPS contrôlé.
-- **2026-10-08** : lot mobile M1 « mot de passe oublié » (route `/forgot-password`, client API S0/S1) — **préparé / non livré** ; Play Store `1.0.0` inchangé ; recette intégrée réelle bloquée tant que DEV/VPS n’a pas migration + secret + `TRUST_PROXY`.
+- **2026-10-07** *(historique)* : parcours « mot de passe oublié » S0/S1 — alors **préparé / non livré** (baseline dépôt encore `2b11725`).
+- **2026-10-08** *(historique)* : lot mobile M1 — alors **préparé / non livré** ; Play Store `1.0.0` inchangé ; recette intégrée encore bloquée sans migration DEV + secret + `TRUST_PROXY`.
+- **2026-10-09** : M1 validé en DEV — backend S0/S1 poussé ; migration password-reset sur `amakifr_db` uniquement ; Mailpit + compte synthétique ; demande / code 8 chiffres / reset / reconnexion ; correctifs email-autofill, zéro initial, barre navigation Android ; build AMAKI Dev `36099ef3-fa3c-40d5-96db-a34166676f27` ; **non** déployé en production ; **non** publié sur Play Store ; production future : `PASSWORD_RESET_HMAC_SECRET` + `TRUST_PROXY` conforme.
+- **2026-10-09** : M2 validé en DEV — M2-B UX web ; M2-C DRAFT/PUBLISHED + backfill + API Bearer lecture seule + anti-IDOR + migration `amakifr_db` uniquement + workflow Brouillon↔Publié + hotfix AlertDialog dépublication (`6284411`) ; M2-D badge publié + lecteur Expo sans WebView (allowlist → RN, liens http/https confirmés, limite 200 000 car.) + dépublication retire badge/accès ; validation téléphone via Metro ; baseline dépôt `ea1d0de` ; **non** en production web ; **non** sur Play Store.
+- **2026-10-09** : priorités mises à jour — P0 inscription web livré en production ; P1 M1 et P1 lecture CR mobile validés DEV (prod/Play en attente) ; suite : rappels cotisations/dettes, origine des connexions, puis copilote IA CR seulement après stabilisation prod M1/M2 (IA non commencée).
 
 ---
 
@@ -296,9 +366,11 @@ Ordre des priorités encore ouvertes (après le P0 inscription web) :
 
 Ces éléments sont documentés comme baseline au moment de la rédaction ; les revérifier avant toute mutation de production :
 
-- SHA de `origin/main` et alignement avec le checkout VPS `/sites/amakifr`.
+- SHA de `origin/main` (attendu documenté : `ea1d0de`) et écart avec le checkout VPS `/sites/amakifr` (production web documentée : `ddf4f9e`).
 - Présence/absence de `maintenance.flag` et réponse HTTP publique réelle.
 - État PM2 `amakifr` (online/stopped) et cwd réel.
 - Valeurs des flags Notes de frais en shell / fichiers env / PM2 (sans afficher d’autres secrets).
 - Existence et permissions de `/sites/amakifr-data/notes-frais`.
 - Nombre de migrations finished en production vs dossiers présents dans le dépôt (anomalie orpheline historique possible — voir `docs/frais-avances/DEPLOY-PRODUCTION.md`).
+- Migrations M1/M2 **non** appliquées en production à ce stade (uniquement `amakifr_db`).
+- Secrets production pour M1 (`PASSWORD_RESET_HMAC_SECRET`) et conformité `TRUST_PROXY` / Nginx effective avant tout déploiement M1.
