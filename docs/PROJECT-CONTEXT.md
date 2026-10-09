@@ -1,19 +1,43 @@
 # AMAKI — Contexte permanent du projet
 
-Dernière mise à jour : 2026-10-09
+Dernière mise à jour : 2026-10-10
+Pause prévue : environ deux semaines — reprendre à la section **« Point de reprise »**.
 
 ## Baselines (ne pas confondre)
 
 | Portée | SHA / version | Statut |
 |--------|---------------|--------|
-| Baseline dépôt / DEV (`origin/main`) | `8b80809` | Validée ; M1/M2 inclus |
-| Production web / backend déployée (documentée) | `8b80809` | M1 + M2 déployés et validés en production |
-| Application Android Play Store publiée | `1.0.0` / `versionCode` `2` | Encore la version publique actuelle |
-| Release Android préparée (non buildée / non publiée) | `1.1.0` / `versionCode` `3` | Prête dans le dépôt ; pas d’EAS / Play Console à ce stade |
+| Baseline dépôt / DEV (`origin/main`) | `7e4e51e` | `chore(mobile): exclude local assets from EAS builds` |
+| Production web / backend déployée | `8b80809` | `fix(auth): navigate to password reset confirmation` — M1 + M2 en production |
+| Application Android Play Store **publiée** | `1.0.0` / `versionCode` `2` | Toujours la version publique |
+| Release Android **buildée**, non soumise | `1.1.0` / `versionCode` `3` | AAB EAS prêt ; **pas** de submit Play Console |
 
-**Règle** : M1 (mot de passe oublié) et M2 (réunions / comptes rendus) sont **validés en production web/backend**. Ils ne sont **pas** encore publiés sur le Play Store (`1.0.0` / code `2` reste la version publique).
+**Règle** : M1 et M2 sont **en production web/backend** et validés (web + AMAKI Dev contre `https://amaki.fr`). Ils ne sont **pas** encore sur le Play Store public.
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
+
+---
+
+## Point de reprise (après pause ~2 semaines)
+
+**Ordre strict — ne pas inverser :**
+
+1. Récupérer / contrôler les métadonnées EAS et le checksum de l’AAB `1.1.0` / code `3`.
+2. Charger l’AAB sur la **piste Play Console interne** (pas la production store d’emblée).
+3. Installer depuis Google Play (piste interne) sur téléphone.
+4. Recette obligatoire :
+   - connexion API production (`https://amaki.fr`) ;
+   - M1 : forgot → code → nouveau MDP → reconnexion ;
+   - M2 : badge rapport publié + lecture ;
+   - dépublication web → disparition badge / accès ;
+   - notifications / session ;
+   - aucun appel LAN / cleartext.
+5. **Seulement après** validation : décider la promotion en production Play Store.
+6. Mettre à jour ce document **après** publication effective.
+
+Artefact AAB (non soumis) :
+
+`https://expo.dev/artifacts/eas/1q7ALXCMdJljhzNsUNn22sOnWTj3QjGLBqri3i_4SGs.aab`
 
 ---
 
@@ -48,7 +72,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - Effectuer une sauvegarde PostgreSQL custom validée avant toute migration ou changement risqué.
 - Les dumps sont créés atomiquement avec `mktemp`, permissions `600`, validation `pg_restore -l` et checksum SHA-256 adjacent.
 - Le checksum doit référencer le chemin final du dump, jamais le nom temporaire.
-- Ne jamais modifier directement `_prisma_migrations`.
+- Ne jamais modifier directement `_prisma_migrations` hors procédure DBA documentée avec gardes.
 - Ne jamais effectuer de mutation métier directement en SQL lorsque le parcours applicatif existe.
 - Pendant un échec de déploiement : conserver la maintenance active et ne pas redémarrer automatiquement sans diagnostic.
 - Les commandes susceptibles d’échouer doivent être lancées dans un sous-shell lorsqu’elles contiennent `exit`, afin de ne pas fermer la session SSH interactive.
@@ -71,10 +95,20 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - Smoke interne : `http://127.0.0.1:9060/`.
 - Next production doit écouter uniquement `127.0.0.1:9060` (`next start -H 127.0.0.1 -p 9060`) — jamais `0.0.0.0:9060`.
 - Nginx est l’unique entrée publique. `TRUST_PROXY` exige la conf **effective** (`nginx -T`), pas seulement le fichier versionné.
-- `deploy/nginx/amaki.conf` est une **référence / checklist** : le déploiement ne la copie pas automatiquement vers `/etc/nginx` (risque d’écraser TLS/maintenance plus riches).
-- Fermeture `9060/tcp` firewalld : étape **humaine contrôlée** après preuve loopback (documentée, non automatisée).
+- `deploy/nginx/amaki.conf` est une **référence / checklist** : le déploiement ne la copie pas automatiquement vers `/etc/nginx`.
+- Fermeture `9060/tcp` firewalld : étape **humaine contrôlée** après preuve loopback.
 - Le smoke interne utilise des tentatives bornées car Next.js peut démarrer en plus de 20 secondes.
 - Après ouverture, vérifier plusieurs réponses publiques `200/3xx` ; en cas d’échec, restaurer immédiatement le flag de maintenance.
+
+**État runtime validé au déploiement M1/M2 (2026-10-09)**
+
+- AMAKI Nginx : upstream `127.0.0.1:9060` ; `X-Real-IP $remote_addr` ; `X-Forwarded-For $proxy_add_x_forwarded_for`.
+- Next écoute uniquement `127.0.0.1:9060`.
+- firewalld : `9060/tcp` retiré en runtime **et** permanent.
+- HTTP interne / public : `200` ; PM2 `amakifr` online / stable.
+- Fichier invalide `mombongo.conf` déplacé de façon **récupérable** vers :
+  `/etc/nginx/conf.disabled/mombongo.conf.disabled.20261009_173112`
+- Dette séparée (hors AMAKI) : avertissements Nginx de `server_name` dupliqué `naxhel.fr`.
 
 ---
 
@@ -131,56 +165,42 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - Refuser comme cibles ordinaires : `amakifr`, `postgres`, `template0`, `template1`.
 - Les opérations rehearsal/restauration sont limitées au loopback sauf autorisation explicite.
 
+**Dumps du lot M1/M2 (2026-10-09) — chemins VPS**
+
+- Avant réconciliation migrations / pré-déploiement :
+  `/sites/amakifr/backups/amakifr-pre-m1m2-20261009_180622.dump`
+- Dump principal du déploiement :
+  `/sites/amakifr/backups/amakifr_custom_20261009_185741.dump`
+- Dump hotfix reset (navigation `/auth/new-password`) :
+  `/sites/amakifr/backups/amakifr_custom_20261009_214236.dump`
+- Logs de déploiement conservés sous `/sites/amakifr/backups/`.
+- `.env` production sauvegardé ; `MAINTENANCE_MODE` dédupliqué à `false`.
+- Aucun rollback nécessaire.
+
 ---
 
-## 6. Application mobile Android — livrée et validée (Play Store)
+## 6. Application mobile Android
 
-**LIVRÉ ET VALIDÉ (piste Production Google Play)**
+### Play Store public (toujours actuel)
 
-- Package Android : `fr.amaki.app`
+- Package : `fr.amaki.app`
 - Google Play : `https://play.google.com/store/apps/details?id=fr.amaki.app`
-- Version publique **actuellement** sur le Play Store : `1.0.0`
-- `versionCode` public actuel : `2`
-- Version de production Play Console actuelle : `2 (1.0.0)`
-- Release **préparée** dans le dépôt (non buildée / non soumise) : `1.1.0` / `versionCode` `3` (`fr.amaki.app` inchangé)
-- Profil EAS production : `EXPO_PUBLIC_API_URL=https://amaki.fr` (pas d’URL LAN / cleartext en store)
-- L’application `1.0.0` reste disponible sur la piste Production jusqu’à publication de `1.1.0`.
-- La recette publique stricte a été réalisée après retrait du compte de la piste interne et réinstallation depuis Google Play.
-- Tests validés :
-  - installation publique ;
-  - premier lancement ;
-  - connexion ;
-  - maintien de session ;
-  - notification reçue application fermée ;
-  - titre et texte corrects ;
-  - ouverture de l’application après appui ;
-  - absence de doublon.
-- Aucun droit Android inattendu n’a été demandé.
-- Le module Notes de frais mobile n’est pas considéré comme livré tant qu’un lot API/mobile spécifique ne l’a pas explicitement validé.
+- Version publique : `1.0.0` / `versionCode` `2`
+- Recette publique stricte historique validée (install, login, session, notifications).
 
-**UI mobile (Accueil, LoginPage, headers) — commitée, non publiée sur le Play Store**
+### Release `1.1.0` / code `3` — buildée, non publiée
 
-État historique au 2026-10-07 (commit `2b11725`) :
-
-- Refonte mobile Accueil, LoginPage et headers dégradés : commitée et poussée sur `origin/main`.
-- UI validée sur téléphone via **AMAKI Dev** (Metro / binaire de développement).
-- Afficher/masquer le mot de passe : **livré et validé** sur AMAKI Dev (plus un chantier ouvert).
-- Nouveau splash validé dans un binaire AMAKI Dev :
-  - fond bleu clair ;
-  - logo centré et transparent ;
-  - proportions correctes ;
-  - transition vers la LoginPage correcte.
-- Build Expo Dev de recette UI : `798d66ff-1f90-4b18-8505-e8c2603e2258`.
-- Application publique Play Store `fr.amaki.app` : toujours en version `1.0.0` / `versionCode` `2`, inchangée.
-- Aucune nouvelle version Android de production n’a été publiée pour M1/M2.
-- Le nouveau design et les lots M1/M2 **ne sont pas** publiés sur le Play Store.
-
-**Build AMAKI Dev (recette M1 / M2 contre API production)**
-
-- Build Expo Dev validé : `36099ef3-fa3c-40d5-96db-a34166676f27`.
-- M2-D a d’abord été validé sur téléphone via **Metro** avec ce client ; puis recette AMAKI Dev contre l’API production `https://amaki.fr` : **OK** (M1 + M2).
-- `mobile/.env` local a été restauré vers l’URL LAN DEV après cette recette (backup sous `/soft/SAS_AMAKIFR/`).
-- Aucun build / submit Play Store `1.1.0` n’a encore été lancé.
+- Dépôt : `7e4e51e` (`chore(mobile): exclude local assets from EAS builds`).
+- Package inchangé : `fr.amaki.app`.
+- API store : `https://amaki.fr` ; cleartext **false**.
+- Build EAS **production** terminé avec succès.
+- Artefact AAB :
+  `https://expo.dev/artifacts/eas/1q7ALXCMdJljhzNsUNn22sOnWTj3QjGLBqri3i_4SGs.aab`
+- **NON** soumis à Play Console ; **aucune** publication.
+- `mobile/.env` local restauré vers LAN DEV après recette production.
+- Recette AMAKI Dev contre `https://amaki.fr` (M1 + M2) : **OK**.
+- Build Expo Dev de référence historique : `36099ef3-fa3c-40d5-96db-a34166676f27`.
+- Notes de frais mobile : non livré tant qu’un lot API/mobile dédié n’est pas validé.
 
 ---
 
@@ -189,110 +209,85 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 **DÉCISIONS D’ARCHITECTURE ET DE SÉCURITÉ**
 
 - Ne jamais récupérer, afficher ou envoyer l’ancien mot de passe.
-- Le parcours « mot de passe oublié » (M1) utilise un code temporaire à 8 chiffres, à usage unique, expirant, permettant de définir un nouveau mot de passe — **validé en production web** ; publication Play Store encore en attente (release `1.1.0` préparée).
+- Parcours « mot de passe oublié » (M1) : code 8 chiffres, usage unique, expirant — **validé en production web** ; store Android en attente de publication `1.1.0`.
+- Runtime production M1 validé (sans valeurs de secrets) :
+  - `PASSWORD_RESET_HMAC_SECRET` : présent, unique, longueur UTF-8 **64** ;
+  - `TRUST_PROXY=true` ;
+  - chaîne Nginx effective conforme (voir §3).
 - Les rappels financiers ne doivent pas exposer de montant sensible sur un écran verrouillé.
 - Les rappels mensuels doivent être idempotents et éviter tout doublon.
 - La collecte concernant l’origine des connexions doit rester proportionnée :
   plateforme Web/Mobile, type d’appareil, système, dernière activité et éventuellement IP tronquée.
 - Définir une durée de conservation avant d’ajouter de nouvelles données de connexion.
 - Ne pas transformer ce besoin en journalisation intrusive de toutes les actions utilisateur.
-- Lecture mobile des comptes rendus (M2-D) : pas de WebView ; HTML allowlisté rendu en composants React Native ; liens http/https uniquement après confirmation utilisateur ; borne stricte de taille.
+- Lecture mobile des comptes rendus (M2-D) : pas de WebView ; HTML allowlisté → composants React Native ; liens http/https après confirmation ; borne 200 000 caractères.
 
 ---
 
-## 8. M1 — Mot de passe oublié (validé production web)
+## 8. M1 — Mot de passe oublié (production web)
 
 **VALIDÉ EN PRODUCTION WEB/BACKEND — NON PUBLIÉ SUR LE PLAY STORE**
 
-- Backend S0/S1 + migration password-reset déployés (baseline prod `8b80809`).
-- Recette production web OK ; recette mobile AMAKI Dev contre `https://amaki.fr` OK.
-- Parcours : demande → code 8 chiffres → réinitialisation → reconnexion.
-- Correctifs : payload email/autofill, zéro initial, barre navigation Android, navigation web vers `/auth/new-password`.
-- Build AMAKI Dev de référence : `36099ef3-fa3c-40d5-96db-a34166676f27`.
-- Play Store : toujours `1.0.0` / code `2` ; release `1.1.0` / code `3` préparée, non buildée.
+- Commit applicatif production : `8b80809`.
+- Migration `20261007220000_password_reset_challenge_security` : **finished**, sans rollback.
+- Recette web production :
+  - e-mail reçu ;
+  - redirection automatique vers `/auth/new-password` validée ;
+  - lien « J’ai déjà un code » visible ;
+  - saisie code / reset fonctionnels.
+- Recette mobile AMAKI Dev contre `https://amaki.fr` : OK.
+- Play Store public : toujours `1.0.0` / code `2`.
 
 ---
 
-## 9. M2 — Réunions et comptes rendus (validé production web)
+## 9. M2 — Réunions et comptes rendus (production web)
 
 **VALIDÉ EN PRODUCTION WEB/BACKEND — NON PUBLIÉ SUR LE PLAY STORE**
 
-Lecture mobile des rapports : validée via AMAKI Dev contre l’API production ; publication store encore en attente (`1.1.0`).
-
-### M2-B — Web UX rapports / réunions
-
-- Expérience web des rapports de réunion améliorée (commit `0371eb7` et suivants).
-- Déployée en production avec la baseline `8b80809`.
-
-### M2-C — Publication DRAFT / PUBLISHED + API Bearer
-
-- Statuts `DRAFT` / `PUBLISHED` ; rapports existants backfillés en `PUBLISHED` lors de la migration.
-- API Bearer lecture seule pour le détail d’un rapport publié ; protections anti-IDOR.
-- Migration DRAFT/PUBLISHED appliquée en production (avec backfill historiques → PUBLISHED).
-- Workflow web validé : Brouillon → Publié → Brouillon (dépublication).
-- Hotfix dépublication : `AlertDialog` — validé (commit `6284411`).
-
-### M2-D — Lecteur mobile Expo
-
-- Badge « compte rendu » visible uniquement si un rapport **publié** est lié (`hasPublishedReport` + `publishedReportId`).
-- Lecteur Expo sécurisé **sans WebView**.
-- HTML TipTap : allowlist stricte → composants React Native (pas d’injection HTML brute).
-- Liens : uniquement `http:` / `https:` absolus, après action et confirmation utilisateur.
-- Borne de taille : `MAX_MEETING_REPORT_HTML_LENGTH = 200_000` caractères ; dépassement → état contrôlé « Compte rendu trop volumineux » (pas de troncature silencieuse, pas de log du contenu).
-- Dépublication : le badge disparaît et l’accès lecteur renvoie une indisponibilité générique.
-- Validé sur téléphone (Metro puis AMAKI Dev contre `https://amaki.fr`).
-- **Non** publié sur le Play Store (`1.0.0` / `versionCode` `2` encore public ; `1.1.0` / code `3` préparé).
+- Migration `20261008190000_rapport_reunion_publication_status` : **finished**, sans rollback.
+- DRAFT / PUBLISHED + backfill historiques → PUBLISHED ; API Bearer lecture seule ; anti-IDOR.
+- Workflow web Brouillon ↔ Publié validé ; hotfix `AlertDialog` dépublication.
+- Lecteur mobile sans WebView ; badge uniquement si publié ; recette AMAKI Dev contre prod OK.
+- Play Store : en attente de publication `1.1.0` / code `3`.
 
 ---
 
-## 10. Travaux prioritaires
+## 10. Réconciliation Prisma historique (pré-déploiement M1/M2)
 
-**ÉTAT DES PRIORITÉS (2026-10-09)**
+**DIVERGENCE DÉTECTÉE PUIS RÉCONCILIÉE — NE PAS RECOMMENCER SANS ANOMALIE**
+
+- Ancienne baseline orpheline
+  `20251204181751_add_unique_adherent_assistance_periode`
+  et `20250101100000_initial_schema` partageaient le même SQL / checksum
+  `e352963e4d64ba9980bb25f45d60604dee386cefc95c7bfd73e15c495a7fe512`.
+- Dump vérifié avant réconciliation :
+  `/sites/amakifr/backups/amakifr-pre-m1m2-20261009_180622.dump`
+- Ligne orpheline supprimée **transactionnellement** avec gardes strictes.
+- Après correction : seules M1/M2 étaient pending ; après déploiement : Prisma production **à jour**.
+- Ne pas rejouer cette réconciliation sans preuve d’anomalie nouvelle.
+
+---
+
+## 11. Travaux prioritaires
+
+**ÉTAT AU 2026-10-10 (avant pause)**
 
 | Priorité | Sujet | État |
 |----------|-------|------|
-| P0 | Inscription web | **Livré en production** |
-| P1 | Mot de passe oublié (M1) | **Validé production web** ; Play Store en attente (`1.1.0`) |
-| P1 | Lecture comptes rendus mobile (M2) | **Validé production web + recette Dev** ; Play Store en attente (`1.1.0`) |
+| P0 | Inscription web | Livré en production |
+| P1 | Mot de passe oublié (M1) | **Production web OK** ; store en attente (AAB prêt) |
+| P1 | Lecture CR mobile (M2) | **Production web + Dev OK** ; store en attente (AAB prêt) |
+| Immédiat reprise | Play interne → recette → éventuelle promo prod | Voir **Point de reprise** |
 
-### Prochaines priorités restantes
+### Dettes ouvertes (après reprise store)
 
-1. Publication Android Play Store `1.1.0` / `versionCode` `3` (build EAS production puis submit).
-2. Rappels mensuels cotisations / dettes.
-3. Identification de l’origine des connexions.
-4. Futur copilote IA pour les comptes rendus — **uniquement après** stabilisation store de M1/M2. **Non livré, non commencé.**
-
-### Détail des chantiers encore ouverts
-
-#### Rappels mensuels cotisations/dettes
-
-- Fournir à l’administrateur un envoi manuel, prévisualisable et éventuellement automatisable.
-- Informer l’adhérent d’un retard de cotisation ou d’une dette et l’inviter à régulariser.
-- Définir la source de calcul, les destinataires, la date mensuelle, l’idempotence, l’historique et le contenu discret des notifications.
-
-#### Origine et sessions de connexion
-
-- Identifier si une connexion vient du Web ou du Mobile.
-- Préférer une vue de sessions/dernière activité à un stockage illimité de toutes les actions.
-- Définir les données collectées, la rétention et les droits de consultation.
-- Auditer l’existant avant toute migration ou suppression de journaux.
-
-#### Copilote IA comptes rendus (futur)
-
-- Hors scope actuel.
-- Ne pas démarrer avant stabilisation production de M1 et M2.
-- Ne pas le déclarer livré ni commencé.
-
----
-
-## 11. Déploiement Android à venir (Play Store)
-
-**BACKEND/WEB M1/M2 : FAIT (`8b80809`). STORE ANDROID : EN ATTENTE.**
-
-1. Confirmer `mobile/.env` local = LAN DEV (ne pas builder le store avec une URL LAN).
-2. Build EAS profil `production` (`EXPO_PUBLIC_API_URL=https://amaki.fr`, cleartext off, `fr.amaki.app`).
-3. Recette AAB / piste interne si besoin, puis submit Play Console `1.1.0` / `versionCode` `3`.
-4. Ne pas republier tant que la recette post-build M1/M2 sur binaire store n’est pas OK.
+1. Rappels mensuels cotisations / dettes.
+2. Identification de l’origine des connexions.
+3. Copilote IA comptes rendus — **seulement après** stabilisation store M1/M2 ; **non commencé**.
+4. Admin reset plaintext (dette produit/sécurité).
+5. Politique mot de passe minimum 6 caractères (dette).
+6. Dette Nginx `naxhel.fr` (`server_name` dupliqué) — hors AMAKI.
+7. Nettoyage éventuel des comptes / scripts synthétiques DEV.
 
 ---
 
@@ -309,35 +304,15 @@ Lecture mobile des rapports : validée via AMAKI Dev contre l’API production ;
 - Ne pas utiliser `/tmp` pour les nouveaux artefacts AMAKI lorsque `/soft/SAS_AMAKIFR` est disponible.
 - Ne jamais y écrire de secrets ou de contenu intégral de `.env`.
 - Cette règle ne change pas à elle seule la configuration des logs runtime PM2/Next.js du VPS.
-- Renvoi du code de confirmation d’inscription : réponse non énumérante (même message que le compte existe ou non), cooldown serveur minimal, et aucun email/code/token dans les logs applicatifs.
+- Renvoi du code de confirmation d’inscription : réponse non énumérante, cooldown serveur minimal, aucun email/code/token dans les logs applicatifs.
 - Confirmation d’email d’inscription — **livrée et validée en production** (baseline historique `cfbe06fb…` puis UX `ddf4f9e…`) :
-  - vérification liée à `email + code` (plus de lookup par code seul) ;
-  - un seul `VerificationToken` actif par email (contrainte UNIQUE) ;
-  - plafond persistant de 3 erreurs (`failedAttempts` / `lockedAt`) côté DB ;
-  - cooldown de renvoi persistant 60 s basé sur `createdAt`.
-- Règle permanente : **email confirmé ≠ compte actif**.
-  - `emailVerified` confirme l’adresse ; `status` Inactif reste distinct et n’est pas modifié par la vérification.
-  - L’activation administrative est obligatoire avant l’accès membre complet.
-  - L’utilisateur est averti de l’attente et notifié par e-mail après activation.
-- Pour chaque nouveau chantier :
-  1. diagnostiquer ;
-  2. produire la preuve ;
-  3. proposer le changement minimal ;
-  4. tester ;
-  5. faire relire le diff ;
-  6. commiter explicitement ;
-  7. pousser ;
-  8. déployer avec sauvegarde et maintenance adaptées ;
-  9. effectuer une recette ;
-  10. mettre à jour ce document si une décision permanente a changé.
-- Ne jamais inscrire dans ce document :
-  - secrets ;
-  - données personnelles ;
-  - identifiants de comptes ;
-  - contenu de `.env` ;
-  - références de notes de frais réelles ;
-  - chemins temporaires ;
-  - résultats éphémères sans valeur architecturale.
+  - vérification liée à `email + code` ;
+  - un seul `VerificationToken` actif par email ;
+  - plafond persistant de 3 erreurs ;
+  - cooldown de renvoi persistant 60 s.
+- Règle permanente : **email confirmé ≠ compte actif** ; activation administrative obligatoire.
+- Pour chaque nouveau chantier : diagnostiquer → preuve → changement minimal → tester → revue → commit → push → déployer avec sauvegarde → recette → mettre à jour ce document si décision permanente.
+- Ne jamais inscrire dans ce document : secrets, données personnelles, identifiants de comptes, contenu de `.env`, références de notes de frais réelles, chemins temporaires, résultats éphémères sans valeur architecturale.
 
 ---
 
@@ -347,29 +322,24 @@ Lecture mobile des rapports : validée via AMAKI Dev contre l’API production ;
 - **2026-09** : migrations Notes de frais 4.x, stockage privé et activation production.
 - **2026-09** : rôles Notes de frais confirmés ; justificatif obligatoire à la soumission.
 - **2026-10** : application Android `fr.amaki.app` version `1.0.0` / `versionCode` `2` validée en Production Google Play.
-- **2026-10** : priorités suivantes enregistrées : inscription web, authentification mobile, rapports de réunions, rappels financiers et origine des connexions.
-- **2026-10** : déploiement sécurisé aligné sur Notes de frais actifs (gardes `assert_notes_frais_flags_on` + `assert_notes_frais_storage_ready`) — livré et validé en production (`f576be2…`).
-- **2026-10** : sécurisation persistante du code de confirmation email (unique email, plafond 3 erreurs, cooldown 60 s, vérification email+code) — livrée et validée en production (`cfbe06fb…`).
-- **2026-10** : email confirmé ≠ compte actif ; activation administrative obligatoire ; utilisateur averti de l’attente et notifié après activation.
-- **2026-10** : UX confirmation email (champ unique, collage filtré, renvoi explicite et attente administrative) — livrée et validée en production (`ddf4f9e…`).
-- **2026-10-07** : refonte UI mobile Accueil / LoginPage / headers dégradés + œil MDP + splash — commitée/poussée (`2b11725`), validée sur téléphone via AMAKI Dev (build Expo Dev `798d66ff-1f90-4b18-8505-e8c2603e2258`) ; Play Store `fr.amaki.app` `1.0.0` inchangé.
-- **2026-10-07** *(historique)* : parcours « mot de passe oublié » S0/S1 — alors **préparé / non livré**.
-- **2026-10-08** *(historique)* : lot mobile M1 — alors **préparé / non livré**.
-- **2026-10-09** *(historique)* : M1/M2 validés d’abord en DEV (`amakifr_db`, Metro / AMAKI Dev).
-- **2026-10-09** : M1/M2 **déployés et validés en production web/backend** (baseline `8b80809`) ; recette AMAKI Dev contre `https://amaki.fr` OK ; Play Store toujours `1.0.0` / code `2`.
-- **2026-10-09** : préparation release Android `1.1.0` / `versionCode` `3` (`fr.amaki.app`) + `eas.json` production avec `EXPO_PUBLIC_API_URL=https://amaki.fr` ; **non** buildée / **non** publiée.
+- **2026-10** : priorités : inscription web, auth mobile, rapports, rappels, origine des connexions.
+- **2026-10** : déploiement sécurisé Notes de frais (gardes) — livré et validé (`f576be2…`).
+- **2026-10** : confirmation email sécurisée + UX — livrées en production (`cfbe06fb…`, `ddf4f9e…`).
+- **2026-10-07** : refonte UI mobile + œil MDP + splash (`2b11725`) ; Play Store `1.0.0` inchangé.
+- **2026-10-09** : M1/M2 validés DEV puis **déployés en production** (`8b80809`) ; migrations password-reset + publication rapports **finished** ; runtime HMAC / `TRUST_PROXY` / loopback / firewalld 9060 ; Prisma réconcilié (orpheline baseline) ; dumps sous `/sites/amakifr/backups/`.
+- **2026-10-09** : hotfix web navigation reset → `/auth/new-password` + lien « J’ai déjà un code » (inclus dans prod `8b80809`).
+- **2026-10-09/10** : release Android `1.1.0` / code `3` préparée puis **AAB EAS production buildé** ; dépôt `7e4e51e` ; **non soumis** Play Console ; Play public reste `1.0.0` / code `2`.
+- **2026-10-10** : pause ~2 semaines — point de reprise = contrôle AAB → piste interne → recette → éventuelle promo prod → MAJ de ce document.
 
 ---
 
-## Faits temporaires à revérifier
+## Faits temporaires à revérifier (reprise)
 
-Ces éléments sont documentés comme baseline au moment de la rédaction ; les revérifier avant toute mutation de production :
-
-- SHA de `origin/main` et checkout VPS `/sites/amakifr` (attendu documenté : `8b80809`).
-- Présence/absence de `maintenance.flag` et réponse HTTP publique réelle.
-- État PM2 `amakifr` (online/stopped) et cwd réel.
-- Valeurs des flags Notes de frais en shell / fichiers env / PM2 (sans afficher d’autres secrets).
-- Existence et permissions de `/sites/amakifr-data/notes-frais`.
-- Nombre de migrations finished en production vs dossiers présents dans le dépôt (anomalie orpheline historique possible — voir `docs/frais-avances/DEPLOY-PRODUCTION.md`).
-- Avant build EAS store : `mobile/.env` local = LAN DEV ; profil production EAS force `https://amaki.fr`.
-- Play Console : ne pas soumettre tant que l’AAB `1.1.0` / code `3` n’a pas passé la recette post-build.
+- SHA `origin/main` (attendu documenté : `7e4e51e`) vs checkout VPS `/sites/amakifr` (applicatif documenté : `8b80809`).
+- Présence/absence de `maintenance.flag` ; HTTP public/interne.
+- PM2 `amakifr` online ; écoute `127.0.0.1:9060` uniquement.
+- Flags Notes de frais + stockage privé (sans afficher d’autres secrets).
+- Prisma : migrations M1/M2 toujours `finished` ; pas de nouvelle orpheline.
+- Métadonnées EAS + checksum AAB `1.1.0` / code `3` avant upload Play interne.
+- `mobile/.env` local = LAN DEV (ne pas re-pointer vers prod sans procédure).
+- Ne pas promouvoir en production Play Store sans recette piste interne OK.
