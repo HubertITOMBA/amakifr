@@ -58,9 +58,12 @@ import {
 import {
   buildHomonymFicheReferences,
   formatPreviewAmountDisplay,
+  formatPreviewComputedAt,
   formatPreviewDueDisplay,
   formatPreviewEuroAmount,
   HOMONYM_DISPLAY_NOTICE,
+  PREVIEW_REFRESH_INCOMPLETE_TOAST,
+  PREVIEW_REFRESH_SUCCESS_TOAST,
 } from "@/lib/services/cotisations/rappel-dette/preview-display";
 import { labelGlobalReason } from "@/lib/services/cotisations/rappel-dette/reason-labels";
 
@@ -427,6 +430,31 @@ describe("formatPreviewEuroAmount / formatPreviewAmountDisplay", () => {
     expect(formatPreviewDueDisplay("—", "failed")).toBe("Non calculé");
     expect(formatPreviewDueDisplay("01 juin 2024", "eligible")).toBe(
       "01 juin 2024"
+    );
+  });
+});
+
+describe("formatPreviewComputedAt", () => {
+  it("affiche date, heure, minutes et secondes en Europe/Paris depuis l’ISO serveur", () => {
+    // 2024-06-30T12:00:00.000Z = 14:00:00 Europe/Paris (été)
+    const formatted = formatPreviewComputedAt("2024-06-30T12:00:00.000Z");
+    expect(formatted).toMatch(/30/);
+    expect(formatted).toMatch(/2024/);
+    expect(formatted).toMatch(/14/);
+    expect(formatted).toMatch(/00/);
+    // Contient des secondes (deux derniers groupes numériques type :ss)
+    expect(formatted).toMatch(/\d{2}:\d{2}:\d{2}/);
+  });
+
+  it("retourne — pour null ou invalide", () => {
+    expect(formatPreviewComputedAt(null)).toBe("—");
+    expect(formatPreviewComputedAt("not-a-date")).toBe("—");
+  });
+
+  it("expose les libellés toast Actualiser", () => {
+    expect(PREVIEW_REFRESH_SUCCESS_TOAST).toBe("Prévisualisation actualisée.");
+    expect(PREVIEW_REFRESH_INCOMPLETE_TOAST).toBe(
+      "Prévisualisation actualisée, mais certains calculs n’ont pas abouti."
     );
   });
 });

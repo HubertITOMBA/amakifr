@@ -36,13 +36,17 @@ import {
 import {
   buildHomonymFicheReferences,
   formatPreviewAmountDisplay,
+  formatPreviewComputedAt,
   formatPreviewDueDisplay,
   formatPreviewEuroAmount,
   HOMONYM_DISPLAY_NOTICE,
+  PREVIEW_REFRESH_INCOMPLETE_TOAST,
+  PREVIEW_REFRESH_SUCCESS_TOAST,
 } from "@/lib/services/cotisations/rappel-dette/preview-display";
 import type { LabeledReason } from "@/lib/services/cotisations/rappel-dette/reason-labels";
 
-function formatDateFr(iso: string | null): string {
+/** Format jour seul pour les échéances des tableaux (inchangé). */
+function formatDueDateFr(iso: string | null): string {
   if (!iso) return "—";
   try {
     return new Intl.DateTimeFormat("fr-FR", {
@@ -222,7 +226,7 @@ function AdherentTable({
               </td>
               <td className="px-3 py-2.5 text-right text-xs tabular-nums whitespace-nowrap text-slate-600 dark:text-slate-300">
                 {formatPreviewDueDisplay(
-                  formatDateFr(row.earliestDueDate),
+                  formatDueDateFr(row.earliestDueDate),
                   row.computationKind
                 )}
               </td>
@@ -257,7 +261,8 @@ export default function AdminRappelsPreviewPage() {
     ]);
   }, [data]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (options?: { manual?: boolean }) => {
+    const isManual = options?.manual === true;
     try {
       setLoading(true);
       setAccessDenied(false);
@@ -277,6 +282,14 @@ export default function AdminRappelsPreviewPage() {
         return;
       }
       setData(result.data);
+      // Toast de fin uniquement après un clic Actualiser (pas au chargement initial).
+      if (isManual) {
+        if (result.data.incomplete) {
+          toast.warning(PREVIEW_REFRESH_INCOMPLETE_TOAST);
+        } else {
+          toast.success(PREVIEW_REFRESH_SUCCESS_TOAST);
+        }
+      }
     } catch (error) {
       console.error("[AdminRappelsPreviewPage]", {
         category: "load_failed",
@@ -354,7 +367,7 @@ export default function AdminRappelsPreviewPage() {
             </div>
             <Button
               type="button"
-              onClick={() => void load()}
+              onClick={() => void load({ manual: true })}
               disabled={loading}
               className="w-full sm:w-auto shrink-0 font-sans bg-white text-blue-700 hover:bg-blue-50 hover:text-blue-800 border border-white shadow-sm disabled:opacity-60"
             >
@@ -415,7 +428,7 @@ export default function AdminRappelsPreviewPage() {
                   Date de référence
                 </div>
                 <div className="text-base font-semibold text-slate-950 dark:text-slate-50 mt-1">
-                  {formatDateFr(data.computedAt)}
+                  {formatPreviewComputedAt(data.computedAt)}
                 </div>
                 <div className="text-sm text-slate-700 dark:text-slate-300 mt-0.5">
                   {data.timezone}
@@ -447,7 +460,7 @@ export default function AdminRappelsPreviewPage() {
               </div>
               <div className="bg-amber-50 dark:bg-amber-900/20 p-3 rounded-lg border border-amber-100 dark:border-amber-800/40 font-sans">
                 <div className="text-sm font-medium text-slate-700 dark:text-slate-300">
-                  Exclus (métier)
+                  Non éligibles
                 </div>
                 <div className="text-2xl font-semibold text-amber-900 dark:text-amber-200 mt-1 tabular-nums">
                   {data.totals.excludedCount}
@@ -483,15 +496,19 @@ export default function AdminRappelsPreviewPage() {
               <div className="bg-gradient-to-r from-amber-500 to-amber-600 dark:from-amber-600 dark:to-amber-700 text-white px-4 sm:px-5 py-3 sm:py-3.5">
                 <h2 className="text-base sm:text-lg font-semibold text-white flex flex-wrap items-center gap-2 sm:gap-3 font-sans">
                   <UserX className="h-5 w-5 shrink-0" />
-                  <span>Exclusions métier</span>
+                  <span>Adhérents non éligibles au rappel</span>
                   <Badge className="bg-white/20 text-white border-white/30 hover:bg-white/25 font-semibold">
                     {data.excluded.length}
                   </Badge>
                 </h2>
+                <p className="mt-1.5 text-xs sm:text-sm text-amber-50/95 font-sans leading-snug max-w-3xl">
+                  Comptes inactifs, absence de dette rappelable ou conditions de
+                  rappel non remplies.
+                </p>
               </div>
               <AdherentTable
                 rows={data.excluded}
-                emptyLabel="Aucune exclusion métier."
+                emptyLabel="Aucun adhérent non éligible au rappel."
                 showLineReasons
                 homonymRefs={homonymRefs}
                 variant="excluded"

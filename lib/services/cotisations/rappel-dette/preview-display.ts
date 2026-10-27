@@ -161,6 +161,40 @@ export function formatPreviewDueDisplay(
   return isoFormattedOrDash;
 }
 
+/**
+ * Formate l’instant serveur `computedAt` pour la carte « Date de référence ».
+ * Date + heure + minutes + secondes, fuseau Europe/Paris.
+ * Ne pas utiliser pour les échéances des tableaux (format jour seul).
+ *
+ * @param iso - Instant ISO renvoyé par le serveur
+ * @returns Libellé fr-FR Europe/Paris, ou « — » si invalide
+ */
+export function formatPreviewComputedAt(iso: string | null): string {
+  if (!iso) return "—";
+  try {
+    return new Intl.DateTimeFormat("fr-FR", {
+      timeZone: "Europe/Paris",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: false,
+    }).format(new Date(iso));
+  } catch {
+    return "—";
+  }
+}
+
+/** Toast succès après Actualiser manuel (résultat complet). */
+export const PREVIEW_REFRESH_SUCCESS_TOAST =
+  "Prévisualisation actualisée." as const;
+
+/** Toast avertissement après Actualiser manuel si calculs incomplets. */
+export const PREVIEW_REFRESH_INCOMPLETE_TOAST =
+  "Prévisualisation actualisée, mais certains calculs n’ont pas abouti." as const;
+
 /** Indication courte pour les collisions de libellé (présentation seule). */
 export const HOMONYM_DISPLAY_NOTICE =
   "Plusieurs fiches portent ce nom." as const;
