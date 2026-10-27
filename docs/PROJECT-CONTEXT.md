@@ -1,43 +1,39 @@
 # AMAKI — Contexte permanent du projet
 
-Dernière mise à jour : 2026-10-10
-Pause prévue : environ deux semaines — reprendre à la section **« Point de reprise »**.
+Dernière mise à jour : 2026-10-27
 
 ## Baselines (ne pas confondre)
 
 | Portée | SHA / version | Statut |
 |--------|---------------|--------|
-| Baseline dépôt / DEV (`origin/main`) | `7e4e51e` | `chore(mobile): exclude local assets from EAS builds` |
+| Baseline dépôt / DEV (`origin/main`) | `ca922f1` | Checkpoint documentaire M1/M2 production (dernier contrôle) |
+| Commit embarqué dans l’AAB store | `7e4e51e` | `chore(mobile): exclude local assets from EAS builds` |
 | Production web / backend déployée | `8b80809` | `fix(auth): navigate to password reset confirmation` — M1 + M2 en production |
-| Application Android Play Store **publiée** | `1.0.0` / `versionCode` `2` | Toujours la version publique |
-| Release Android **buildée**, non soumise | `1.1.0` / `versionCode` `3` | AAB EAS prêt ; **pas** de submit Play Console |
+| Application Android Play Store **publiée** | `1.1.0` / `versionCode` `3` | Production 100 %, disponible sur Google Play depuis le 27 oct. 2026 01:05 |
 
-**Règle** : M1 et M2 sont **en production web/backend** et validés (web + AMAKI Dev contre `https://amaki.fr`). Ils ne sont **pas** encore sur le Play Store public.
+**Règle** : M1 et M2 sont **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`), avec recette depuis Google Play réussie.
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
 
 ---
 
-## Point de reprise (après pause ~2 semaines)
+## Point de reprise — release Android 1.1.0 **clôturée**
 
-**Ordre strict — ne pas inverser :**
+La pause et le plan « piste interne → promo prod » sont **terminés**.
 
-1. Récupérer / contrôler les métadonnées EAS et le checksum de l’AAB `1.1.0` / code `3`.
-2. Charger l’AAB sur la **piste Play Console interne** (pas la production store d’emblée).
-3. Installer depuis Google Play (piste interne) sur téléphone.
-4. Recette obligatoire :
-   - connexion API production (`https://amaki.fr`) ;
-   - M1 : forgot → code → nouveau MDP → reconnexion ;
-   - M2 : badge rapport publié + lecture ;
-   - dépublication web → disparition badge / accès ;
-   - notifications / session ;
-   - aucun appel LAN / cleartext.
-5. **Seulement après** validation : décider la promotion en production Play Store.
-6. Mettre à jour ce document **après** publication effective.
-
-Artefact AAB (non soumis) :
-
-`https://expo.dev/artifacts/eas/1q7ALXCMdJljhzNsUNn22sOnWTj3QjGLBqri3i_4SGs.aab`
+- Play Store Production : `fr.amaki.app` `1.1.0` / `versionCode` `3` — statut « Disponible sur Google Play », déploiement **100 %**, 1 pays/région.
+- Recette **depuis Google Play** réussie (version installée `1.1.0`) :
+  - connexion / session OK ;
+  - API production HTTPS, aucun LAN / cleartext ;
+  - M1 reset mot de passe OK ;
+  - M2 badge / lecture CR OK ;
+  - dépublication web → badge disparu OK ;
+  - notifications / non-régression OK.
+- Build EAS production :
+  - ID `ee1ca777-aae1-4dc0-a795-5396707ed6a1` ;
+  - commit embarqué `7e4e51e` ;
+  - SHA-256 AAB `8288f9d4ec7c1942f4628c1d5cb5eae80d82d4b25a5751d90e234e8af1c6cf93`.
+- **Prochaine priorité métier** : cadrage des **rappels cotisations / dettes** (pas de nouvelle release Android en cours).
 
 ---
 
@@ -181,26 +177,25 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ## 6. Application mobile Android
 
-### Play Store public (toujours actuel)
+### Play Store public — `1.1.0` / code `3` (livré)
 
 - Package : `fr.amaki.app`
 - Google Play : `https://play.google.com/store/apps/details?id=fr.amaki.app`
-- Version publique : `1.0.0` / `versionCode` `2`
-- Recette publique stricte historique validée (install, login, session, notifications).
-
-### Release `1.1.0` / code `3` — buildée, non publiée
-
-- Dépôt : `7e4e51e` (`chore(mobile): exclude local assets from EAS builds`).
-- Package inchangé : `fr.amaki.app`.
+- Version publique : `1.1.0` / `versionCode` `3`
+- Publiée le **27 octobre 2026 à 01:05** — statut « Disponible sur Google Play », déploiement Production **100 %**, 1 pays/région.
 - API store : `https://amaki.fr` ; cleartext **false**.
-- Build EAS **production** terminé avec succès.
-- Artefact AAB :
-  `https://expo.dev/artifacts/eas/1q7ALXCMdJljhzNsUNn22sOnWTj3QjGLBqri3i_4SGs.aab`
-- **NON** soumis à Play Console ; **aucune** publication.
-- `mobile/.env` local restauré vers LAN DEV après recette production.
-- Recette AMAKI Dev contre `https://amaki.fr` (M1 + M2) : **OK**.
-- Build Expo Dev de référence historique : `36099ef3-fa3c-40d5-96db-a34166676f27`.
+- Commit embarqué dans l’AAB : `7e4e51e`.
+- Build EAS : `ee1ca777-aae1-4dc0-a795-5396707ed6a1`
+- SHA-256 AAB : `8288f9d4ec7c1942f4628c1d5cb5eae80d82d4b25a5751d90e234e8af1c6cf93`
+- Recette depuis Google Play (2026-10-27) : connexion/session, M1, M2, dépublication web, notifications — **OK**.
+- Recette historique AMAKI Dev contre prod et build Dev `36099ef3-fa3c-40d5-96db-a34166676f27` : conservées comme jalons antérieurs.
+- `mobile/.env` local : LAN DEV (ne pas re-pointer vers prod sans procédure).
 - Notes de frais mobile : non livré tant qu’un lot API/mobile dédié n’est pas validé.
+
+### Dettes Play Console (non bloquantes)
+
+- Optimisation DEX / obscurcissement : ~**1 %** — échéance **février 2027**.
+- Bord-à-bord et grand écran : à traiter ultérieurement.
 
 ---
 
@@ -209,7 +204,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 **DÉCISIONS D’ARCHITECTURE ET DE SÉCURITÉ**
 
 - Ne jamais récupérer, afficher ou envoyer l’ancien mot de passe.
-- Parcours « mot de passe oublié » (M1) : code 8 chiffres, usage unique, expirant — **validé en production web** ; store Android en attente de publication `1.1.0`.
+- Parcours « mot de passe oublié » (M1) : code 8 chiffres, usage unique, expirant — **validé en production web et sur Play Store `1.1.0`**.
 - Runtime production M1 validé (sans valeurs de secrets) :
   - `PASSWORD_RESET_HMAC_SECRET` : présent, unique, longueur UTF-8 **64** ;
   - `TRUST_PROXY=true` ;
@@ -224,31 +219,30 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ---
 
-## 8. M1 — Mot de passe oublié (production web)
+## 8. M1 — Mot de passe oublié (production web + Play Store)
 
-**VALIDÉ EN PRODUCTION WEB/BACKEND — NON PUBLIÉ SUR LE PLAY STORE**
+**VALIDÉ EN PRODUCTION WEB/BACKEND ET SUR PLAY STORE `1.1.0`**
 
-- Commit applicatif production : `8b80809`.
+- Commit applicatif production web : `8b80809`.
 - Migration `20261007220000_password_reset_challenge_security` : **finished**, sans rollback.
 - Recette web production :
   - e-mail reçu ;
   - redirection automatique vers `/auth/new-password` validée ;
   - lien « J’ai déjà un code » visible ;
   - saisie code / reset fonctionnels.
-- Recette mobile AMAKI Dev contre `https://amaki.fr` : OK.
-- Play Store public : toujours `1.0.0` / code `2`.
+- Recette mobile : AMAKI Dev contre `https://amaki.fr` puis **Google Play `1.1.0`** — OK.
 
 ---
 
-## 9. M2 — Réunions et comptes rendus (production web)
+## 9. M2 — Réunions et comptes rendus (production web + Play Store)
 
-**VALIDÉ EN PRODUCTION WEB/BACKEND — NON PUBLIÉ SUR LE PLAY STORE**
+**VALIDÉ EN PRODUCTION WEB/BACKEND ET SUR PLAY STORE `1.1.0`**
 
 - Migration `20261008190000_rapport_reunion_publication_status` : **finished**, sans rollback.
 - DRAFT / PUBLISHED + backfill historiques → PUBLISHED ; API Bearer lecture seule ; anti-IDOR.
 - Workflow web Brouillon ↔ Publié validé ; hotfix `AlertDialog` dépublication.
-- Lecteur mobile sans WebView ; badge uniquement si publié ; recette AMAKI Dev contre prod OK.
-- Play Store : en attente de publication `1.1.0` / code `3`.
+- Lecteur mobile sans WebView ; badge uniquement si publié.
+- Recette mobile : AMAKI Dev contre prod puis **Google Play `1.1.0`** (badge, lecture, dépublication web) — OK.
 
 ---
 
@@ -270,24 +264,28 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ## 11. Travaux prioritaires
 
-**ÉTAT AU 2026-10-10 (avant pause)**
+**ÉTAT AU 2026-10-27 (release Android clôturée)**
 
 | Priorité | Sujet | État |
 |----------|-------|------|
 | P0 | Inscription web | Livré en production |
-| P1 | Mot de passe oublié (M1) | **Production web OK** ; store en attente (AAB prêt) |
-| P1 | Lecture CR mobile (M2) | **Production web + Dev OK** ; store en attente (AAB prêt) |
-| Immédiat reprise | Play interne → recette → éventuelle promo prod | Voir **Point de reprise** |
+| P1 | Mot de passe oublié (M1) | **Production web + Play Store `1.1.0` OK** |
+| P1 | Lecture CR mobile (M2) | **Production web + Play Store `1.1.0` OK** |
+| **Prochaine** | Rappels cotisations / dettes | **À cadrer** (prochaine priorité métier) |
 
-### Dettes ouvertes (après reprise store)
+### Dettes ouvertes
 
-1. Rappels mensuels cotisations / dettes.
+1. **Rappels mensuels cotisations / dettes** — cadrage puis implémentation.
 2. Identification de l’origine des connexions.
 3. Copilote IA comptes rendus — **seulement après** stabilisation store M1/M2 ; **non commencé**.
 4. Admin reset plaintext (dette produit/sécurité).
 5. Politique mot de passe minimum 6 caractères (dette).
-6. Dette Nginx `naxhel.fr` (`server_name` dupliqué) — hors AMAKI.
-7. Nettoyage éventuel des comptes / scripts synthétiques DEV.
+6. Play Console : optimisation DEX / obscurcissement (~1 %, échéance fév. 2027) ; bord-à-bord / grand écran.
+7. Search Console (analyse ultérieure) :
+   - 2 erreurs 5xx historiques sur `/` et `/favicon.ico` — **état actuel HTTP 200**, cinq essais réussis chacun ;
+   - autres catégories à analyser : robots.txt 4, redirections 3, doublons canonical 2, explorées non indexées 11.
+8. Dette Nginx `naxhel.fr` (`server_name` dupliqué) — hors AMAKI.
+9. Nettoyage éventuel des comptes / scripts synthétiques DEV.
 
 ---
 
@@ -328,18 +326,19 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - **2026-10-07** : refonte UI mobile + œil MDP + splash (`2b11725`) ; Play Store `1.0.0` inchangé.
 - **2026-10-09** : M1/M2 validés DEV puis **déployés en production** (`8b80809`) ; migrations password-reset + publication rapports **finished** ; runtime HMAC / `TRUST_PROXY` / loopback / firewalld 9060 ; Prisma réconcilié (orpheline baseline) ; dumps sous `/sites/amakifr/backups/`.
 - **2026-10-09** : hotfix web navigation reset → `/auth/new-password` + lien « J’ai déjà un code » (inclus dans prod `8b80809`).
-- **2026-10-09/10** : release Android `1.1.0` / code `3` préparée puis **AAB EAS production buildé** ; dépôt `7e4e51e` ; **non soumis** Play Console ; Play public reste `1.0.0` / code `2`.
-- **2026-10-10** : pause ~2 semaines — point de reprise = contrôle AAB → piste interne → recette → éventuelle promo prod → MAJ de ce document.
+- **2026-10-09/10** : release Android `1.1.0` / code `3` préparée puis AAB EAS production buildé (commit embarqué `7e4e51e`).
+- **2026-10-10** : pause ~2 semaines — point de reprise Play documenté.
+- **2026-10-27** : Play Store Production `fr.amaki.app` `1.1.0` / `versionCode` `3` **publié** (01:05, 100 %, disponible) ; EAS `ee1ca777-aae1-4dc0-a795-5396707ed6a1` ; SHA-256 AAB `8288f9d4…c6cf93` ; recette Google Play M1/M2 OK ; release Android **clôturée** ; prochaine priorité = cadrage rappels cotisations/dettes ; dettes Play DEX (~1 %, fév. 2027) et Search Console (5xx historiques résolus en 200, autres catégories à analyser).
 
 ---
 
-## Faits temporaires à revérifier (reprise)
+## Faits temporaires à revérifier
 
-- SHA `origin/main` (attendu documenté : `7e4e51e`) vs checkout VPS `/sites/amakifr` (applicatif documenté : `8b80809`).
+- SHA `origin/main` (attendu documenté : `ca922f1`) vs checkout VPS `/sites/amakifr` (applicatif documenté : `8b80809`).
 - Présence/absence de `maintenance.flag` ; HTTP public/interne.
 - PM2 `amakifr` online ; écoute `127.0.0.1:9060` uniquement.
 - Flags Notes de frais + stockage privé (sans afficher d’autres secrets).
 - Prisma : migrations M1/M2 toujours `finished` ; pas de nouvelle orpheline.
-- Métadonnées EAS + checksum AAB `1.1.0` / code `3` avant upload Play interne.
+- Play Store public : confirmer `1.1.0` / code `3` toujours disponible si incident store.
 - `mobile/.env` local = LAN DEV (ne pas re-pointer vers prod sans procédure).
-- Ne pas promouvoir en production Play Store sans recette piste interne OK.
+- Avant le chantier rappels cotisations/dettes : cadrer source de calcul, destinataires, idempotence, contenu discret des notifications.
