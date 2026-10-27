@@ -6,13 +6,14 @@ Dernière mise à jour : 2026-10-27
 
 | Portée | SHA / version | Statut |
 |--------|---------------|--------|
-| Commit fonctionnel R1 Lot 1 | `ed253fd` | `feat(cotisations): compute reminder eligibility` — calcul d’éligibilité dans le dépôt |
-| Commit fonctionnel R1 Lot 2 (dépôt) | voir `origin/main` après push Lot 2 | Preview dry-run ADMIN\|PRESID ; **pas** d’envoi ; parent `f2dc638` ; SHA exact dans le journal §13 après push |
+| Commit fonctionnel R1 Lot 1 | `ed253fd` | `feat(cotisations): compute reminder eligibility` — calcul d’éligibilité |
+| Commit fonctionnel R1 Lot 2 (preview initial) | `773a5c4` | `feat(cotisations): add dry-run debt reminder preview for ADMIN and PRESID` — parent `f2dc638` |
+| Correction Actualiser / libellés (Lot 2) | `aa08df9` (`aa08df96d759a0ebc22548f2af7b91f165314d0c`) | `fix(cotisations): clarify debt reminder preview refresh feedback` |
+| Production web / backend **déployée** | `aa08df9` | Lots 1+2 + correction Actualiser/libellés en production |
 | Commit embarqué dans l’AAB store | `7e4e51e` | `chore(mobile): exclude local assets from EAS builds` |
-| Production web / backend déployée | `8b80809` | M1 + M2 en production ; **Lot 2 non déployé** tant que le déploiement sécurisé n’a pas réussi |
 | Application Android Play Store **publiée** | `1.1.0` / `versionCode` `3` | Production 100 %, disponible sur Google Play depuis le 27 oct. 2026 01:05 |
 
-**Règle** : M1 et M2 sont **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`), avec recette depuis Google Play réussie. Le dépôt local peut être **en avance** sur le VPS web. **Ne pas confondre** `ed253fd` (Lot 1 commité) et `f2dc638` (HEAD actuel / baseline avant un éventuel commit Lot 2).
+**Règle** : M1 et M2 restent **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`). La production applicative web courante est **`aa08df9`**. Distinguer : `ed253fd` (Lot 1), `773a5c4` (Lot 2 preview initial), `aa08df9` (correction Actualiser/libellés = SHA **applicatif déployé**). Un éventuel commit **documentaire** ultérieur de ce fichier sera un SHA **distinct** — ne pas le confondre avec le SHA applicatif déployé.
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
 
@@ -35,18 +36,18 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
   - commit embarqué `7e4e51e` ;
   - SHA-256 AAB `8288f9d4ec7c1942f4628c1d5cb5eae80d82d4b25a5751d90e234e8af1c6cf93`.
 - Release Android **clôturée** ; pas de nouvelle release Android en cours.
-- Chantier métier en cours : **rappels cotisations / dettes (R1)** — Lot 1 commité ; Lot 2 implémenté/relu **dans le working tree local, non commité** (voir ci-dessous).
+- **Aucun** changement mobile/Expo dans le chantier R1 Lots 1+2 ; version Play Store **inchangée**.
 
 ---
 
 ## Point de reprise — R1 rappels cotisations/dettes
 
-**ÉTAT AU 2026-10-27**
+**ÉTAT AU 2026-10-27 — Lots 1+2 déployés en production (`aa08df9`)**
 
 | Lot | État | SHA / remarque |
 |-----|------|----------------|
-| Lot 1 — calcul d’éligibilité | **Commité** dans le dépôt | `ed253fd` |
-| Lot 2 — prévisualisation admin dry-run | **Commité / poussé** avec le commit applicatif Lot 2 (parent `f2dc638`) ; déploiement production **séparé** | Accès ADMIN\|PRESID ; aucun envoi |
+| Lot 1 — calcul d’éligibilité | **Commité** + inclus en prod via chaîne Lot 2 | `ed253fd` |
+| Lot 2 — prévisualisation admin dry-run | **Commité, poussé, déployé** | Preview initial `773a5c4` ; correction Actualiser/libellés `aa08df9` (**prod**) |
 | Lot 3 — envoi manuel | **Non commencé** | — |
 
 ### Lot 1 (commité — `ed253fd`)
@@ -56,7 +57,7 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
   (`computeDetteRappelable` + calendrier Europe/Paris + résolveurs d’échéance + tests).
 - Commit : `ed253fd` — `feat(cotisations): compute reminder eligibility`.
 - **Aucun** schéma / migration / UI d’envoi / cron / mobile / email / push dans ce lot.
-- Calcul Lot 1 **inchangé** par le travail Lot 2.
+- Calcul Lot 1 **inchangé** par le Lot 2 et par la correction Actualiser/libellés.
 
 #### Périmètre métier retenu
 
@@ -85,18 +86,34 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 - Historique d’envoi fiable + marquage `Envoye` : à construire avec le **Lot 3** (envoi manuel idempotent) — **non démarré**.
 - Aucun champ persistant de contestation / gel.
 
-### Lot 2 (commit applicatif — déploiement production distinct)
+### Lot 2 (preview dry-run — déployé)
 
 Prévisualisation administrateur dry-run : route `/admin/finances/rappels-preview`.
 
-- Accès **ADMIN et PRESID** (helper `canAccessPreviewRappelsDette`) avec **garde serveur** avant toute lecture métier.
+- Accès **ADMIN et PRESID** uniquement (helper `canAccessPreviewRappelsDette`) avec **garde serveur** avant toute lecture métier ; **permissions globales inchangées**.
 - **Écart consignable** : plein accès général président souhaité vs bypass `authorize` **ADMIN seul** / `ROLE_PERMISSIONS` PRESID partiel — **non** corrigé hors Lot 2.
-- **Sans** mutation métier, **sans** création de relance, **sans** envoi (email / notification / push) ; **Lot 3 non démarré**.
+- **Sans** mutation métier, **sans** création de relance, **sans** envoi (email / notification / push) ; **aucun envoi de rappel ni automatisation** ; **Lot 3 non démarré**.
 - Motifs FR ; exclusions métier ≠ échecs techniques ; « Non calculé » + totaux partiels.
-- Validation ciblée : **91** tests ; tsc comparatif **11** communs / **0** ajouté ; **compilation globale non validée**.
+- Présentation : montants EUR à **deux décimales** ; homonymes distingués (« Fiche N ») ; tableaux avec défilement horizontal vérifiés en local.
+- Libellés : « Non éligibles » / « Adhérents non éligibles au rappel » + sous-titre explicatif (correction `aa08df9`).
+- Actualiser : toast succès après clic manuel ; `computedAt` date+heure+secondes Europe/Paris (instant serveur) ; pas de toast au chargement initial (couvert par tests).
+- Validation ciblée Lot 2 initial : **91** tests ; tsc comparatif **11** communs / **0** ajouté ; correction Actualiser : **24** tests ciblés ; **compilation TypeScript globale non validée** (ne pas affirmer le contraire).
+- PRESID / rôles refusés : **couverts par tests** ; **non vérifiés au navigateur**.
 - Effet transitif : `auth()` → Redis `updateSessionActivity` (hors métier).
-- **Aucune** migration Prisma dans Lot 1 ni Lot 2.
-- Parent Git : `f2dc638`. SHA applicatif exact et SHA **déployé** : journal §13 / baselines après push et après déploiement réussi.
+- **Aucune** migration Prisma dans Lot 1, Lot 2 ni la correction Actualiser.
+- Chaîne Git : parent Lot 2 `f2dc638` → `773a5c4` → `aa08df9` (**SHA applicatif déployé**).
+
+### Recette utilisateur production (confirmée)
+
+- Bannière « Prévisualisation — aucun envoi » : **OK**.
+- Toast après Actualiser : **OK**.
+- Date/heure de référence (secondes, Europe/Paris) et évolution entre Actualiser : **OK**.
+
+### Déploiements sécurisés associés (rappel)
+
+- Sauvegardes PostgreSQL custom validées (checksum + `pg_restore -l`) lors des déploiements Lot 2 / correction.
+- **Aucune** migration appliquée (schéma déjà à jour).
+- PM2 `amakifr` stable, cwd `/sites/amakifr` ; écoute `127.0.0.1:9060` ; maintenance **OFF** ; HTTP interne/public **200** ; flags Notes de frais **true/true**.
 
 ### Décisions produit R1 (v1)
 
@@ -108,8 +125,8 @@ Prévisualisation administrateur dry-run : route `/admin/finances/rappels-previe
 
 ### Prochaine étape
 
-- Déploiement production Lot 2 via `scripts/deploy-production-safe.sh` (après push) — **distinct** du commit applicatif.
-- **Lot 3** (envoi manuel idempotent) : **ne pas démarrer**.
+- **Lot 3** (envoi manuel idempotent) : **ne pas démarrer** tant que non autorisé explicitement.
+- Ne pas lancer d’anciens producteurs de relances comme substitut du Lot 3.
 
 ---
 
@@ -249,6 +266,14 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - `.env` production sauvegardé ; `MAINTENANCE_MODE` dédupliqué à `false`.
 - Aucun rollback nécessaire.
 
+**Dumps R1 Lot 2 / correction Actualiser (2026-10-27) — chemins VPS**
+
+- Déploiement Lot 2 (`773a5c4`) :
+  `/sites/amakifr/backups/amakifr_custom_20261027_174258.dump`
+- Déploiement correction Actualiser (`aa08df9`) :
+  `/sites/amakifr/backups/amakifr_custom_20261027_185237.dump`
+- Chaque dump : permissions `600`, checksum SHA-256 adjacent validé, `pg_restore -l` OK.
+
 ---
 
 ## 6. Application mobile Android
@@ -267,6 +292,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - Recette historique AMAKI Dev contre prod et build Dev `36099ef3-fa3c-40d5-96db-a34166676f27` : conservées comme jalons antérieurs.
 - `mobile/.env` local : LAN DEV (ne pas re-pointer vers prod sans procédure).
 - Notes de frais mobile : non livré tant qu’un lot API/mobile dédié n’est pas validé.
+- R1 Lots 1+2 : **aucun** changement mobile/Expo ; Play Store **inchangé**.
 
 ### Dettes Play Console (non bloquantes)
 
@@ -300,7 +326,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 **VALIDÉ EN PRODUCTION WEB/BACKEND ET SUR PLAY STORE `1.1.0`**
 
-- Commit applicatif production web : `8b80809`.
+- Commit applicatif production web au moment M1/M2 : `8b80809` (historique) ; baseline web courante : `aa08df9` (inclut M1/M2 + R1).
 - Migration `20261007220000_password_reset_challenge_security` : **finished**, sans rollback.
 - Recette web production :
   - e-mail reçu ;
@@ -341,18 +367,19 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ## 11. Travaux prioritaires
 
-**ÉTAT AU 2026-10-27 (Android clôturée ; R1 Lot 1 `ed253fd` ; Lot 2 commit applicatif en cours de livraison dépôt ; production web encore `8b80809` tant que le deploy n’a pas réussi)**
+**ÉTAT AU 2026-10-27 (Android clôturée ; R1 Lots 1+2 déployés en prod `aa08df9` ; Lot 3 non commencé)**
 
 | Priorité | Sujet | État |
 |----------|-------|------|
 | P0 | Inscription web | Livré en production |
 | P1 | Mot de passe oublié (M1) | **Production web + Play Store `1.1.0` OK** |
 | P1 | Lecture CR mobile (M2) | **Production web + Play Store `1.1.0` OK** |
-| **En cours** | Rappels cotisations / dettes (R1) | **Lot 1** `ed253fd` ; **Lot 2** commit/push dépôt (parent `f2dc638`) ; déploiement prod **à confirmer** ; **Lot 3** non démarré |
+| P1 | Rappels cotisations / dettes (R1) Lots 1+2 | **Déployés** (`ed253fd` → `773a5c4` → `aa08df9`) ; dry-run uniquement |
+| **Suivant** | R1 Lot 3 — envoi manuel | **Non commencé** |
 
 ### Dettes ouvertes
 
-1. **Rappels cotisations / dettes (R1)** — Lot 1 OK ; Lot 2 preview dry-run ADMIN\|PRESID (dépôt) ; déploiement prod et SHA déployé à confirmer ; Lot 3 **non démarré** ; auto hors v1.
+1. **Rappels cotisations / dettes (R1) Lot 3** — envoi manuel idempotent **non démarré** ; auto hors v1 ; ne pas utiliser d’anciens producteurs de relances.
 2. Identification de l’origine des connexions.
 3. Copilote IA comptes rendus — **seulement après** stabilisation store M1/M2 ; **non commencé**.
 4. Admin reset plaintext (dette produit/sécurité).
@@ -363,6 +390,8 @@ Ne jamais afficher ni versionner les secrets de `.env`.
    - autres catégories à analyser : robots.txt 4, redirections 3, doublons canonical 2, explorées non indexées 11.
 8. Dette Nginx `naxhel.fr` (`server_name` dupliqué) — hors AMAKI.
 9. Nettoyage éventuel des comptes / scripts synthétiques DEV.
+10. Compilation TypeScript globale du dépôt : **non validée**.
+11. PRESID / rôles refusés preview : tests OK ; **recette navigateur non faite**.
 
 ---
 
@@ -387,7 +416,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
   - cooldown de renvoi persistant 60 s.
 - Règle permanente : **email confirmé ≠ compte actif** ; activation administrative obligatoire.
 - Pour chaque nouveau chantier : diagnostiquer → preuve → changement minimal → tester → revue → commit → push → déployer avec sauvegarde → recette → mettre à jour ce document si décision permanente.
-- Ne jamais inscrire dans ce document : secrets, données personnelles, identifiants de comptes, contenu de `.env`, références de notes de frais réelles, chemins temporaires, résultats éphémères sans valeur architecturale.
+- Ne jamais inscrire dans ce document : secrets, données personnelles, identifiants de comptes, contenu de `.env`, références de notes de frais réelles, chemins temporaires, résultats éphémères sans valeur architecturale, détails d’authentification opérationnelle.
 
 ---
 
@@ -406,19 +435,21 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - **2026-10-09/10** : release Android `1.1.0` / code `3` préparée puis AAB EAS production buildé (commit embarqué `7e4e51e`).
 - **2026-10-10** : pause ~2 semaines — point de reprise Play documenté.
 - **2026-10-27** : Play Store Production `fr.amaki.app` `1.1.0` / `versionCode` `3` **publié** (01:05, 100 %, disponible) ; EAS `ee1ca777-aae1-4dc0-a795-5396707ed6a1` ; SHA-256 AAB `8288f9d4…c6cf93` ; recette Google Play M1/M2 OK ; release Android **clôturée** ; dettes Play DEX (~1 %, fév. 2027) et Search Console (5xx historiques résolus en 200, autres catégories à analyser).
-- **2026-10-27** : **R1 Lot 1** livré dans le dépôt (`ed253fd`) — service `lib/services/cotisations/rappel-dette/` (`computeDetteRappelable`) ; sources CM + DetteInitiale + Assistance (hors ObligationCotisation) ; dette nette / J+15 / DetteInitiale échéance 01/01/N+1 Paris / pending exclus / cooldown seulement si preuve Envoye|Lu|Repondu+dateEnvoi ; gel via params serveur sans persistance ; 69 tests OK ; pas de schéma/UI/API/envoi/cron ; point de reprise = **R1 Lot 2 preview/dry-run admin** ; décisions v1 : validation admin, email+notif interne, max 30 j, ton neutre, auto hors v1.
-- **2026-10-27** : **R1 Lot 2** preview dry-run ADMIN\|PRESID — route `/admin/finances/rappels-preview` ; helper `preview-access.ts` ; sans mutation / relance / envoi ; parent `f2dc638` ; **91** tests ; tsc 11/0 ; compilation globale non validée ; Redis session via `auth()` ; **aucune** migration ; permissions globales inchangées ; écart bypass président **consigné** ; **Lot 3 non démarré**. SHA applicatif exact : complété après push (ne pas inventer de SHA dans ce paragraphe au moment du commit).
-- **2026-10-27** : Autorisation utilisateur commit + push + déploiement sécurisé Lot 2 ; **aucun** envoi rappel/email/notif/push/cron.
+- **2026-10-27** : **R1 Lot 1** livré dans le dépôt (`ed253fd`) — service `lib/services/cotisations/rappel-dette/` (`computeDetteRappelable`) ; sources CM + DetteInitiale + Assistance (hors ObligationCotisation) ; dette nette / J+15 / DetteInitiale échéance 01/01/N+1 Paris / pending exclus / cooldown seulement si preuve Envoye|Lu|Repondu+dateEnvoi ; gel via params serveur sans persistance ; 69 tests OK ; pas de schéma/UI/API/envoi/cron ; décisions v1 : validation admin, email+notif interne, max 30 j, ton neutre, auto hors v1.
+- **2026-10-27** : **R1 Lot 2** preview dry-run ADMIN\|PRESID — commit `773a5c4` (parent `f2dc638`) ; route `/admin/finances/rappels-preview` ; sans mutation / relance / envoi ; **91** tests ; tsc 11/0 ; compilation globale non validée ; **aucune** migration ; permissions globales inchangées ; écart bypass président consignable ; **Lot 3 non démarré**.
+- **2026-10-27** : Déploiement sécurisé Lot 2 → prod `773a5c4` ; dump `amakifr_custom_20261027_174258.dump` validé ; 0 migration ; PM2 stable ; maintenance OFF ; HTTP 200/200 ; flags Notes de frais true/true ; bannière preview observée en production.
+- **2026-10-27** : Correction Actualiser/libellés — commit/push/déploiement `aa08df9` (`aa08df96d759a0ebc22548f2af7b91f165314d0c`) ; dump `amakifr_custom_20261027_185237.dump` validé ; 0 migration ; recette utilisateur prod : toast + date/heure OK ; présentation locale EUR/homonymes/tableaux OK ; PRESID/refusés navigateur non faits ; **aucun** envoi/cron/Lot 3 ; **aucun** changement mobile/Expo.
+- **2026-10-27** : Alignement Git confirmé : local = `origin/main` = prod `/sites/amakifr` = `aa08df9`. Clôture documentaire R1 Lots 1+2 (ce fichier) — le SHA du futur commit documentaire sera **distinct** du SHA applicatif déployé `aa08df9`.
 
 ---
 
 ## Faits temporaires à revérifier
 
-- SHA `origin/main` (après push Lot 2) vs checkout VPS `/sites/amakifr` (documenté `8b80809` jusqu’au deploy réussi).
+- SHA `origin/main` vs checkout VPS `/sites/amakifr` (dernière confirmation : tous deux `aa08df9`).
 - Présence/absence de `maintenance.flag` ; HTTP public/interne.
 - PM2 `amakifr` online ; écoute `127.0.0.1:9060` uniquement.
 - Flags Notes de frais + stockage privé (sans afficher d’autres secrets).
-- Prisma : migrations M1/M2 `finished` ; R1 Lot 1/Lot 2 **sans** migration nouvelle.
-- Play Store public : `1.1.0` / code `3`.
+- Prisma : migrations M1/M2 `finished` ; R1 **sans** migration nouvelle ; schéma à jour.
+- Play Store public : `1.1.0` / code `3` (inchangé par R1).
 - `mobile/.env` local = LAN DEV.
-- R1 Lot 2 : dry-run uniquement ; Lot 3 non démarré ; ne pas lancer d’anciens producteurs de relances.
+- R1 : dry-run uniquement ; Lot 3 non démarré ; ne pas lancer d’anciens producteurs de relances.
