@@ -6,12 +6,12 @@ Dernière mise à jour : 2026-10-27
 
 | Portée | SHA / version | Statut |
 |--------|---------------|--------|
-| Baseline dépôt / DEV (`origin/main`) | `ca922f1` | Checkpoint documentaire M1/M2 production (dernier contrôle) |
+| Baseline dépôt / DEV (`origin/main`) | `ed253fd` | R1 Lot 1 livré : calcul d’éligibilité rappels cotisations/dettes |
 | Commit embarqué dans l’AAB store | `7e4e51e` | `chore(mobile): exclude local assets from EAS builds` |
 | Production web / backend déployée | `8b80809` | `fix(auth): navigate to password reset confirmation` — M1 + M2 en production |
 | Application Android Play Store **publiée** | `1.1.0` / `versionCode` `3` | Production 100 %, disponible sur Google Play depuis le 27 oct. 2026 01:05 |
 
-**Règle** : M1 et M2 sont **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`), avec recette depuis Google Play réussie.
+**Règle** : M1 et M2 sont **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`), avec recette depuis Google Play réussie. Le SHA dépôt (`ed253fd`) peut être **en avance** sur le VPS web tant que R1 n’est pas déployé.
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
 
@@ -33,7 +33,66 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
   - ID `ee1ca777-aae1-4dc0-a795-5396707ed6a1` ;
   - commit embarqué `7e4e51e` ;
   - SHA-256 AAB `8288f9d4ec7c1942f4628c1d5cb5eae80d82d4b25a5751d90e234e8af1c6cf93`.
-- **Prochaine priorité métier** : cadrage des **rappels cotisations / dettes** (pas de nouvelle release Android en cours).
+- Release Android **clôturée** ; pas de nouvelle release Android en cours.
+- Chantier métier en cours : **rappels cotisations / dettes (R1)** — voir point de reprise R1 Lot 2 ci-dessous.
+
+---
+
+## Point de reprise — R1 rappels cotisations/dettes (Lot 1 livré)
+
+**ÉTAT AU 2026-10-27 — R1 Lot 1 dans le dépôt (`ed253fd`)**
+
+### Livrable Lot 1
+
+- Service serveur lecture seule :
+  `lib/services/cotisations/rappel-dette/`
+  (`computeDetteRappelable` + calendrier Europe/Paris + résolveurs d’échéance + tests).
+- Commit : `ed253fd` — `feat(cotisations): compute reminder eligibility`.
+- **Aucun** schéma / migration / UI / API d’envoi / cron / mobile / email / push dans ce lot.
+
+### Périmètre métier retenu
+
+| Inclure | Exclure |
+|---------|---------|
+| `CotisationMensuelle` | `ObligationCotisation` (**legacy**, exclusion explicite) |
+| `DetteInitiale` | |
+| `Assistance` | |
+
+### Règles d’éligibilité (Lot 1)
+
+- Dette **nette** = max(0, brut retenues − avoirs `Disponible`).
+- Éligible à **J+15** (jours civils `Europe/Paris`) après échéance.
+- `DetteInitiale` année N : échéance technique **01/01/(N+1) 00:00 Europe/Paris** (pas `createdAt`).
+- Lignes avec paiement `EnAttente` ou `EnCours` **exclues**.
+- User / adhérent **Actif** uniquement.
+- Bénéficiaire d’une assistance sur CM : exclu selon règle métier existante (`adherentBeneficiaireId === adherentId`).
+- Cooldown **30 jours** uniquement avec **preuve d’envoi réussi** :
+  `RelanceCotisationMensuelle.statut ∈ {Envoye, Lu, Repondu}` **et** `dateEnvoi` non null.
+  `EnAttente` / échec / absence de preuve → ne bloquent pas.
+- Gel / contestation : paramètres serveur internes (`frozenAdherent`, `frozenLineKeys`) — **pas de persistance** Prisma à ce stade.
+
+### Validation Lot 1
+
+- 69 tests (rappel-dette + cotisations existants) OK.
+- ESLint ciblé OK ; aucune erreur TypeScript dans `rappel-dette`.
+
+### Limites connues
+
+- Les producteurs actuels créent des relances en `EnAttente` **sans** marquer `Envoye` / `dateEnvoi` → cooldown **pas encore opérationnel** en conditions réelles.
+- Historique d’envoi fiable + marquage `Envoye` : à construire avec le **Lot 3** (envoi manuel idempotent).
+- Aucun champ persistant de contestation / gel.
+
+### Décisions produit R1 (v1)
+
+- Validation **admin obligatoire** avant tout envoi.
+- Canaux futurs v1 : **email + notification interne** (pas de SMS ; push hors v1 sauf lot dédié).
+- Fréquence max : **1 / 30 jours / adhérent**.
+- Ton **factuel et neutre** (pas de wording culpabilisant / menaces ROI dans le canal v1).
+- **Automatisation hors v1** (après preview + envoi manuel + recette).
+
+### Prochain lot (nouveau chat)
+
+**R1 Lot 2 — prévisualisation administrateur / dry-run**, lecture seule, **sans envoi**.
 
 ---
 
@@ -211,6 +270,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
   - chaîne Nginx effective conforme (voir §3).
 - Les rappels financiers ne doivent pas exposer de montant sensible sur un écran verrouillé.
 - Les rappels mensuels doivent être idempotents et éviter tout doublon.
+- Rappels cotisations/dettes (R1) : source de vérité = CM + dettes initiales + assistances (hors `ObligationCotisation`) ; validation admin obligatoire en v1 ; automatisation hors v1 ; voir § Point de reprise R1.
 - La collecte concernant l’origine des connexions doit rester proportionnée :
   plateforme Web/Mobile, type d’appareil, système, dernière activité et éventuellement IP tronquée.
 - Définir une durée de conservation avant d’ajouter de nouvelles données de connexion.
@@ -264,18 +324,18 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ## 11. Travaux prioritaires
 
-**ÉTAT AU 2026-10-27 (release Android clôturée)**
+**ÉTAT AU 2026-10-27 (Android clôturée ; R1 Lot 1 livré en dépôt)**
 
 | Priorité | Sujet | État |
 |----------|-------|------|
 | P0 | Inscription web | Livré en production |
 | P1 | Mot de passe oublié (M1) | **Production web + Play Store `1.1.0` OK** |
 | P1 | Lecture CR mobile (M2) | **Production web + Play Store `1.1.0` OK** |
-| **Prochaine** | Rappels cotisations / dettes | **À cadrer** (prochaine priorité métier) |
+| **En cours** | Rappels cotisations / dettes (R1) | **Lot 1 livré (`ed253fd`)** ; prochain = **Lot 2 preview/dry-run** |
 
 ### Dettes ouvertes
 
-1. **Rappels mensuels cotisations / dettes** — cadrage puis implémentation.
+1. **Rappels cotisations / dettes (R1)** — Lot 1 OK ; Lot 2 preview admin ; Lot 3 envoi manuel idempotent ; auto hors v1.
 2. Identification de l’origine des connexions.
 3. Copilote IA comptes rendus — **seulement après** stabilisation store M1/M2 ; **non commencé**.
 4. Admin reset plaintext (dette produit/sécurité).
@@ -328,17 +388,18 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - **2026-10-09** : hotfix web navigation reset → `/auth/new-password` + lien « J’ai déjà un code » (inclus dans prod `8b80809`).
 - **2026-10-09/10** : release Android `1.1.0` / code `3` préparée puis AAB EAS production buildé (commit embarqué `7e4e51e`).
 - **2026-10-10** : pause ~2 semaines — point de reprise Play documenté.
-- **2026-10-27** : Play Store Production `fr.amaki.app` `1.1.0` / `versionCode` `3` **publié** (01:05, 100 %, disponible) ; EAS `ee1ca777-aae1-4dc0-a795-5396707ed6a1` ; SHA-256 AAB `8288f9d4…c6cf93` ; recette Google Play M1/M2 OK ; release Android **clôturée** ; prochaine priorité = cadrage rappels cotisations/dettes ; dettes Play DEX (~1 %, fév. 2027) et Search Console (5xx historiques résolus en 200, autres catégories à analyser).
+- **2026-10-27** : Play Store Production `fr.amaki.app` `1.1.0` / `versionCode` `3` **publié** (01:05, 100 %, disponible) ; EAS `ee1ca777-aae1-4dc0-a795-5396707ed6a1` ; SHA-256 AAB `8288f9d4…c6cf93` ; recette Google Play M1/M2 OK ; release Android **clôturée** ; dettes Play DEX (~1 %, fév. 2027) et Search Console (5xx historiques résolus en 200, autres catégories à analyser).
+- **2026-10-27** : **R1 Lot 1** livré dans le dépôt (`ed253fd`) — service `lib/services/cotisations/rappel-dette/` (`computeDetteRappelable`) ; sources CM + DetteInitiale + Assistance (hors ObligationCotisation) ; dette nette / J+15 / DetteInitiale échéance 01/01/N+1 Paris / pending exclus / cooldown seulement si preuve Envoye|Lu|Repondu+dateEnvoi ; gel via params serveur sans persistance ; 69 tests OK ; pas de schéma/UI/API/envoi/cron ; point de reprise = **R1 Lot 2 preview/dry-run admin** ; décisions v1 : validation admin, email+notif interne, max 30 j, ton neutre, auto hors v1.
 
 ---
 
 ## Faits temporaires à revérifier
 
-- SHA `origin/main` (attendu documenté : `ca922f1`) vs checkout VPS `/sites/amakifr` (applicatif documenté : `8b80809`).
+- SHA `origin/main` (attendu documenté : `ed253fd`) vs checkout VPS `/sites/amakifr` (applicatif documenté : `8b80809` — R1 pas encore déployé en prod).
 - Présence/absence de `maintenance.flag` ; HTTP public/interne.
 - PM2 `amakifr` online ; écoute `127.0.0.1:9060` uniquement.
 - Flags Notes de frais + stockage privé (sans afficher d’autres secrets).
-- Prisma : migrations M1/M2 toujours `finished` ; pas de nouvelle orpheline.
+- Prisma : migrations M1/M2 toujours `finished` ; pas de nouvelle orpheline ; R1 Lot 1 **sans** migration.
 - Play Store public : confirmer `1.1.0` / code `3` toujours disponible si incident store.
 - `mobile/.env` local = LAN DEV (ne pas re-pointer vers prod sans procédure).
-- Avant le chantier rappels cotisations/dettes : cadrer source de calcul, destinataires, idempotence, contenu discret des notifications.
+- Avant R1 Lot 2 : preview admin dry-run uniquement (aucun envoi).
