@@ -8,6 +8,37 @@ export {
 } from "@/lib/services/cotisations/rappel-dette/compute-dette-rappelable";
 
 export {
+  previewRappelsDetteAdmin,
+  PREVIEW_RAPPELS_BANNER,
+  PREVIEW_INCOMPLETE_ALERT,
+  type PreviewRappelsDetteResult,
+  type PreviewRappelAdherentRow,
+  type PreviewRappelsDetteAdminOptions,
+  type PreviewComputationKind,
+} from "@/lib/services/cotisations/rappel-dette/preview-rappels-admin";
+
+export {
+  canAccessPreviewRappelsDette,
+  PREVIEW_RAPPELS_ACCESS_DENIED_MESSAGE,
+} from "@/lib/services/cotisations/rappel-dette/preview-access";
+
+export {
+  labelGlobalReason,
+  labelLineIgnoreReason,
+  isTechnicalComputationFailure,
+  type LabeledReason,
+} from "@/lib/services/cotisations/rappel-dette/reason-labels";
+
+export {
+  formatPreviewEuroAmount,
+  formatPreviewAmountDisplay,
+  formatPreviewDueDisplay,
+  buildHomonymFicheReferences,
+  HOMONYM_DISPLAY_NOTICE,
+  type PreviewDisplayComputationKind,
+} from "@/lib/services/cotisations/rappel-dette/preview-display";
+
+export {
   getParisYmd,
   civilDaysBetweenParis,
   addCivilDaysParis,

@@ -3,12 +3,16 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Euro, TrendingUp, TrendingDown, AlertCircle, Receipt, HandHeart, FileText, RefreshCw, BarChart3, UserCheck, History, Building2 } from "lucide-react";
+import { Euro, TrendingUp, TrendingDown, AlertCircle, Receipt, HandHeart, FileText, RefreshCw, BarChart3, UserCheck, History, Building2, Eye } from "lucide-react";
 import Link from "next/link";
 import { getFinancialStats } from "@/actions/paiements";
 import { toast } from "sonner";
+import { useCurrentUser } from "@/hooks/use-current-user";
+import { canAccessPreviewRappelsDette } from "@/lib/services/cotisations/rappel-dette/preview-access";
 
 export default function AdminFinancesPage() {
+  const user = useCurrentUser();
+  const canPreviewRappels = canAccessPreviewRappelsDette(user?.role);
   const [loading, setLoading] = useState(true);
   const [stats, setStats] = useState({
     totalDettesInitiales: 0,
@@ -313,6 +317,29 @@ export default function AdminFinancesPage() {
               </CardContent>
             </Card>
           </Link>
+
+          {/* Masquage client : ADMIN|PRESID. La garde serveur reste impérative. */}
+          {canPreviewRappels && (
+            <Link href="/admin/finances/rappels-preview">
+              <Card className="shadow-lg border-2 border-sky-200 dark:border-sky-800/50 bg-white dark:bg-gray-900 hover:shadow-xl transition-all duration-300 cursor-pointer h-full !py-0">
+                <CardHeader className="bg-gradient-to-r from-sky-100 to-sky-50 dark:from-sky-900/30 dark:to-sky-800/20 rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6 gap-0">
+                  <CardTitle className="flex items-center gap-2 text-base sm:text-lg text-gray-700 dark:text-gray-200">
+                    <Eye className="h-5 w-5 sm:h-6 sm:w-6 text-sky-500 dark:text-sky-400" />
+                    Prévisualisation rappels
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="pt-4 sm:pt-6 pb-4 sm:pb-6 px-4 sm:px-6">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className="text-sm text-gray-700 dark:text-gray-300">Consulter les adhérents éligibles</p>
+                      <p className="text-xs text-gray-600 dark:text-gray-400 mt-1">Aucun envoi</p>
+                    </div>
+                    <Eye className="h-8 w-8 text-sky-500 dark:text-sky-400" />
+                  </div>
+                </CardContent>
+              </Card>
+            </Link>
+          )}
         </div>
 
         {/* Card Synthèse Financière */}
