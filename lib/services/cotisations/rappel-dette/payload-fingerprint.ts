@@ -4,23 +4,35 @@ import { getParisYmd } from "@/lib/services/cotisations/rappel-dette/paris-calen
 import type { RappelRetainedLine } from "@/lib/services/cotisations/rappel-dette/types";
 
 /**
- * Identifiant de contrat pour le lien/template de détail confirmé.
- * Pas une route HTTP : intégration UI/lien restante (hors cette passe).
+ * Identifiant de contrat pour le lien/template de détail **v1** (pending).
+ * Conservé strictement pour les réservations historiques v1.
+ * Pas une route HTTP réelle tant que pending.
  */
 export const RAPPEL_DETTE_TEMPLATE_DETAIL_LINK_CONTRACT =
   "rappel-dette.detail-link.v1.pending-integration" as const;
+
+/**
+ * Contrat lien détail **v2** : profil web cotisations (situation courante).
+ * Path relatif figé : voir `RAPPEL_DETTE_DETAIL_PATH_V2`.
+ */
+export const RAPPEL_DETTE_TEMPLATE_DETAIL_LINK_CONTRACT_V2 =
+  "rappel-dette.detail-link.v2.web-profile-cotisations" as const;
 
 /**
  * Catalogue serveur immuable : version template → contrat lien détail.
  * Figé à l’exécution (`Object.freeze`) ; résolution **propriétés propres** uniquement.
  * Paramètres **internes serveur** — pas librement pilotables par un formulaire.
  * Toute version hors catalogue (y compris héritées : constructor, toString, __proto__)
- * → null. Pas de valeur libre ni de route HTTP réelle.
+ * → null. Pas de valeur libre.
+ *
+ * `email-rappel-dette-v1` / pending : **inchangés**.
+ * `email-rappel-dette-v2` : nouveau contrat web-profile-cotisations.
  */
 export const RAPPEL_DETTE_TEMPLATE_REGISTRY: Readonly<
   Record<string, string>
 > = Object.freeze({
   "email-rappel-dette-v1": RAPPEL_DETTE_TEMPLATE_DETAIL_LINK_CONTRACT,
+  "email-rappel-dette-v2": RAPPEL_DETTE_TEMPLATE_DETAIL_LINK_CONTRACT_V2,
 });
 
 /**

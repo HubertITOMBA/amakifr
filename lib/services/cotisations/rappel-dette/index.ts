@@ -74,6 +74,7 @@ export {
 
 export {
   RAPPEL_DETTE_TEMPLATE_DETAIL_LINK_CONTRACT,
+  RAPPEL_DETTE_TEMPLATE_DETAIL_LINK_CONTRACT_V2,
   RAPPEL_DETTE_TEMPLATE_REGISTRY,
   RAPPEL_DETTE_FINGERPRINT_SCHEMA_VERSION,
   buildRappelDetteFingerprintPayload,
@@ -109,4 +110,11 @@ export {
  * Import serveur uniquement :
  * `@/lib/services/cotisations/rappel-dette/rappel-dette-notification`
  * (création via `tx.notification.create` — jamais `createNotification` / push).
+ *
+ * Adaptateur email SMTP/Resend (classification Accepted/DNA/Unknown) :
+ * **ne pas** réexporter ici — non branché actions/UI/cron.
+ * Import : `@/lib/services/cotisations/rappel-dette/rappel-dette-email-provider-adapter`
+ *
+ * Contenu / URL canonique template v2 : **ne pas** réexporter ici.
+ * `canonical-app-url` / `rappel-dette-email-content-v2` — construction serveur only.
  */

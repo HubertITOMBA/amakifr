@@ -26,6 +26,7 @@ import { useSession } from "next-auth/react"
 import { RegisterButton } from "@/components/auth/register-button"
 import { ResetButton } from "@/components/auth/reset-button"
 import { toast } from "react-toastify"
+import { resolvePostLoginRedirect } from "@/lib/auth/safe-callback-url"
 
 /**
  * Formulaire de connexion. Gère explicitement verificationRequired / deliveryFailed
@@ -45,6 +46,9 @@ export default function LoginForm() {
     searchParams.get("error") === "OAuthAccountNotLinked"
       ? "E-mail déjà utilisé avec un autre fournisseur !"
       : ""
+  const postLoginRedirect = resolvePostLoginRedirect(
+    searchParams.get("callbackUrl")
+  )
 
   const form = useForm<z.infer<typeof LoginSchema>>({
     resolver: zodResolver(LoginSchema),
@@ -99,9 +103,9 @@ export default function LoginForm() {
           await new Promise((r) => setTimeout(r, 300))
 
           try {
-            window.location.href = "/?loggedIn=true"
+            window.location.href = postLoginRedirect
           } catch {
-            router.push("/?loggedIn=true")
+            router.push(postLoginRedirect)
           }
         }
       } catch (err: unknown) {
@@ -121,7 +125,7 @@ export default function LoginForm() {
           setSuccess("Connexion réussie !")
           router.refresh()
           setTimeout(() => {
-            window.location.href = "/?loggedIn=true"
+            window.location.href = postLoginRedirect
           }, 300)
           return
         }

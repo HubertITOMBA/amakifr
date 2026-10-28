@@ -13,9 +13,12 @@ import {
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import LoginForm from "@/components/auth/login-form";
+import { DEFAULT_POST_LOGIN_REDIRECT } from "@/lib/auth/safe-callback-url";
 
 const loginMock = vi.fn();
 const pushMock = vi.fn();
+const refreshMock = vi.fn();
+let searchParamsGet: (key: string) => string | null = () => null;
 
 vi.mock("@/actions/auth/login", () => ({
   login: (...args: unknown[]) => loginMock(...args),
@@ -24,10 +27,10 @@ vi.mock("@/actions/auth/login", () => ({
 vi.mock("next/navigation", () => ({
   useRouter: () => ({
     push: pushMock,
-    refresh: vi.fn(),
+    refresh: refreshMock,
   }),
   useSearchParams: () => ({
-    get: () => null,
+    get: (key: string) => searchParamsGet(key),
   }),
 }));
 
@@ -35,7 +38,7 @@ vi.mock("next-auth/react", () => ({
   useSession: () => ({
     data: null,
     status: "unauthenticated",
-    update: vi.fn(),
+    update: vi.fn().mockResolvedValue(undefined),
   }),
 }));
 
@@ -70,6 +73,8 @@ describe("LoginForm — compte non confirmé", () => {
   beforeEach(() => {
     loginMock.mockReset();
     pushMock.mockReset();
+    refreshMock.mockReset();
+    searchParamsGet = () => null;
   });
 
   afterEach(() => {
@@ -154,5 +159,87 @@ describe("LoginForm — compte non confirmé", () => {
       expect(pushMock).toHaveBeenCalledWith("/auth/new-verification");
     });
     expect(pushMock.mock.calls[0][0]).toBe("/auth/new-verification");
+  });
+});
+
+describe("LoginForm — redirection post-login (callbackUrl)", () => {
+  const originalLocation = window.location;
+
+  beforeEach(() => {
+    loginMock.mockReset();
+    pushMock.mockReset();
+    refreshMock.mockReset();
+    searchParamsGet = () => null;
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: { ...originalLocation, href: "http://localhost/auth/sign-in" },
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    Object.defineProperty(window, "location", {
+      configurable: true,
+      value: originalLocation,
+    });
+  });
+
+  async function fillAndSubmit(user: ReturnType<typeof userEvent.setup>) {
+    await user.type(
+      screen.getByLabelText(/email adresse/i),
+      "membre@example.com",
+    );
+    await user.type(screen.getByLabelText(/mot de passe/i), "secret1");
+    await user.click(screen.getByRole("button", { name: /^connexion$/i }));
+  }
+
+  it("sans callbackUrl → repli /?loggedIn=true", async () => {
+    loginMock.mockResolvedValue({ success: "ok" });
+    const user = userEvent.setup();
+    render(<LoginForm />);
+    await fillAndSubmit(user);
+
+    await waitFor(() => {
+      expect(window.location.href).toBe(DEFAULT_POST_LOGIN_REDIRECT);
+    });
+  });
+
+  it("callbackUrl interne valide → redirection honorée", async () => {
+    const target = "/user/profile?section=cotisations&vue=toutes";
+    searchParamsGet = (key) => (key === "callbackUrl" ? target : null);
+    loginMock.mockResolvedValue({ success: "ok" });
+    const user = userEvent.setup();
+    render(<LoginForm />);
+    await fillAndSubmit(user);
+
+    await waitFor(() => {
+      expect(window.location.href).toBe(target);
+    });
+  });
+
+  it("callbackUrl externe → repli sûr", async () => {
+    searchParamsGet = (key) =>
+      key === "callbackUrl" ? "https://evil.example/phish" : null;
+    loginMock.mockResolvedValue({ success: "ok" });
+    const user = userEvent.setup();
+    render(<LoginForm />);
+    await fillAndSubmit(user);
+
+    await waitFor(() => {
+      expect(window.location.href).toBe(DEFAULT_POST_LOGIN_REDIRECT);
+    });
+  });
+
+  it("callbackUrl //host → repli sûr", async () => {
+    searchParamsGet = (key) =>
+      key === "callbackUrl" ? "//evil.example/x" : null;
+    loginMock.mockResolvedValue({ success: "ok" });
+    const user = userEvent.setup();
+    render(<LoginForm />);
+    await fillAndSubmit(user);
+
+    await waitFor(() => {
+      expect(window.location.href).toBe(DEFAULT_POST_LOGIN_REDIRECT);
+    });
   });
 });

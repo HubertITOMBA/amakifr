@@ -674,6 +674,12 @@ describe("catalogue template (propriétés propres uniquement)", () => {
     expect(resolveTemplateDetailLinkContract(TEMPLATE)).toBe(
       RAPPEL_DETTE_TEMPLATE_DETAIL_LINK_CONTRACT
     );
+    expect(resolveTemplateDetailLinkContract("email-rappel-dette-v2")).toBe(
+      "rappel-dette.detail-link.v2.web-profile-cotisations"
+    );
+    expect(RAPPEL_DETTE_TEMPLATE_REGISTRY["email-rappel-dette-v1"]).toBe(
+      "rappel-dette.detail-link.v1.pending-integration"
+    );
     for (const inherited of ["constructor", "toString", "__proto__"]) {
       expect(resolveTemplateDetailLinkContract(inherited)).toBeNull();
     }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { format } from "date-fns";
 import { fr } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -31,6 +31,10 @@ import {
   getTypesAssistancePourSimulation,
 } from "@/actions/paiements";
 import { HistoriqueCotisationsTable, HistoriqueCotisation } from "@/components/user/HistoriqueCotisationsTable";
+import {
+  resolveCotisationsVue,
+  type CotisationsVue,
+} from "@/lib/user/cotisations-vue";
 
 interface DetteInitiale {
   id: string;
@@ -146,6 +150,7 @@ export function CotisationsSection({
   readOnly?: boolean;
 }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const showPaymentActions = !readOnly;
   const adherent = profile?.adherent ?? null;
   const dettesInitiales = adherent?.DettesInitiales ?? [];
@@ -159,7 +164,13 @@ export function CotisationsSection({
   const [selectedCotisationsMois, setSelectedCotisationsMois] = useState<number>(() => now.getMonth() + 1);
   const [selectedCotisationsAnnee, setSelectedCotisationsAnnee] = useState<number>(() => now.getFullYear());
   const [calendarCotisationsOpen, setCalendarCotisationsOpen] = useState(false);
-  const [cotisationsVue, setCotisationsVue] = useState<"mois" | "annee" | "toutes">("mois");
+  const vueFromUrl = searchParams?.get("vue") ?? null;
+  const [cotisationsVue, setCotisationsVue] = useState<CotisationsVue>(() =>
+    resolveCotisationsVue(vueFromUrl)
+  );
+  useEffect(() => {
+    setCotisationsVue(resolveCotisationsVue(searchParams?.get("vue") ?? null));
+  }, [searchParams]);
   const [showSimulation, setShowSimulation] = useState(false);
   const [showHistorique, setShowHistorique] = useState(false);
   const handlePrintHistorique = () => {
@@ -655,7 +666,10 @@ export function CotisationsSection({
 
       <div className="flex flex-wrap items-center gap-2 mb-2">
         <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Afficher :</span>
-        <Select value={cotisationsVue} onValueChange={(v: "mois" | "annee" | "toutes") => setCotisationsVue(v)}>
+        <Select
+          value={cotisationsVue}
+          onValueChange={(v: CotisationsVue) => setCotisationsVue(v)}
+        >
           <SelectTrigger className="w-[160px] h-8 text-sm">
             <SelectValue />
           </SelectTrigger>
