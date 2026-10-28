@@ -20,10 +20,15 @@ export const PENDING_PAYMENT_STATUSES = ["EnAttente", "EnCours"] as const;
  */
 export const RAPPEL_SENT_STATUSES = ["Envoye", "Lu", "Repondu"] as const;
 
+/**
+ * Sources de dette rappelable.
+ * L’entité Prisma `Assistance` (prestation au bénéficiaire) n’est plus une source
+ * depuis la décision métier 2026-10-28 — seules les CM (y compris catégorie
+ * assistance dues par des tiers) et DetteInitiale le sont.
+ */
 export type RappelDebtSource =
   | "cotisation_mensuelle"
-  | "dette_initiale"
-  | "assistance";
+  | "dette_initiale";
 
 /**
  * Raisons d’ignorance d’une ligne (audit / preview).

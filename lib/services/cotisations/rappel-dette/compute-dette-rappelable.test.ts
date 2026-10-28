@@ -18,7 +18,9 @@ const {
   findUniqueAdherent: vi.fn(),
   findManyCm: vi.fn(),
   findManyDette: vi.fn(),
-  findManyAssistance: vi.fn(),
+  findManyAssistance: vi.fn(() => {
+    throw new Error("Assistance ne doit pas être lue par computeDetteRappelable");
+  }),
   findManyPaiement: vi.fn(),
   findManyAvoir: vi.fn(),
   findFirstRelance: vi.fn(),
@@ -29,6 +31,7 @@ vi.mock("@/lib/db", () => ({
     adherent: { findUnique: findUniqueAdherent },
     cotisationMensuelle: { findMany: findManyCm },
     detteInitiale: { findMany: findManyDette },
+    // Garde anti-régression : l’entité Assistance n’est plus une source de dette.
     assistance: { findMany: findManyAssistance },
     paiementCotisation: { findMany: findManyPaiement },
     avoir: { findMany: findManyAvoir },
@@ -61,7 +64,7 @@ function mockActif() {
 function mockEmptySources() {
   findManyCm.mockResolvedValue([]);
   findManyDette.mockResolvedValue([]);
-  findManyAssistance.mockResolvedValue([]);
+  // findManyAssistance : garde throw — ne pas mockResolvedValue (ne doit pas être appelée)
   findManyPaiement.mockResolvedValue([]);
   findManyAvoir.mockResolvedValue([]);
   findFirstRelance.mockResolvedValue(null);
@@ -150,25 +153,22 @@ describe("computeDetteRappelable", () => {
     expect(atJ15.montantBrut.toString()).toBe("100");
   });
 
-  it("Assistance seule : due = dateEvenement", async () => {
+  it("Assistance reçue seule : dette rappelable nulle, non éligible (pas de lecture table)", async () => {
     mockActif();
-    findManyAssistance.mockResolvedValue([
-      {
-        id: "as-1",
-        montantRestant: dec("50"),
-        statut: "EnAttente",
-        dateEvenement: parisCivilDate(2024, 6, 1),
-      },
-    ]);
-
+    // Aucune CM / dette — l’entité Assistance ne doit ni être lue ni créer d’éligibilité
+    // (y compris pour la preview dry-run qui délègue à ce calcul).
     const r = await computeDetteRappelable(ADH, {
       now: parisCivilDate(2024, 6, 16),
     });
-    expect(r.eligible).toBe(true);
-    expect(r.retainedLines[0]?.source).toBe("assistance");
+    expect(r.eligible).toBe(false);
+    expect(r.retainedLines).toHaveLength(0);
+    expect(r.detteNette.toString()).toBe("0");
+    expect(r.montantBrut.toString()).toBe("0");
+    expect(r.globalReasons).toContain("NO_RETAINED_LINES");
+    expect(findManyAssistance).not.toHaveBeenCalled();
   });
 
-  it("combine les trois sources et ignore ObligationCotisation", async () => {
+  it("combine CM + DetteInitiale (sans entité Assistance) et ignore ObligationCotisation", async () => {
     mockActif();
     findManyCm.mockResolvedValue([
       {
@@ -183,32 +183,41 @@ describe("computeDetteRappelable", () => {
     findManyDette.mockResolvedValue([
       { id: "di-1", annee: 2022, montantRestant: dec("40") },
     ]);
-    findManyAssistance.mockResolvedValue([
+
+    const r = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r.eligible).toBe(true);
+    expect(r.montantBrut.toString()).toBe("55");
+    expect(r.retainedLines.map((l) => l.source).sort()).toEqual([
+      "cotisation_mensuelle",
+      "dette_initiale",
+    ]);
+    // ordre déterministe : dueDate ASC
+    expect(r.retainedLines.map((l) => l.id)).toEqual(["di-1", "cm-1"]);
+    expect(r.earliestDueDate?.getTime()).toBe(
+      r.retainedLines[0]!.dueDate.getTime()
+    );
+    expect(findManyAssistance).not.toHaveBeenCalled();
+  });
+
+  it("CM assistance pour un autre bénéficiaire : dette conservée", async () => {
+    mockActif();
+    findManyCm.mockResolvedValue([
       {
-        id: "as-1",
+        id: "cm-tiers",
+        adherentId: ADH,
+        adherentBeneficiaireId: "adh-benef-autre",
         montantRestant: dec("50"),
         statut: "EnAttente",
-        dateEvenement: parisCivilDate(2024, 4, 1),
+        dateEcheance: parisCivilDate(2024, 5, 1),
       },
     ]);
 
     const r = await computeDetteRappelable(ADH, { now: NOW });
     expect(r.eligible).toBe(true);
-    expect(r.montantBrut.toString()).toBe("105");
-    expect(r.retainedLines.map((l) => l.source).sort()).toEqual([
-      "assistance",
-      "cotisation_mensuelle",
-      "dette_initiale",
-    ]);
-    // ordre déterministe : dueDate ASC
-    expect(r.retainedLines.map((l) => l.id)).toEqual([
-      "di-1",
-      "as-1",
-      "cm-1",
-    ]);
-    expect(r.earliestDueDate?.getTime()).toBe(
-      r.retainedLines[0]!.dueDate.getTime()
-    );
+    expect(r.retainedLines).toHaveLength(1);
+    expect(r.retainedLines[0]?.source).toBe("cotisation_mensuelle");
+    expect(r.retainedLines[0]?.id).toBe("cm-tiers");
+    expect(r.detteNette.toString()).toBe("50");
   });
 
   it("avoir total → non éligible COVERED_BY_AVOIR", async () => {
@@ -398,23 +407,44 @@ describe("computeDetteRappelable", () => {
         dateEcheance: parisCivilDate(2024, 5, 1),
       },
     ]);
-    findManyAssistance.mockResolvedValue([
-      {
-        id: "as-annule",
-        montantRestant: dec("50"),
-        statut: "Annule",
-        dateEvenement: parisCivilDate(2024, 5, 1),
-      },
-    ]);
 
     const r = await computeDetteRappelable(ADH, { now: NOW });
     expect(r.eligible).toBe(false);
     const reasons = r.ignoredLines.map((l) => l.reason).sort();
     expect(reasons).toEqual([
       "STATUS_CLOSED",
-      "STATUS_CLOSED",
       "ZERO_OR_NEGATIVE_REMAINING",
     ]);
+    expect(findManyAssistance).not.toHaveBeenCalled();
+  });
+
+  it("CM + DetteInitiale + avoirs : calcul inchangé (sans entité Assistance)", async () => {
+    mockActif();
+    findManyCm.mockResolvedValue([
+      {
+        id: "cm-1",
+        adherentId: ADH,
+        adherentBeneficiaireId: null,
+        montantRestant: dec("40"),
+        statut: "EnAttente",
+        dateEcheance: parisCivilDate(2024, 5, 1),
+      },
+    ]);
+    findManyDette.mockResolvedValue([
+      { id: "di-1", annee: 2022, montantRestant: dec("20") },
+    ]);
+    findManyAvoir.mockResolvedValue([{ montantRestant: dec("15") }]);
+
+    const r = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r.montantBrut.toString()).toBe("60");
+    expect(r.avoirDisponible.toString()).toBe("15");
+    expect(r.detteNette.toString()).toBe("45");
+    expect(r.eligible).toBe(true);
+    expect(r.retainedLines.map((l) => l.source).sort()).toEqual([
+      "cotisation_mensuelle",
+      "dette_initiale",
+    ]);
+    expect(findManyAssistance).not.toHaveBeenCalled();
   });
 
   it("dette nette jamais négative (avoir > brut)", async () => {

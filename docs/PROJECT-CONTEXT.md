@@ -63,9 +63,10 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 
 | Inclure | Exclure |
 |---------|---------|
-| `CotisationMensuelle` | `ObligationCotisation` (**legacy**, exclusion explicite) |
-| `DetteInitiale` | |
-| `Assistance` | |
+| `CotisationMensuelle` (y compris CM catégorie Assistance dues par des **tiers**) | `ObligationCotisation` (**legacy**, exclusion explicite) |
+| `DetteInitiale` | Entité Prisma `Assistance` (prestation versée au bénéficiaire — **pas** une dette) |
+
+> **Correction 2026-10-28** (locale, **non déployée**) : l’historique Lot 1 (`ed253fd` / prod `aa08df9`) incluait à tort l’entité `Assistance` comme source de dette du bénéficiaire. Décision utilisateur : Assistance = prestation de l’association au bénéficiaire, sans remboursement. Correctif branche `fix/r1-exclude-assistance-entity-from-debt` (worktree isolé) — **pas encore en production**.
 
 #### Règles d’éligibilité (Lot 1)
 
@@ -79,6 +80,7 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
   `RelanceCotisationMensuelle.statut ∈ {Envoye, Lu, Repondu}` **et** `dateEnvoi` non null.
   `EnAttente` / échec / absence de preuve → ne bloquent pas.
 - Gel / contestation : paramètres serveur internes (`frozenAdherent`, `frozenLineKeys`) — **pas de persistance** Prisma à ce stade.
+- **Collatéraux hors rappel** (à traiter séparément, non inclus dans ce correctif) : totaux API/mobile / `getCumulDette` qui additionnent encore `Assistance.montantRestant` dans une « dette » agrégée.
 
 #### Limites Lot 1 (toujours valables)
 
@@ -313,7 +315,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
   - chaîne Nginx effective conforme (voir §3).
 - Les rappels financiers ne doivent pas exposer de montant sensible sur un écran verrouillé.
 - Les rappels mensuels doivent être idempotents et éviter tout doublon.
-- Rappels cotisations/dettes (R1) : source de vérité = CM + dettes initiales + assistances (hors `ObligationCotisation`) ; validation admin obligatoire en v1 ; automatisation hors v1 ; voir § Point de reprise R1.
+- Rappels cotisations/dettes (R1) : source de vérité = CM + dettes initiales (hors `ObligationCotisation` ; hors entité `Assistance` prestation — décision 2026-10-28, correctif local non déployé) ; validation admin obligatoire en v1 ; automatisation hors v1 ; voir § Point de reprise R1.
 - La collecte concernant l’origine des connexions doit rester proportionnée :
   plateforme Web/Mobile, type d’appareil, système, dernière activité et éventuellement IP tronquée.
 - Définir une durée de conservation avant d’ajouter de nouvelles données de connexion.
@@ -435,7 +437,8 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - **2026-10-09/10** : release Android `1.1.0` / code `3` préparée puis AAB EAS production buildé (commit embarqué `7e4e51e`).
 - **2026-10-10** : pause ~2 semaines — point de reprise Play documenté.
 - **2026-10-27** : Play Store Production `fr.amaki.app` `1.1.0` / `versionCode` `3` **publié** (01:05, 100 %, disponible) ; EAS `ee1ca777-aae1-4dc0-a795-5396707ed6a1` ; SHA-256 AAB `8288f9d4…c6cf93` ; recette Google Play M1/M2 OK ; release Android **clôturée** ; dettes Play DEX (~1 %, fév. 2027) et Search Console (5xx historiques résolus en 200, autres catégories à analyser).
-- **2026-10-27** : **R1 Lot 1** livré dans le dépôt (`ed253fd`) — service `lib/services/cotisations/rappel-dette/` (`computeDetteRappelable`) ; sources CM + DetteInitiale + Assistance (hors ObligationCotisation) ; dette nette / J+15 / DetteInitiale échéance 01/01/N+1 Paris / pending exclus / cooldown seulement si preuve Envoye|Lu|Repondu+dateEnvoi ; gel via params serveur sans persistance ; 69 tests OK ; pas de schéma/UI/API/envoi/cron ; décisions v1 : validation admin, email+notif interne, max 30 j, ton neutre, auto hors v1.
+- **2026-10-27** : **R1 Lot 1** livré dans le dépôt (`ed253fd`) — service `lib/services/cotisations/rappel-dette/` (`computeDetteRappelable`) ; sources CM + DetteInitiale + Assistance (hors ObligationCotisation) ; dette nette / J+15 / DetteInitiale échéance 01/01/N+1 Paris / pending exclus / cooldown seulement si preuve Envoye|Lu|Repondu+dateEnvoi ; gel via params serveur sans persistance ; 69 tests OK ; pas de schéma/UI/API/envoi/cron ; décisions v1 : validation admin, email+notif interne, max 30 j, ton neutre, auto hors v1. **Note 2026-10-28** : l’inclusion de l’entité `Assistance` comme dette du bénéficiaire est **incorrecte** au regard de la décision métier du 28/10/2026 ; corrigée localement (non déployée) sur `fix/r1-exclude-assistance-entity-from-debt` — sources rappelables = CM + DetteInitiale uniquement.
+- **2026-10-28** : Décision métier — `Assistance` = prestation versée au bénéficiaire, sans remboursement ; n’est **pas** une dette de ce bénéficiaire ; les CM d’assistance des autres adhérents restent des dettes. Correctif rappel/preview **local / non déployé** (branche `fix/r1-exclude-assistance-entity-from-debt`). Totaux API/mobile/`getCumulDette` collatéraux : ticket séparé. Lot 3 suspendu.
 - **2026-10-27** : **R1 Lot 2** preview dry-run ADMIN\|PRESID — commit `773a5c4` (parent `f2dc638`) ; route `/admin/finances/rappels-preview` ; sans mutation / relance / envoi ; **91** tests ; tsc 11/0 ; compilation globale non validée ; **aucune** migration ; permissions globales inchangées ; écart bypass président consignable ; **Lot 3 non démarré**.
 - **2026-10-27** : Déploiement sécurisé Lot 2 → prod `773a5c4` ; dump `amakifr_custom_20261027_174258.dump` validé ; 0 migration ; PM2 stable ; maintenance OFF ; HTTP 200/200 ; flags Notes de frais true/true ; bannière preview observée en production.
 - **2026-10-27** : Correction Actualiser/libellés — commit/push/déploiement `aa08df9` (`aa08df96d759a0ebc22548f2af7b91f165314d0c`) ; dump `amakifr_custom_20261027_185237.dump` validé ; 0 migration ; recette utilisateur prod : toast + date/heure OK ; présentation locale EUR/homonymes/tableaux OK ; PRESID/refusés navigateur non faits ; **aucun** envoi/cron/Lot 3 ; **aucun** changement mobile/Expo.

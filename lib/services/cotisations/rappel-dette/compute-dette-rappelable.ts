@@ -5,7 +5,6 @@ import {
   civilDaysBetweenParis,
 } from "@/lib/services/cotisations/rappel-dette/paris-calendar";
 import {
-  resolveAssistanceDueDate,
   resolveCotisationMensuelleDueDate,
   resolveDetteInitialeDueDate,
 } from "@/lib/services/cotisations/rappel-dette/resolve-due-date";
@@ -29,8 +28,6 @@ const CM_OPEN_STATUSES = new Set([
   "PartiellementPaye",
   "EnRetard",
 ]);
-
-const ASSISTANCE_OPEN_STATUSES = new Set(["EnAttente", "Affecte"]);
 
 function d(value: Prisma.Decimal | string | number | null | undefined): Prisma.Decimal {
   if (value instanceof Prisma.Decimal) return value;
@@ -74,8 +71,12 @@ function emptyResult(
 /**
  * Calcule l’éligibilité d’un adhérent au rappel de cotisations/dettes (Lot 1).
  *
- * Sources : CotisationMensuelle, DetteInitiale, Assistance uniquement.
+ * Sources : CotisationMensuelle, DetteInitiale uniquement.
+ * L’entité `Assistance` (prestation versée au bénéficiaire) n’est **pas** une dette
+ * du bénéficiaire — décision métier 2026-10-28. Les CM d’assistance dues par les
+ * autres adhérents restent des dettes (source cotisation_mensuelle).
  * Exclut ObligationCotisation (legacy). Aucune mutation DB, aucun envoi.
+ * Aucune lecture de la table `assistances`.
  *
  * Cooldown 30 j : uniquement si une RelanceCotisationMensuelle porte une
  * **preuve d’envoi réussi** (statut ∈ Envoye|Lu|Repondu ET dateEnvoi ≠ null).
@@ -123,7 +124,6 @@ export async function computeDetteRappelable(
     const [
       cotisations,
       dettes,
-      assistances,
       pendingPayments,
       avoirs,
       lastRelance,
@@ -147,15 +147,6 @@ export async function computeDetteRappelable(
           montantRestant: true,
         },
       }),
-      db.assistance.findMany({
-        where: { adherentId },
-        select: {
-          id: true,
-          montantRestant: true,
-          statut: true,
-          dateEvenement: true,
-        },
-      }),
       db.paiementCotisation.findMany({
         where: {
           adherentId,
@@ -163,13 +154,11 @@ export async function computeDetteRappelable(
           OR: [
             { cotisationMensuelleId: { not: null } },
             { detteInitialeId: { not: null } },
-            { assistanceId: { not: null } },
           ],
         },
         select: {
           cotisationMensuelleId: true,
           detteInitialeId: true,
-          assistanceId: true,
         },
       }),
       db.avoir.findMany({
@@ -196,11 +185,9 @@ export async function computeDetteRappelable(
 
     const pendingCm = new Set<string>();
     const pendingDette = new Set<string>();
-    const pendingAssistance = new Set<string>();
     for (const p of pendingPayments) {
       if (p.cotisationMensuelleId) pendingCm.add(p.cotisationMensuelleId);
       if (p.detteInitialeId) pendingDette.add(p.detteInitialeId);
-      if (p.assistanceId) pendingAssistance.add(p.assistanceId);
     }
 
     const retained: RappelRetainedLine[] = [];
@@ -328,21 +315,6 @@ export async function computeDetteRappelable(
         dueDate,
         pending: pendingDette.has(row.id),
         closed: false,
-        beneficiary: false,
-      });
-    }
-
-    for (const row of assistances) {
-      const restant = d(row.montantRestant);
-      const dueDate = resolveAssistanceDueDate(row.dateEvenement);
-      const closed = !ASSISTANCE_OPEN_STATUSES.has(row.statut);
-      tryRetain({
-        source: "assistance",
-        id: row.id,
-        montantRestant: restant,
-        dueDate,
-        pending: pendingAssistance.has(row.id),
-        closed,
         beneficiary: false,
       });
     }
