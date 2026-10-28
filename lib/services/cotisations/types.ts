@@ -111,8 +111,8 @@ export type MyCotisationYearItemDto = CotisationMensuelleDto & {
 };
 
 /**
- * Synthèse financière — alignée sur la logique getCumulDette (Web),
- * mais résolue uniquement via actor.userId (jamais adherentId client).
+ * Synthèse financière — alignée sur getCumulDette (Web) sans entité
+ * Assistance dans le total ; résolue via actor.userId (jamais adherentId client).
  */
 export type MyCotisationYearSummaryDto = {
   detteBrute: string;

@@ -1,6 +1,6 @@
 # AMAKI — Contexte permanent du projet
 
-Dernière mise à jour : 2026-10-27
+Dernière mise à jour : 2026-10-28
 
 ## Baselines (ne pas confondre)
 
@@ -9,11 +9,12 @@ Dernière mise à jour : 2026-10-27
 | Commit fonctionnel R1 Lot 1 | `ed253fd` | `feat(cotisations): compute reminder eligibility` — calcul d’éligibilité |
 | Commit fonctionnel R1 Lot 2 (preview initial) | `773a5c4` | `feat(cotisations): add dry-run debt reminder preview for ADMIN and PRESID` — parent `f2dc638` |
 | Correction Actualiser / libellés (Lot 2) | `aa08df9` (`aa08df96d759a0ebc22548f2af7b91f165314d0c`) | `fix(cotisations): clarify debt reminder preview refresh feedback` |
-| Production web / backend **déployée** | `aa08df9` | Lots 1+2 + correction Actualiser/libellés en production |
+| Exclusion entité Assistance du rappel/preview | `b8c4edd` | `fix(cotisations): exclude received assistance from reminder debt` — **`origin/main`** |
+| Production web / backend **attendue** | `b8c4edd` | Lots 1+2 + Actualiser + exclusion Assistance rappel (vérifier VPS avant toute mutation) |
 | Commit embarqué dans l’AAB store | `7e4e51e` | `chore(mobile): exclude local assets from EAS builds` |
 | Application Android Play Store **publiée** | `1.1.0` / `versionCode` `3` | Production 100 %, disponible sur Google Play depuis le 27 oct. 2026 01:05 |
 
-**Règle** : M1 et M2 restent **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`). La production applicative web courante est **`aa08df9`**. Distinguer : `ed253fd` (Lot 1), `773a5c4` (Lot 2 preview initial), `aa08df9` (correction Actualiser/libellés = SHA **applicatif déployé**). Un éventuel commit **documentaire** ultérieur de ce fichier sera un SHA **distinct** — ne pas le confondre avec le SHA applicatif déployé.
+**Règle** : M1 et M2 restent **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`). Distinguer : `ed253fd` (Lot 1), `773a5c4` (Lot 2), `aa08df9` (Actualiser), `b8c4edd` (exclusion Assistance **rappel**). Totaux compte (`getCumulDette` / self lines/year) : correctif **local / non commité / non déployé** (worktree `fix/r1-totals-exclude-assistance-from-debt`).
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
 
@@ -42,13 +43,15 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 
 ## Point de reprise — R1 rappels cotisations/dettes
 
-**ÉTAT AU 2026-10-27 — Lots 1+2 déployés en production (`aa08df9`)**
+**ÉTAT AU 2026-10-28 — Lots 1+2 + exclusion Assistance rappel sur `origin/main` (`b8c4edd`) ; Lot 3 suspendu**
 
 | Lot | État | SHA / remarque |
 |-----|------|----------------|
-| Lot 1 — calcul d’éligibilité | **Commité** + inclus en prod via chaîne Lot 2 | `ed253fd` |
-| Lot 2 — prévisualisation admin dry-run | **Commité, poussé, déployé** | Preview initial `773a5c4` ; correction Actualiser/libellés `aa08df9` (**prod**) |
-| Lot 3 — envoi manuel | **Non commencé** | — |
+| Lot 1 — calcul d’éligibilité | **Commité** + chaîne Lot 2 | `ed253fd` (sources rappelables **corrigées** en `b8c4edd` : plus d’entité Assistance) |
+| Lot 2 — prévisualisation admin dry-run | **Commité** | Preview `773a5c4` ; Actualiser `aa08df9` ; hérite du calcul `b8c4edd` |
+| Exclusion Assistance (rappel) | **Sur `origin/main`** | `b8c4edd` |
+| Totaux dette compte (F1–F3 + ownership S1) | **Local / non commité / non déployé** | Worktree `fix/r1-totals-exclude-assistance-from-debt` |
+| Lot 3 — envoi manuel | **Suspendu** | — |
 
 ### Lot 1 (commité — `ed253fd`)
 
@@ -66,7 +69,7 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 | `CotisationMensuelle` (y compris CM catégorie Assistance dues par des **tiers**) | `ObligationCotisation` (**legacy**, exclusion explicite) |
 | `DetteInitiale` | Entité Prisma `Assistance` (prestation versée au bénéficiaire — **pas** une dette) |
 
-> **Correction 2026-10-28** (locale, **non déployée**) : l’historique Lot 1 (`ed253fd` / prod `aa08df9`) incluait à tort l’entité `Assistance` comme source de dette du bénéficiaire. Décision utilisateur : Assistance = prestation de l’association au bénéficiaire, sans remboursement. Correctif branche `fix/r1-exclude-assistance-entity-from-debt` (worktree isolé) — **pas encore en production**.
+> **Correction rappel 2026-10-28** (`b8c4edd` sur `origin/main`) : l’historique Lot 1 (`ed253fd`) incluait à tort l’entité `Assistance` comme source de dette du bénéficiaire. Décision : Assistance = prestation de l’association au bénéficiaire — **pas** une dette. Les CM d’assistance dues par des tiers restent des dettes. Ne pas réécrire l’historique `ed253fd` comme s’il avait déjà cette règle.
 
 #### Règles d’éligibilité (Lot 1)
 
@@ -80,7 +83,7 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
   `RelanceCotisationMensuelle.statut ∈ {Envoye, Lu, Repondu}` **et** `dateEnvoi` non null.
   `EnAttente` / échec / absence de preuve → ne bloquent pas.
 - Gel / contestation : paramètres serveur internes (`frozenAdherent`, `frozenLineKeys`) — **pas de persistance** Prisma à ce stade.
-- **Collatéraux hors rappel** (à traiter séparément, non inclus dans ce correctif) : totaux API/mobile / `getCumulDette` qui additionnent encore `Assistance.montantRestant` dans une « dette » agrégée.
+- **Totaux compte** (`getCumulDette`, résumés `getMyCotisationLines` / `getMyCotisationYear`) : correctif F1–F3 + ownership S1 **local / non commité / non déployé** (pas d’entité Assistance dans la dette bénéficiaire ; Obligations legacy **conservées** dans ces totaux — périmètre ≠ rappel). **Totaux admin** synthèse / `getFinancialStats` prestations : **non corrigés** dans ce lot.
 
 #### Limites Lot 1 (toujours valables)
 
@@ -315,7 +318,8 @@ Ne jamais afficher ni versionner les secrets de `.env`.
   - chaîne Nginx effective conforme (voir §3).
 - Les rappels financiers ne doivent pas exposer de montant sensible sur un écran verrouillé.
 - Les rappels mensuels doivent être idempotents et éviter tout doublon.
-- Rappels cotisations/dettes (R1) : source de vérité = CM + dettes initiales (hors `ObligationCotisation` ; hors entité `Assistance` prestation — décision 2026-10-28, correctif local non déployé) ; validation admin obligatoire en v1 ; automatisation hors v1 ; voir § Point de reprise R1.
+- Rappels cotisations/dettes (R1) : source de vérité = CM + dettes initiales (hors `ObligationCotisation` ; hors entité `Assistance` prestation — décision 2026-10-28, correctif rappel `b8c4edd`) ; validation admin obligatoire en v1 ; automatisation hors v1 ; voir § Point de reprise R1.
+- Dette bénéficiaire (compte) : pas d’entité `Assistance` dans `totalDette` / `detteBrute` ; correctif totaux **local non commité** ; totaux admin prestations **non** assimilés.
 - La collecte concernant l’origine des connexions doit rester proportionnée :
   plateforme Web/Mobile, type d’appareil, système, dernière activité et éventuellement IP tronquée.
 - Définir une durée de conservation avant d’ajouter de nouvelles données de connexion.
@@ -369,19 +373,21 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ## 11. Travaux prioritaires
 
-**ÉTAT AU 2026-10-27 (Android clôturée ; R1 Lots 1+2 déployés en prod `aa08df9` ; Lot 3 non commencé)**
+**ÉTAT AU 2026-10-28 (Android clôturée ; `origin/main` = `b8c4edd` ; totaux compte en correctif local ; Lot 3 suspendu)**
 
 | Priorité | Sujet | État |
 |----------|-------|------|
 | P0 | Inscription web | Livré en production |
 | P1 | Mot de passe oublié (M1) | **Production web + Play Store `1.1.0` OK** |
 | P1 | Lecture CR mobile (M2) | **Production web + Play Store `1.1.0` OK** |
-| P1 | Rappels cotisations / dettes (R1) Lots 1+2 | **Déployés** (`ed253fd` → `773a5c4` → `aa08df9`) ; dry-run uniquement |
-| **Suivant** | R1 Lot 3 — envoi manuel | **Non commencé** |
+| P1 | Rappels cotisations / dettes (R1) Lots 1+2 + exclusion Assistance rappel | Chaîne jusqu’à `b8c4edd` ; dry-run uniquement |
+| P1 | Totaux dette compte (Assistance hors dette) | **Local / non commité** |
+| **Suivant** | R1 Lot 3 — envoi manuel | **Suspendu** |
 
 ### Dettes ouvertes
 
-1. **Rappels cotisations / dettes (R1) Lot 3** — envoi manuel idempotent **non démarré** ; auto hors v1 ; ne pas utiliser d’anciens producteurs de relances.
+1. **Rappels cotisations / dettes (R1) Lot 3** — envoi manuel idempotent **suspendu** ; auto hors v1 ; ne pas utiliser d’anciens producteurs de relances.
+1b. Totaux admin synthèse / prestations (`getFinancialStats`, créances avec Assistance) — **non corrigés**.
 2. Identification de l’origine des connexions.
 3. Copilote IA comptes rendus — **seulement après** stabilisation store M1/M2 ; **non commencé**.
 4. Admin reset plaintext (dette produit/sécurité).
@@ -437,8 +443,9 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - **2026-10-09/10** : release Android `1.1.0` / code `3` préparée puis AAB EAS production buildé (commit embarqué `7e4e51e`).
 - **2026-10-10** : pause ~2 semaines — point de reprise Play documenté.
 - **2026-10-27** : Play Store Production `fr.amaki.app` `1.1.0` / `versionCode` `3` **publié** (01:05, 100 %, disponible) ; EAS `ee1ca777-aae1-4dc0-a795-5396707ed6a1` ; SHA-256 AAB `8288f9d4…c6cf93` ; recette Google Play M1/M2 OK ; release Android **clôturée** ; dettes Play DEX (~1 %, fév. 2027) et Search Console (5xx historiques résolus en 200, autres catégories à analyser).
-- **2026-10-27** : **R1 Lot 1** livré dans le dépôt (`ed253fd`) — service `lib/services/cotisations/rappel-dette/` (`computeDetteRappelable`) ; sources CM + DetteInitiale + Assistance (hors ObligationCotisation) ; dette nette / J+15 / DetteInitiale échéance 01/01/N+1 Paris / pending exclus / cooldown seulement si preuve Envoye|Lu|Repondu+dateEnvoi ; gel via params serveur sans persistance ; 69 tests OK ; pas de schéma/UI/API/envoi/cron ; décisions v1 : validation admin, email+notif interne, max 30 j, ton neutre, auto hors v1. **Note 2026-10-28** : l’inclusion de l’entité `Assistance` comme dette du bénéficiaire est **incorrecte** au regard de la décision métier du 28/10/2026 ; corrigée localement (non déployée) sur `fix/r1-exclude-assistance-entity-from-debt` — sources rappelables = CM + DetteInitiale uniquement.
-- **2026-10-28** : Décision métier — `Assistance` = prestation versée au bénéficiaire, sans remboursement ; n’est **pas** une dette de ce bénéficiaire ; les CM d’assistance des autres adhérents restent des dettes. Correctif rappel/preview **local / non déployé** (branche `fix/r1-exclude-assistance-entity-from-debt`). Totaux API/mobile/`getCumulDette` collatéraux : ticket séparé. Lot 3 suspendu.
+- **2026-10-27** : **R1 Lot 1** livré dans le dépôt (`ed253fd`) — service `lib/services/cotisations/rappel-dette/` (`computeDetteRappelable`) ; sources **à l’époque** CM + DetteInitiale + Assistance (hors ObligationCotisation) ; dette nette / J+15 / … ; 69 tests OK. **Annotation 2026-10-28** : l’inclusion de l’entité `Assistance` était incorrecte ; corrigée sur `origin/main` @ `b8c4edd` (sources rappelables courantes = CM + DetteInitiale uniquement).
+- **2026-10-28** : Décision métier — `Assistance` = prestation, pas dette du bénéficiaire ; CM d’assistance des tiers = dettes. Correctif rappel/preview **`b8c4edd`**. Lot 3 **suspendu**.
+- **2026-10-28** : Correctif totaux compte F1–F3 + ownership S1 (`getCumulDette` / résumés lines+year) — **local / non commité / non déployé** (branche `fix/r1-totals-exclude-assistance-from-debt`) ; droit lecture tierce = `canRead(..., "getAdherentFinancialItems")` ; Obligations legacy **conservées** dans ces totaux ; totaux admin synthèse/prestations **non** corrigés ; aucun changement mobile/Expo.
 - **2026-10-27** : **R1 Lot 2** preview dry-run ADMIN\|PRESID — commit `773a5c4` (parent `f2dc638`) ; route `/admin/finances/rappels-preview` ; sans mutation / relance / envoi ; **91** tests ; tsc 11/0 ; compilation globale non validée ; **aucune** migration ; permissions globales inchangées ; écart bypass président consignable ; **Lot 3 non démarré**.
 - **2026-10-27** : Déploiement sécurisé Lot 2 → prod `773a5c4` ; dump `amakifr_custom_20261027_174258.dump` validé ; 0 migration ; PM2 stable ; maintenance OFF ; HTTP 200/200 ; flags Notes de frais true/true ; bannière preview observée en production.
 - **2026-10-27** : Correction Actualiser/libellés — commit/push/déploiement `aa08df9` (`aa08df96d759a0ebc22548f2af7b91f165314d0c`) ; dump `amakifr_custom_20261027_185237.dump` validé ; 0 migration ; recette utilisateur prod : toast + date/heure OK ; présentation locale EUR/homonymes/tableaux OK ; PRESID/refusés navigateur non faits ; **aucun** envoi/cron/Lot 3 ; **aucun** changement mobile/Expo.
@@ -448,11 +455,11 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ## Faits temporaires à revérifier
 
-- SHA `origin/main` vs checkout VPS `/sites/amakifr` (dernière confirmation : tous deux `aa08df9`).
+- SHA `origin/main` vs checkout VPS `/sites/amakifr` (attendu `b8c4edd` — **revérifier** avant mutation).
 - Présence/absence de `maintenance.flag` ; HTTP public/interne.
 - PM2 `amakifr` online ; écoute `127.0.0.1:9060` uniquement.
 - Flags Notes de frais + stockage privé (sans afficher d’autres secrets).
 - Prisma : migrations M1/M2 `finished` ; R1 **sans** migration nouvelle ; schéma à jour.
-- Play Store public : `1.1.0` / code `3` (inchangé par R1).
+- Play Store public : `1.1.0` / code `3` (inchangé par R1 / totaux).
 - `mobile/.env` local = LAN DEV.
-- R1 : dry-run uniquement ; Lot 3 non démarré ; ne pas lancer d’anciens producteurs de relances.
+- R1 : dry-run uniquement ; Lot 3 **suspendu** ; totaux compte correctif local non commité ; ne pas lancer d’anciens producteurs de relances.

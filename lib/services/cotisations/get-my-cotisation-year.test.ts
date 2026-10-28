@@ -60,7 +60,6 @@ function emptyParallel() {
     .mockResolvedValueOnce([]) // year cotisations
     .mockResolvedValueOnce([]); // open cotisations summary
   findManyDette.mockResolvedValue([]);
-  findManyAssistance.mockResolvedValue([]); // open assistances summary only
   findManyPaiement.mockResolvedValue([]); // pending EnAttente
   aggregatePaiement.mockResolvedValue({ _sum: { montant: null } });
   findManyObligation.mockResolvedValue([]);
@@ -180,12 +179,16 @@ describe("getMyCotisationYear", () => {
     expect(findManyCotisation.mock.calls[0][0].where.adherentId).toBe("adh-A");
   });
 
-  it("synthèse dette/avoir/resteNet + totalPayeAnnee (agrégat, sans historique)", async () => {
+  it("synthèse dette/avoir/resteNet + totalPayeAnnee (sans entité Assistance)", async () => {
     findUniqueAdherent.mockResolvedValue({ id: "adh-A" });
     findManyCotisation
       .mockResolvedValueOnce([]) // year
       .mockResolvedValueOnce([
-        { montantRestant: new Prisma.Decimal("20") },
+        {
+          adherentId: "adh-A",
+          adherentBeneficiaireId: null,
+          montantRestant: new Prisma.Decimal("20"),
+        },
       ]); // open
     findManyDette.mockResolvedValue([
       {
@@ -197,6 +200,7 @@ describe("getMyCotisationYear", () => {
         description: null,
       },
     ]);
+    // Ancien mock Assistance « 10 » : ne doit plus contribuer ni être lu
     findManyAssistance.mockResolvedValue([
       { montantRestant: new Prisma.Decimal("10") },
     ]);
@@ -211,13 +215,15 @@ describe("getMyCotisationYear", () => {
 
     const result = await getMyCotisationYear(actor(), 2026);
 
-    expect(result.summary.detteBrute).toBe("90");
+    // 60 DI + 20 CM − 15 avoir ; Assistance entité exclue du total
+    expect(result.summary.detteBrute).toBe("80");
     expect(result.summary.avoirDisponible).toBe("15");
-    expect(result.summary.resteNet).toBe("75");
+    expect(result.summary.resteNet).toBe("65");
     expect(result.summary.totalPayeAnnee).toBe("30");
     expect(result.dettes).toHaveLength(1);
     expect(result.dettes[0].hasPendingPayment).toBe(false);
     expect(result).not.toHaveProperty("paiements");
+    expect(findManyAssistance).not.toHaveBeenCalled();
     expect(aggregatePaiement.mock.calls[0][0].where.inscriptionEvenementId).toBe(
       null
     );

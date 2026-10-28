@@ -816,6 +816,18 @@ export async function updatePaiement(data: z.infer<typeof UpdatePaiementSchema>)
 /**
  * Calcule le cumul de la dette totale d'un adhérent
  */
+/**
+ * Cumul de dette d’un adhérent (lecture).
+ *
+ * Calcul : DetteInitiale + CM ouvertes (hors auto-bénéfice) + Obligations
+ * legacy − avoirs. L’entité `Assistance` est listée à titre informatif
+ * (clé `assistances` conservée) mais **jamais** additionnée à totalDette /
+ * detteNette (prestation, pas dette du bénéficiaire).
+ *
+ * Autorisation : propriétaire de la fiche, ou
+ * `canRead(..., "getAdherentFinancialItems")` (ADMIN via hasPermission —
+ * compatible `checkAndSendRelances`). Refus avant lecture des lignes du tiers.
+ */
 export async function getCumulDette(adherentId: string) {
   try {
     const session = await auth();
@@ -823,74 +835,93 @@ export async function getCumulDette(adherentId: string) {
       return { success: false, error: "Non autorisé" };
     }
 
-    // Récupérer toutes les dettes
-    const dettesInitiales = await prisma.detteInitiale.findMany({
-      where: { adherentId },
+    const { authorizeCumulDetteAccess } = await import(
+      "@/lib/services/cotisations/authorize-cumul-dette"
+    );
+    const { canRead } = await import("@/lib/dynamic-permissions");
+
+    const authz = await authorizeCumulDetteAccess(
+      session.user.id,
+      adherentId,
+      {
+        resolveSelfAdherentId: async (userId) => {
+          const self = await prisma.adherent.findUnique({
+            where: { userId },
+            select: { id: true },
+          });
+          return self?.id ?? null;
+        },
+        canReadAdherentFinancialItems: (userId) =>
+          canRead(userId, "getAdherentFinancialItems"),
+      }
+    );
+
+    if (!authz.ok) {
+      return { success: false, error: "Non autorisé" };
+    }
+
+    const {
+      computeAdherentDetteSummary,
+      ADHERENT_DETTE_OPEN_STATUSES,
+    } = await import(
+      "@/lib/services/cotisations/compute-adherent-dette-summary"
+    );
+
+    const [
+      dettesInitiales,
+      cotisationsMensuelles,
+      assistances,
+      obligations,
+      avoirsDisponibles,
+    ] = await Promise.all([
+      prisma.detteInitiale.findMany({
+        where: { adherentId },
+      }),
+      prisma.cotisationMensuelle.findMany({
+        where: {
+          adherentId,
+          statut: { in: [...ADHERENT_DETTE_OPEN_STATUSES] },
+        },
+      }),
+      // Liste informative uniquement — hors totalDette / detteNette
+      prisma.assistance.findMany({
+        where: {
+          adherentId,
+          statut: { in: ["EnAttente"] },
+        },
+      }),
+      prisma.obligationCotisation.findMany({
+        where: {
+          adherentId,
+          statut: { in: [...ADHERENT_DETTE_OPEN_STATUSES] },
+        },
+      }),
+      prisma.avoir.findMany({
+        where: {
+          adherentId,
+          statut: "Disponible",
+          montantRestant: { gt: 0 },
+        },
+      }),
+    ]);
+
+    const summary = computeAdherentDetteSummary({
+      dettesInitiales,
+      cotisationsOuvertes: cotisationsMensuelles.map((c) => ({
+        adherentId: c.adherentId,
+        adherentBeneficiaireId: c.adherentBeneficiaireId,
+        montantRestant: c.montantRestant,
+      })),
+      obligationsOuvertes: obligations,
+      avoirsDisponibles,
     });
-
-    const cotisationsMensuelles = await prisma.cotisationMensuelle.findMany({
-      where: {
-        adherentId,
-        statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] },
-      },
-    });
-
-    const assistances = await prisma.assistance.findMany({
-      where: {
-        adherentId,
-        statut: { in: ["EnAttente"] },
-      },
-    });
-
-    const obligations = await prisma.obligationCotisation.findMany({
-      where: {
-        adherentId,
-        statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] },
-      },
-    });
-
-    // Calculer le total
-    let totalDette = new Decimal(0);
-
-    dettesInitiales.forEach((d) => {
-      totalDette = totalDette.plus(d.montantRestant);
-    });
-
-    cotisationsMensuelles.forEach((c) => {
-      totalDette = totalDette.plus(c.montantRestant);
-    });
-
-    assistances.forEach((a) => {
-      totalDette = totalDette.plus(a.montantRestant);
-    });
-
-    obligations.forEach((o) => {
-      totalDette = totalDette.plus(o.montantRestant);
-    });
-
-    // Récupérer les avoirs disponibles et les soustraire de la dette
-    const avoirsDisponibles = await prisma.avoir.findMany({
-      where: {
-        adherentId,
-        statut: "Disponible",
-        montantRestant: { gt: 0 },
-      },
-    });
-
-    let totalAvoirs = new Decimal(0);
-    avoirsDisponibles.forEach((a) => {
-      totalAvoirs = totalAvoirs.plus(a.montantRestant);
-    });
-
-    // Dette nette = dette totale - avoirs disponibles
-    const detteNette = totalDette.minus(totalAvoirs).gt(0) ? totalDette.minus(totalAvoirs) : new Decimal(0);
 
     return {
       success: true,
       data: {
-        totalDette: Number(totalDette.toFixed(2)),
-        totalAvoirs: Number(totalAvoirs.toFixed(2)),
-        detteNette: Number(detteNette.toFixed(2)),
+        totalDette: Number(summary.detteBrute.toFixed(2)),
+        totalAvoirs: Number(summary.avoirDisponible.toFixed(2)),
+        detteNette: Number(summary.detteNette.toFixed(2)),
         dettesInitiales: dettesInitiales.map((d) => ({
           ...d,
           montant: Number(d.montant),
@@ -903,6 +934,7 @@ export async function getCumulDette(adherentId: string) {
           montantPaye: Number(c.montantPaye),
           montantRestant: Number(c.montantRestant),
         })),
+        // Informative : prestation bénéficiaire — hors totalDette / detteNette
         assistances: assistances.map((a) => ({
           ...a,
           montant: Number(a.montant),

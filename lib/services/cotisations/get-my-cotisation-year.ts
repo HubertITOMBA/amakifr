@@ -3,6 +3,10 @@ import { db } from "@/lib/db";
 import { z } from "zod";
 import type { AuthContext } from "@/lib/auth-context";
 import { ServiceError } from "@/lib/service-error";
+import {
+  ADHERENT_DETTE_OPEN_STATUSES,
+  computeAdherentDetteSummary,
+} from "@/lib/services/cotisations/compute-adherent-dette-summary";
 import { decimalToMoneyString } from "@/lib/services/cotisations/decimal-to-money-string";
 import { buildAssistanceDisplayLabel } from "@/lib/services/cotisations/build-assistance-display-label";
 import type {
@@ -206,8 +210,9 @@ export function mapPayment(row: {
 /**
  * Vue financière annuelle self-service (Phase A — lecture seule).
  *
- * Synthèse dette/avoir/resteNet : même composition que getCumulDette Web,
- * sans accepter d'adherentId client.
+ * Synthèse dette/avoir/resteNet : DetteInitiale + CM ouvertes (hors
+ * auto-bénéfice) + Obligations legacy − avoirs — alignée getCumulDette
+ * (sans entité Assistance dans le total). Pas d’adherentId client.
  *
  * Assistances affichées = lignes CotisationMensuelle (catégorie Assistance),
  * comme la liste mensuelle profil Web — pas l'entité Assistance (bénéficiaire).
@@ -237,7 +242,6 @@ export async function getMyCotisationYear(
       pendingPayments,
       payeAnneeAgg,
       openCotisations,
-      openAssistances,
       openObligations,
       avoirsDisponibles,
     ] = await Promise.all([
@@ -332,22 +336,22 @@ export async function getMyCotisationYear(
         },
         _sum: { montant: true },
       }),
-      // --- synthèse (miroir getCumulDette, scoped self) ---
+      // --- synthèse dette (sans entité Assistance) ---
       db.cotisationMensuelle.findMany({
         where: {
           adherentId,
-          statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] },
+          statut: { in: [...ADHERENT_DETTE_OPEN_STATUSES] },
         },
-        select: { montantRestant: true },
-      }),
-      db.assistance.findMany({
-        where: { adherentId, statut: { in: ["EnAttente"] } },
-        select: { montantRestant: true },
+        select: {
+          adherentId: true,
+          adherentBeneficiaireId: true,
+          montantRestant: true,
+        },
       }),
       db.obligationCotisation.findMany({
         where: {
           adherentId,
-          statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] },
+          statut: { in: [...ADHERENT_DETTE_OPEN_STATUSES] },
         },
         select: { montantRestant: true },
       }),
@@ -372,28 +376,12 @@ export async function getMyCotisationYear(
         .filter((id): id is string => Boolean(id))
     );
 
-    let totalDette = new Prisma.Decimal(0);
-    for (const d of dettesRows) {
-      totalDette = totalDette.plus(d.montantRestant);
-    }
-    for (const c of openCotisations) {
-      totalDette = totalDette.plus(c.montantRestant);
-    }
-    for (const a of openAssistances) {
-      totalDette = totalDette.plus(a.montantRestant);
-    }
-    for (const o of openObligations) {
-      totalDette = totalDette.plus(o.montantRestant);
-    }
-
-    let totalAvoirs = new Prisma.Decimal(0);
-    for (const a of avoirsDisponibles) {
-      totalAvoirs = totalAvoirs.plus(a.montantRestant);
-    }
-
-    const detteNette = totalDette.minus(totalAvoirs).gt(0)
-      ? totalDette.minus(totalAvoirs)
-      : new Prisma.Decimal(0);
+    const detteSummary = computeAdherentDetteSummary({
+      dettesInitiales: dettesRows,
+      cotisationsOuvertes: openCotisations,
+      obligationsOuvertes: openObligations,
+      avoirsDisponibles,
+    });
 
     const totalPayeAnnee = new Prisma.Decimal(payeAnneeAgg._sum.montant ?? 0);
 
@@ -462,9 +450,9 @@ export async function getMyCotisationYear(
     return {
       annee: year,
       summary: {
-        detteBrute: decimalToMoneyString(totalDette),
-        avoirDisponible: decimalToMoneyString(totalAvoirs),
-        resteNet: decimalToMoneyString(detteNette),
+        detteBrute: decimalToMoneyString(detteSummary.detteBrute),
+        avoirDisponible: decimalToMoneyString(detteSummary.avoirDisponible),
+        resteNet: decimalToMoneyString(detteSummary.detteNette),
         totalPayeAnnee: decimalToMoneyString(totalPayeAnnee),
       },
       cotisations,

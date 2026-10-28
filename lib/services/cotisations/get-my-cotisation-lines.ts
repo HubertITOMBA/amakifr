@@ -4,6 +4,10 @@ import type { AuthContext } from "@/lib/auth-context";
 import { db } from "@/lib/db";
 import { ServiceError } from "@/lib/service-error";
 import { buildAssistanceDisplayLabel } from "@/lib/services/cotisations/build-assistance-display-label";
+import {
+  ADHERENT_DETTE_OPEN_STATUSES,
+  computeAdherentDetteSummary,
+} from "@/lib/services/cotisations/compute-adherent-dette-summary";
 import { decimalToMoneyString } from "@/lib/services/cotisations/decimal-to-money-string";
 import type {
   MyCotisationLineDto,
@@ -49,74 +53,64 @@ async function resolveSelfAdherentId(actor: AuthContext): Promise<string> {
   return adherent.id;
 }
 
+/**
+ * Résumé dette self-service — sans lecture de l’entité Assistance.
+ * CM auto-bénéfice exclues du total (aligné listes / rappel).
+ */
 async function buildSummary(adherentId: string): Promise<MyCotisationYearSummaryDto> {
-  const [
-    dettesRows,
-    openCotisations,
-    openAssistances,
-    openObligations,
+  const [dettesRows, openCotisations, openObligations, avoirsDisponibles, payeAgg] =
+    await Promise.all([
+      db.detteInitiale.findMany({
+        where: { adherentId },
+        select: { montantRestant: true },
+      }),
+      db.cotisationMensuelle.findMany({
+        where: {
+          adherentId,
+          statut: { in: [...ADHERENT_DETTE_OPEN_STATUSES] },
+        },
+        select: {
+          adherentId: true,
+          adherentBeneficiaireId: true,
+          montantRestant: true,
+        },
+      }),
+      db.obligationCotisation.findMany({
+        where: {
+          adherentId,
+          statut: { in: [...ADHERENT_DETTE_OPEN_STATUSES] },
+        },
+        select: { montantRestant: true },
+      }),
+      db.avoir.findMany({
+        where: {
+          adherentId,
+          statut: "Disponible",
+          montantRestant: { gt: 0 },
+        },
+        select: { montantRestant: true },
+      }),
+      db.paiementCotisation.aggregate({
+        where: {
+          adherentId,
+          statut: "Valide",
+          inscriptionEvenementId: null,
+        },
+        _sum: { montant: true },
+      }),
+    ]);
+
+  const summary = computeAdherentDetteSummary({
+    dettesInitiales: dettesRows,
+    cotisationsOuvertes: openCotisations,
+    obligationsOuvertes: openObligations,
     avoirsDisponibles,
-    payeAgg,
-  ] = await Promise.all([
-    db.detteInitiale.findMany({
-      where: { adherentId },
-      select: { montantRestant: true },
-    }),
-    db.cotisationMensuelle.findMany({
-      where: {
-        adherentId,
-        statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] },
-      },
-      select: { montantRestant: true },
-    }),
-    db.assistance.findMany({
-      where: { adherentId, statut: { in: ["EnAttente"] } },
-      select: { montantRestant: true },
-    }),
-    db.obligationCotisation.findMany({
-      where: {
-        adherentId,
-        statut: { in: ["EnAttente", "PartiellementPaye", "EnRetard"] },
-      },
-      select: { montantRestant: true },
-    }),
-    db.avoir.findMany({
-      where: {
-        adherentId,
-        statut: "Disponible",
-        montantRestant: { gt: 0 },
-      },
-      select: { montantRestant: true },
-    }),
-    db.paiementCotisation.aggregate({
-      where: {
-        adherentId,
-        statut: "Valide",
-        inscriptionEvenementId: null,
-      },
-      _sum: { montant: true },
-    }),
-  ]);
-
-  let totalDette = new Prisma.Decimal(0);
-  for (const d of dettesRows) totalDette = totalDette.plus(d.montantRestant);
-  for (const c of openCotisations) totalDette = totalDette.plus(c.montantRestant);
-  for (const a of openAssistances) totalDette = totalDette.plus(a.montantRestant);
-  for (const o of openObligations) totalDette = totalDette.plus(o.montantRestant);
-
-  let totalAvoirs = new Prisma.Decimal(0);
-  for (const a of avoirsDisponibles) {
-    totalAvoirs = totalAvoirs.plus(a.montantRestant);
-  }
-
-  const detteNette = totalDette.minus(totalAvoirs).gt(0)
-    ? totalDette.minus(totalAvoirs)
-    : new Prisma.Decimal(0);
+  });
 
   return {
-    detteBrute: decimalToMoneyString(totalDette),
-    avoirDisponible: decimalToMoneyString(totalAvoirs),
-    resteNet: decimalToMoneyString(detteNette),
+    detteBrute: decimalToMoneyString(summary.detteBrute),
+    avoirDisponible: decimalToMoneyString(summary.avoirDisponible),
+    resteNet: decimalToMoneyString(summary.detteNette),
     totalPayeAnnee: decimalToMoneyString(
       new Prisma.Decimal(payeAgg._sum.montant ?? 0)
     ),
