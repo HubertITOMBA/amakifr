@@ -17,6 +17,9 @@ export const PENDING_PAYMENT_STATUSES = ["EnAttente", "EnCours"] as const;
  * Valeurs observées / documentées : EnAttente, Envoye, Lu, Repondu.
  * Seuls Envoye | Lu | Repondu + dateEnvoi non null comptent pour le cooldown.
  * EnAttente / statut inconnu / échec non modélisé : ne bloquent jamais.
+ *
+ * Lot 3.2 : union avec RappelDetteEnvoi (emailStatus=Accepted + emailAcceptedAt).
+ * Reserved / Calling / Unknown / DefinitelyNotAccepted / Abandoned : non preuves.
  */
 export const RAPPEL_SENT_STATUSES = ["Envoye", "Lu", "Repondu"] as const;
 
@@ -81,13 +84,22 @@ export type ComputeDetteRappelableResult = {
   /** Prochaine date civile (Europe/Paris) où un rappel pourrait être envisageable. */
   nextEligibleReminderAt: Date | null;
   /**
-   * Dernier envoi réussi connu : RelanceCotisationMensuelle avec
-   * statut ∈ RAPPEL_SENT_STATUSES et dateEnvoi non null.
-   * Absent si aucune preuve fiable (ex. seules lignes EnAttente).
+   * Dernier envoi réussi connu = max des preuves :
+   * - RelanceCotisationMensuelle : statut ∈ RAPPEL_SENT_STATUSES + dateEnvoi ;
+   * - RappelDetteEnvoi : emailStatus=Accepted + emailAcceptedAt
+   *   (indépendant de notifStatus / closedAt).
+   * Absent si aucune preuve fiable.
    */
   lastReminderSentAt: Date | null;
   globalReasons: RappelGlobalReason[];
 };
+
+/**
+ * Client de lecture compatible transaction interactive Prisma.
+ * Fourni par le futur service d’envoi (`prisma.$transaction(async (tx) => …)`).
+ * Le singleton applicatif `db` (PrismaClient) est structurellement compatible.
+ */
+export type ComputeDetteRappelablePrisma = Prisma.TransactionClient;
 
 /**
  * Options serveur internes uniquement.
@@ -108,6 +120,14 @@ export type ComputeDetteRappelableOptions = {
    * Paramètre interne serveur uniquement — jamais depuis une requête client.
    */
   frozenLineKeys?: ReadonlySet<string>;
+  /**
+   * Client Prisma de lecture (ex. `Prisma.TransactionClient` du futur envoi).
+   * Si omis : singleton `db` (comportement actuel preview / appels existants).
+   * Si fourni : **toutes** les lectures du calcul l’utilisent ; aucun repli sur `db`.
+   * Interne serveur uniquement — jamais depuis body/query/headers HTTP.
+   * N’ouvre ni transaction ni verrou : orchestration hors de ce calcul.
+   */
+  prisma?: ComputeDetteRappelablePrisma;
 };
 
 /**

@@ -69,7 +69,23 @@ function emptyResult(
 }
 
 /**
- * Calcule l’éligibilité d’un adhérent au rappel de cotisations/dettes (Lot 1).
+ * Plus récente des dates de preuve (null si aucune).
+ *
+ * @param a - Première date candidate
+ * @param b - Seconde date candidate
+ * @returns La date max, ou null
+ */
+function maxProofDate(
+  a: Date | null | undefined,
+  b: Date | null | undefined
+): Date | null {
+  if (!a) return b ?? null;
+  if (!b) return a;
+  return a.getTime() >= b.getTime() ? a : b;
+}
+
+/**
+ * Calcule l’éligibilité d’un adhérent au rappel de cotisations/dettes (Lot 1 + 3.2).
  *
  * Sources : CotisationMensuelle, DetteInitiale uniquement.
  * L’entité `Assistance` (prestation versée au bénéficiaire) n’est **pas** une dette
@@ -78,15 +94,20 @@ function emptyResult(
  * Exclut ObligationCotisation (legacy). Aucune mutation DB, aucun envoi.
  * Aucune lecture de la table `assistances`.
  *
- * Cooldown 30 j : uniquement si une RelanceCotisationMensuelle porte une
- * **preuve d’envoi réussi** (statut ∈ Envoye|Lu|Repondu ET dateEnvoi ≠ null).
- * EnAttente / échec / dateEnvoi orpheline : ignorés (pas d’invention).
+ * Cooldown 30 j : `lastReminderSentAt` = max des preuves :
+ * - RelanceCotisationMensuelle : statut ∈ Envoye|Lu|Repondu ET dateEnvoi ≠ null ;
+ * - RappelDetteEnvoi : emailStatus=Accepted ET emailAcceptedAt ≠ null
+ *   (notif NotStarted / closedAt null ouverts encore le cooldown).
+ * Non-preuves : Reserved, Calling, Unknown, DefinitelyNotAccepted, Abandoned,
+ * EnAttente legacy / date orpheline. Tentatives bloquantes = futur service d’envoi.
  *
- * `options.frozenAdherent` / `frozenLineKeys` : paramètres **internes serveur**
- * uniquement — ne jamais les lire depuis un body/query client.
+ * `options.frozenAdherent` / `frozenLineKeys` / `prisma` : paramètres
+ * **internes serveur** uniquement — ne jamais les lire depuis un body/query client.
+ * `options.prisma` : client de lecture (ex. TransactionClient) ; défaut = `db`.
+ * Aucune transaction ni verrou ouverts ici ; orchestration hors calcul.
  *
  * @param adherentId - Identifiant adhérent
- * @param options - Horloge et gels (injection serveur / tests ; pas de migration)
+ * @param options - Horloge, gels et client de lecture (injection serveur / tests)
  * @returns Résultat structuré (éligible, montants Decimal, lignes, reasons)
  */
 export async function computeDetteRappelable(
@@ -95,13 +116,15 @@ export async function computeDetteRappelable(
 ): Promise<ComputeDetteRappelableResult> {
   const now = options.now ?? new Date();
   const frozenLineKeys = options.frozenLineKeys ?? new Set<string>();
+  // Client injecté exclusif si fourni — aucun fallback vers `db` en cas d’échec.
+  const client = options.prisma ?? db;
 
   if (!adherentId || adherentId.trim() === "") {
     return emptyResult("", ["ADHERENT_NOT_FOUND"]);
   }
 
   try {
-    const adherent = await db.adherent.findUnique({
+    const adherent = await client.adherent.findUnique({
       where: { id: adherentId },
       select: {
         id: true,
@@ -127,8 +150,9 @@ export async function computeDetteRappelable(
       pendingPayments,
       avoirs,
       lastRelance,
+      lastRappelDetteEnvoi,
     ] = await Promise.all([
-      db.cotisationMensuelle.findMany({
+      client.cotisationMensuelle.findMany({
         where: { adherentId },
         select: {
           id: true,
@@ -139,7 +163,7 @@ export async function computeDetteRappelable(
           dateEcheance: true,
         },
       }),
-      db.detteInitiale.findMany({
+      client.detteInitiale.findMany({
         where: { adherentId },
         select: {
           id: true,
@@ -147,7 +171,7 @@ export async function computeDetteRappelable(
           montantRestant: true,
         },
       }),
-      db.paiementCotisation.findMany({
+      client.paiementCotisation.findMany({
         where: {
           adherentId,
           statut: { in: [...PENDING_PAYMENT_STATUSES] },
@@ -161,7 +185,7 @@ export async function computeDetteRappelable(
           detteInitialeId: true,
         },
       }),
-      db.avoir.findMany({
+      client.avoir.findMany({
         where: {
           adherentId,
           statut: "Disponible",
@@ -169,10 +193,8 @@ export async function computeDetteRappelable(
         },
         select: { montantRestant: true },
       }),
-      // Preuve d’envoi réussi uniquement (schéma : EnAttente|Envoye|Lu|Repondu).
-      // Producteur actuel (checkAndSendRelances) crée EnAttente sans dateEnvoi :
-      // ces lignes ne doivent PAS déclencher le cooldown.
-      db.relanceCotisationMensuelle.findFirst({
+      // Preuve legacy : Envoye|Lu|Repondu + dateEnvoi (EnAttente exclus).
+      client.relanceCotisationMensuelle.findFirst({
         where: {
           adherentId,
           statut: { in: [...RAPPEL_SENT_STATUSES] },
@@ -180,6 +202,17 @@ export async function computeDetteRappelable(
         },
         orderBy: { dateEnvoi: "desc" },
         select: { dateEnvoi: true, statut: true },
+      }),
+      // Preuve Lot 3 : Accepted + emailAcceptedAt (indépendant notif/closedAt).
+      // Nécessite table RappelDetteEnvoi (migration 3.1) — fail-closed si absente.
+      client.rappelDetteEnvoi.findFirst({
+        where: {
+          adherentId,
+          emailStatus: "Accepted",
+          emailAcceptedAt: { not: null },
+        },
+        orderBy: { emailAcceptedAt: "desc" },
+        select: { emailAcceptedAt: true, emailStatus: true },
       }),
     ]);
 
@@ -338,7 +371,10 @@ export async function computeDetteRappelable(
     const earliestDueDate =
       retained.length > 0 ? retained[0]!.dueDate : null;
 
-    const lastReminderSentAt = lastRelance?.dateEnvoi ?? null;
+    const lastReminderSentAt = maxProofDate(
+      lastRelance?.dateEnvoi,
+      lastRappelDetteEnvoi?.emailAcceptedAt
+    );
 
     const globalReasons: RappelGlobalReason[] = [];
 

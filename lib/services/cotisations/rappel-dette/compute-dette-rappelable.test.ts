@@ -4,7 +4,10 @@ import {
   addCivilDaysParis,
   parisCivilDate,
 } from "@/lib/services/cotisations/rappel-dette/paris-calendar";
-import { frozenLineKey } from "@/lib/services/cotisations/rappel-dette/types";
+import {
+  frozenLineKey,
+  type ComputeDetteRappelablePrisma,
+} from "@/lib/services/cotisations/rappel-dette/types";
 
 const {
   findUniqueAdherent,
@@ -14,6 +17,7 @@ const {
   findManyPaiement,
   findManyAvoir,
   findFirstRelance,
+  findFirstRappelDetteEnvoi,
 } = vi.hoisted(() => ({
   findUniqueAdherent: vi.fn(),
   findManyCm: vi.fn(),
@@ -24,6 +28,7 @@ const {
   findManyPaiement: vi.fn(),
   findManyAvoir: vi.fn(),
   findFirstRelance: vi.fn(),
+  findFirstRappelDetteEnvoi: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -36,6 +41,7 @@ vi.mock("@/lib/db", () => ({
     paiementCotisation: { findMany: findManyPaiement },
     avoir: { findMany: findManyAvoir },
     relanceCotisationMensuelle: { findFirst: findFirstRelance },
+    rappelDetteEnvoi: { findFirst: findFirstRappelDetteEnvoi },
     // Garde anti-régression : ObligationCotisation ne doit jamais être interrogée.
     obligationCotisation: {
       findMany: vi.fn(() => {
@@ -68,6 +74,7 @@ function mockEmptySources() {
   findManyPaiement.mockResolvedValue([]);
   findManyAvoir.mockResolvedValue([]);
   findFirstRelance.mockResolvedValue(null);
+  findFirstRappelDetteEnvoi.mockResolvedValue(null);
 }
 
 describe("computeDetteRappelable", () => {
@@ -79,6 +86,7 @@ describe("computeDetteRappelable", () => {
     findManyPaiement.mockReset();
     findManyAvoir.mockReset();
     findFirstRelance.mockReset();
+    findFirstRappelDetteEnvoi.mockReset();
     mockEmptySources();
   });
 
@@ -344,6 +352,170 @@ describe("computeDetteRappelable", () => {
     expect(at30.globalReasons).toEqual(["ELIGIBLE"]);
   });
 
+
+  function mockEligibleCm() {
+    findManyCm.mockResolvedValue([
+      {
+        id: "cm-1",
+        adherentId: ADH,
+        adherentBeneficiaireId: null,
+        montantRestant: dec("15"),
+        statut: "EnAttente",
+        dateEcheance: parisCivilDate(2024, 5, 1),
+      },
+    ]);
+  }
+
+  it("cooldown Lot 3.2 : preuve RappelDetteEnvoi seule ouvre le cooldown", async () => {
+    mockActif();
+    mockEligibleCm();
+    const acceptedAt = parisCivilDate(2024, 6, 10);
+    findFirstRelance.mockResolvedValue(null);
+    findFirstRappelDetteEnvoi.mockResolvedValue({
+      emailAcceptedAt: acceptedAt,
+      emailStatus: "Accepted",
+    });
+
+    const r = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r.eligible).toBe(false);
+    expect(r.lastReminderSentAt?.getTime()).toBe(acceptedAt.getTime());
+    expect(r.globalReasons).toContain("REMINDER_COOLDOWN_30D");
+    expect(findManyAssistance).not.toHaveBeenCalled();
+  });
+
+  it("cooldown Lot 3.2 : preuve historique seule (sans RappelDetteEnvoi)", async () => {
+    mockActif();
+    mockEligibleCm();
+    const sentAt = parisCivilDate(2024, 6, 10);
+    findFirstRelance.mockResolvedValue({
+      dateEnvoi: sentAt,
+      statut: "Lu",
+    });
+    findFirstRappelDetteEnvoi.mockResolvedValue(null);
+
+    const r = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r.lastReminderSentAt?.getTime()).toBe(sentAt.getTime());
+    expect(r.globalReasons).toContain("REMINDER_COOLDOWN_30D");
+  });
+
+  it("cooldown Lot 3.2 : deux preuves → date max quel que soit l’ordre", async () => {
+    mockActif();
+    mockEligibleCm();
+    const older = parisCivilDate(2024, 5, 1);
+    const newer = parisCivilDate(2024, 6, 15);
+
+    findFirstRelance.mockResolvedValue({
+      dateEnvoi: newer,
+      statut: "Envoye",
+    });
+    findFirstRappelDetteEnvoi.mockResolvedValue({
+      emailAcceptedAt: older,
+      emailStatus: "Accepted",
+    });
+    const r1 = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r1.lastReminderSentAt?.getTime()).toBe(newer.getTime());
+
+    findFirstRelance.mockResolvedValue({
+      dateEnvoi: older,
+      statut: "Envoye",
+    });
+    findFirstRappelDetteEnvoi.mockResolvedValue({
+      emailAcceptedAt: newer,
+      emailStatus: "Accepted",
+    });
+    const r2 = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r2.lastReminderSentAt?.getTime()).toBe(newer.getTime());
+  });
+
+  it("cooldown Lot 3.2 : Accepted + notif NotStarted + closedAt null ouvre cooldown", async () => {
+    mockActif();
+    mockEligibleCm();
+    const acceptedAt = parisCivilDate(2024, 6, 20);
+    findFirstRelance.mockResolvedValue(null);
+    findFirstRappelDetteEnvoi.mockResolvedValue({
+      emailAcceptedAt: acceptedAt,
+      emailStatus: "Accepted",
+    });
+
+    const r = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r.lastReminderSentAt?.getTime()).toBe(acceptedAt.getTime());
+    expect(r.eligible).toBe(false);
+    expect(r.globalReasons).toContain("REMINDER_COOLDOWN_30D");
+  });
+
+  it("cooldown Lot 3.2 : absence de preuves → pas de cooldown", async () => {
+    mockActif();
+    mockEligibleCm();
+    findFirstRelance.mockResolvedValue(null);
+    findFirstRappelDetteEnvoi.mockResolvedValue(null);
+
+    const r = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r.lastReminderSentAt).toBeNull();
+    expect(r.eligible).toBe(true);
+    expect(r.globalReasons).not.toContain("REMINDER_COOLDOWN_30D");
+  });
+
+  it("cooldown Lot 3.2 : états non Accepted ignorés (filtre emailStatus)", async () => {
+    mockActif();
+    mockEligibleCm();
+    findFirstRelance.mockResolvedValue(null);
+    findFirstRappelDetteEnvoi.mockResolvedValue(null);
+
+    const r = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r.eligible).toBe(true);
+    expect(r.lastReminderSentAt).toBeNull();
+    expect(findFirstRappelDetteEnvoi).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ emailStatus: "Accepted" }),
+      })
+    );
+  });
+
+  it("cooldown Lot 3.2 : frontière 30 j sur preuve RappelDetteEnvoi", async () => {
+    mockActif();
+    findManyCm.mockResolvedValue([
+      {
+        id: "cm-1",
+        adherentId: ADH,
+        adherentBeneficiaireId: null,
+        montantRestant: dec("15"),
+        statut: "EnAttente",
+        dateEcheance: parisCivilDate(2024, 1, 1),
+      },
+    ]);
+    const acceptedAt = parisCivilDate(2024, 6, 1);
+    findFirstRelance.mockResolvedValue(null);
+    findFirstRappelDetteEnvoi.mockResolvedValue({
+      emailAcceptedAt: acceptedAt,
+      emailStatus: "Accepted",
+    });
+
+    const at29 = await computeDetteRappelable(ADH, {
+      now: addCivilDaysParis(acceptedAt, 29),
+    });
+    expect(at29.eligible).toBe(false);
+    expect(at29.globalReasons).toContain("REMINDER_COOLDOWN_30D");
+
+    const at30 = await computeDetteRappelable(ADH, {
+      now: addCivilDaysParis(acceptedAt, 30),
+    });
+    expect(at30.eligible).toBe(true);
+    expect(at30.globalReasons).toEqual(["ELIGIBLE"]);
+  });
+
+  it("cooldown Lot 3.2 : erreur lecture RappelDetteEnvoi → fail-closed", async () => {
+    mockActif();
+    mockEligibleCm();
+    findFirstRelance.mockResolvedValue(null);
+    findFirstRappelDetteEnvoi.mockRejectedValue(
+      new Error("table rappel_dette_envoi missing")
+    );
+
+    const r = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r.eligible).toBe(false);
+    expect(r.globalReasons).toEqual(["PRISMA_ERROR"]);
+  });
+
   it("paiement EnCours / EnAttente → ligne PENDING_PAYMENT", async () => {
     mockActif();
     findManyCm.mockResolvedValue([
@@ -563,5 +735,212 @@ describe("computeDetteRappelable", () => {
     const r = await computeDetteRappelable(ADH, { now: NOW });
     expect(r.montantBrut).toBeInstanceOf(Prisma.Decimal);
     expect(r.montantBrut.toString()).toBe("10.3");
+  });
+});
+
+describe("computeDetteRappelable — injection client Prisma (lecture)", () => {
+  const txAdherent = vi.fn();
+  const txCm = vi.fn();
+  const txDette = vi.fn();
+  const txPaiement = vi.fn();
+  const txAvoir = vi.fn();
+  const txRelance = vi.fn();
+  const txRappel = vi.fn();
+
+  /**
+   * Double de lecture pour tests — surface minimale des délégués utilisés.
+   * Assertion de type test-only (pas un contournement du typage produit).
+   */
+  function makeInjectedClient(): ComputeDetteRappelablePrisma {
+    const client = {
+      adherent: { findUnique: txAdherent },
+      cotisationMensuelle: { findMany: txCm },
+      detteInitiale: { findMany: txDette },
+      paiementCotisation: { findMany: txPaiement },
+      avoir: { findMany: txAvoir },
+      relanceCotisationMensuelle: { findFirst: txRelance },
+      rappelDetteEnvoi: { findFirst: txRappel },
+    };
+    return client as ComputeDetteRappelablePrisma;
+  }
+
+  function mockTxActif() {
+    txAdherent.mockResolvedValue({
+      id: ADH,
+      User: { status: "Actif" },
+    });
+  }
+
+  function mockTxEmptySources() {
+    txCm.mockResolvedValue([]);
+    txDette.mockResolvedValue([]);
+    txPaiement.mockResolvedValue([]);
+    txAvoir.mockResolvedValue([]);
+    txRelance.mockResolvedValue(null);
+    txRappel.mockResolvedValue(null);
+  }
+
+  function mockTxEligibleCm() {
+    txCm.mockResolvedValue([
+      {
+        id: "cm-1",
+        adherentId: ADH,
+        adherentBeneficiaireId: null,
+        montantRestant: dec("15"),
+        statut: "EnAttente",
+        dateEcheance: parisCivilDate(2024, 5, 1),
+      },
+    ]);
+  }
+
+  function expectGlobalDbUnused() {
+    expect(findUniqueAdherent).not.toHaveBeenCalled();
+    expect(findManyCm).not.toHaveBeenCalled();
+    expect(findManyDette).not.toHaveBeenCalled();
+    expect(findManyAssistance).not.toHaveBeenCalled();
+    expect(findManyPaiement).not.toHaveBeenCalled();
+    expect(findManyAvoir).not.toHaveBeenCalled();
+    expect(findFirstRelance).not.toHaveBeenCalled();
+    expect(findFirstRappelDetteEnvoi).not.toHaveBeenCalled();
+  }
+
+  beforeEach(() => {
+    findUniqueAdherent.mockReset();
+    findManyCm.mockReset();
+    findManyDette.mockReset();
+    findManyAssistance.mockReset();
+    findManyPaiement.mockReset();
+    findManyAvoir.mockReset();
+    findFirstRelance.mockReset();
+    findFirstRappelDetteEnvoi.mockReset();
+    findUniqueAdherent.mockImplementation(() => {
+      throw new Error("db global ne doit pas être appelé avec prisma injecté");
+    });
+    findManyCm.mockImplementation(() => {
+      throw new Error("db global ne doit pas être appelé avec prisma injecté");
+    });
+    findManyDette.mockImplementation(() => {
+      throw new Error("db global ne doit pas être appelé avec prisma injecté");
+    });
+    findManyAssistance.mockImplementation(() => {
+      throw new Error("db global ne doit pas être appelé avec prisma injecté");
+    });
+    findManyPaiement.mockImplementation(() => {
+      throw new Error("db global ne doit pas être appelé avec prisma injecté");
+    });
+    findManyAvoir.mockImplementation(() => {
+      throw new Error("db global ne doit pas être appelé avec prisma injecté");
+    });
+    findFirstRelance.mockImplementation(() => {
+      throw new Error("db global ne doit pas être appelé avec prisma injecté");
+    });
+    findFirstRappelDetteEnvoi.mockImplementation(() => {
+      throw new Error("db global ne doit pas être appelé avec prisma injecté");
+    });
+
+    txAdherent.mockReset();
+    txCm.mockReset();
+    txDette.mockReset();
+    txPaiement.mockReset();
+    txAvoir.mockReset();
+    txRelance.mockReset();
+    txRappel.mockReset();
+    mockTxEmptySources();
+  });
+
+  it("toutes les lectures passent par le client injecté (aucun db global ni Assistance)", async () => {
+    mockTxActif();
+    mockTxEligibleCm();
+    const prisma = makeInjectedClient();
+
+    const r = await computeDetteRappelable(ADH, { now: NOW, prisma });
+    expect(r.eligible).toBe(true);
+    expect(txAdherent).toHaveBeenCalledTimes(1);
+    expect(txCm).toHaveBeenCalledTimes(1);
+    expect(txDette).toHaveBeenCalledTimes(1);
+    expect(txPaiement).toHaveBeenCalledTimes(1);
+    expect(txAvoir).toHaveBeenCalledTimes(1);
+    expect(txRelance).toHaveBeenCalledTimes(1);
+    expect(txRappel).toHaveBeenCalledTimes(1);
+    expectGlobalDbUnused();
+  });
+
+  it("preuves historique + RappelDetteEnvoi et date max via client injecté", async () => {
+    mockTxActif();
+    mockTxEligibleCm();
+    const older = parisCivilDate(2024, 5, 1);
+    const newer = parisCivilDate(2024, 6, 15);
+    txRelance.mockResolvedValue({ dateEnvoi: older, statut: "Envoye" });
+    txRappel.mockResolvedValue({
+      emailAcceptedAt: newer,
+      emailStatus: "Accepted",
+    });
+
+    const r = await computeDetteRappelable(ADH, {
+      now: NOW,
+      prisma: makeInjectedClient(),
+    });
+    expect(r.lastReminderSentAt?.getTime()).toBe(newer.getTime());
+    expect(r.globalReasons).toContain("REMINDER_COOLDOWN_30D");
+    expect(r.eligible).toBe(false);
+    expect(txRelance).toHaveBeenCalled();
+    expect(txRappel).toHaveBeenCalled();
+    expectGlobalDbUnused();
+  });
+
+  it("erreur sur client injecté → PRISMA_ERROR sans fallback db global", async () => {
+    mockTxActif();
+    mockTxEligibleCm();
+    txRappel.mockRejectedValue(new Error("tx read failed"));
+
+    const r = await computeDetteRappelable(ADH, {
+      now: NOW,
+      prisma: makeInjectedClient(),
+    });
+    expect(r.eligible).toBe(false);
+    expect(r.globalReasons).toEqual(["PRISMA_ERROR"]);
+    expectGlobalDbUnused();
+  });
+
+  it("sans injection : comportement inchangé (db global mocké)", async () => {
+    findUniqueAdherent.mockReset();
+    findManyCm.mockReset();
+    findManyDette.mockReset();
+    findManyAssistance.mockReset();
+    findManyPaiement.mockReset();
+    findManyAvoir.mockReset();
+    findFirstRelance.mockReset();
+    findFirstRappelDetteEnvoi.mockReset();
+    mockEmptySources();
+    mockActif();
+    findManyCm.mockResolvedValue([
+      {
+        id: "cm-1",
+        adherentId: ADH,
+        adherentBeneficiaireId: null,
+        montantRestant: dec("15"),
+        statut: "EnAttente",
+        dateEcheance: parisCivilDate(2024, 5, 1),
+      },
+    ]);
+
+    const r = await computeDetteRappelable(ADH, { now: NOW });
+    expect(r.eligible).toBe(true);
+    expect(findUniqueAdherent).toHaveBeenCalled();
+    expect(findManyCm).toHaveBeenCalled();
+    expect(findFirstRappelDetteEnvoi).toHaveBeenCalled();
+    expect(txAdherent).not.toHaveBeenCalled();
+    expect(findManyAssistance).not.toHaveBeenCalled();
+  });
+
+  it("surface d’appel limitée aux find* (pas de create/update/delete sur le double)", async () => {
+    mockTxActif();
+    mockTxEligibleCm();
+    const prisma = makeInjectedClient();
+    await computeDetteRappelable(ADH, { now: NOW, prisma });
+    expect(txAdherent).toHaveBeenCalled();
+    expect(txCm).toHaveBeenCalled();
+    expect(txRelance).toHaveBeenCalled();
+    expect(txRappel).toHaveBeenCalled();
   });
 });

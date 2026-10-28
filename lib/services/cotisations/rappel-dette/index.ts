@@ -69,4 +69,44 @@ export {
   type RappelIgnoredLine,
   type ComputeDetteRappelableResult,
   type ComputeDetteRappelableOptions,
+  type ComputeDetteRappelablePrisma,
 } from "@/lib/services/cotisations/rappel-dette/types";
+
+export {
+  RAPPEL_DETTE_TEMPLATE_DETAIL_LINK_CONTRACT,
+  RAPPEL_DETTE_TEMPLATE_REGISTRY,
+  RAPPEL_DETTE_FINGERPRINT_SCHEMA_VERSION,
+  buildRappelDetteFingerprintPayload,
+  hashRappelDetteFingerprint,
+  computeRappelDetteFingerprint,
+  normalizeRecipientEmail,
+  resolveTemplateDetailLinkContract,
+  type RappelDetteFingerprintPayload,
+  type RappelDetteFingerprintLine,
+} from "@/lib/services/cotisations/rappel-dette/payload-fingerprint";
+
+export {
+  RAPPEL_DETTE_RESERVED_TTL_MS,
+  RAPPEL_DETTE_RESERVATION_ACCESS_DENIED_MESSAGE,
+  RAPPEL_DETTE_RESERVED_ON_PRECALLING_REFUSAL,
+  reserveRappelDetteEnvoi,
+  authorizeRappelDetteCalling,
+  type ReserveRappelDetteInput,
+  type ReserveRappelDetteResult,
+  type AuthorizeCallingInput,
+  type AuthorizeCallingResult,
+} from "@/lib/services/cotisations/rappel-dette/rappel-dette-reservation";
+
+/**
+ * Persistance résultat email : **ne pas** réexporter ici.
+ * Import serveur uniquement :
+ * `@/lib/services/cotisations/rappel-dette/rappel-dette-email-outcome`
+ * (évite un export client accidentel via ce barrel mixte).
+ * `caller.kind="server_adapter"` = convention interne de forme, pas une auth.
+ * Aucune action HTTP / paramètre client ne doit appeler ce service avec un outcome fabriqué.
+ *
+ * Notification interne post-Accepted : **ne pas** réexporter ici.
+ * Import serveur uniquement :
+ * `@/lib/services/cotisations/rappel-dette/rappel-dette-notification`
+ * (création via `tx.notification.create` — jamais `createNotification` / push).
+ */

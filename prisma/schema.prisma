@@ -262,6 +262,9 @@ model User {
   cotisationsDuMoisCreees       CotisationDuMois[]           @relation("CotisationDuMoisCreatedBy") // Cotisations du mois créées
   cotisationsMensuelles         CotisationMensuelle[] // Cotisations mensuelles créées
   relancesCotisationMensuelle   RelanceCotisationMensuelle[] // Relances créées
+  rappelsDetteEnvoiCrees        RappelDetteEnvoi[]           @relation("RappelDetteEnvoiCreatedBy") // Envois rappel dette R1 Lot 3 (acteur)
+  rappelsDetteEnvoiRecus        RappelDetteEnvoi[]           @relation("RappelDetteEnvoiRecipient") // Envois rappel dette R1 Lot 3 (destinataire User)
+  rappelsDetteEnvoiReconcilies  RappelDetteEnvoi[]           @relation("RappelDetteEnvoiReconciledBy") // Réconciliations ops Unknown
   dettesInitialesCreees         DetteInitiale[]              @relation("DetteInitialeCreatedBy") // Dettes initiales créées
   paiementsCreees               PaiementCotisation[]         @relation("PaiementCreatedBy") // Paiements créés
   comptesPaiementAssociation    ComptePaiementAssociation[]  @relation("ComptePaiementCreatedBy") // Comptes bancaires / Wero association
@@ -448,6 +451,7 @@ model Adherent {
   CotisationsMensuelles             CotisationMensuelle[] // Cotisations mensuelles (payeur)
   CotisationsMensuellesBeneficiaire CotisationMensuelle[]        @relation("CotisationMensuelleBeneficiaire") // Cotisations mensuelles dont l'adhérent est bénéficiaire (assistances)
   RelancesCotisationMensuelle       RelanceCotisationMensuelle[] // Relances cotisations mensuelles
+  RappelsDetteEnvoi                 RappelDetteEnvoi[] // Envois rappel dette R1 Lot 3 (cible)
   CotisationsDuMoisBeneficiaire     CotisationDuMois[]           @relation("CotisationDuMoisBeneficiaire") // Cotisations du mois dont l'adhérent est bénéficiaire (assistances)
   InscriptionsEvenements            InscriptionEvenement[] // Inscriptions aux événements
   idees                             Idee[] // Idées soumises par l'adhérent
@@ -972,6 +976,110 @@ model RelanceCotisationMensuelle {
   updatedAt DateTime @updatedAt
 
   @@map("relances_cotisation_mensuelle")
+}
+
+/**
+ * R1 Lot 3 — envoi manuel agrégé de rappel dette (ADMIN|PRESID).
+ * Preuve cooldown = emailStatus Accepted + emailAcceptedAt non null.
+ * Completed = email accepté (cooldown) ; notif peut rester NotStarted (reprise).
+ * Preuve création notif = notifStatus Created + notificationCreatedAt (durable).
+ * notificationId = lien vivant optionnel (SetNull si purge UI/RGPD) — ne pas recréer.
+ * Unknown bloquant jusqu’à conclusion Accepted ou DefinitelyNotAccepted (ops).
+ * Gel métier : paramètres serveur uniquement (pas de colonne gel ici).
+ * CHECKs = états possibles ; transitions historiques = service (voir revue v2).
+ * Trigger SQL : immutabilité notificationCreatedAt + terminalité notif Created
+ * (pas représentable dans Prisma — voir migration.sql).
+ * Migration : prisma/migrations/20261027190000_rappel_dette_envoi/migration.sql
+ */
+enum RappelDetteReservationStatus {
+  Reserved
+  Calling
+  Completed
+  Failed
+  Abandoned
+  Unknown
+}
+
+enum RappelDetteEmailStatus {
+  NotStarted
+  Calling
+  Accepted
+  DefinitelyNotAccepted
+  Unknown
+}
+
+enum RappelDetteNotifStatus {
+  NotStarted
+  Created
+  Failed
+}
+
+model RappelDetteEnvoi {
+  id String @id @default(cuid())
+
+  adherentId String
+  /// Acteur ADMIN|PRESID ayant confirmé l’envoi.
+  createdByUserId String
+  /// Destinataire applicatif (User lié à l’adhérent au moment de la réservation).
+  recipientUserId String
+  /// Adresse email effective confirmée (empreinte) — pas de secret.
+  recipientEmail String @db.VarChar(255)
+
+  /// UUID fourni une fois par geste UI de confirmation.
+  clientConfirmationId String @unique @db.VarChar(64)
+  /// Empreinte payload confirmé (sans computedAt) — hex/base64 borné.
+  payloadFingerprint String @db.VarChar(128)
+  /// Version/identifiant du template email neutre (catalogue serveur interne).
+  /// Le contrat lien détail est **dérivé** de cette version via
+  /// RAPPEL_DETTE_TEMPLATE_REGISTRY (immuable) — pas de valeur libre non reconstructible.
+  templateVersion String @db.VarChar(64)
+
+  montantBrut      Decimal @db.Decimal(12, 2)
+  avoirDisponible  Decimal @db.Decimal(12, 2)
+  detteNette       Decimal @db.Decimal(12, 2)
+  /// Lignes retenues : [{ source, id, montantRestant, dueDateYmd }]
+  retainedLinesJson Json
+
+  reservationStatus RappelDetteReservationStatus @default(Reserved)
+  emailStatus       RappelDetteEmailStatus       @default(NotStarted)
+  notifStatus       RappelDetteNotifStatus       @default(NotStarted)
+
+  reservedAt    DateTime  @default(now())
+  lockExpiresAt DateTime
+  callingAt     DateTime?
+  /// Instant ouvrant le cooldown Lot 1 (uniquement si email Accepted).
+  emailAcceptedAt DateTime?
+  /// Clôture de l’envoi hors reprise notif ouverte (Completed+NotStarted → null).
+  closedAt DateTime?
+  /// Première entrée en incertitude — conservé après résolution ops.
+  unknownAt DateTime?
+  /// Réconciliation ops : uniquement avec conclusion Accepted / DefinitelyNotAccepted.
+  reconciledAt DateTime?
+  reconciledByUserId String?
+  /// Code décision ops borné (ex. OPS_ACCEPTED_LATE) — pas de corps d’erreur / secret.
+  reconciliationDecisionCode String? @db.VarChar(64)
+
+  /// Code technique borné (ex. EAUTH, timeout) — jamais corps d’erreur fournisseur / PII.
+  technicalResultCode String? @db.VarChar(64)
+
+  /// Lien vivant vers la notification (unique) ; SetNull si purge — ne prouve pas à lui seul.
+  notificationId String? @unique
+  /// Preuve durable qu’une notification a été créée une fois (idempotence anti-recréation).
+  notificationCreatedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  Adherent      Adherent      @relation(fields: [adherentId], references: [id], onDelete: Restrict)
+  CreatedBy     User          @relation("RappelDetteEnvoiCreatedBy", fields: [createdByUserId], references: [id], onDelete: Restrict)
+  RecipientUser User          @relation("RappelDetteEnvoiRecipient", fields: [recipientUserId], references: [id], onDelete: Restrict)
+  ReconciledBy  User?         @relation("RappelDetteEnvoiReconciledBy", fields: [reconciledByUserId], references: [id], onDelete: Restrict)
+  Notification  Notification? @relation(fields: [notificationId], references: [id], onDelete: SetNull)
+
+  @@index([adherentId, emailAcceptedAt(sort: Desc)], map: "rappel_dette_envoi_adherent_accepted_idx")
+  @@index([adherentId, reservationStatus], map: "rappel_dette_envoi_adherent_reservation_idx")
+  @@index([reservedAt], map: "rappel_dette_envoi_reserved_at_idx")
+  @@map("rappel_dette_envoi")
 }
 
 // Modèle pour les dettes initiales (2024, 2025, etc.)
@@ -1560,6 +1668,8 @@ model Notification {
   lue       Boolean          @default(false)
   createdAt DateTime         @default(now())
   User      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  /// Lien inverse optionnel : au plus un envoi rappel dette référence cette notification.
+  RappelDetteEnvoi RappelDetteEnvoi?
 
   @@index([userId])
   @@index([lue])
