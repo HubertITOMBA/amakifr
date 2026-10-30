@@ -11,7 +11,7 @@ Dernière mise à jour : 2026-10-30
 | Correction Actualiser / libellés (Lot 2) | `aa08df9` (`aa08df96d759a0ebc22548f2af7b91f165314d0c`) | `fix(cotisations): clarify debt reminder preview refresh feedback` |
 | Exclusion entité Assistance du rappel/preview | `b8c4edd` | `fix(cotisations): exclude received assistance from reminder debt` |
 | Production web / backend / `origin/main` **attendue** | `c95e611` | Lots 1+2 + exclusion Assistance rappel + totaux compte F1–F3 (vérifier VPS avant toute mutation) |
-| Branche Lot 3 réalignée (socle + gels **commités**, non activé en prod) | `5c38bf9` (+ commit pose/levée sur la même branche ; base `c95e611`) | Envoi / gels persistés / pose·levée — **deux flags off** ; **aucune UI** pose/levée ; migrations Lot 3 **non** appliquées aux bases app |
+| Branche Lot 3 réalignée (socle + gels + pose/levée **commités** ; lectures admin **cette passe**) | Parent pose/levée `b68a9a3` (gels `5c38bf9` ; base `c95e611`) | Envoi / gels / pose·levée / lectures capacités·historiques — **deux flags off** ; **aucune UI** ; migrations Lot 3 **non** appliquées aux bases app |
 | Commit embarqué dans l’AAB store | `7e4e51e` | `chore(mobile): exclude local assets from EAS builds` |
 | Application Android Play Store **publiée** | `1.1.0` / `versionCode` `3` | Production 100 %, disponible sur Google Play depuis le 27 oct. 2026 01:05 |
 
@@ -44,7 +44,7 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 
 ## Point de reprise — R1 rappels cotisations/dettes
 
-**ÉTAT AU 2026-10-30 — production / `origin/main` = `c95e611` ; socle Lot 3 + gels persistés @ `5c38bf9` sur branche dédiée (non activé en prod) ; commandes pose/levée gels sur la même branche — **flags off**, **aucune UI**, non déployées**
+**ÉTAT AU 2026-10-30 — production / `origin/main` = `c95e611` ; branche Lot 3 `fix/r1-lot3-realign-on-c95e611` : socle + gels @ `5c38bf9` + pose/levée @ `b68a9a3` + lectures admin (capacités / historiques) **cette passe** — **deux flags off**, **aucune UI**, non déployées**
 
 | Lot | État | SHA / remarque |
 |-----|------|----------------|
@@ -54,24 +54,27 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 | Totaux dette compte (F1–F3 + ownership S1) | **Production / `origin/main`** | `c95e611` — Obligations legacy **conservées** dans ces totaux |
 | Lot 3 — envoi manuel (socle) | **Commité sur branche dédiée, non activé en prod** | Chaîne jusqu’à `889c849` puis gels `5c38bf9` sur `fix/r1-lot3-realign-on-c95e611` (base `c95e611`) ; flag `RAPPEL_DETTE_ENVOI_ENABLED=false` ; migrations Lot 3 **non** appliquées aux bases app |
 | Lot 3 — gels / contestation (persistance) | **Commité sur branche dédiée @ `5c38bf9`, non activé** | Schéma + `20261030150000_rappel_dette_gel` ; résolveur ; jeton prepare **v2** ; branchements preview/prepare/reserve/Calling — **absents de la production** |
-| Lot 3 — gels pose / levée (commandes) | **Commité sur branche dédiée, non activé** | Services + Server Actions ; flag `RAPPEL_DETTE_GEL_MUTATION_ENABLED=false` (**indépendant** de l’envoi) ; levée = audit acteur/date **sans** nouveau motif ; **aucune UI** |
+| Lot 3 — gels pose / levée (commandes) | **Commité sur branche dédiée @ `b68a9a3`, non activé** | Services + Server Actions ; flag `RAPPEL_DETTE_GEL_MUTATION_ENABLED=false` (**indépendant** de l’envoi) ; levée = audit acteur/date **sans** nouveau motif ; **aucune UI** |
+| Lot 3 — lectures admin (capacités / historiques) | **Cette passe sur branche dédiée, non activé** | Parent `b68a9a3` ; capacités (booléens flags) + historiques paginés envois/gels ; curseurs liés au périmètre + ancre vérifiée ; `notifResumeEligible` ≠ `canResumeNotif` ; **aucune UI** ; lectures OK flags off |
 
 ### Distinction production vs branche Lot 3 (mise à jour 2026-10-30)
 
 | Surface | Contenu |
 |---------|---------|
-| **Production / `origin/main` @ `c95e611`** | Lots 1+2 ; rappel/preview **sans** Assistance comme dette ; totaux compte F1–F3 + ownership S1 ; **aucun** runtime Lot 3 / gels (pas de tables gels, pas de jeton v2, pas de résolveur gels, pas de pose/levée) |
+| **Production / `origin/main` @ `c95e611`** | Lots 1+2 ; rappel/preview **sans** Assistance comme dette ; totaux compte F1–F3 + ownership S1 ; **aucun** runtime Lot 3 / gels (pas de tables gels, pas de jeton v2, pas de résolveur gels, pas de pose/levée, pas de lectures admin Lot 3) |
 | **WIP local principal @ `1455af5` + fichiers non suivis** *(historique)* | Broader WIP Lot 3 — **ne pas** confondre avec la greffe réalignée |
-| **Branche Lot 3 @ `5c38bf9` + commit pose/levée** | Socle envoi + **gels persistés** (`5c38bf9`) ; puis commandes/actions pose·levée sur la même branche ; **deux flags off** ; migrations `…envoi` + `…gel` **dans le dépôt**, **non** appliquées aux bases app ; harness PG / generate / scénarios **exclus** des commits produit |
+| **Branche Lot 3 @ `5c38bf9` + pose/levée `b68a9a3` + lectures (cette passe)** | Socle envoi + gels persistés + commandes pose·levée + lectures capacités/historiques ; **deux flags off** ; migrations `…envoi` + `…gel` **dans le dépôt**, **non** appliquées aux bases app ; harness PG / generate / scénarios **exclus** des commits produit |
 
 #### Garde-fous Lot 3 (socle inactif en production)
 
 - **Flags off** : `RAPPEL_DETTE_ENVOI_ENABLED=false` ; `RAPPEL_DETTE_GEL_MUTATION_ENABLED=false` — pas d’activation runtime en dépôt.
-- **Pose / levée** : services + Server Actions sur branche dédiée — **non activés** / **non déployés** ; garde mutation **indépendante** de l’envoi ; levée = audit acteur/date **sans** nouveau motif ; **aucune UI**.
+- **Pose / levée** : services + Server Actions sur branche dédiée @ `b68a9a3` — **non activés** / **non déployés** ; garde mutation **indépendante** de l’envoi ; levée = audit acteur/date **sans** nouveau motif ; **aucune UI**.
+- **Lectures admin (cette passe)** : capacités + historiques envois/gels paginés ; curseurs liés à `adherentId` / kind / filtres effectifs + **ancre vérifiée** (erreur explicite si incompatible) ; `notifResumeEligible` (état métier) **distinct** de `canResumeNotif` (éligible ∧ flag envoi) ; `canProposeResend` toujours false ; **aucune UI**.
 - **Validations pose/levée (séparées)** : **26** Vitest mockés (historique) ; **20** contrôles PG jetable — ne pas cumuler en un score unique. Recovery **P2002** : **non exercée** en PG sous verrou adhérent normal (sérialisation → `already_active`) ; couverture unitaire séparée.
+- **Validations lectures admin (séparées)** : **38** Vitest mockés ; **15** scénarios PG jetable — **ne pas** cumuler ni confondre avec les scores pose/levée. Base jetable **supprimée** après contrôles ; **aucune** base applicative migrée pour cette passe.
 - **Services d’envoi** : présents sur la branche dédiée ; **non activés** en production ; email-outcome / notification hors barrel public selon socle.
 - **Preview / `computeDetteRappelable`** (socle Lot 3) : lit aussi `RappelDetteEnvoi` (cooldown Accepted). Le branchement gels lit en outre les tables gels / révision. **Déployer le binaire correspondant sans les migrations** → échec Prisma (fail-closed).
-- **Deux migrations Lot 3 requises** avant mise en service du code correspondant (y compris preview qui lit ces tables) :
+- **Deux migrations Lot 3 requises** avant mise en service du code correspondant (y compris preview / lectures qui lisent ces tables) :
   1. `20261027190000_rappel_dette_envoi`
   2. `20261030150000_rappel_dette_gel`
   Appliquer **avant** ou **avec** le binaire — **jamais** le code seul sur une base sans tables.
@@ -414,7 +417,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ## 11. Travaux prioritaires
 
-**ÉTAT AU 2026-10-30 (Android clôturée ; `origin/main` / prod = `c95e611` ; Lot 3 gels persistés @ `5c38bf9` + pose/levée sur branche dédiée — non activé ; aucune UI)**
+**ÉTAT AU 2026-10-30 (Android clôturée ; `origin/main` / prod = `c95e611` ; Lot 3 gels @ `5c38bf9` + pose/levée @ `b68a9a3` + lectures admin cette passe — non activé ; aucune UI)**
 
 | Priorité | Sujet | État |
 |----------|-------|------|
@@ -425,7 +428,8 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 | P1 | Totaux dette compte (Assistance hors dette) | **Production `c95e611`** |
 | **Suivant** | R1 Lot 3 — envoi manuel (socle) | **Commité** (chaîne → `5c38bf9`) — **flag envoi off** / non déployé ; migrations non appliquées aux bases app |
 | **Suivant** | R1 Lot 3 — gels / contestation (persistance) | **Commité** @ `5c38bf9` — absents de la prod |
-| **Suivant** | R1 Lot 3 — gels pose / levée | **Commité** sur branche dédiée — flag mutation off (indépendant) ; levée auditée sans nouveau motif ; **aucune UI** ; non activé |
+| **Suivant** | R1 Lot 3 — gels pose / levée | **Commité** @ `b68a9a3` — flag mutation off (indépendant) ; levée auditée sans nouveau motif ; **aucune UI** ; non activé |
+| **Suivant** | R1 Lot 3 — lectures admin (capacités / historiques) | **Cette passe** (parent `b68a9a3`) — curseurs liés + ancre ; `notifResumeEligible` ≠ `canResumeNotif` ; **38** Vitest / **15** PG **séparés** ; **aucune UI** ; flags off |
 
 ### Dettes ouvertes
 
@@ -496,14 +500,15 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - **2026-10-27** : Alignement Git confirmé : local = `origin/main` = prod `/sites/amakifr` = `aa08df9`. Clôture documentaire R1 Lots 1+2 (ce fichier) — le SHA du futur commit documentaire sera **distinct** du SHA applicatif déployé `aa08df9`.
 - **2026-10-30** : Socle Lot 3 **commité** sur branche dédiée — `889c849` (envoi) puis gels persistés **`5c38bf9`** ; **flags off** ; **non** déployé / **non** activé en prod ; production / `origin/main` restent **`c95e611`**.
 - **2026-10-30** : **Passe gels persistés** — schéma + migration `20261030150000_rappel_dette_gel` + résolveur + jeton prepare v2 + branchements ; validations **séparées** (SQL 30 ; Vitest 93 ; PG 14 ; complément G6) ; **commité** @ `5c38bf9` ; tables gels / révision **absentes de la production** ; gel après Calling **non rétroactif** ; **TypeScript global non validé**.
-- **2026-10-30** : **Pose / levée gels** — services + Server Actions + tests ; garde mutation indépendante (défaut off) ; levée auditée acteur/date sans nouveau motif ; **aucune UI** ; validations **séparées** (**26** Vitest historiques ; **20** contrôles PG) ; recovery P2002 **non exercée** en PG sous verrou normal ; **deux** migrations Lot 3 toujours requises avant mise en service ; migrations **non** appliquées aux bases app.
+- **2026-10-30** : **Pose / levée gels** — commit `b68a9a3` ; services + Server Actions + tests ; garde mutation indépendante (défaut off) ; levée auditée acteur/date sans nouveau motif ; **aucune UI** ; validations **séparées** (**26** Vitest historiques ; **20** contrôles PG) ; recovery P2002 **non exercée** en PG sous verrou normal ; **deux** migrations Lot 3 toujours requises avant mise en service ; migrations **non** appliquées aux bases app.
+- **2026-10-30** : **Lectures admin Lot 3** (capacités + historiques envois/gels paginés) — **cette passe** sur `fix/r1-lot3-realign-on-c95e611` (parent `b68a9a3`) ; curseurs liés au périmètre + ancre vérifiée ; `notifResumeEligible` distinct de `canResumeNotif` ; validations **séparées** (**38** Vitest ; **15** scénarios PG jetable) ; base jetable **supprimée** ; **aucune** base app migrée ; **aucune UI** ; **deux flags false** ; TypeScript global **non validé** ; `origin/main` / prod restent **`c95e611`**.
 
 ---
 
 ## Faits temporaires à revérifier
 
 - SHA `origin/main` vs checkout VPS `/sites/amakifr` (rappel+totaux attendus sur **`c95e611`** — **revérifier** avant mutation).
-- Lot 3 : branche `fix/r1-lot3-realign-on-c95e611` (gels @ `5c38bf9` + pose/levée) — **ne pas** confondre avec le WIP principal historique `1455af5`.
+- Lot 3 : branche `fix/r1-lot3-realign-on-c95e611` (gels @ `5c38bf9` + pose/levée @ `b68a9a3` + lectures admin cette passe) — **ne pas** confondre avec le WIP principal historique `1455af5`.
 - Présence/absence de `maintenance.flag` ; HTTP public/interne.
 - PM2 `amakifr` online ; écoute `127.0.0.1:9060` uniquement.
 - Flags Notes de frais + stockage privé (sans afficher d’autres secrets).

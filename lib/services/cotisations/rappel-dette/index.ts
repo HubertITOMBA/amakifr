@@ -135,4 +135,7 @@ export {
  * Mutations gels (pose / levée) : **ne pas** réexporter ici.
  * `rappel-dette-gel-mutate` / `rappel-dette-gel-mutation-activation` —
  * Server Actions dédiées uniquement ; flag mutation indépendant, défaut off.
+ *
+ * Lectures admin Lot 3 (capacités / historiques) : **ne pas** réexporter ici.
+ * `rappel-dette-admin-reads` — Server Actions dédiées uniquement.
  */
