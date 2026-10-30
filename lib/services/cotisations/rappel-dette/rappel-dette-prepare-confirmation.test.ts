@@ -82,15 +82,25 @@ describe("prepareRappelDetteConfirmation", () => {
           recipientUserId: "u-1",
           recipientEmail: "jean.dupont@example.test",
         }),
+        resolveGels: async () => ({
+          ok: true as const,
+          gelsRevision: BigInt(0),
+          gelsRevisionDecimal: "0",
+          frozenAdherent: false,
+          frozenLineKeys: new Set<string>(),
+        }),
         compute: async () => eligibleCompute(),
       },
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.detteNette).toBe("100.00");
+    expect(r.gelsRevision).toBe("0");
     expect(r.recipientMasked).toBe("j***@example.test");
     expect(r.templateVersion).toBe(RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2);
     expect(r.confirmationToken).toMatch(/^rdc1\./);
+    expect(r.claims.v).toBe(2);
+    expect(r.claims.gelsRevision).toBe("0");
     expect(JSON.stringify(r)).not.toMatch(/jean\.dupont@example\.test/);
     expect(r.claims).not.toHaveProperty("email");
     expect(r.claims).not.toHaveProperty("recipientEmail");
@@ -105,6 +115,33 @@ describe("prepareRappelDetteConfirmation", () => {
     expect(v.ok).toBe(true);
   });
 
+  it("source gels KO → GEL_SOURCE_UNAVAILABLE fail-closed", async () => {
+    const compute = vi.fn();
+    const r = await prepareRappelDetteConfirmation({
+      actor: { userId: "admin-1", role: UserRole.ADMIN },
+      adherentId: "adh-1",
+      getNow: () => NOW,
+      deps: {
+        isEnvoiEnabled: () => true,
+        hmacSecret: SECRET,
+        loadRecipient: async () => ({
+          ok: true as const,
+          recipientUserId: "u-1",
+          recipientEmail: "x@y.z",
+        }),
+        resolveGels: async () => ({
+          ok: false as const,
+          code: "GEL_SOURCE_UNAVAILABLE" as const,
+          message: "Source des gels indisponible",
+        }),
+        compute,
+      },
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) expect(r.code).toBe("GEL_SOURCE_UNAVAILABLE");
+    expect(compute).not.toHaveBeenCalled();
+  });
+
   it("non éligible → NOT_ELIGIBLE sans token", async () => {
     const r = await prepareRappelDetteConfirmation({
       actor: { userId: "admin-1", role: UserRole.PRESID },
@@ -117,6 +154,13 @@ describe("prepareRappelDetteConfirmation", () => {
           ok: true as const,
           recipientUserId: "u-1",
           recipientEmail: "x@y.z",
+        }),
+        resolveGels: async () => ({
+          ok: true as const,
+          gelsRevision: BigInt(0),
+          gelsRevisionDecimal: "0",
+          frozenAdherent: false,
+          frozenLineKeys: new Set<string>(),
         }),
         compute: async () => ({
           ...eligibleCompute(),
@@ -143,6 +187,13 @@ describe("prepareRappelDetteConfirmation", () => {
           ok: true as const,
           recipientUserId: "u-1",
           recipientEmail: "a@b.c",
+        }),
+        resolveGels: async () => ({
+          ok: true as const,
+          gelsRevision: BigInt(0),
+          gelsRevisionDecimal: "0",
+          frozenAdherent: false,
+          frozenLineKeys: new Set<string>(),
         }),
         compute: async () => eligibleCompute(),
       },

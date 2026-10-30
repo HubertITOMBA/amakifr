@@ -1,21 +1,31 @@
 /**
  * Jeton HMAC de préparation Lot 3 — intégrité prepare↔confirm.
  *
- * Garantit l’intégrité des claims (pas la confidentialité ni l’usage unique).
- * L’idempotence d’envoi reste assurée par la réservation.
+ * v2 : claim `gelsRevision` (chaîne décimale) — indépendant de l’empreinte financière.
+ * v1 / usage v1 : **refusés** (ancienne version).
  *
+ * Garantit l’intégrité des claims (pas la confidentialité ni l’usage unique).
  * Aucun email / secret applicatif dans le jeton ni dans les logs bornés.
  * Secret : `RAPPEL_DETTE_CONFIRMATION_HMAC_SECRET` uniquement — **aucun** fallback.
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { parseGelsRevisionDecimal } from "@/lib/services/cotisations/rappel-dette/rappel-dette-gel-resolve";
 
 /** TTL préparation (10 min) — distinct de `RAPPEL_DETTE_RESERVED_TTL_MS`. */
 export const RAPPEL_DETTE_PREPARE_TTL_MS = 10 * 60 * 1000;
 
-export const RAPPEL_DETTE_CONFIRMATION_TOKEN_VERSION = 1 as const;
+/** Version courante du jeton (gelsRevision obligatoire). */
+export const RAPPEL_DETTE_CONFIRMATION_TOKEN_VERSION = 2 as const;
+
+/** Ancienne version — refusée à la vérification. */
+export const RAPPEL_DETTE_CONFIRMATION_TOKEN_VERSION_V1 = 1 as const;
 
 export const RAPPEL_DETTE_CONFIRMATION_TOKEN_USAGE =
+  "rappel_dette_prepare_v2" as const;
+
+/** Usage v1 — refusé. */
+export const RAPPEL_DETTE_CONFIRMATION_TOKEN_USAGE_V1 =
   "rappel_dette_prepare_v1" as const;
 
 /**
@@ -35,6 +45,8 @@ export type RappelDetteConfirmationTokenClaims = {
   actorUserId: string;
   adherentId: string;
   fingerprint: string;
+  /** Révision gels — chaîne décimale (pas de Number). */
+  gelsRevision: string;
   templateVersion: typeof RAPPEL_DETTE_CONFIRMATION_TEMPLATE_V2;
   clientConfirmationId: string;
   issuedAt: number;
@@ -45,6 +57,8 @@ export type SignConfirmationTokenInput = {
   actorUserId: string;
   adherentId: string;
   fingerprint: string;
+  /** Révision gels sérialisée (décimal). */
+  gelsRevision: string;
   clientConfirmationId: string;
   issuedAt: Date;
   /** Secret serveur injecté (tests) ; sinon lu depuis env. */
@@ -138,6 +152,7 @@ function serializeClaims(claims: RappelDetteConfirmationTokenClaims): string {
     actorUserId: claims.actorUserId,
     adherentId: claims.adherentId,
     fingerprint: claims.fingerprint,
+    gelsRevision: claims.gelsRevision,
     templateVersion: claims.templateVersion,
     clientConfirmationId: claims.clientConfirmationId,
     issuedAt: claims.issuedAt,
@@ -155,7 +170,7 @@ function safeEqualBuffers(a: Buffer, b: Buffer): boolean {
 }
 
 /**
- * Signe un jeton de préparation (HMAC-SHA256).
+ * Signe un jeton de préparation v2 (HMAC-SHA256).
  *
  * @param input - Claims métier + horodatage d’émission
  */
@@ -176,6 +191,7 @@ export function signRappelDetteConfirmationToken(
   const adherentId = String(input.adherentId ?? "").trim();
   const fingerprint = String(input.fingerprint ?? "").trim();
   const clientConfirmationId = String(input.clientConfirmationId ?? "").trim();
+  const gelsRevisionRaw = String(input.gelsRevision ?? "").trim();
 
   if (!actorUserId || !adherentId || !fingerprint || !clientConfirmationId) {
     return {
@@ -189,6 +205,13 @@ export function signRappelDetteConfirmationToken(
       ok: false,
       code: "VALIDATION_ERROR",
       message: "Claims de confirmation invalides",
+    };
+  }
+  if (parseGelsRevisionDecimal(gelsRevisionRaw) === null) {
+    return {
+      ok: false,
+      code: "VALIDATION_ERROR",
+      message: "Révision gels invalide",
     };
   }
 
@@ -207,6 +230,7 @@ export function signRappelDetteConfirmationToken(
     actorUserId,
     adherentId,
     fingerprint,
+    gelsRevision: gelsRevisionRaw,
     templateVersion: RAPPEL_DETTE_CONFIRMATION_TEMPLATE_V2,
     clientConfirmationId,
     issuedAt,
@@ -221,7 +245,7 @@ export function signRappelDetteConfirmationToken(
 }
 
 /**
- * Vérifie signature et claims (acteur courant, TTL, durée exacte).
+ * Vérifie signature et claims (acteur courant, TTL, durée exacte, v2).
  *
  * @param input - Jeton + actorUserId session
  */
@@ -289,7 +313,6 @@ export function verifyRappelDetteConfirmationToken(
 
   const o = parsed as Record<string, unknown>;
 
-  // Interdit : email / secrets dans le payload
   if (
     "email" in o ||
     "recipientEmail" in o ||
@@ -304,11 +327,25 @@ export function verifyRappelDetteConfirmationToken(
     };
   }
 
+  if (o.v === RAPPEL_DETTE_CONFIRMATION_TOKEN_VERSION_V1) {
+    return {
+      ok: false,
+      code: "CONFIRMATION_TOKEN_VERSION_INVALID",
+      message: "Version de jeton non supportée",
+    };
+  }
   if (o.v !== RAPPEL_DETTE_CONFIRMATION_TOKEN_VERSION) {
     return {
       ok: false,
       code: "CONFIRMATION_TOKEN_VERSION_INVALID",
       message: "Version de jeton non supportée",
+    };
+  }
+  if (o.usage === RAPPEL_DETTE_CONFIRMATION_TOKEN_USAGE_V1) {
+    return {
+      ok: false,
+      code: "CONFIRMATION_TOKEN_USAGE_INVALID",
+      message: "Usage de jeton invalide",
     };
   }
   if (o.usage !== RAPPEL_DETTE_CONFIRMATION_TOKEN_USAGE) {
@@ -330,6 +367,7 @@ export function verifyRappelDetteConfirmationToken(
   const adherentId = String(o.adherentId ?? "").trim();
   const fingerprint = String(o.fingerprint ?? "").trim();
   const clientConfirmationId = String(o.clientConfirmationId ?? "").trim();
+  const gelsRevisionRaw = String(o.gelsRevision ?? "").trim();
   const issuedAt = Number(o.issuedAt);
   const expiresAt = Number(o.expiresAt);
 
@@ -341,6 +379,14 @@ export function verifyRappelDetteConfirmationToken(
     !Number.isFinite(issuedAt) ||
     !Number.isFinite(expiresAt)
   ) {
+    return {
+      ok: false,
+      code: "CONFIRMATION_TOKEN_INVALID",
+      message: "Jeton de confirmation invalide",
+    };
+  }
+
+  if (parseGelsRevisionDecimal(gelsRevisionRaw) === null) {
     return {
       ok: false,
       code: "CONFIRMATION_TOKEN_INVALID",
@@ -396,13 +442,13 @@ export function verifyRappelDetteConfirmationToken(
     actorUserId,
     adherentId,
     fingerprint,
+    gelsRevision: gelsRevisionRaw,
     templateVersion: RAPPEL_DETTE_CONFIRMATION_TEMPLATE_V2,
     clientConfirmationId,
     issuedAt,
     expiresAt,
   };
 
-  // Re-sérialiser et comparer pour détecter clés/ordre parasites
   if (serializeClaims(claims) !== body) {
     return {
       ok: false,

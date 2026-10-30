@@ -17,6 +17,7 @@ function signOk(overrides?: Partial<Parameters<typeof signRappelDetteConfirmatio
     actorUserId: ACTOR,
     adherentId: "adh-1",
     fingerprint: "a".repeat(64),
+    gelsRevision: "0",
     clientConfirmationId: "11111111-1111-4111-8111-111111111111",
     issuedAt: NOW,
     secret: SECRET,
@@ -60,6 +61,7 @@ describe("rappel-dette-confirmation-token", () => {
       actorUserId: ACTOR,
       adherentId: "adh-1",
       fingerprint: "fp",
+      gelsRevision: "0",
       clientConfirmationId: "conf-1",
       issuedAt: NOW,
       secret: "",
@@ -78,7 +80,12 @@ describe("rappel-dette-confirmation-token", () => {
   it("refuse jeton altéré (signature)", () => {
     const signed = signOk();
     const parts = signed.token.split(".");
-    const tampered = `${parts[0]}.${parts[1]}.${parts[2]!.replace(/A/g, "B")}`;
+    const sig = parts[2]!;
+    // Flip un caractère base64url de façon déterministe (évite no-op si pas de « A »).
+    const flip =
+      sig[0] === "A" ? "B" : sig[0] === "B" ? "A" : sig[0] === "-" ? "_" : "A";
+    const tampered = `${parts[0]}.${parts[1]}.${flip}${sig.slice(1)}`;
+    expect(tampered).not.toBe(signed.token);
     const v = verifyRappelDetteConfirmationToken({
       token: tampered,
       actorUserId: ACTOR,
@@ -146,11 +153,27 @@ describe("rappel-dette-confirmation-token", () => {
       actorUserId: ACTOR,
       adherentId: "adh-1",
       fingerprint: "a".repeat(64),
+      gelsRevision: "0",
       templateVersion: "email-rappel-dette-v2",
       clientConfirmationId: "11111111-1111-4111-8111-111111111111",
       issuedAt: NOW.getTime(),
       expiresAt: NOW.getTime() + RAPPEL_DETTE_PREPARE_TTL_MS,
     };
+
+    const oldV1 = verifyRappelDetteConfirmationToken({
+      token: forge({
+        ...base,
+        v: 1,
+        usage: "rappel_dette_prepare_v1",
+      }),
+      actorUserId: ACTOR,
+      now: NOW,
+      secret: SECRET,
+    });
+    expect(oldV1.ok).toBe(false);
+    if (!oldV1.ok) {
+      expect(oldV1.code).toBe("CONFIRMATION_TOKEN_VERSION_INVALID");
+    }
 
     const badVersion = verifyRappelDetteConfirmationToken({
       token: forge({ ...base, v: 99 }),

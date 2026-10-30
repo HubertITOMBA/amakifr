@@ -153,6 +153,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps,
@@ -191,6 +192,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps(),
@@ -204,6 +206,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       deps: happyDeps(),
     });
@@ -217,6 +220,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       deps: happyDeps(),
     });
@@ -232,6 +236,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       deps: happyDeps({
         isEnvoiEnabled: () => false,
@@ -251,6 +256,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       deps: happyDeps({
         validateProvider: () => ({
@@ -278,6 +284,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       // smtpTransport omis
       deps: happyDeps({ authorizeCalling, persistOutcome, ensureNotification }),
@@ -299,6 +306,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport: { sendMail: "not-a-function" as unknown as () => Promise<never> },
       deps: happyDeps({ authorizeCalling }),
@@ -329,6 +337,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       deps: resendDeps(),
     });
@@ -342,6 +351,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       resendTransport: {
         emails: { send: null as unknown as () => Promise<never> },
@@ -362,6 +372,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps({
@@ -384,6 +395,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       resendTransport,
       deps: happyDeps({
@@ -415,6 +427,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport: smtpWithThis,
       deps: happyDeps({
@@ -449,6 +462,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       resendTransport: resendWithThis,
       deps: happyDeps({
@@ -483,6 +497,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
     } as const;
 
@@ -515,6 +530,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       deps: happyDeps({
         buildDetailUrl: () => null,
@@ -534,6 +550,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       deps: happyDeps({
         reserve: vi.fn(async () => ({
@@ -560,6 +577,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps({
@@ -589,6 +607,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps({
@@ -639,6 +658,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: depsFactory(),
@@ -648,6 +668,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: depsFactory(),
@@ -668,6 +689,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps({
@@ -696,6 +718,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps({
@@ -730,6 +753,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps({
@@ -755,6 +779,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps({
@@ -798,6 +823,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps({ sendSmtp, persistOutcome, ensureNotification }),
@@ -818,6 +844,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps({
@@ -876,6 +903,7 @@ describe("orchestrateRappelDetteSend", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: FP,
+      expectedGelsRevision: "0",
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport,
       deps: happyDeps({

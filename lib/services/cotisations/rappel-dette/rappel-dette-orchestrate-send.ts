@@ -230,12 +230,12 @@ export type OrchestrateRappelDetteSendInput = {
   adherentId: string;
   clientConfirmationId: string;
   expectedFingerprint: string;
+  /** Révision gels du jeton v2 (chaîne décimale) — comparée sous verrou. */
+  expectedGelsRevision: string;
   /** Catalogue serveur — seule v2 autorisée pour l’envoi réel. */
   templateVersion: typeof RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2;
   getNow?: () => Date;
   reservedTtlMs?: number;
-  frozenAdherent?: boolean;
-  frozenLineKeys?: ReadonlySet<string>;
   smtpTransport?: SmtpTransport;
   resendTransport?: ResendTransport;
   /** Corrélation logs bornée (pas de PII). */
@@ -368,7 +368,10 @@ function mapReserveFailure(
   const nextHint =
     r.code === "REQUIRES_RECONFIRM" || r.code === "NOT_ELIGIBLE"
       ? "reconfirm"
-      : r.code === "BLOCKED_ATTEMPT" || r.code === "CONFLICT"
+      : r.code === "BLOCKED_ATTEMPT" ||
+          r.code === "CONFLICT" ||
+          r.code === "GEL_SOURCE_UNAVAILABLE" ||
+          r.code === "COMPUTE_ERROR"
         ? "wait_or_ops"
         : "none";
   return fail(r.code, r.message, { nextHint });
@@ -514,11 +517,10 @@ export async function orchestrateRappelDetteSend(
     adherentId: input.adherentId,
     clientConfirmationId: input.clientConfirmationId,
     expectedFingerprint: input.expectedFingerprint,
+    expectedGelsRevision: input.expectedGelsRevision,
     templateVersion: input.templateVersion,
     getNow: input.getNow,
     reservedTtlMs: input.reservedTtlMs,
-    frozenAdherent: input.frozenAdherent,
-    frozenLineKeys: input.frozenLineKeys,
   });
 
   if (!reserved.ok) {
@@ -675,8 +677,6 @@ export async function orchestrateRappelDetteSend(
     envoiId: reserved.envoiId,
     adherentId: input.adherentId,
     getNow: input.getNow,
-    frozenAdherent: input.frozenAdherent,
-    frozenLineKeys: input.frozenLineKeys,
   });
 
   if (!calling.ok) {

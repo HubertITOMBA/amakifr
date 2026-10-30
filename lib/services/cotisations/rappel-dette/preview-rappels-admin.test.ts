@@ -39,6 +39,22 @@ vi.mock("@/lib/services/cotisations/rappel-dette/compute-dette-rappelable", () =
   computeDetteRappelable,
 }));
 
+vi.mock("@/lib/services/cotisations/rappel-dette/rappel-dette-gel-resolve", async () => {
+  const actual = await vi.importActual<
+    typeof import("@/lib/services/cotisations/rappel-dette/rappel-dette-gel-resolve")
+  >("@/lib/services/cotisations/rappel-dette/rappel-dette-gel-resolve");
+  return {
+    ...actual,
+    resolveRappelDetteGels: vi.fn(async () => ({
+      ok: true as const,
+      gelsRevision: BigInt(0),
+      gelsRevisionDecimal: "0",
+      frozenAdherent: false,
+      frozenLineKeys: new Set<string>(),
+    })),
+  };
+});
+
 vi.mock("@/lib/mail", () => ({
   sendEmail,
   sendCustomEmailToUsers: vi.fn(),
@@ -368,10 +384,11 @@ describe("previewRappelsDetteAdmin", () => {
 
     expect(computeDetteRappelable).toHaveBeenCalledTimes(4);
     for (const call of computeDetteRappelable.mock.calls) {
-      expect(call[1]).toEqual({ now });
-      expect(call[1]).not.toHaveProperty("frozenAdherent");
-      expect(call[1]).not.toHaveProperty("frozenLineKeys");
-      expect(Object.keys(call[1] as object).sort()).toEqual(["now"]);
+      expect(call[1]).toMatchObject({
+        now,
+        frozenAdherent: false,
+        frozenLineKeys: expect.any(Set),
+      });
     }
     expect(computeDetteRappelable.mock.calls[0]![1].now).toBe(now);
     expect(computeDetteRappelable.mock.calls[1]![1].now).toBe(now);

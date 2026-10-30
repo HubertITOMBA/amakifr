@@ -55,11 +55,12 @@ import { confirmRappelDetteManualSendAction } from "@/actions/cotisations/confir
 const TEMPLATE_V2 = "email-rappel-dette-v2" as const;
 
 const CLAIMS = {
-  v: 1 as const,
-  usage: "rappel_dette_prepare_v1" as const,
+  v: 2 as const,
+  usage: "rappel_dette_prepare_v2" as const,
   actorUserId: "admin-1",
   adherentId: "adh-claims",
   fingerprint: "fp-claims",
+  gelsRevision: "0",
   templateVersion: TEMPLATE_V2,
   clientConfirmationId: "conf-claims",
   issuedAt: Date.parse("2026-10-30T12:00:00.000Z"),
@@ -153,6 +154,7 @@ describe("confirmRappelDetteManualSendAction", () => {
       actorUserId: "admin-1",
       adherentId: "adh-1",
       fingerprint: "b".repeat(64),
+      gelsRevision: "0",
       clientConfirmationId: "33333333-3333-4333-8333-333333333333",
       issuedAt: new Date("2026-10-30T12:00:00.000Z"),
       secret,
@@ -236,6 +238,7 @@ describe("confirmRappelDetteManualSendAction", () => {
         adherentId: "adh-claims",
         clientConfirmationId: "conf-claims",
         expectedFingerprint: "fp-claims",
+        expectedGelsRevision: "0",
         templateVersion: TEMPLATE_V2,
         smtpTransport: expect.anything(),
       })

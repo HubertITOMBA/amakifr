@@ -156,6 +156,7 @@ export async function confirmRappelDetteManualSendAction(
       adherentId: claims.adherentId,
       clientConfirmationId: claims.clientConfirmationId,
       expectedFingerprint: claims.fingerprint,
+      expectedGelsRevision: claims.gelsRevision,
       templateVersion: RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2,
       smtpTransport: transport.smtpTransport,
       resendTransport: transport.resendTransport,

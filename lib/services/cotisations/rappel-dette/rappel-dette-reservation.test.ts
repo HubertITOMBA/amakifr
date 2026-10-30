@@ -19,6 +19,8 @@ const {
   updateEnvoi,
   updateManyEnvoi,
   findUniqueAdherent,
+  findManyGel,
+  findUniqueGelRevision,
   computeDetteRappelable,
   callOrder,
 } = vi.hoisted(() => {
@@ -61,6 +63,14 @@ const {
           status: "Actif",
         },
       };
+    }),
+    findManyGel: vi.fn(async () => {
+      callOrder.push("gel.findMany");
+      return [];
+    }),
+    findUniqueGelRevision: vi.fn(async () => {
+      callOrder.push("gelRevision.findUnique");
+      return null;
     }),
     computeDetteRappelable: vi.fn(),
   };
@@ -149,6 +159,7 @@ function reservedRow(overrides: Record<string, unknown> = {}) {
     callingAt: null,
     payloadFingerprint: fp,
     templateVersion: TEMPLATE,
+    gelsRevision: BigInt(0),
     recipientUserId: "user-recipient",
     recipientEmail: "destinataire@example.com",
     montantBrut: compute.montantBrut,
@@ -170,6 +181,8 @@ function mockTx() {
         updateMany: updateManyEnvoi,
       },
       adherent: { findUnique: findUniqueAdherent },
+      rappelDetteGel: { findMany: findManyGel },
+      rappelDetteGelRevision: { findUnique: findUniqueGelRevision },
     };
     return fn(tx);
   });
@@ -227,6 +240,16 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       callOrder.push("compute");
       return eligibleCompute();
     });
+    findManyGel.mockReset();
+    findManyGel.mockImplementation(async () => {
+      callOrder.push("gel.findMany");
+      return [];
+    });
+    findUniqueGelRevision.mockReset();
+    findUniqueGelRevision.mockImplementation(async () => {
+      callOrder.push("gelRevision.findUnique");
+      return null;
+    });
     mockTx();
   });
 
@@ -236,6 +259,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: "abc",
+      expectedGelsRevision: "0",
       templateVersion: TEMPLATE,
     });
     expect(r.ok).toBe(false);
@@ -251,6 +275,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
         adherentId: ADH,
         clientConfirmationId: KEY,
         expectedFingerprint: fingerprintFor(),
+        expectedGelsRevision: "0",
         templateVersion: TEMPLATE,
       });
       expect(r.ok).toBe(false);
@@ -268,6 +293,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
         adherentId: ADH,
         clientConfirmationId: `${KEY}-${actor.role}`,
         expectedFingerprint: fp,
+        expectedGelsRevision: "0",
         templateVersion: TEMPLATE,
         getNow: () => T0,
       });
@@ -291,6 +317,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: fp,
+      expectedGelsRevision: "0",
       templateVersion: TEMPLATE,
       getNow,
       reservedTtlMs: 120_000,
@@ -324,6 +351,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: fp,
+      expectedGelsRevision: "0",
       templateVersion: TEMPLATE,
       getNow: () => T0,
     });
@@ -352,6 +380,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: fp,
+      expectedGelsRevision: "0",
       templateVersion: TEMPLATE,
       getNow: () => T0,
     });
@@ -369,6 +398,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: fingerprintFor(),
+      expectedGelsRevision: "0",
       templateVersion: TEMPLATE,
       getNow: () => T0,
     });
@@ -388,6 +418,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: fingerprintFor(),
+      expectedGelsRevision: "0",
       templateVersion: TEMPLATE,
       getNow: () => T0,
     });
@@ -404,6 +435,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: "conf-key-bbbbbbbb",
       expectedFingerprint: fingerprintFor(),
+      expectedGelsRevision: "0",
       templateVersion: TEMPLATE,
       getNow: () => T0,
     });
@@ -418,6 +450,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: "0".repeat(64),
+      expectedGelsRevision: "0",
       templateVersion: TEMPLATE,
       getNow: () => T0,
     });
@@ -433,6 +466,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: fingerprintFor(),
+      expectedGelsRevision: "0",
       templateVersion: TEMPLATE,
       getNow: () => T0,
     });
@@ -447,6 +481,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: fp,
+      expectedGelsRevision: "0",
       templateVersion: TEMPLATE,
       getNow: () => T0,
     });
@@ -478,6 +513,7 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       adherentId: ADH,
       clientConfirmationId: KEY,
       expectedFingerprint: fingerprintFor(),
+      expectedGelsRevision: "0",
       templateVersion: "template-inconnu-xyz",
       getNow: () => T0,
     });
@@ -556,6 +592,14 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
 
   it("gel serveur apparu → Calling refusé", async () => {
     findUniqueEnvoi.mockImplementation(async () => reservedRow());
+    findManyGel.mockImplementation(async () => [
+      {
+        scope: "ADHERENT",
+        lineSource: null,
+        cotisationMensuelleId: null,
+        detteInitialeId: null,
+      },
+    ]);
     computeDetteRappelable.mockImplementation(async (_id, opts) => {
       if (opts?.frozenAdherent === true) {
         return eligibleCompute({
@@ -570,11 +614,49 @@ describe("reserveRappelDetteEnvoi / authorizeRappelDetteCalling", () => {
       envoiId: "envoi-1",
       adherentId: ADH,
       getNow: () => T0,
-      frozenAdherent: true,
     });
     expect(r.ok).toBe(false);
     if (!r.ok) {
       expect(r.code).toBe("NOT_ELIGIBLE");
+      expect(r.reservedFate).toBe(RAPPEL_DETTE_RESERVED_ON_PRECALLING_REFUSAL);
+    }
+    expect(updateManyEnvoi).not.toHaveBeenCalled();
+  });
+
+  it("gelsRevision null (ancien Reserved) → REQUIRES_RECONFIRM", async () => {
+    findUniqueEnvoi.mockImplementation(async () =>
+      reservedRow({ gelsRevision: null })
+    );
+    const r = await authorizeRappelDetteCalling({
+      actor: ACTOR_ADMIN,
+      envoiId: "envoi-1",
+      adherentId: ADH,
+      getNow: () => T0,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe("REQUIRES_RECONFIRM");
+      expect(r.reservedFate).toBe(RAPPEL_DETTE_RESERVED_ON_PRECALLING_REFUSAL);
+    }
+    expect(updateManyEnvoi).not.toHaveBeenCalled();
+  });
+
+  it("pose→levée (révision obsolète) → REQUIRES_RECONFIRM même dette inchangée", async () => {
+    findUniqueEnvoi.mockImplementation(async () =>
+      reservedRow({ gelsRevision: BigInt(1) })
+    );
+    findUniqueGelRevision.mockImplementation(async () => ({
+      revision: BigInt(3),
+    }));
+    const r = await authorizeRappelDetteCalling({
+      actor: ACTOR_ADMIN,
+      envoiId: "envoi-1",
+      adherentId: ADH,
+      getNow: () => T0,
+    });
+    expect(r.ok).toBe(false);
+    if (!r.ok) {
+      expect(r.code).toBe("REQUIRES_RECONFIRM");
       expect(r.reservedFate).toBe(RAPPEL_DETTE_RESERVED_ON_PRECALLING_REFUSAL);
     }
     expect(updateManyEnvoi).not.toHaveBeenCalled();

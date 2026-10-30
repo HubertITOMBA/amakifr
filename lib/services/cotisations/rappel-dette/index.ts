@@ -128,6 +128,7 @@ export {
  * Activation / garde legacy / resolve provider : **ne pas** réexporter ici.
  * `rappel-dette-activation` / `rappel-dette-legacy-guard` / `rappel-dette-provider-resolve`
  *
- * Gels : toujours sans source persistée — options injectables ≠ protection prod ;
- * activation réelle bloquée tant que cette exigence métier n’est pas résolue.
+ * Gels persistés : résolveur serveur (`rappel-dette-gel-resolve`) — **ne pas**
+ * réexporter ici. Prepare/reserve/Calling/preview consomment le résolveur ;
+ * jamais de frozen* depuis le client HTTP. Flag envoi reste off hors activation.
  */

@@ -1,14 +1,11 @@
 /**
  * Préparation d’une confirmation d’envoi Lot 3 — **sans mutation métier**.
  *
- * Recalcul + destinataire + empreinte + jeton HMAC. Aucun reserve / transport /
- * notification / envoi.
+ * Recalcul + gels (résolveur serveur) + destinataire + empreinte + jeton HMAC v2.
+ * Aucun reserve / transport / notification / envoi.
  *
- * Gels : `frozenAdherent` / `frozenLineKeys` restent des options injectables
- * **sans source persistée** Prisma. Cette préparation **n’injecte pas** de gels
- * (comportement aligné preview). Tant qu’aucune source serveur réelle n’existe,
- * l’activation produit (`RAPPEL_DETTE_ENVOI_ENABLED=true`) reste **bloquée**
- * si le métier exige le gel/contestation.
+ * Gels : lus via `resolveRappelDetteGels` — jamais depuis le client HTTP.
+ * `frozen*` injectables conservés uniquement pour tests via deps.resolveGels.
  *
  * Module serveur — **ne pas** réexporter via le barrel public.
  */
@@ -35,6 +32,12 @@ import {
   signRappelDetteConfirmationToken,
   type RappelDetteConfirmationTokenClaims,
 } from "@/lib/services/cotisations/rappel-dette/rappel-dette-confirmation-token";
+import {
+  GEL_SOURCE_UNAVAILABLE,
+  resolveRappelDetteGels,
+  type ResolveRappelDetteGelsResult,
+  type RappelDetteGelPrisma,
+} from "@/lib/services/cotisations/rappel-dette/rappel-dette-gel-resolve";
 import { RAPPEL_DETTE_RESERVATION_ACCESS_DENIED_MESSAGE } from "@/lib/services/cotisations/rappel-dette/rappel-dette-reservation";
 import { RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2 } from "@/lib/services/cotisations/rappel-dette/rappel-dette-orchestrate-send";
 
@@ -45,7 +48,7 @@ export type PrepareRappelDetteConfirmationInput = {
   adherentId: string;
   getNow?: () => Date;
   /**
-   * Injection **tests uniquement** (flag / secret / compute / destinataire).
+   * Injection **tests uniquement** (flag / secret / compute / destinataire / gels).
    * Jamais depuis FormData / body client.
    */
   deps?: PrepareRappelDetteConfirmationDeps;
@@ -61,6 +64,13 @@ export type PrepareRappelDetteConfirmationDeps = {
     | { ok: true; recipientUserId: string; recipientEmail: string }
     | { ok: false; code: string; message: string }
   >;
+  /** Résolveur gels injectable (tests) — défaut : lecture Prisma `db`. */
+  resolveGels?: (input: {
+    prisma: RappelDetteGelPrisma;
+    adherentId: string;
+  }) => Promise<ResolveRappelDetteGelsResult>;
+  /** Client lecture gels (défaut `db`). */
+  gelPrisma?: RappelDetteGelPrisma;
   randomConfirmationId?: () => string;
 };
 
@@ -69,6 +79,8 @@ export type PrepareRappelDetteConfirmationSuccess = {
   adherentId: string;
   clientConfirmationId: string;
   expectedFingerprint: string;
+  /** Révision gels capturée (décimal) — aussi dans le jeton. */
+  gelsRevision: string;
   templateVersion: typeof RAPPEL_DETTE_ORCHESTRATE_TEMPLATE_V2;
   detteNette: string;
   referenceAt: string;
@@ -147,7 +159,7 @@ async function defaultLoadRecipient(
 }
 
 /**
- * Prépare une confirmation signée (lecture / recalcul uniquement).
+ * Prépare une confirmation signée v2 (lecture / recalcul + gels).
  *
  * @param input - Acteur session + adhérent cible
  */
@@ -228,9 +240,24 @@ export async function prepareRappelDetteConfirmation(
     };
   }
 
-  // Pas de gels : aucune source persistée (voir en-tête module).
+  const gelPrisma = deps.gelPrisma ?? db;
+  const resolveGels = deps.resolveGels ?? resolveRappelDetteGels;
+  const gels = await resolveGels({ prisma: gelPrisma, adherentId });
+  if (!gels.ok) {
+    return {
+      ok: false,
+      code: GEL_SOURCE_UNAVAILABLE,
+      message: gels.message,
+      nextHint: "wait_or_ops",
+    };
+  }
+
   const computeFn = deps.compute ?? computeDetteRappelable;
-  const compute = await computeFn(adherentId, { now });
+  const compute = await computeFn(adherentId, {
+    now,
+    frozenAdherent: gels.frozenAdherent,
+    frozenLineKeys: gels.frozenLineKeys,
+  });
 
   if (compute.globalReasons.includes("PRISMA_ERROR")) {
     return {
@@ -268,6 +295,7 @@ export async function prepareRappelDetteConfirmation(
     actorUserId: input.actor.userId,
     adherentId,
     fingerprint,
+    gelsRevision: gels.gelsRevisionDecimal,
     clientConfirmationId,
     issuedAt: now,
     secret: deps.hmacSecret === undefined ? undefined : deps.hmacSecret ?? "",
@@ -292,6 +320,7 @@ export async function prepareRappelDetteConfirmation(
     adherentId,
     clientConfirmationId: signed.claims.clientConfirmationId,
     expectedFingerprint: fingerprint,
+    gelsRevision: gels.gelsRevisionDecimal,
     templateVersion,
     detteNette: detteNetteStr,
     referenceAt: now.toISOString(),

@@ -27,6 +27,7 @@ export type PrepareRappelDetteConfirmationActionSuccess = {
     adherentId: string;
     clientConfirmationId: string;
     expectedFingerprint: string;
+    gelsRevision: string;
     templateVersion: string;
     detteNette: string;
     referenceAt: string;
@@ -127,6 +128,7 @@ export async function prepareRappelDetteConfirmationAction(
         adherentId: result.adherentId,
         clientConfirmationId: result.clientConfirmationId,
         expectedFingerprint: result.expectedFingerprint,
+        gelsRevision: result.gelsRevision,
         templateVersion: result.templateVersion,
         detteNette: result.detteNette,
         referenceAt: result.referenceAt,

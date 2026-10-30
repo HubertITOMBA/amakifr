@@ -1,6 +1,6 @@
 # AMAKI — Contexte permanent du projet
 
-Dernière mise à jour : 2026-10-28
+Dernière mise à jour : 2026-10-30
 
 ## Baselines (ne pas confondre)
 
@@ -9,12 +9,13 @@ Dernière mise à jour : 2026-10-28
 | Commit fonctionnel R1 Lot 1 | `ed253fd` | `feat(cotisations): compute reminder eligibility` — calcul d’éligibilité |
 | Commit fonctionnel R1 Lot 2 (preview initial) | `773a5c4` | `feat(cotisations): add dry-run debt reminder preview for ADMIN and PRESID` — parent `f2dc638` |
 | Correction Actualiser / libellés (Lot 2) | `aa08df9` (`aa08df96d759a0ebc22548f2af7b91f165314d0c`) | `fix(cotisations): clarify debt reminder preview refresh feedback` |
-| Exclusion entité Assistance du rappel/preview | `b8c4edd` | `fix(cotisations): exclude received assistance from reminder debt` — **`origin/main`** |
-| Production web / backend **attendue** | `b8c4edd` | Lots 1+2 + Actualiser + exclusion Assistance rappel (vérifier VPS avant toute mutation) |
+| Exclusion entité Assistance du rappel/preview | `b8c4edd` | `fix(cotisations): exclude received assistance from reminder debt` |
+| Production web / backend / `origin/main` **attendue** | `c95e611` | Lots 1+2 + exclusion Assistance rappel + totaux compte F1–F3 (vérifier VPS avant toute mutation) |
+| Branche Lot 3 réalignée (socle **commité**, non activé en prod) | `889c849` (HEAD branche `fix/r1-lot3-realign-on-c95e611`, base `c95e611`) | Envoi manuel / orchestration / actions — **flag off** ; migrations Lot 3 **non** appliquées aux bases app |
 | Commit embarqué dans l’AAB store | `7e4e51e` | `chore(mobile): exclude local assets from EAS builds` |
 | Application Android Play Store **publiée** | `1.1.0` / `versionCode` `3` | Production 100 %, disponible sur Google Play depuis le 27 oct. 2026 01:05 |
 
-**Règle** : M1 et M2 restent **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`). Distinguer : `ed253fd` (Lot 1), `773a5c4` (Lot 2), `aa08df9` (Actualiser), `b8c4edd` (exclusion Assistance **rappel**). Totaux compte (`getCumulDette` / self lines/year) : correctif **local / non commité / non déployé** (worktree `fix/r1-totals-exclude-assistance-from-debt`).
+**Règle** : M1 et M2 restent **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`). Distinguer : `ed253fd` (Lot 1), `773a5c4` (Lot 2), `aa08df9` (Actualiser), `b8c4edd` (exclusion Assistance **rappel**), `c95e611` (prod / `origin/main`), `889c849` (socle Lot 3 sur branche dédiée — **pas** en prod). Totaux compte prod : inclus dans `c95e611`.
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
 
@@ -43,7 +44,7 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 
 ## Point de reprise — R1 rappels cotisations/dettes
 
-**ÉTAT AU 2026-10-28 — production `c95e611` ; Lot 3 en préparation locale (worktree) — non commité / non activé**
+**ÉTAT AU 2026-10-30 — production / `origin/main` = `c95e611` ; socle Lot 3 commité sur branche dédiée (`889c849`, non activé en prod) ; passe gels préparée / validée localement, pas encore commitée**
 
 | Lot | État | SHA / remarque |
 |-----|------|----------------|
@@ -51,23 +52,31 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 | Lot 2 — prévisualisation admin dry-run | **Commité** + déployé | Preview `773a5c4` ; Actualiser `aa08df9` |
 | Exclusion Assistance (rappel) | **Production / `origin/main`** | Chaîne jusqu’à `b8c4edd` puis totaux `c95e611` |
 | Totaux dette compte (F1–F3 + ownership S1) | **Production / `origin/main`** | `c95e611` — Obligations legacy **conservées** dans ces totaux |
-| Lot 3 — envoi manuel | **Socle versionnable, non activé** | Branche `fix/r1-lot3-realign-on-c95e611` (base `c95e611`) ; services d’envoi **non branchés** (pas d’UI / action / cron) ; **aucune** migration appliquée aux bases applicatives |
+| Lot 3 — envoi manuel (socle) | **Commité sur branche dédiée, non activé en prod** | `fix/r1-lot3-realign-on-c95e611` @ **`889c849`** (base `c95e611`) ; flag `RAPPEL_DETTE_ENVOI_ENABLED=false` ; migrations Lot 3 **non** appliquées aux bases app |
+| Lot 3 — gels / contestation | **Préparation locale validée, non commitée** | Schéma + `20261030150000_rappel_dette_gel` ; résolveur ; jeton prepare **v2** (`gelsRevision`) ; branchements preview/prepare/reserve/Calling — **absents de la production** |
 
-### Distinction production vs WIP local (2026-10-28)
+### Distinction production vs WIP local (mise à jour 2026-10-30)
 
 | Surface | Contenu |
 |---------|---------|
-| **Production / `origin/main` @ `c95e611`** | Lots 1+2 ; rappel/preview **sans** entité Assistance comme dette ; totaux compte F1–F3 + ownership S1 ; **aucun** Lot 3 activé en runtime prod tant que ce code + migration ne sont pas déployés |
-| **WIP local principal @ `1455af5` + fichiers non suivis** | Broader WIP Lot 3 historique (peut encore contenir d’anciennes hypothèses) — **ne pas** confondre avec la greffe réalignée |
-| **Branche Lot 3 réalignée** | Sources rappel = **CM** (y compris CM assistance **dues par des tiers**) + **DetteInitiale** ; **Assistance reçue exclue** ; services d’envoi (réservation / outcome email / notif interne) **présents mais non branchés** ; migration `20261027190000_rappel_dette_envoi` **dans le dépôt**, **non appliquée** à `amakifr_db` / `amakifr` / `amakifr_vcl` |
+| **Production / `origin/main` @ `c95e611`** | Lots 1+2 ; rappel/preview **sans** Assistance comme dette ; totaux compte F1–F3 + ownership S1 ; **aucun** runtime Lot 3 / gels (pas de tables gels, pas de jeton v2, pas de résolveur gels) |
+| **WIP local principal @ `1455af5` + fichiers non suivis** *(historique)* | Broader WIP Lot 3 — **ne pas** confondre avec la greffe réalignée |
+| **Branche Lot 3 réalignée @ `889c849`** | Socle **déjà commité** : sources rappel = **CM** (tiers) + **DetteInitiale** ; Assistance reçue exclue ; services d’envoi / orchestration / actions présents ; **flag off** ; migration `20261027190000_rappel_dette_envoi` **dans le dépôt**, **non** appliquée à `amakifr_db` / `amakifr` / `amakifr_vcl` |
+| **Worktree gels (non commité)** | Périmètre futur attendu : **18 fichiers techniques + `docs/PROJECT-CONTEXT.md` = 19 fichiers** ; harness PG / script generate isolé **exclus** du commit |
 
-#### Garde-fous Lot 3 (socle inactif)
+#### Garde-fous Lot 3 (socle inactif en production)
 
-- **Services d’envoi non branchés** : aucun appel depuis `app/` / actions / cron ; email-outcome et notification hors barrel public.
-- **Preview / `computeDetteRappelable`** : le calcul (donc la preview dry-run qui l’utilise) lit désormais aussi `RappelDetteEnvoi` pour le cooldown (preuve `Accepted` + `emailAcceptedAt`). **Déployer ce code sans la migration** fait échouer la lecture Prisma (fail-closed / erreur table absente).
-- **Migration obligatoire avant déploiement** de ce code sur un environnement : appliquer `20261027190000_rappel_dette_envoi` **avant** ou **avec** la mise en service du binaire — **jamais** le code seul sur une base sans table.
-- **Bases applicatives** : à la date de ce socle, **aucune** migration Lot 3.1 n’a été appliquée à `amakifr_db` / `amakifr` / `amakifr_vcl`.
-- **Production courante** : `origin/main` / prod rappel+totaux = **`c95e611`** (sans Lot 3 runtime).
+- **Flag off** : `RAPPEL_DETTE_ENVOI_ENABLED=false` — pas d’activation runtime en dépôt.
+- **Aucune action produit pose/levée gel ni UI** associée (pas d’écrans / actions métier de pose·levée).
+- **Services d’envoi** : présents sur la branche dédiée ; **non activés** en production ; email-outcome / notification hors barrel public selon socle.
+- **Preview / `computeDetteRappelable`** (socle Lot 3) : lit aussi `RappelDetteEnvoi` (cooldown Accepted). Le branchement gels local lit en outre les tables gels / révision. **Déployer le binaire correspondant sans les migrations** → échec Prisma (fail-closed).
+- **Deux migrations Lot 3 requises** avant mise en service du code correspondant (y compris preview qui lit ces tables) :
+  1. `20261027190000_rappel_dette_envoi`
+  2. `20261030150000_rappel_dette_gel`
+  Appliquer **avant** ou **avec** le binaire — **jamais** le code seul sur une base sans tables.
+- **Limite gels** : un gel posé **après** un Calling déjà **commité** n’est **pas rétroactif** — il n’annule pas l’autorisation Calling ; l’appel fournisseur peut encore avoir lieu une fois, puis preuve Accepted.
+- **Bases applicatives** : **aucune** migration Lot 3 (`…envoi` ni `…gel`) appliquée à `amakifr_db` / `amakifr` / `amakifr_vcl`.
+- **Production courante** : `origin/main` / prod = **`c95e611`** (sans Lot 3 runtime, sans gels).
 
 ### Lot 1 (commité — `ed253fd`)
 
@@ -98,14 +107,14 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 - Cooldown **30 jours** uniquement avec **preuve d’envoi réussi** :
   `RelanceCotisationMensuelle.statut ∈ {Envoye, Lu, Repondu}` **et** `dateEnvoi` non null.
   `EnAttente` / échec / absence de preuve → ne bloquent pas.
-- Gel / contestation : paramètres serveur internes (`frozenAdherent`, `frozenLineKeys`) — **pas de persistance** Prisma à ce stade.
-- **Totaux compte** (`getCumulDette`, résumés `getMyCotisationLines` / `getMyCotisationYear`) : correctif F1–F3 + ownership S1 **local / non commité / non déployé** (pas d’entité Assistance dans la dette bénéficiaire ; Obligations legacy **conservées** dans ces totaux — périmètre ≠ rappel). **Totaux admin** synthèse / `getFinancialStats` prestations : **non corrigés** dans ce lot.
+- Gel / contestation **au Lot 1 (`ed253fd`, 2026-10-27)** : paramètres serveur internes (`frozenAdherent`, `frozenLineKeys`) uniquement — **pas de persistance** Prisma à ce stade historique.
+- **Totaux compte** : correctif F1–F3 + ownership S1 **en production** via chaîne **`c95e611`** (Obligations legacy **conservées** dans ces totaux — périmètre ≠ rappel). **Totaux admin** synthèse / `getFinancialStats` prestations : **non corrigés** dans ce lot.
 
 #### Limites Lot 1 (toujours valables)
 
-- Les producteurs actuels créent des relances en `EnAttente` **sans** marquer `Envoye` / `dateEnvoi` → cooldown **pas encore opérationnel** en conditions réelles.
-- Historique d’envoi fiable + marquage preuve Lot 3 (`RappelDetteEnvoi` Accepted) : **en préparation locale** dans le worktree réaligné — **non commité / non activé / non déployé**.
-- Aucun champ persistant de contestation / gel.
+- Les producteurs actuels créent des relances en `EnAttente` **sans** marquer `Envoye` / `dateEnvoi` → cooldown legacy **pas encore opérationnel** en conditions réelles.
+- Historique d’envoi / preuve Accepted Lot 3 (`RappelDetteEnvoi`) : socle **commité** sur branche dédiée (`889c849`) — **non activé / non déployé** en production.
+- Persistance gels / révision / jeton prepare v2 / résolveur : **préparation locale validée (2026-10-30), pas encore commitée** — **absents de la production**.
 
 ### Lot 2 (preview dry-run — déployé)
 
@@ -113,7 +122,7 @@ Prévisualisation administrateur dry-run : route `/admin/finances/rappels-previe
 
 - Accès **ADMIN et PRESID** uniquement (helper `canAccessPreviewRappelsDette`) avec **garde serveur** avant toute lecture métier ; **permissions globales inchangées**.
 - **Écart consignable** : plein accès général président souhaité vs bypass `authorize` **ADMIN seul** / `ROLE_PERMISSIONS` PRESID partiel — **non** corrigé hors Lot 2.
-- **Sans** mutation métier, **sans** création de relance, **sans** envoi (email / notification / push) ; **aucun envoi de rappel ni automatisation** ; Lot 3 **non activé** en production (préparation locale worktree seulement).
+- **Sans** mutation métier, **sans** création de relance, **sans** envoi (email / notification / push) ; **aucun envoi de rappel ni automatisation** ; Lot 3 **non activé** en production *(toujours vrai au 2026-10-30 ; socle Lot 3 existe sur branche dédiée @ `889c849` mais flag off / non déployé)*.
 - Motifs FR ; exclusions métier ≠ échecs techniques ; « Non calculé » + totaux partiels.
 - Présentation : montants EUR à **deux décimales** ; homonymes distingués (« Fiche N ») ; tableaux avec défilement horizontal vérifiés en local.
 - Libellés : « Non éligibles » / « Adhérents non éligibles au rappel » + sous-titre explicatif (correction `aa08df9`).
@@ -146,9 +155,21 @@ Prévisualisation administrateur dry-run : route `/admin/finances/rappels-previe
 
 ### Prochaine étape
 
-- **Lot 3** (envoi manuel idempotent) : socle sur branche dédiée ; **pas** d’activation app/cron ; **pas** d’application de migration aux bases applicatives sans autorisation explicite ; déployer code + migration ensemble (voir garde-fous ci-dessus).
+- **Lot 3 socle** : déjà **commité** @ `889c849` sur `fix/r1-lot3-realign-on-c95e611` — **pas** d’activation app/cron en prod ; **pas** d’application des migrations aux bases app sans autorisation explicite.
+- **Passe gels** : revue / commit des **19 fichiers** candidats (18 techniques + ce document) lorsque autorisé ; exclure harness et script generate isolé.
+- Avant mise en service du binaire gels/envoi correspondant : appliquer **les deux** migrations Lot 3 (`…envoi` + `…gel`) **avec** le code — y compris si la preview lit ces tables.
 - Ne pas lancer d’anciens producteurs de relances comme substitut du Lot 3.
-- Validation PG isolée : bases jetables préfixées uniquement (`amakifr_r1_lot3_*_test_*`) — jamais `amakifr_db` / `amakifr` / `amakifr_vcl`.
+- Validation PG isolée : bases jetables préfixées uniquement (`amakifr_r1_lot3_*`) — jamais `amakifr_db` / `amakifr` / `amakifr_vcl`.
+
+### Validations locales passe gels (2026-10-30) — **séparées**, pas de total cumulé
+
+| Campagne | Résultat | Portée |
+|----------|----------|--------|
+| Contrôles SQL gel (T01–T30) | **30 PASS** | schéma / triggers / contraintes (DB jetable) |
+| Vitest wiring gels | **93 PASS** | suite unitaire ciblée |
+| PG services (PG-G1…G9) | **14 PASS** | preview / prepare / reserve / Calling / orch |
+| Complément chronologie G6 | **ok** | Calling commit → pose → ≤1 faux appel → Accepted ; replay sans 2ᵉ appel |
+| TypeScript **global** du dépôt | **non validé** | ne pas affirmer le contraire ; tsc ciblé gels : 0 erreur propre (transitifs auth/db préexistants) |
 
 ---
 
@@ -390,7 +411,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ## 11. Travaux prioritaires
 
-**ÉTAT AU 2026-10-28 (Android clôturée ; `origin/main` / prod applicatif rappel+totaux = `c95e611` ; Lot 3 préparation locale worktree)**
+**ÉTAT AU 2026-10-30 (Android clôturée ; `origin/main` / prod = `c95e611` ; socle Lot 3 @ `889c849` sur branche dédiée — non activé ; gels validés localement — non commités)**
 
 | Priorité | Sujet | État |
 |----------|-------|------|
@@ -399,11 +420,12 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 | P1 | Lecture CR mobile (M2) | **Production web + Play Store `1.1.0` OK** |
 | P1 | Rappels cotisations / dettes (R1) Lots 1+2 + exclusion Assistance rappel | **Production `c95e611`** ; dry-run uniquement |
 | P1 | Totaux dette compte (Assistance hors dette) | **Production `c95e611`** |
-| **Suivant** | R1 Lot 3 — envoi manuel | Socle branche dédiée — **non activé** ; migration non appliquée aux bases app |
+| **Suivant** | R1 Lot 3 — envoi manuel (socle) | **Commité** @ `889c849` — **flag off** / non déployé ; migrations non appliquées aux bases app |
+| **Suivant** | R1 Lot 3 — gels / contestation | **Validé localement, non commité** ; 19 fichiers candidats ; absents de la prod |
 
 ### Dettes ouvertes
 
-1. **Rappels cotisations / dettes (R1) Lot 3** — préparation locale worktree ; validation PG jetable puis revue avant commit ; auto hors v1 ; ne pas utiliser d’anciens producteurs de relances.  
+1. **Rappels cotisations / dettes (R1) Lot 3 — gels** — commit des 19 fichiers candidats lorsque autorisé ; puis éventuelle mise en service uniquement avec **les deux** migrations Lot 3 ; auto hors v1 ; ne pas utiliser d’anciens producteurs de relances.
 1b. Totaux admin synthèse / prestations (`getFinancialStats`, créances avec Assistance) — **non corrigés**.
 2. Identification de l’origine des connexions.
 3. Copilote IA comptes rendus — **seulement après** stabilisation store M1/M2 ; **non commencé**.
@@ -463,22 +485,25 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - **2026-10-27** : **R1 Lot 1** livré dans le dépôt (`ed253fd`) — service `lib/services/cotisations/rappel-dette/` (`computeDetteRappelable`) ; sources **à l’époque** CM + DetteInitiale + Assistance (hors ObligationCotisation) ; dette nette / J+15 / … ; 69 tests OK. **Annotation 2026-10-28** : l’inclusion de l’entité `Assistance` était incorrecte ; corrigée sur `origin/main` @ `b8c4edd` (sources rappelables courantes = CM + DetteInitiale uniquement).
 - **2026-10-28** : Décision métier — `Assistance` = prestation, pas dette du bénéficiaire ; CM d’assistance des tiers = dettes. Correctif rappel/preview **`b8c4edd`**.
 - **2026-10-28** : Correctif totaux compte F1–F3 + ownership S1 fusionné / déployé dans la chaîne jusqu’à **`c95e611`** ; Obligations legacy **conservées** dans ces totaux ; totaux admin synthèse/prestations **non** corrigés ; aucun changement mobile/Expo.
-- **2026-10-28** : **Lot 3** — socle inactif sur `fix/r1-lot3-realign-on-c95e611` (base `c95e611`) : sources rappel = CM (tiers) + DetteInitiale ; Assistance reçue exclue ; services envoi **non branchés** ; `computeDetteRappelable` / preview dépendent de `RappelDetteEnvoi` pour le cooldown → **migration obligatoire avant déploiement** ; migration **non appliquée** aux bases applicatives.
-- **2026-10-27** : **R1 Lot 2** preview dry-run ADMIN\|PRESID — commit `773a5c4` (parent `f2dc638`) ; route `/admin/finances/rappels-preview` ; sans mutation / relance / envoi ; **91** tests ; tsc 11/0 ; compilation globale non validée ; **aucune** migration ; permissions globales inchangées ; écart bypass président consignable ; **Lot 3 non démarré**.
+- **2026-10-28** *(historique)* : **Lot 3** — socle inactif amorcé sur `fix/r1-lot3-realign-on-c95e611` (base `c95e611`) : sources rappel = CM (tiers) + DetteInitiale ; Assistance reçue exclue ; services envoi alors en cours de greffe ; `computeDetteRappelable` / preview dépendent de `RappelDetteEnvoi` → **migration `…envoi` obligatoire avant déploiement** ; migration **non** appliquée aux bases app.
+- **2026-10-27** : **R1 Lot 2** preview dry-run ADMIN\|PRESID — commit `773a5c4` (parent `f2dc638`) ; route `/admin/finances/rappels-preview` ; sans mutation / relance / envoi ; **91** tests ; tsc 11/0 ; compilation globale non validée ; **aucune** migration ; permissions globales inchangées ; écart bypass président consignable ; **Lot 3 non démarré** *(à cette date)*.
 - **2026-10-27** : Déploiement sécurisé Lot 2 → prod `773a5c4` ; dump `amakifr_custom_20261027_174258.dump` validé ; 0 migration ; PM2 stable ; maintenance OFF ; HTTP 200/200 ; flags Notes de frais true/true ; bannière preview observée en production.
 - **2026-10-27** : Correction Actualiser/libellés — commit/push/déploiement `aa08df9` (`aa08df96d759a0ebc22548f2af7b91f165314d0c`) ; dump `amakifr_custom_20261027_185237.dump` validé ; 0 migration ; recette utilisateur prod : toast + date/heure OK ; présentation locale EUR/homonymes/tableaux OK ; PRESID/refusés navigateur non faits ; **aucun** envoi/cron/Lot 3 ; **aucun** changement mobile/Expo.
 - **2026-10-27** : Alignement Git confirmé : local = `origin/main` = prod `/sites/amakifr` = `aa08df9`. Clôture documentaire R1 Lots 1+2 (ce fichier) — le SHA du futur commit documentaire sera **distinct** du SHA applicatif déployé `aa08df9`.
+- **2026-10-30** : Socle Lot 3 **commité** sur branche dédiée — dernier commit **`889c849`** ; **flag off** ; **non** déployé / **non** activé en prod ; production / `origin/main` restent **`c95e611`**.
+- **2026-10-30** : **Passe gels** — schéma + migration `20261030150000_rappel_dette_gel` + résolveur + jeton prepare v2 + branchements ; validations **séparées** (SQL 30 PASS ; Vitest 93 PASS ; PG 14 PASS ; complément G6 ok) ; **TypeScript global non validé** ; **pas encore commitée** ; tables gels / révision / jeton v2 / résolveur **absents de la production** ; **deux** migrations Lot 3 requises avant mise en service du code correspondant (y compris preview) ; gel après Calling commit **non rétroactif** ; aucune UI / action produit pose·levée ; périmètre commit futur = **19 fichiers** (18 techniques + ce document).
 
 ---
 
 ## Faits temporaires à revérifier
 
-- SHA `origin/main` vs checkout VPS `/sites/amakifr` (rappel+totaux attendus sur chaîne `c95e611` — **revérifier** avant mutation).
-- Lot 3 : présent uniquement en worktree local ; **ne pas** confondre avec le WIP principal `1455af5`.
+- SHA `origin/main` vs checkout VPS `/sites/amakifr` (rappel+totaux attendus sur **`c95e611`** — **revérifier** avant mutation).
+- Lot 3 socle : branche `fix/r1-lot3-realign-on-c95e611` @ `889c849` — **ne pas** confondre avec le WIP principal historique `1455af5` ni avec la passe gels non commitée.
+- Passe gels : fichiers locaux non commités ; **revérifier** avant staging/commit.
 - Présence/absence de `maintenance.flag` ; HTTP public/interne.
 - PM2 `amakifr` online ; écoute `127.0.0.1:9060` uniquement.
 - Flags Notes de frais + stockage privé (sans afficher d’autres secrets).
-- Prisma : migrations M1/M2 `finished` ; R1 **sans** migration nouvelle ; schéma à jour.
-- Play Store public : `1.1.0` / code `3` (inchangé par R1 / totaux).
+- Prisma prod : migrations M1/M2 `finished` ; **aucune** migration Lot 3 (`…envoi` / `…gel`) sur bases app.
+- Play Store public : `1.1.0` / code `3` (inchangé par R1 / totaux / Lot 3).
 - `mobile/.env` local = LAN DEV.
-- R1 : dry-run uniquement ; Lot 3 **suspendu** ; totaux compte correctif local non commité ; ne pas lancer d’anciens producteurs de relances.
+- R1 prod : dry-run uniquement ; Lot 3 **flag off / non déployé** ; ne pas lancer d’anciens producteurs de relances.

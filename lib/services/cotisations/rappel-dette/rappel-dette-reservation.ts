@@ -11,6 +11,14 @@ import {
   RAPPEL_DETTE_TEMPLATE_DETAIL_LINK_CONTRACT,
 } from "@/lib/services/cotisations/rappel-dette/payload-fingerprint";
 import { canAccessPreviewRappelsDette } from "@/lib/services/cotisations/rappel-dette/preview-access";
+import {
+  GEL_SOURCE_UNAVAILABLE,
+  gelsRevisionsEqual,
+  parseGelsRevisionDecimal,
+  resolveRappelDetteGels,
+  type ResolveRappelDetteGelsResult,
+  type RappelDetteGelPrisma,
+} from "@/lib/services/cotisations/rappel-dette/rappel-dette-gel-resolve";
 
 /**
  * TTL local **proposé** pour une réservation `Reserved` (15 minutes).
@@ -58,9 +66,19 @@ export type ReserveRappelDetteInput = {
    * (tests : avancer l’horloge pendant l’attente simulée).
    */
   getNow?: () => Date;
-  /** Gels serveur internes — jamais depuis HTTP client. */
-  frozenAdherent?: boolean;
-  frozenLineKeys?: ReadonlySet<string>;
+  /**
+   * Révision gels confirmée (claim jeton, chaîne décimale).
+   * Comparée sous verrou à la révision courante.
+   */
+  expectedGelsRevision: string;
+  /**
+   * Injection **tests** du résolveur gels — jamais depuis HTTP.
+   * Défaut : `resolveRappelDetteGels` sur le `tx`.
+   */
+  resolveGels?: (input: {
+    prisma: RappelDetteGelPrisma;
+    adherentId: string;
+  }) => Promise<ResolveRappelDetteGelsResult>;
 };
 
 export type ReserveRappelDetteSuccess = {
@@ -97,6 +115,7 @@ export type ReserveRappelDetteFailure = {
     | "BLOCKED_ATTEMPT"
     | "UNRESOLVED_UNCERTAINTY"
     | "COMPUTE_ERROR"
+    | typeof GEL_SOURCE_UNAVAILABLE
     | "INTERNAL_ERROR";
   message: string;
 };
@@ -110,9 +129,14 @@ export type AuthorizeCallingInput = {
   envoiId: string;
   adherentId: string;
   getNow?: () => Date;
-  /** Gels serveur au moment du passage Calling (recalcul sous verrou). */
-  frozenAdherent?: boolean;
-  frozenLineKeys?: ReadonlySet<string>;
+  /**
+   * Injection **tests** du résolveur gels — jamais depuis HTTP.
+   * Défaut : `resolveRappelDetteGels` sur le `tx`.
+   */
+  resolveGels?: (input: {
+    prisma: RappelDetteGelPrisma;
+    adherentId: string;
+  }) => Promise<ResolveRappelDetteGelsResult>;
 };
 
 export type AuthorizeCallingSuccess = {
@@ -143,6 +167,7 @@ export type AuthorizeCallingFailure = {
     | "REQUIRES_RECONFIRM"
     | "NOT_ELIGIBLE"
     | "COMPUTE_ERROR"
+    | typeof GEL_SOURCE_UNAVAILABLE
     | "INTERNAL_ERROR";
   message: string;
   /**
@@ -261,6 +286,9 @@ export async function reserveRappelDetteEnvoi(
   const clientConfirmationId = String(input.clientConfirmationId ?? "").trim();
   const expectedFingerprint = String(input.expectedFingerprint ?? "").trim();
   const templateVersion = String(input.templateVersion ?? "").trim();
+  const expectedGelsRevisionRaw = String(input.expectedGelsRevision ?? "").trim();
+  const expectedGelsRevision = parseGelsRevisionDecimal(expectedGelsRevisionRaw);
+  const resolveGels = input.resolveGels ?? resolveRappelDetteGels;
 
   if (!adherentId) {
     return failReserve("VALIDATION_ERROR", "Adhérent requis");
@@ -270,6 +298,9 @@ export async function reserveRappelDetteEnvoi(
   }
   if (!expectedFingerprint || expectedFingerprint.length > 128) {
     return failReserve("VALIDATION_ERROR", "Empreinte invalide");
+  }
+  if (expectedGelsRevision === null) {
+    return failReserve("VALIDATION_ERROR", "Révision gels invalide");
   }
   if (!templateVersion || templateVersion.length > 64) {
     return failReserve("VALIDATION_ERROR", "Version de template invalide");
@@ -377,11 +408,23 @@ export async function reserveRappelDetteEnvoi(
       }
       const { recipientUserId, recipientEmail } = recipientOrFail;
 
+      // Gels sous le même tx / verrou — 0 fallback db.
+      const gels = await resolveGels({ prisma: tx, adherentId });
+      if (!gels.ok) {
+        return failReserve(GEL_SOURCE_UNAVAILABLE, gels.message);
+      }
+      if (!gelsRevisionsEqual(gels.gelsRevision, expectedGelsRevision)) {
+        return failReserve(
+          "REQUIRES_RECONFIRM",
+          "Les gels ont changé — nouvelle confirmation requise"
+        );
+      }
+
       const compute = await computeDetteRappelable(adherentId, {
         prisma: tx,
         now,
-        frozenAdherent: input.frozenAdherent,
-        frozenLineKeys: input.frozenLineKeys,
+        frozenAdherent: gels.frozenAdherent,
+        frozenLineKeys: gels.frozenLineKeys,
       });
 
       if (compute.globalReasons.includes("PRISMA_ERROR")) {
@@ -429,6 +472,7 @@ export async function reserveRappelDetteEnvoi(
           clientConfirmationId,
           payloadFingerprint: fingerprint,
           templateVersion,
+          gelsRevision: gels.gelsRevision,
           montantBrut: compute.montantBrut,
           avoirDisponible: compute.avoirDisponible,
           detteNette: compute.detteNette,
@@ -466,11 +510,11 @@ export async function reserveRappelDetteEnvoi(
 
 /**
  * Autorise atomiquement Reserved → Calling sous verrou adhérent.
- * Avant transition : destinataire + recalcul + gels + empreinte du snapshot
- * confirmé ; refus sans `providerCallAuthorized` et sans libérer `Reserved`.
- * Aucun appel fournisseur.
+ * Avant transition : gelsRevision + destinataire + recalcul + empreinte ;
+ * `gelsRevision` null (ancien Reserved) ou drift → RECONFIRM, jamais Calling.
+ * Aucun appel fournisseur. Preuves Accepted / Unknown inchangées.
  *
- * @param input - Acteur, envoi, cible, gels serveur
+ * @param input - Acteur, envoi, cible
  */
 export async function authorizeRappelDetteCalling(
   input: AuthorizeCallingInput
@@ -485,6 +529,7 @@ export async function authorizeRappelDetteCalling(
 
   const envoiId = String(input.envoiId ?? "").trim();
   const adherentId = String(input.adherentId ?? "").trim();
+  const resolveGels = input.resolveGels ?? resolveRappelDetteGels;
   if (!envoiId || !adherentId) {
     return failCalling("VALIDATION_ERROR", "Identifiants requis");
   }
@@ -526,6 +571,32 @@ export async function authorizeRappelDetteCalling(
       }
 
       // ——— Contrôles juste avant Calling (même tx, horloge post-verrou) ———
+      // Ancien Reserved sans révision capturée → reconfirm (jamais Calling).
+      if (envoi.gelsRevision == null) {
+        return failCalling(
+          "REQUIRES_RECONFIRM",
+          "Révision gels absente — nouvelle confirmation requise",
+          RAPPEL_DETTE_RESERVED_ON_PRECALLING_REFUSAL
+        );
+      }
+
+      const gels = await resolveGels({ prisma: tx, adherentId });
+      if (!gels.ok) {
+        return failCalling(
+          GEL_SOURCE_UNAVAILABLE,
+          gels.message,
+          RAPPEL_DETTE_RESERVED_ON_PRECALLING_REFUSAL
+        );
+      }
+      // Pose→levée / drift révision même si dette financière inchangée.
+      if (!gelsRevisionsEqual(gels.gelsRevision, envoi.gelsRevision)) {
+        return failCalling(
+          "REQUIRES_RECONFIRM",
+          "Les gels ont changé — nouvelle confirmation requise",
+          RAPPEL_DETTE_RESERVED_ON_PRECALLING_REFUSAL
+        );
+      }
+
       const recipientOrFail = await loadRecipientUnderTx(tx, adherentId);
       if (isReserveFailure(recipientOrFail)) {
         return failCalling(
@@ -541,8 +612,8 @@ export async function authorizeRappelDetteCalling(
       const compute = await computeDetteRappelable(adherentId, {
         prisma: tx,
         now,
-        frozenAdherent: input.frozenAdherent,
-        frozenLineKeys: input.frozenLineKeys,
+        frozenAdherent: gels.frozenAdherent,
+        frozenLineKeys: gels.frozenLineKeys,
       });
 
       if (compute.globalReasons.includes("PRISMA_ERROR")) {
@@ -572,8 +643,7 @@ export async function authorizeRappelDetteCalling(
         );
       }
 
-      // Empreinte reconstruite : template/contrat dérivés du snapshot +
-      // destinataire/montants/lignes **recalculés** — pas de remplacement silencieux.
+      // Empreinte financière inchangée (schéma fingerprint v1) — gels via révision.
       const { fingerprint } = computeRappelDetteFingerprint({
         adherentId,
         recipientUserId,

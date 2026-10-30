@@ -15,6 +15,9 @@ import {
   type LabeledReason,
 } from "@/lib/services/cotisations/rappel-dette/reason-labels";
 import {
+  resolveRappelDetteGels,
+} from "@/lib/services/cotisations/rappel-dette/rappel-dette-gel-resolve";
+import {
   RAPPEL_DETTE_TIMEZONE,
   type ComputeDetteRappelableResult,
   type RappelGlobalReason,
@@ -214,8 +217,26 @@ export async function previewRappelsDetteAdmin(
   for (const adherent of adherents) {
     let result: ComputeDetteRappelableResult;
     try {
-      // Pas de frozen* : jamais pilotés depuis ce parcours.
-      result = await computeDetteRappelable(adherent.id, { now });
+      // Gels : résolveur serveur uniquement — jamais depuis HTTP client.
+      const gels = await resolveRappelDetteGels({
+        prisma: db,
+        adherentId: adherent.id,
+      });
+      if (!gels.ok) {
+        console.error("[previewRappelsDetteAdmin]", {
+          category: "gel_source_unavailable",
+          adherentIdLength: adherent.id.length,
+          code: gels.code,
+        });
+        failed.push(technicalFailureRow(adherent));
+        continue;
+      }
+
+      result = await computeDetteRappelable(adherent.id, {
+        now,
+        frozenAdherent: gels.frozenAdherent,
+        frozenLineKeys: gels.frozenLineKeys,
+      });
     } catch (error) {
       console.error("[previewRappelsDetteAdmin]", {
         category: "compute_throw",
