@@ -7,6 +7,7 @@ import { UserRole, MoyenPaiement, TypeEvenementFamilial, CategorieTypeCotisation
 import { z } from "zod";
 import { revalidatePath } from "next/cache";
 import { Decimal } from "@prisma/client/runtime/library";
+import { assertLegacyRappelChannelsAllowed } from "@/lib/services/cotisations/rappel-dette/rappel-dette-legacy-guard";
 
 /**
  * Schéma de validation pour créer une dette initiale
@@ -1213,6 +1214,11 @@ export async function checkAndSendRelances() {
     const session = await auth();
     if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
+    }
+
+    const legacyGuard = assertLegacyRappelChannelsAllowed("checkAndSendRelances");
+    if (!legacyGuard.ok) {
+      return { success: false, error: legacyGuard.message };
     }
 
     // Récupérer le montant de la cotisation mensuelle (par défaut 15€)

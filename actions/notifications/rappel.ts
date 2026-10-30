@@ -8,6 +8,7 @@ import { addDays, subDays, isAfter, isBefore, format, differenceInDays } from "d
 import { sendCustomEmailToUsers, sendRappelDetailleCotisationEmail, REGLEMENT_COTISATIONS_EXCERPT_TEXT } from "@/lib/mail";
 import type { RappelDetailleData } from "@/lib/mail";
 import { createNotification } from "@/actions/notifications";
+import { assertLegacyRappelChannelsAllowed } from "@/lib/services/cotisations/rappel-dette/rappel-dette-legacy-guard";
 
 /**
  * Types de rappels disponibles
@@ -391,6 +392,12 @@ async function sendRappelsLimiteInscription(now: Date) {
  * Envoie les rappels pour les échéances de cotisation
  */
 async function sendRappelsCotisations(now: Date) {
+  const legacyGuard = assertLegacyRappelChannelsAllowed("sendRappelsCotisations");
+  if (!legacyGuard.ok) {
+    // Lot 3 actif : aucun envoi / notification legacy cotisations
+    return [];
+  }
+
   const rappelsEnvoyes: any[] = [];
 
   // Cotisations échéant dans 7 jours
@@ -494,6 +501,13 @@ export async function sendRappelManuelCotisations(
     const session = await auth();
     if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
+    }
+
+    const legacyGuard = assertLegacyRappelChannelsAllowed(
+      "sendRappelManuelCotisations"
+    );
+    if (!legacyGuard.ok) {
+      return { success: false, error: legacyGuard.message };
     }
 
     if (!adherentIds || adherentIds.length === 0) {

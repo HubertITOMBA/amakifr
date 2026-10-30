@@ -8,6 +8,7 @@ import { subDays, format } from "date-fns";
 import { sendCustomEmailToUsers } from "@/lib/mail";
 import { revalidatePath } from "next/cache";
 import { RELANCE_VARIABLES } from "@/lib/relances/constants";
+import { assertLegacyRappelChannelsAllowed } from "@/lib/services/cotisations/rappel-dette/rappel-dette-legacy-guard";
 
 /**
  * Schéma pour créer un template de relance
@@ -133,6 +134,13 @@ export async function executeRelancesAutomatiques() {
     const session = await auth();
     if (!session?.user?.id || session.user.role !== UserRole.ADMIN) {
       return { success: false, error: "Non autorisé" };
+    }
+
+    const legacyGuard = assertLegacyRappelChannelsAllowed(
+      "executeRelancesAutomatiques"
+    );
+    if (!legacyGuard.ok) {
+      return { success: false, error: legacyGuard.message };
     }
 
     // Récupérer la configuration (pour l'instant, valeurs par défaut)

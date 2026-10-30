@@ -117,4 +117,10 @@ export {
  *
  * Contenu / URL canonique template v2 : **ne pas** réexporter ici.
  * `canonical-app-url` / `rappel-dette-email-content-v2` — construction serveur only.
+ *
+ * Orchestrateur d’envoi Lot 3 : **ne pas** réexporter ici — non branché actions/UI/cron.
+ * Import : `@/lib/services/cotisations/rappel-dette/rappel-dette-orchestrate-send`
+ *
+ * Activation / garde legacy / resolve provider : **ne pas** réexporter ici.
+ * `rappel-dette-activation` / `rappel-dette-legacy-guard` / `rappel-dette-provider-resolve`
  */
