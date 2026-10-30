@@ -131,4 +131,8 @@ export {
  * Gels persistés : résolveur serveur (`rappel-dette-gel-resolve`) — **ne pas**
  * réexporter ici. Prepare/reserve/Calling/preview consomment le résolveur ;
  * jamais de frozen* depuis le client HTTP. Flag envoi reste off hors activation.
+ *
+ * Mutations gels (pose / levée) : **ne pas** réexporter ici.
+ * `rappel-dette-gel-mutate` / `rappel-dette-gel-mutation-activation` —
+ * Server Actions dédiées uniquement ; flag mutation indépendant, défaut off.
  */
