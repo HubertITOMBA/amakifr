@@ -19,12 +19,12 @@ import { isRappelDetteEnvoiEnabled } from "@/lib/services/cotisations/rappel-det
 import { isRappelDetteGelMutationEnabled } from "@/lib/services/cotisations/rappel-dette/rappel-dette-gel-mutation-activation";
 import { formatGelsRevisionDecimal } from "@/lib/services/cotisations/rappel-dette/rappel-dette-gel-resolve";
 import { maskRappelDetteRecipientEmail } from "@/lib/services/cotisations/rappel-dette/rappel-dette-prepare-confirmation";
+import { RAPPEL_DETTE_ADMIN_READ_SOURCE_UNAVAILABLE } from "@/lib/services/cotisations/rappel-dette/rappel-dette-admin-read-constants";
+
+export { RAPPEL_DETTE_ADMIN_READ_SOURCE_UNAVAILABLE } from "@/lib/services/cotisations/rappel-dette/rappel-dette-admin-read-constants";
 
 export const RAPPEL_DETTE_ADMIN_READ_ACCESS_DENIED_MESSAGE =
   "Lectures rappel dette réservées aux administrateurs et au président." as const;
-
-export const RAPPEL_DETTE_ADMIN_READ_SOURCE_UNAVAILABLE =
-  "RAPPEL_DETTE_ADMIN_READ_SOURCE_UNAVAILABLE" as const;
 
 /** Accepted fournisseur ≠ livraison boîte mail. */
 export const RAPPEL_DETTE_EMAIL_ACCEPTED_MEANING =
