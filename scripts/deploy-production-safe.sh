@@ -15,6 +15,7 @@
 #   9. build (flags Notes de frais actifs)
 #  10. prisma migrate deploy
 #  11. contrôles SQL post-migration
+#  11b. POST_MIGRATE_ASSERT_SQL (optionnel) — garde avant seeds/restart/maint-off
 #  12. seeds si ALLOW_SEEDS=1 (STOP si échec)
 #  13. pm2 restart (écoute 127.0.0.1:9060) + pm2 save (bloquant)
 #  14. garde live ss (loopback only) + smoke interne ; puis smoke public
@@ -27,6 +28,11 @@
 #   MAINTENANCE_CHECK_URL=https://amaki.fr/
 #   SMOKE_URL=https://amaki.fr/   # même rigueur d’hôte/schéma
 #   INTERNAL_SMOKE_URL=http://127.0.0.1:9060/  # port PM2 vérifié sur le VPS
+#
+# Optionnel :
+#   POST_MIGRATE_ASSERT_SQL=<chemin>  # SQL lecture seule sous SCRIPT_ROOT (checkout source)
+#     Absent → comportement historique. Défini → validation stricte + psql -X -v ON_ERROR_STOP=1.
+#     Échec → fail() avant seeds/restart/maint-off (PM2 stoppé, maintenance ON).
 #
 # En échec : maintenance reste ON ; PM2 n’est pas redémarré automatiquement
 # (sauf si restart déjà réussi — alors maint ON si save/smoke échoue).
@@ -285,6 +291,14 @@ if [[ -d prisma/migrations/20260918130000_notes_frais_4x10_retention_policies_le
   " | grep -qx OK || fail "migrations 4.x / politique ACTIVE invalides"
 fi
 echo -e "${GREEN}✅ Contrôles SQL OK${NC}"
+
+# ─── 11b. Assertions post-migrate optionnelles (garde avant seeds/restart) ────
+# Variable absente → no-op (historique). Variable définie → fichier sous
+# SCRIPT_ROOT obligatoire ; échec validation/SQL → fail() ici (PM2 stoppé, maint ON).
+step "11b/15 — POST_MIGRATE_ASSERT_SQL (garde avant restart)"
+URL_SAFE="${DATABASE_URL%%\?*}"
+run_post_migrate_assert_sql "$SCRIPT_ROOT" "$URL_SAFE" \
+  || fail "POST_MIGRATE_ASSERT_SQL a échoué — runtime non redémarré, maintenance conservée"
 
 # ─── 12. Seeds ───────────────────────────────────────────────────────────────
 step "12/15 — Seeds (ALLOW_SEEDS=1 requis ; échec = STOP)"

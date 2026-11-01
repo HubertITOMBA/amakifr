@@ -1335,3 +1335,99 @@ assert_deploy_script_no_critical_warn_continue() {
   fi
   return 0
 }
+
+# ---------------------------------------------------------------------------
+# POST_MIGRATE_ASSERT_SQL — garde optionnelle avant seeds / pm2 restart / maint-off
+#
+# Variable d'environnement POST_MIGRATE_ASSERT_SQL :
+#   - absente ou non définie → no-op (comportement historique), return 0
+#   - définie (même chemin relatif) → validation stricte puis psql
+#
+# Validation (échec = return 1, jamais saut silencieux) :
+#   - fichier existant, régulier, lisible, non vide
+#   - chemin résolu (realpath) situé sous script_root (checkout source du deploy)
+#   - pas de symlink sortant hors script_root (realpath final sous racine)
+#
+# Exécution : psql -X -v ON_ERROR_STOP=1 -f <fichier>
+#   DATABASE_URL n'est jamais affichée (url_safe passée en argument, non echo).
+#   PSQL_CMD peut surcharger « psql » (tests uniquement).
+#
+# Usage: run_post_migrate_assert_sql <script_root> <database_url_safe>
+# ---------------------------------------------------------------------------
+run_post_migrate_assert_sql() {
+  local script_root="${1:-}"
+  local url_safe="${2:-}"
+  local raw_path resolved root_resolved psql_bin
+
+  # Absent → no-op historique. Définie vide → erreur (pas de saut silencieux).
+  if [[ -z "${POST_MIGRATE_ASSERT_SQL+x}" ]]; then
+    return 0
+  fi
+  if [[ -z "${POST_MIGRATE_ASSERT_SQL}" ]]; then
+    fail_guard "POST_MIGRATE_ASSERT_SQL est définie mais vide"
+    return 1
+  fi
+
+  raw_path="${POST_MIGRATE_ASSERT_SQL}"
+  [[ -n "$script_root" ]] || {
+    fail_guard "run_post_migrate_assert_sql: script_root requis"
+    return 1
+  }
+  [[ -n "$url_safe" ]] || {
+    fail_guard "run_post_migrate_assert_sql: url base requise (non affichée)"
+    return 1
+  }
+
+  root_resolved="$(realpath "$script_root" 2>/dev/null)" || {
+    fail_guard "POST_MIGRATE_ASSERT_SQL: SCRIPT_ROOT invalide"
+    return 1
+  }
+
+  if [[ ! -e "$raw_path" ]]; then
+    fail_guard "POST_MIGRATE_ASSERT_SQL introuvable"
+    return 1
+  fi
+  # -f suit les symlinks pour le type « fichier » ; realpath borne ensuite sous SCRIPT_ROOT
+  if [[ ! -f "$raw_path" ]]; then
+    fail_guard "POST_MIGRATE_ASSERT_SQL n'est pas un fichier régulier"
+    return 1
+  fi
+  if [[ ! -r "$raw_path" ]]; then
+    fail_guard "POST_MIGRATE_ASSERT_SQL non lisible"
+    return 1
+  fi
+  if [[ ! -s "$raw_path" ]]; then
+    fail_guard "POST_MIGRATE_ASSERT_SQL est vide"
+    return 1
+  fi
+
+  resolved="$(realpath "$raw_path" 2>/dev/null)" || {
+    fail_guard "POST_MIGRATE_ASSERT_SQL: realpath impossible"
+    return 1
+  }
+  case "$resolved" in
+    "$root_resolved"|"$root_resolved"/*) ;;
+    *)
+      fail_guard "POST_MIGRATE_ASSERT_SQL hors checkout source (SCRIPT_ROOT)"
+      return 1
+      ;;
+  esac
+
+  psql_bin="${PSQL_CMD:-psql}"
+  if [[ -x "$psql_bin" ]]; then
+    :
+  elif command -v "$psql_bin" >/dev/null 2>&1; then
+    :
+  else
+    fail_guard "psql introuvable pour POST_MIGRATE_ASSERT_SQL"
+    return 1
+  fi
+
+  # -X : ignore .psqlrc ; ON_ERROR_STOP : toute erreur SQL → exit ≠ 0
+  # Ne jamais printf/echo url_safe ni DATABASE_URL.
+  if ! "$psql_bin" -X -v ON_ERROR_STOP=1 -f "$resolved" "$url_safe" </dev/null; then
+    fail_guard "POST_MIGRATE_ASSERT_SQL: échec psql (assertions)"
+    return 1
+  fi
+  return 0
+}
