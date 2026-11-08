@@ -4,6 +4,7 @@ import { apiSuccess, apiError } from "@/lib/api/response";
 import { handleApiError } from "@/lib/api/errors";
 import { ServiceError } from "@/lib/service-error";
 import { updateMyReunionParticipation } from "@/lib/services/reunions/update-my-reunion-participation";
+import { clearMyReunionParticipation } from "@/lib/services/reunions/clear-my-reunion-participation";
 
 export const dynamic = "force-dynamic";
 
@@ -15,8 +16,21 @@ const FORBIDDEN_BODY_KEYS = [
   "authorId",
 ] as const;
 
+const ALLOWED_PATCH_STATUTS = new Set(["Present", "Absent", "Excuse"]);
+
+function assertNoClientIdentityQuery(request: NextRequest) {
+  const query = request.nextUrl.searchParams;
+  if (query.has("adherentId") || query.has("userId") || query.has("participantId")) {
+    throw new ServiceError(
+      "VALIDATION_ERROR",
+      "Paramètres userId, adherentId et participantId non autorisés"
+    );
+  }
+}
+
 /**
  * PATCH /api/v1/me/reunions/[id]/participation — confirmer sa présence self-service.
+ * Compatible anciennes apps : statut Present | Absent | Excuse uniquement.
  * Identité via Bearer uniquement — aucun userId/adherentId client.
  */
 export async function PATCH(
@@ -29,13 +43,7 @@ export async function PATCH(
       return apiError("UNAUTHENTICATED", "Non authentifié", 401);
     }
 
-    const query = request.nextUrl.searchParams;
-    if (query.has("adherentId") || query.has("userId") || query.has("participantId")) {
-      throw new ServiceError(
-        "VALIDATION_ERROR",
-        "Paramètres userId, adherentId et participantId non autorisés"
-      );
-    }
+    assertNoClientIdentityQuery(request);
 
     let raw: unknown;
     try {
@@ -60,7 +68,7 @@ export async function PATCH(
     }
 
     const statut = body.statut;
-    if (typeof statut !== "string") {
+    if (typeof statut !== "string" || !ALLOWED_PATCH_STATUTS.has(statut)) {
       throw new ServiceError(
         "VALIDATION_ERROR",
         "Statut de participation invalide"
@@ -73,6 +81,30 @@ export async function PATCH(
       statut: statut as "Present" | "Absent" | "Excuse",
     });
 
+    return apiSuccess(result);
+  } catch (error) {
+    return handleApiError(error);
+  }
+}
+
+/**
+ * DELETE /api/v1/me/reunions/[id]/participation — retirer sa réponse (Non répondu).
+ * Canonique : suppression de la ligne ParticipationReunion. Idempotent.
+ */
+export async function DELETE(
+  request: NextRequest,
+  { params }: { params: Promise<{ id: string }> }
+) {
+  try {
+    const actor = await resolveApiActor(request);
+    if (!actor) {
+      return apiError("UNAUTHENTICATED", "Non authentifié", 401);
+    }
+
+    assertNoClientIdentityQuery(request);
+
+    const { id: reunionId } = await params;
+    const result = await clearMyReunionParticipation(actor, reunionId);
     return apiSuccess(result);
   } catch (error) {
     return handleApiError(error);

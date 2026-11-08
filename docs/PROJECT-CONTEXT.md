@@ -1,6 +1,6 @@
 # AMAKI — Contexte permanent du projet
 
-Dernière mise à jour : 2026-11-08
+Dernière mise à jour : 2026-11-09
 
 ## Baselines (ne pas confondre)
 
@@ -29,6 +29,50 @@ Dernière mise à jour : 2026-11-08
 - **Après** push de ce commit sur `fix/r1-lot3-realign-on-c95e611` : les six correctifs + cette doc sont **sur la branche Lot 3** ; `origin/main` / prod applicative restent **`62e59a1`** avec **flags off** — aucun déploiement ni activation effectué par cette passe.
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
+
+---
+
+## Point de reprise — RSVP réunions (retrait + conflit admin) — **local non commité**
+
+**ÉTAT AU 2026-11-09** — correctif local dans **ce** worktree `feat/reunions-rsvp-withdraw` (base `a7762c7`) ; **aucun** commit / push / déploiement / AAB dans cette passe. Ne pas confondre avec le chantier Lot 3 / flags / prod `62e59a1` documentés ci-dessus.
+
+| Portée | État |
+|--------|------|
+| Worktree | `/soft/dev/nextjs/worktrees/amakifr-reunions-rsvp` (`feat/reunions-rsvp-withdraw`) |
+| Principal WIP `1455af5` / recette Lot 3 / prod | **préservés** — hors périmètre de ce correctif |
+| Migration Prisma | **aucune** |
+| Recette jetable RSVP | SAS `reunions-rsvp-recette-20261108T154839Z` (DB + preuves) |
+
+### Fonctionnalités (delta)
+
+- API : `DELETE /api/v1/me/reunions/[id]/participation` (retrait idempotent → absence de ligne) ; `PATCH` reste au **format** Present\|Absent\|Excuse (apps anciennes) mais **règles date / verrou** alignées (réunions non confirmées, passées, annulées refusées sous verrou).
+- Admin : enregistrement en **delta** + `expected` (`absent` \| `row`) ; collision unique participation → `CONFLICT` (validation structurelle P2002, pas `instanceof`) ; warning + rechargement ; edits obsolètes remplacés seulement après données fraîches.
+- Mobile (dev-client) : bouton « Retirer ma réponse » ; **pas** de publication AAB dans cette passe.
+- Dialogue participants : timeout UI, générations anti-réponses obsolètes, `ready` ; instrumentation temporaire `corr=rmid-` **retirée**.
+
+### Validations datées (preuves **distinctes** — ne pas cumuler)
+
+| Preuve | Résultat | Date / note |
+|--------|----------|-------------|
+| Vitest web RSVP (campagne) | **91** | antérieur au mapping CONFLICT final |
+| Contrôles PG jetable | **17 PASS** | antérieur ; DB jetable droppée — non rejoués sans changement TX |
+| Vitest mobile | **431** | antérieur (`npm ci` mobile) |
+| Observations navigateur + test manuel CONFLICT | OK (warning → reload Present) | 2026-11-08 |
+| Vitest web suites RSVP post-nettoyage | **162 PASS** (13 fichiers) | 2026-11-09 |
+| Mobile typecheck + `npm test` | **OK** / **431 PASS** | 2026-11-09 |
+| tsc ciblé RSVP (+ `next-auth.d.ts`) | **0** erreur sur candidats ; **38** diagnostics transitifs (`lib/toast.ts`, templates) | **ne permet pas** d’affirmer une compilation TypeScript web **globale** réussie |
+
+### Limites assumées
+
+- Aller-retour concurrent A→B→A **sans version** non détecté.
+- Clavier / focus mobile : non audités ici.
+- `/api/build-id` : sujet **séparé**, diagnostic seul, **non** corrigé dans ce chantier.
+- Lenteur chargement dialogue Décembre : améliorée sous moindre pression mémoire ; **cause non définitivement expliquée**.
+
+### Déploiements futurs (à ne pas confondre)
+
+- **Web / API** : déployable après commit + revue — **non** annoncé / **non** activé ici.
+- **AAB mobile** : cycle EAS / Play Store **distinct** ; apps store actuelles sans bouton retrait ; PATCH format compatible.
 
 ---
 
@@ -520,6 +564,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - **2026-10-30** : **Lectures admin Lot 3** (capacités + historiques envois/gels paginés) — commit `9ef7218` sur `fix/r1-lot3-realign-on-c95e611` (parent `b68a9a3`) ; curseurs liés + ancre vérifiée ; `notifResumeEligible` distinct de `canResumeNotif` ; validations **séparées** (**38** Vitest ; **15** scénarios PG jetable) ; base jetable **supprimée** ; **aucune** base app migrée ; **deux flags false** ; TypeScript global **non validé** ; `origin/main` / prod restent **`c95e611`**.
 - **2026-11-01** : **UI opérations + recherche adhérents** sur branche Lot 3 (parent lectures `9ef7218`) — route `/admin/finances/rappels-operations` **distincte** de la preview ; recherche limitée ADMIN\|PRESID ; **sans passeport** ; « Fiche N » ; séparation client/serveur (constants purs) ; **deux flags false** ; *(à cette date)* migrations **non** encore appliquées aux bases app ; **aucun** envoi ; TypeScript global **non validé** ; recette navigateur **partielle** ; `origin/main` / prod étaient alors **`c95e611`**.
 - **2026-11-08** : Alignement observé — production / `origin/main` = **`62e59a1`** (**avant** ce commit) ; **deux** migrations Lot 3 **appliquées** ; **deux flags off** ; recette isolée SAS (données fictives + Mailpit, 2026-11-02 → 2026-11-08) sans activation prod ; observations navigateur **distinctes** des preuves DB/harness ; limites (clavier/focus, gel ligne absent UI, pas de rupture réseau réelle, TypeScript global non validé) ; **correctifs présentation** dialogs/accessibilité livrés **dans ce commit** sur `fix/r1-lot3-realign-on-c95e611` (parent `62e59a1`) — **sans** push `main`, **sans** déploiement, **sans** activation ; WIP principal **`1455af5`** préservé.
+- **2026-11-09** : RSVP réunions (retrait + conflit admin) — **état local non commité** sur `feat/reunions-rsvp-withdraw` @ base `a7762c7` ; DELETE participation + delta admin + CONFLICT structurel ; mobile retrait en dev-client seulement ; preuves 91 Vitest ≠ 17 PG ≠ 431 mobile ≠ 162 Vitest post-nettoyage ≠ test manuel CONFLICT ; tsc ciblé 0 sur candidats / 38 transitifs (**pas** une validation tsc web globale) ; limites A→B→A / build-id séparé / lenteur non expliquée ; **aucun** déploiement web ni AAB annoncé.
 
 ---
 

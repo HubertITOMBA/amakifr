@@ -11,6 +11,7 @@ import {
   hostProposalErrorMessage,
   mapParticipationStatut,
   mapReunionStatut,
+  participationErrorMessage,
   reunionsErrorMessage,
   splitReunionsByTime,
 } from "@/api/reunions-state";
@@ -78,6 +79,60 @@ describe("mapParticipationStatut", () => {
 
   it("Présent", () => {
     expect(mapParticipationStatut("Present")?.label).toBe("Présent");
+  });
+
+  it("NonRepondu — libellé neutre, pas une réponse donnée", () => {
+    const display = mapParticipationStatut("NonRepondu");
+    expect(display).toEqual({ label: "Non répondu", tone: "neutral" });
+    // Contrats UI (ReunionCard) : hasAnswer = Present|Absent|Excuse uniquement.
+    // NonRepondu reste affichable (badge/historique) sans être une réponse.
+    const answerStatuses = ["Present", "Absent", "Excuse"] as const;
+    expect(answerStatuses).not.toContain("NonRepondu");
+    expect(display?.tone).toBe("neutral");
+    expect(mapParticipationStatut("Present")?.tone).not.toBe("neutral");
+  });
+
+  it("Absent / Excusé — tons distincts de NonRepondu", () => {
+    expect(mapParticipationStatut("Absent")).toEqual({
+      label: "Absent",
+      tone: "danger",
+    });
+    expect(mapParticipationStatut("Excuse")).toEqual({
+      label: "Excusé",
+      tone: "warning",
+    });
+  });
+});
+
+describe("participationErrorMessage", () => {
+  it("403 réunion non modifiable", () => {
+    expect(
+      participationErrorMessage({
+        status: 403,
+        code: "FORBIDDEN",
+        message: "Participation non modifiable pour cette réunion.",
+      })
+    ).toBe("Participation non modifiable pour cette réunion.");
+  });
+
+  it("403 sans message métier — repli", () => {
+    expect(
+      participationErrorMessage({
+        status: 403,
+        code: "FORBIDDEN",
+        message: "",
+      })
+    ).toBe("Modification non autorisée pour cette réunion.");
+  });
+
+  it("réseau", () => {
+    expect(
+      participationErrorMessage({
+        status: 0,
+        code: "NETWORK_ERROR",
+        message: "x",
+      })
+    ).toBe("Serveur injoignable. Vérifiez votre connexion.");
   });
 });
 

@@ -67,6 +67,17 @@ export type UpdateMyReunionParticipationResult = {
   statut: string;
 };
 
+/**
+ * Résultat du retrait self-service.
+ * `participationStatus: null` = Non répondu (absence de ligne).
+ */
+export type ClearMyReunionParticipationResult = {
+  participationStatus: null;
+  cleared: true;
+  /** true si aucune ligne n'existait déjà (idempotent) */
+  alreadyClear: boolean;
+};
+
 export type HostProposalBlockedReason =
   | "ALREADY_HOST_THIS_YEAR"
   | "MONTH_ALREADY_TAKEN"

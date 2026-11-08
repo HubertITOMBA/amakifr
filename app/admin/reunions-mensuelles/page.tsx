@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useMemo, useCallback } from "react";
+import React, { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,6 +31,8 @@ import {
   FileText,
   ArrowLeft,
   ArrowUpDown,
+  RefreshCw,
+  Loader2,
 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "react-toastify";
@@ -42,8 +44,8 @@ import {
   validerMoisReunion,
   getReunionMensuelleById,
   adminSetParticipationsReunion,
+  getAdherentsPourReunionParticipants,
 } from "@/actions/reunions-mensuelles";
-import { getAdherentsMembres } from "@/actions/cotisations-du-mois";
 import { StatutReunionMensuelle, TypeLieuReunion, StatutParticipationReunion } from "@prisma/client";
 import {
   DropdownMenu,
@@ -69,6 +71,16 @@ import { Check, ChevronsUpDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
   createColumnHelper,
   getCoreRowModel,
   useReactTable,
@@ -80,6 +92,21 @@ import {
 } from "@tanstack/react-table";
 import { DataTable } from "@/components/admin/DataTable";
 import { InlineAdherentSearchPanel } from "@/components/admin/InlineAdherentSearchPanel";
+import { isReunionPast } from "@/lib/services/reunions/reunion-helpers";
+import {
+  buildParticipantsState,
+  countListParticipationBadges,
+  countParticipationStats,
+  hasUnsavedParticipantsEdits,
+  isParticipantsLoadGenerationCurrent,
+  nextParticipantsLoadGeneration,
+  raceParticipantsLoadWithTimeout,
+  NON_REPONDU_PERIMETER_HINT,
+  PARTICIPANTS_DIALOG_LOAD_TIMEOUT_MESSAGE,
+  PARTICIPANTS_REFRESH_DISCARD_MESSAGE,
+  type ParticipantAdherentRow,
+  type ParticipantsLoadGeneration,
+} from "@/lib/services/reunions/participants-dialog-state";
 
 const columnHelper = createColumnHelper<any>();
 
@@ -104,7 +131,7 @@ function dateToUtcNoonIso(d: Date) {
 
 export default function AdminReunionsMensuellesPage() {
   const [reunions, setReunions] = useState<any[]>([]);
-  const [adherents, setAdherents] = useState<any[]>([]);
+  const [adherents, setAdherents] = useState<ParticipantAdherentRow[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
   const [editingReunion, setEditingReunion] = useState<any | null>(null);
@@ -133,19 +160,45 @@ export default function AdminReunionsMensuellesPage() {
   const [globalFilter, setGlobalFilter] = useState("");
   const [anneeCartes, setAnneeCartes] = useState(new Date().getFullYear());
   const [participantsDialogReunion, setParticipantsDialogReunion] = useState<any | null>(null);
+  const [participantsDialogLoading, setParticipantsDialogLoading] = useState(false);
+  /** true seulement après un chargement réussi pour la génération courante — bloque Enregistrer sinon */
+  const [participantsDialogReady, setParticipantsDialogReady] = useState(false);
   const [participantsEdits, setParticipantsEdits] = useState<Record<string, { statut: StatutParticipationReunion; justificatifFournit: boolean }>>({});
-  const [participantsInitial, setParticipantsInitial] = useState<Record<string, { statut: StatutParticipationReunion; justificatifFournit: boolean }>>({});
+  /** État serveur à l'ouverture : distingue ligne absente vs ligne NonRepondu */
+  const [participantsInitial, setParticipantsInitial] = useState<
+    Record<
+      string,
+      | { kind: "absent" }
+      | { kind: "row"; statut: StatutParticipationReunion; justificatifFournit: boolean }
+    >
+  >({});
+  const [participantsSearch, setParticipantsSearch] = useState("");
   const [participantsSort, setParticipantsSort] = useState<{ key: "adherent" | "statut"; direction: "asc" | "desc" }>({
     key: "adherent",
     direction: "asc",
   });
+  const [listRefreshing, setListRefreshing] = useState(false);
+  const [participantsRefreshing, setParticipantsRefreshing] = useState(false);
+  /** Génération de chargement (réunion + seq) — les réponses obsolètes sont ignorées. */
+  const participantsLoadSeqRef = useRef(0);
+  const participantsLoadGenRef = useRef<ParticipantsLoadGeneration | null>(null);
+  /** Miroir ref du loading pour garde anti-concurrence sans recréer le callback. */
+  const participantsDialogLoadingRef = useRef(false);
+  const adherentsRef = useRef(adherents);
+  useEffect(() => {
+    adherentsRef.current = adherents;
+  }, [adherents]);
+  /** Confirmation avant actualisation qui abandonnerait des edits locaux. */
+  const [refreshConfirmScope, setRefreshConfirmScope] = useState<
+    null | "list" | "participants"
+  >(null);
 
   const loadData = useCallback(async () => {
     try {
       setLoading(true);
       const [reunionsResult, adherentsResult] = await Promise.all([
         getAllReunionsMensuelles(),
-        getAdherentsMembres(),
+        getAdherentsPourReunionParticipants(),
       ]);
 
       if (reunionsResult.success && reunionsResult.data) {
@@ -156,7 +209,9 @@ export default function AdminReunionsMensuellesPage() {
       }
 
       if (adherentsResult.success && adherentsResult.adherents) {
-        setAdherents(adherentsResult.adherents);
+        setAdherents(adherentsResult.adherents as ParticipantAdherentRow[]);
+      } else if (!adherentsResult.success) {
+        toast.error(adherentsResult.error || "Erreur lors du chargement des adhérents");
       }
     } catch (error) {
       console.error("Erreur dans loadData:", error);
@@ -169,6 +224,18 @@ export default function AdminReunionsMensuellesPage() {
   useEffect(() => {
     loadData();
   }, [loadData]);
+
+  const participantsDirty = useMemo(
+    () =>
+      !!participantsDialogReunion &&
+      hasUnsavedParticipantsEdits(participantsInitial, participantsEdits),
+    [participantsDialogReunion, participantsInitial, participantsEdits]
+  );
+
+  const hasUnsavedAdminWork = useMemo(
+    () => participantsDirty || !!editingReunion || showForm,
+    [participantsDirty, editingReunion, showForm]
+  );
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -311,15 +378,8 @@ export default function AdminReunionsMensuellesPage() {
     return badges[statut] || { label: statut, variant: "outline" };
   };
 
-  const isReunionPassee = (reunion: any) => {
-    if (!reunion?.dateReunion) return false;
-    const now = new Date();
-    now.setHours(0, 0, 0, 0);
-    const d = new Date(reunion.dateReunion);
-    if (Number.isNaN(d.getTime())) return false;
-    d.setHours(0, 0, 0, 0);
-    return d.getTime() < now.getTime();
-  };
+  const isReunionPassee = (reunion: any) =>
+    isReunionPast(reunion?.dateReunion ? new Date(reunion.dateReunion) : null);
 
   const getStatutBadgeForReunion = (reunion: any) => {
     const badge = getStatutBadge(reunion?.statut);
@@ -343,6 +403,370 @@ export default function AdminReunionsMensuellesPage() {
         return <Building2 className="h-4 w-4" />;
       default:
         return <MapPin className="h-4 w-4" />;
+    }
+  };
+
+  /**
+   * Ferme le dialogue participants : invalide la génération en cours et
+   * réinitialise loading / ready. N'annule pas un POST Server Action déjà parti.
+   */
+  const closeParticipantsDialog = useCallback(() => {
+    participantsLoadSeqRef.current += 1;
+    participantsLoadGenRef.current = null;
+    participantsDialogLoadingRef.current = false;
+    setParticipantsDialogLoading(false);
+    setParticipantsRefreshing(false);
+    setParticipantsDialogReady(false);
+    setParticipantsDialogReunion(null);
+    setParticipantsEdits({});
+    setParticipantsInitial({});
+    setRefreshConfirmScope((scope) =>
+      scope === "participants" ? null : scope
+    );
+  }, []);
+
+  /**
+   * Charge / recharge le dialogue participants (lecture seule serveur).
+   * Génération liée à la réunion : réponses obsolètes ignorées.
+   * Timeout UI borné — ne prétend pas annuler le POST serveur.
+   *
+   * @param reunion - Réunion cible
+   * @param options.resetFilters - Si true (ouverture), réinitialise recherche/tri
+   * @param options.closeOnError - Fermer le dialogue en cas d'échec (ouverture)
+   * @param options.manualToast - Toast succès uniquement après clic Actualiser
+   */
+  const loadParticipantsDialogData = useCallback(
+    async (
+      reunion: { id: string },
+      options: {
+        resetFilters?: boolean;
+        closeOnError?: boolean;
+        manualToast?: boolean;
+        /** Conflit : garder les edits jusqu'aux données fraîches (ready=false bloque la sauvegarde). */
+        preserveEditsUntilFresh?: boolean;
+      } = {}
+    ) => {
+      const {
+        resetFilters = false,
+        closeOnError = false,
+        manualToast = false,
+        preserveEditsUntilFresh = false,
+      } = options;
+
+      // Même réunion déjà en chargement : pas de relance concurrente / boucle
+      if (
+        participantsDialogLoadingRef.current &&
+        participantsLoadGenRef.current?.reunionId === reunion.id
+      ) {
+        return false;
+      }
+
+      const gen = nextParticipantsLoadGeneration(
+        participantsLoadSeqRef.current,
+        reunion.id
+      );
+      participantsLoadSeqRef.current = gen.seq;
+      participantsLoadGenRef.current = gen;
+
+      // Bloquer toute sauvegarde pendant le rechargement
+      setParticipantsDialogReady(false);
+      if (!preserveEditsUntilFresh) {
+        setParticipantsEdits({});
+        setParticipantsInitial({});
+      }
+      participantsDialogLoadingRef.current = true;
+      setParticipantsDialogLoading(true);
+      if (resetFilters) {
+        setParticipantsSearch("");
+        setParticipantsSort({ key: "adherent", direction: "asc" });
+      }
+
+      const stillCurrent = () =>
+        isParticipantsLoadGenerationCurrent(participantsLoadGenRef.current, gen);
+
+      try {
+        // Timeout = déblocage UI uniquement ; le/les POST continuent côté serveur.
+        const raced = await raceParticipantsLoadWithTimeout(
+          Promise.all([
+            getReunionMensuelleById(reunion.id),
+            getAdherentsPourReunionParticipants(),
+          ])
+        );
+
+        if (!stillCurrent()) {
+          return false;
+        }
+
+        if (raced.status === "timeout") {
+          toast.error(PARTICIPANTS_DIALOG_LOAD_TIMEOUT_MESSAGE);
+          setParticipantsDialogReady(false);
+          if (closeOnError) {
+            closeParticipantsDialog();
+          }
+          return false;
+        }
+
+        const [fresh, adherentsReload] = raced.value;
+
+        if (!fresh.success || !fresh.data) {
+          toast.error(fresh.error || "Impossible de charger les participants");
+          setParticipantsDialogReady(false);
+          if (closeOnError) closeParticipantsDialog();
+          return false;
+        }
+
+        let adherentsList = adherentsRef.current;
+        if (adherentsReload.success && adherentsReload.adherents) {
+          adherentsList = adherentsReload.adherents as ParticipantAdherentRow[];
+        } else if (adherentsList.length === 0) {
+          toast.error(
+            adherentsReload.error || "Impossible de charger les adhérents"
+          );
+          setParticipantsDialogReady(false);
+          if (closeOnError) closeParticipantsDialog();
+          return false;
+        }
+
+        if (!stillCurrent()) {
+          return false;
+        }
+
+        const { initial, edits, merged } = buildParticipantsState(
+          fresh.data.Participations || [],
+          adherentsList
+        );
+        // Reconstruit expected (initial) + edits depuis les données fraîches
+        setAdherents(merged);
+        setParticipantsInitial(initial as typeof participantsInitial);
+        setParticipantsEdits(edits as typeof participantsEdits);
+        setParticipantsDialogReunion(fresh.data);
+        setParticipantsDialogReady(true);
+        setReunions((prev) =>
+          prev.map((r) =>
+            r.id === fresh.data.id
+              ? { ...r, Participations: fresh.data.Participations }
+              : r
+          )
+        );
+        if (manualToast) {
+          toast.success("Participants actualisés");
+        }
+        return true;
+      } catch (e) {
+        console.error(e);
+        if (!stillCurrent()) return false;
+        toast.error("Erreur lors du chargement des participants");
+        setParticipantsDialogReady(false);
+        if (closeOnError) closeParticipantsDialog();
+        return false;
+      } finally {
+        // Ne pas éteindre le loader si une génération plus récente l'a repris
+        if (stillCurrent()) {
+          participantsDialogLoadingRef.current = false;
+          setParticipantsDialogLoading(false);
+        }
+      }
+    },
+    [closeParticipantsDialog]
+  );
+
+  const openParticipantsDialog = useCallback(
+    async (reunion: any) => {
+      // Titre immédiat ; compteurs/lignes masqués tant que loading (pas d'anciens badges)
+      setParticipantsDialogReunion(reunion);
+      setParticipantsDialogReady(false);
+      setParticipantsEdits({});
+      setParticipantsInitial({});
+      await loadParticipantsDialogData(reunion, {
+        resetFilters: true,
+        closeOnError: true,
+      });
+    },
+    [loadParticipantsDialogData]
+  );
+
+  /**
+   * Actualise la liste des réunions + compteurs sans perdre année / recherche.
+   * Lecture seule — aucune écriture DB ni émission.
+   */
+  const refreshReunionsList = useCallback(async () => {
+    if (listRefreshing) return;
+    setListRefreshing(true);
+    try {
+      const [reunionsResult, adherentsResult] = await Promise.all([
+        getAllReunionsMensuelles(),
+        getAdherentsPourReunionParticipants(),
+      ]);
+      if (!reunionsResult.success || !reunionsResult.data) {
+        toast.error(
+          reunionsResult.error || "Erreur lors de l'actualisation des réunions"
+        );
+        return;
+      }
+      setReunions(reunionsResult.data);
+      if (adherentsResult.success && adherentsResult.adherents) {
+        setAdherents(adherentsResult.adherents as ParticipantAdherentRow[]);
+      }
+      // Formulaire édition / création : abandonné si confirmation déjà acceptée
+      setEditingReunion(null);
+      setShowForm(false);
+      // Dialogue ouvert : reconstruire expected depuis la réunion fraîche
+      if (participantsDialogReunion?.id) {
+        const match = reunionsResult.data.find(
+          (r: { id: string }) => r.id === participantsDialogReunion.id
+        );
+        await loadParticipantsDialogData(
+          match ?? participantsDialogReunion,
+          { resetFilters: false, manualToast: false }
+        );
+      }
+      toast.success("Liste des réunions actualisée");
+    } catch (error) {
+      console.error(error);
+      toast.error("Erreur lors de l'actualisation des réunions");
+    } finally {
+      setListRefreshing(false);
+    }
+  }, [
+    listRefreshing,
+    participantsDialogReunion,
+    loadParticipantsDialogData,
+  ]);
+
+  const refreshParticipantsDialog = useCallback(async () => {
+    if (!participantsDialogReunion || participantsRefreshing) return;
+    setParticipantsRefreshing(true);
+    try {
+      await loadParticipantsDialogData(participantsDialogReunion, {
+        resetFilters: false,
+        manualToast: true,
+      });
+    } finally {
+      setParticipantsRefreshing(false);
+    }
+  }, [
+    participantsDialogReunion,
+    participantsRefreshing,
+    loadParticipantsDialogData,
+  ]);
+
+  const requestRefreshReunionsList = () => {
+    if (listRefreshing) return;
+    if (hasUnsavedAdminWork) {
+      setRefreshConfirmScope("list");
+      return;
+    }
+    void refreshReunionsList();
+  };
+
+  const requestRefreshParticipantsDialog = () => {
+    if (participantsRefreshing || participantsDialogLoading) return;
+    if (participantsDirty) {
+      setRefreshConfirmScope("participants");
+      return;
+    }
+    void refreshParticipantsDialog();
+  };
+
+  const confirmPendingRefresh = () => {
+    const scope = refreshConfirmScope;
+    setRefreshConfirmScope(null);
+    if (scope === "list") void refreshReunionsList();
+    else if (scope === "participants") void refreshParticipantsDialog();
+  };
+
+  const toggleParticipantsSort = (key: "adherent" | "statut") => {
+    setParticipantsSort((prev) => {
+      if (prev.key === key) {
+        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
+      }
+      return { key, direction: "asc" };
+    });
+  };
+
+  const handleSaveParticipants = async () => {
+    if (!participantsDialogReunion || !participantsDialogReady) return;
+    if (participantsDialogLoading || participantsRefreshing) return;
+    setLoading(true);
+    try {
+      // Delta uniquement + état attendu (absent vs row) pour comparaison atomique serveur
+      const payloadParticipations = adherents
+        .map((a) => {
+          const edit = participantsEdits[a.id] ?? {
+            statut: "NonRepondu" as StatutParticipationReunion,
+            justificatifFournit: false,
+          };
+          const initial = participantsInitial[a.id] ?? { kind: "absent" as const };
+          const initialStatut =
+            initial.kind === "absent" ? ("NonRepondu" as StatutParticipationReunion) : initial.statut;
+          const initialJustificatif =
+            initial.kind === "absent" ? false : initial.justificatifFournit;
+          const changed =
+            edit.statut !== initialStatut ||
+            Boolean(edit.justificatifFournit) !== Boolean(initialJustificatif);
+          if (!changed) return null;
+          return {
+            adherentId: a.id,
+            statut: edit.statut,
+            justificatifFournit: Boolean(edit.justificatifFournit),
+            expected:
+              initial.kind === "absent"
+                ? ({ kind: "absent" } as const)
+                : ({
+                    kind: "row" as const,
+                    statut: initial.statut,
+                    justificatifFournit: Boolean(initial.justificatifFournit),
+                  }),
+          };
+        })
+        .filter((p): p is NonNullable<typeof p> => p !== null);
+
+      if (payloadParticipations.length === 0) {
+        toast.info("Aucune modification détectée.");
+        setLoading(false);
+        return;
+      }
+
+      const result = await adminSetParticipationsReunion({
+        reunionId: participantsDialogReunion.id,
+        participations: payloadParticipations,
+      });
+
+      if (result.success) {
+        const totals = countParticipationStats(adherents, participantsEdits);
+        toast.success(
+          `Participants enregistrés — Présents: ${totals.presents} | Absents: ${totals.absents} | Excusés: ${totals.excuses} | Non répondus: ${totals.nonRepondus}`
+        );
+        setParticipantsDialogReunion(null);
+        await loadData();
+      } else if ((result as { code?: string }).code === "CONFLICT") {
+        toast.warning(
+          result.error ||
+            "Conflit : réponses mises à jour ailleurs. Rechargement…"
+        );
+        // ready=false immédiat ; edits obsolètes remplacés seulement si charge OK
+        const reloaded = await loadParticipantsDialogData(
+          participantsDialogReunion,
+          {
+            resetFilters: false,
+            closeOnError: false,
+            preserveEditsUntilFresh: true,
+          }
+        );
+        if (!reloaded) {
+          toast.error(
+            "Impossible de recharger après conflit. Actualisez avant de réenregistrer."
+          );
+          // Empêcher une sauvegarde aveugle des anciennes valeurs
+          setParticipantsDialogReady(false);
+        }
+      } else {
+        toast.error(result.error || "Erreur lors de l'enregistrement des participants");
+      }
+    } catch (error) {
+      toast.error("Erreur lors de l'enregistrement des participants");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -425,9 +849,8 @@ export default function AdminReunionsMensuellesPage() {
         cell: (info) => {
           const reunion = info.row.original;
           const participations = info.getValue() || [];
-          const presents = participations.filter((p: any) => p.statut === "Present").length;
-          const absents = participations.filter((p: any) => p.statut === "Absent").length;
-          const excuses = participations.filter((p: any) => p.statut === "Excuse").length;
+          const { presents, absents, excuses } =
+            countListParticipationBadges(participations);
           const canViewList = reunion.statut === "DateConfirmee";
           return (
             <button
@@ -498,7 +921,7 @@ export default function AdminReunionsMensuellesPage() {
         },
       }),
     ],
-    []
+    [openParticipantsDialog]
   );
 
   const filteredData = useMemo(() => {
@@ -545,78 +968,6 @@ export default function AdminReunionsMensuellesPage() {
     }
   };
 
-  const openParticipantsDialog = (reunion: any) => {
-    const initial: Record<string, { statut: StatutParticipationReunion; justificatifFournit: boolean }> = {};
-    adherents.forEach((a) => {
-      const part = reunion.Participations?.find((p: any) => p.adherentId === a.id);
-      initial[a.id] = {
-        statut: (part?.statut ?? "NonRepondu") as StatutParticipationReunion,
-        justificatifFournit: Boolean(part?.justificatifFournit),
-      };
-    });
-    setParticipantsInitial(initial);
-    setParticipantsEdits(initial);
-    setParticipantsSort({ key: "adherent", direction: "asc" });
-    setParticipantsDialogReunion(reunion);
-  };
-
-  const toggleParticipantsSort = (key: "adherent" | "statut") => {
-    setParticipantsSort((prev) => {
-      if (prev.key === key) {
-        return { key, direction: prev.direction === "asc" ? "desc" : "asc" };
-      }
-      return { key, direction: "asc" };
-    });
-  };
-
-  const handleSaveParticipants = async () => {
-    if (!participantsDialogReunion) return;
-    setLoading(true);
-    try {
-      // Envoyer uniquement les changements pour ne pas écraser l'historique non modifié
-      const payloadParticipations = adherents
-        .map((a) => ({
-          adherentId: a.id,
-          statut: (participantsEdits[a.id]?.statut ?? "NonRepondu") as StatutParticipationReunion,
-          justificatifFournit: Boolean(participantsEdits[a.id]?.justificatifFournit),
-          initialStatut: (participantsInitial[a.id]?.statut ?? "NonRepondu") as StatutParticipationReunion,
-          initialJustificatif: Boolean(participantsInitial[a.id]?.justificatifFournit),
-        }))
-        .filter((p) => p.statut !== p.initialStatut || p.justificatifFournit !== p.initialJustificatif)
-        .map(({ adherentId, statut, justificatifFournit }) => ({ adherentId, statut, justificatifFournit }));
-
-      if (payloadParticipations.length === 0) {
-        toast.info("Aucune modification détectée.");
-        setLoading(false);
-        return;
-      }
-
-      const result = await adminSetParticipationsReunion({
-        reunionId: participantsDialogReunion.id,
-        participations: payloadParticipations,
-      });
-
-      if (result.success) {
-        const presents = payloadParticipations.filter((p) => p.statut === "Present").length;
-        const absents = payloadParticipations.filter((p) => p.statut === "Absent").length;
-        const excuses = payloadParticipations.filter((p) => p.statut === "Excuse").length;
-        const nonRepondus = payloadParticipations.filter((p) => p.statut === "NonRepondu").length;
-
-        toast.success(
-          `Participants enregistrés - Présents: ${presents} | Absents: ${absents} | Excusés: ${excuses} | Non répondus: ${nonRepondus}`
-        );
-        setParticipantsDialogReunion(null);
-        await loadData();
-      } else {
-        toast.error(result.error || "Erreur lors de l'enregistrement des participants");
-      }
-    } catch (error) {
-      toast.error("Erreur lors de l'enregistrement des participants");
-    } finally {
-      setLoading(false);
-    }
-  };
-
   const table = useReactTable({
     data: filteredData,
     columns,
@@ -643,8 +994,8 @@ export default function AdminReunionsMensuellesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:to-slate-800 p-2 sm:p-4">
-      <div className="mx-auto max-w-[96rem] w-full mb-3">
+    <div className="min-h-full w-full bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:to-slate-800 p-3 sm:p-4 lg:p-6 font-sans">
+      <div className="w-full mb-3">
         <Button variant="ghost" size="sm" asChild>
           <Link href="/admin" className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white">
             <ArrowLeft className="h-4 w-4" />
@@ -652,29 +1003,46 @@ export default function AdminReunionsMensuellesPage() {
           </Link>
         </Button>
       </div>
-      <Card className="mx-auto max-w-[96rem] w-full shadow-lg border-blue-200">
+      <Card className="w-full shadow-lg border-blue-200">
         <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-t-lg">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 py-3">
             <CardTitle className="flex items-center gap-2 text-lg">
               <Calendar className="h-4 w-4" />
               Gestion des Réunions Mensuelles ({reunions.length})
             </CardTitle>
-            <Button
-              onClick={() => {
-                setEditingReunion(null);
-                setFormData({
-                  annee: new Date().getFullYear(),
-                  mois: new Date().getMonth() + 1,
-                  adherentHoteId: "",
-                });
-                setSelectedAdherent(null);
-                setShowForm(true);
-              }}
-              className="bg-white text-blue-600 hover:bg-blue-50 border-white shadow-sm font-medium"
-            >
-              <Plus className="h-4 w-4 mr-2" />
-              Nouvelle réunion
-            </Button>
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={requestRefreshReunionsList}
+                disabled={listRefreshing || loading}
+                aria-label="Actualiser la liste des réunions et les compteurs"
+                className="bg-white/10 text-white border-white/40 hover:bg-white/20 hover:text-white"
+              >
+                {listRefreshing ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" aria-hidden />
+                )}
+                Actualiser
+              </Button>
+              <Button
+                onClick={() => {
+                  setEditingReunion(null);
+                  setFormData({
+                    annee: new Date().getFullYear(),
+                    mois: new Date().getMonth() + 1,
+                    adherentHoteId: "",
+                  });
+                  setSelectedAdherent(null);
+                  setShowForm(true);
+                }}
+                className="bg-white text-blue-600 hover:bg-blue-50 border-white shadow-sm font-medium"
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nouvelle réunion
+              </Button>
+            </div>
           </div>
           <CardDescription className="text-blue-100 text-xs pb-3">
             Gérez les réunions mensuelles : cliquez sur un mois pour créer une réunion (choisir l&apos;hôte) ou modifier / changer l&apos;hôte.
@@ -753,12 +1121,12 @@ export default function AdminReunionsMensuellesPage() {
             <h3 className="text-sm font-semibold mb-2">Liste des réunions</h3>
             <div className="flex flex-col sm:flex-row gap-2 mb-3">
               <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden />
                 <Input
                   placeholder="Rechercher par mois, année, hôte..."
                   value={globalFilter}
                   onChange={(e) => setGlobalFilter(e.target.value)}
-                  className="pl-10"
+                  className="pl-10 sm:pl-10 font-sans"
                 />
               </div>
             </div>
@@ -1044,9 +1412,14 @@ export default function AdminReunionsMensuellesPage() {
           </Dialog>
 
           {/* Dialog : Liste des participants (à la demande) */}
-          <Dialog open={!!participantsDialogReunion} onOpenChange={(open) => !open && setParticipantsDialogReunion(null)}>
-            <DialogContent className="max-w-md max-h-[85vh] overflow-hidden flex flex-col p-0 gap-0 border-2 border-blue-200 dark:border-blue-800">
-              <DialogHeader className="rounded-t-lg px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white border-b border-blue-400/30">
+          <Dialog
+            open={!!participantsDialogReunion}
+            onOpenChange={(open) => {
+              if (!open) closeParticipantsDialog();
+            }}
+          >
+            <DialogContent className="w-[calc(100vw-1.5rem)] sm:max-w-3xl lg:max-w-4xl max-h-[90vh] overflow-hidden flex flex-col p-0 gap-0 border-2 border-blue-200 dark:border-blue-800 font-sans">
+              <DialogHeader className="shrink-0 rounded-t-lg px-4 py-3 bg-gradient-to-r from-blue-500 to-blue-600 dark:from-blue-600 dark:to-blue-700 text-white border-b border-blue-400/30">
                 <DialogTitle className="text-base">Liste des participants</DialogTitle>
                 <DialogDescription className="text-blue-100 text-xs mt-0.5">
                   {participantsDialogReunion && (
@@ -1054,156 +1427,299 @@ export default function AdminReunionsMensuellesPage() {
                   )}
                 </DialogDescription>
               </DialogHeader>
-              {participantsDialogReunion && (
-                <div className="overflow-auto flex-1 min-h-0">
-                  {(() => {
-                    const stats = adherents.reduce(
-                      (acc, a) => {
-                        const part = participantsDialogReunion.Participations?.find((p: any) => p.adherentId === a.id);
-                        const fallbackStatut = (part?.statut ?? "NonRepondu") as StatutParticipationReunion;
-                        const statut = (participantsEdits[a.id]?.statut ?? fallbackStatut) as StatutParticipationReunion;
-                        if (statut === "Present") acc.presents += 1;
-                        else if (statut === "Absent") acc.absents += 1;
-                        else if (statut === "Excuse") acc.excuses += 1;
-                        else acc.nonRepondus += 1;
-                        return acc;
-                      },
-                      { presents: 0, absents: 0, excuses: 0, nonRepondus: 0 }
+              {participantsDialogReunion && (() => {
+                const participantsBusy =
+                  participantsDialogLoading || participantsRefreshing;
+                const showParticipantsBody =
+                  participantsDialogReady && !participantsBusy;
+                const stats = countParticipationStats(adherents, participantsEdits);
+                const listAligned = countListParticipationBadges(
+                  participantsDialogReunion.Participations || []
+                );
+                const q = participantsSearch.trim().toLowerCase();
+                const visibleAdherents = !q
+                  ? adherents
+                  : adherents.filter((a) =>
+                      `${a.firstname ?? ""} ${a.lastname ?? ""} ${a.email ?? ""}`
+                        .toLowerCase()
+                        .includes(q)
                     );
 
-                    return (
-                      <div className="px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                        <div className="flex flex-wrap items-center gap-2 text-xs">
-                          <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900/60 dark:text-green-100">
-                            Présents: {stats.presents}
-                          </Badge>
-                          <Badge variant="secondary" className="bg-red-100 text-red-800 dark:bg-red-900/60 dark:text-red-100">
-                            Absents: {stats.absents}
-                          </Badge>
-                          <Badge variant="secondary" className="bg-orange-100 text-orange-800 dark:bg-orange-900/60 dark:text-orange-100">
-                            Excusés: {stats.excuses}
-                          </Badge>
-                          <Badge variant="secondary" className="bg-slate-200 text-slate-800 dark:bg-slate-700 dark:text-slate-100">
-                            Non répondus: {stats.nonRepondus}
-                          </Badge>
+                return (
+                  <>
+                    <div className="shrink-0 px-3 py-2 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50 space-y-2">
+                      {showParticipantsBody ? (
+                        <>
+                          <div className="flex flex-wrap items-center gap-2 text-xs font-sans">
+                            <Badge className="border border-green-300 bg-green-100 text-green-900 font-semibold">
+                              Présent : {stats.presents}
+                            </Badge>
+                            <Badge className="border border-red-300 bg-red-100 text-red-900 font-semibold">
+                              Absent : {stats.absents}
+                            </Badge>
+                            <Badge className="border border-amber-300 bg-amber-100 text-amber-950 font-semibold">
+                              Excusé : {stats.excuses}
+                            </Badge>
+                            <Badge className="border border-slate-300 bg-slate-100 text-slate-800 font-semibold">
+                              Non répondu : {stats.nonRepondus}
+                            </Badge>
+                          </div>
+                          <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
+                            {NON_REPONDU_PERIMETER_HINT}
+                            {stats.presents === listAligned.presents &&
+                              stats.absents === listAligned.absents &&
+                              stats.excuses === listAligned.excuses && (
+                                <> Compteurs P/A/E alignés sur la liste (données fraîches).</>
+                              )}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="text-[11px] text-slate-600 dark:text-slate-400 leading-snug">
+                          {participantsBusy
+                            ? "Chargement des compteurs et de la liste…"
+                            : "Données non disponibles — utilisez Actualiser."}
+                        </p>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                        <div className="relative flex-1">
+                          <Search className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" aria-hidden />
+                          <Input
+                            placeholder="Filtrer les participants…"
+                            value={participantsSearch}
+                            onChange={(e) => setParticipantsSearch(e.target.value)}
+                            className="pl-10 sm:pl-10 h-9 font-sans"
+                            disabled={participantsDialogLoading || participantsRefreshing || !participantsDialogReady}
+                          />
                         </div>
-                      </div>
-                    );
-                  })()}
-                  <table className="w-full text-sm border-collapse">
-                    <thead>
-                      <tr className="border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/50">
-                        <th className="text-left px-3 py-2 font-medium text-slate-700 dark:text-slate-300">
-                          <button
-                            type="button"
-                            onClick={() => toggleParticipantsSort("adherent")}
-                            className="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
-                          >
-                            Adhérent
-                            <ArrowUpDown className="h-3.5 w-3.5" />
-                          </button>
-                        </th>
-                        <th className="text-left px-3 py-2 font-medium text-slate-700 dark:text-slate-300">
-                          <button
-                            type="button"
-                            onClick={() => toggleParticipantsSort("statut")}
-                            className="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
-                          >
-                            Statut
-                            <ArrowUpDown className="h-3.5 w-3.5" />
-                          </button>
-                        </th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {adherents
-                        .map((a) => {
-                          const part = participantsDialogReunion.Participations?.find((p: any) => p.adherentId === a.id);
-                          const statut = (part?.statut ?? "NonRepondu") as StatutParticipationReunion;
-                          const currentStatut = (participantsEdits[a.id]?.statut ?? statut) as StatutParticipationReunion;
-                          const currentJustificatif = participantsEdits[a.id]?.justificatifFournit ?? Boolean(part?.justificatifFournit);
-                          return { adherent: a, currentStatut, currentJustificatif };
-                        })
-                        .sort((x, y) => {
-                          if (participantsSort.key === "adherent") {
-                            const aName = `${x.adherent.firstname ?? ""} ${x.adherent.lastname ?? ""}`.trim().toLowerCase();
-                            const bName = `${y.adherent.firstname ?? ""} ${y.adherent.lastname ?? ""}`.trim().toLowerCase();
-                            const cmp = aName.localeCompare(bName, "fr");
-                            return participantsSort.direction === "asc" ? cmp : -cmp;
+                        <Button
+                          type="button"
+                          variant="outline"
+                          size="sm"
+                          onClick={requestRefreshParticipantsDialog}
+                          disabled={
+                            participantsDialogLoading ||
+                            participantsRefreshing ||
+                            loading
                           }
-                          const statusOrder: Record<StatutParticipationReunion, number> = {
-                            Present: 1,
-                            Excuse: 2,
-                            Absent: 3,
-                            NonRepondu: 4,
-                          };
-                          const cmp = statusOrder[x.currentStatut] - statusOrder[y.currentStatut];
-                          return participantsSort.direction === "asc" ? cmp : -cmp;
-                        })
-                        .map(({ adherent: a, currentStatut, currentJustificatif }) => {
-                        return (
-                          <tr key={a.id} className="border-b border-slate-100 dark:border-slate-800">
-                            <td className="px-3 py-2">{a.firstname} {a.lastname}</td>
-                            <td className="px-3 py-2">
-                              <div className="space-y-2">
-                                <Select
-                                  value={currentStatut}
-                                  onValueChange={(v) =>
-                                    setParticipantsEdits((prev) => ({
-                                      ...prev,
-                                      [a.id]: {
-                                        statut: v as StatutParticipationReunion,
-                                        justificatifFournit: prev[a.id]?.justificatifFournit ?? false,
-                                      },
-                                    }))
-                                  }
+                          aria-label="Actualiser les réponses et les compteurs des participants"
+                          className="shrink-0"
+                        >
+                          {participantsRefreshing || participantsDialogLoading ? (
+                            <Loader2 className="h-4 w-4 mr-2 animate-spin" aria-hidden />
+                          ) : (
+                            <RefreshCw className="h-4 w-4 mr-2" aria-hidden />
+                          )}
+                          Actualiser
+                        </Button>
+                      </div>
+                    </div>
+                    <div className="overflow-auto flex-1 min-h-0">
+                      {participantsBusy ? (
+                        <div className="flex items-center justify-center py-12 text-sm text-slate-600">
+                          Chargement des réponses…
+                        </div>
+                      ) : !participantsDialogReady ? (
+                        <div className="flex items-center justify-center py-12 text-sm text-slate-600">
+                          Impossible d&apos;afficher les participants. Réessayez via Actualiser.
+                        </div>
+                      ) : (
+                        <table className="w-full text-sm border-collapse">
+                          <thead className="sticky top-0 bg-slate-50 dark:bg-slate-900 z-10">
+                            <tr className="border-b border-slate-200 dark:border-slate-700">
+                              <th className="text-left px-3 py-2 font-semibold text-slate-700 dark:text-slate-300">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleParticipantsSort("adherent")}
+                                  className="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
                                 >
-                                  <SelectTrigger className="h-8">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Present">Présent</SelectItem>
-                                    <SelectItem value="Absent">Absent</SelectItem>
-                                    <SelectItem value="Excuse">Excusé</SelectItem>
-                                    <SelectItem value="NonRepondu">Non répondu</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                                {(currentStatut === "Absent" || currentStatut === "Excuse") && (
-                                  <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
-                                    <Checkbox
-                                      checked={currentJustificatif}
-                                      onCheckedChange={(checked) =>
-                                        setParticipantsEdits((prev) => ({
-                                          ...prev,
-                                          [a.id]: {
-                                            statut: prev[a.id]?.statut ?? currentStatut,
-                                            justificatifFournit: checked === true,
-                                          },
-                                        }))
-                                      }
-                                    />
-                                    Justificatif fourni
-                                  </label>
-                                )}
-                              </div>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <DialogFooter className="px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
-                <Button type="button" onClick={handleSaveParticipants} disabled={loading}>
-                  Enregistrer
-                </Button>
-                <Button type="button" variant="outline" onClick={() => setParticipantsDialogReunion(null)}>
-                  Fermer
-                </Button>
-              </DialogFooter>
+                                  Adhérent
+                                  <ArrowUpDown className="h-3.5 w-3.5" />
+                                </button>
+                              </th>
+                              <th className="text-left px-3 py-2 font-semibold text-slate-700 dark:text-slate-300">
+                                <button
+                                  type="button"
+                                  onClick={() => toggleParticipantsSort("statut")}
+                                  className="inline-flex items-center gap-1 hover:text-blue-600 dark:hover:text-blue-400"
+                                >
+                                  Statut
+                                  <ArrowUpDown className="h-3.5 w-3.5" />
+                                </button>
+                              </th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {visibleAdherents
+                              .map((a) => {
+                                const currentStatut = (participantsEdits[a.id]?.statut ??
+                                  "NonRepondu") as StatutParticipationReunion;
+                                const currentJustificatif = Boolean(
+                                  participantsEdits[a.id]?.justificatifFournit
+                                );
+                                return { adherent: a, currentStatut, currentJustificatif };
+                              })
+                              .sort((x, y) => {
+                                if (participantsSort.key === "adherent") {
+                                  const aName = `${x.adherent.firstname ?? ""} ${x.adherent.lastname ?? ""}`
+                                    .trim()
+                                    .toLowerCase();
+                                  const bName = `${y.adherent.firstname ?? ""} ${y.adherent.lastname ?? ""}`
+                                    .trim()
+                                    .toLowerCase();
+                                  const cmp = aName.localeCompare(bName, "fr");
+                                  return participantsSort.direction === "asc" ? cmp : -cmp;
+                                }
+                                const statusOrder: Record<StatutParticipationReunion, number> = {
+                                  Present: 1,
+                                  Excuse: 2,
+                                  Absent: 3,
+                                  NonRepondu: 4,
+                                };
+                                const cmp = statusOrder[x.currentStatut] - statusOrder[y.currentStatut];
+                                return participantsSort.direction === "asc" ? cmp : -cmp;
+                              })
+                              .map(({ adherent: a, currentStatut, currentJustificatif }) => {
+                                const statutBadgeClass =
+                                  currentStatut === "Present"
+                                    ? "border-green-300 bg-green-50 text-green-900"
+                                    : currentStatut === "Absent"
+                                      ? "border-red-300 bg-red-50 text-red-900"
+                                      : currentStatut === "Excuse"
+                                        ? "border-amber-300 bg-amber-50 text-amber-950"
+                                        : "border-slate-300 bg-slate-50 text-slate-800";
+                                return (
+                                  <tr
+                                    key={a.id}
+                                    className="border-b border-slate-100 dark:border-slate-800"
+                                  >
+                                    <td className="px-3 py-2 align-top">
+                                      <div className="font-medium text-slate-900 dark:text-slate-100 flex flex-wrap items-center gap-1.5">
+                                        <span>
+                                          {a.firstname} {a.lastname}
+                                        </span>
+                                        {a.userStatus === "Inactif" && (
+                                          <span className="inline-flex rounded-md border border-slate-400 bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-700 dark:border-slate-500 dark:bg-slate-700 dark:text-slate-100">
+                                            Inactif
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="mt-1">
+                                        <span
+                                          className={`inline-flex rounded-md border px-2 py-0.5 text-[11px] font-semibold ${statutBadgeClass}`}
+                                        >
+                                          {currentStatut === "Present"
+                                            ? "Présent"
+                                            : currentStatut === "Absent"
+                                              ? "Absent"
+                                              : currentStatut === "Excuse"
+                                                ? "Excusé"
+                                                : "Non répondu"}
+                                        </span>
+                                      </div>
+                                    </td>
+                                    <td className="px-3 py-2 align-top">
+                                      <div className="space-y-2">
+                                        <Select
+                                          value={currentStatut}
+                                          onValueChange={(v) =>
+                                            setParticipantsEdits((prev) => ({
+                                              ...prev,
+                                              [a.id]: {
+                                                statut: v as StatutParticipationReunion,
+                                                justificatifFournit:
+                                                  prev[a.id]?.justificatifFournit ?? false,
+                                              },
+                                            }))
+                                          }
+                                        >
+                                          <SelectTrigger className="h-8">
+                                            <SelectValue />
+                                          </SelectTrigger>
+                                          <SelectContent>
+                                            <SelectItem value="Present">Présent</SelectItem>
+                                            <SelectItem value="Absent">Absent</SelectItem>
+                                            <SelectItem value="Excuse">Excusé</SelectItem>
+                                            <SelectItem value="NonRepondu">Non répondu</SelectItem>
+                                          </SelectContent>
+                                        </Select>
+                                        {(currentStatut === "Absent" ||
+                                          currentStatut === "Excuse") && (
+                                          <label className="inline-flex items-center gap-2 text-xs text-slate-600 dark:text-slate-300">
+                                            <Checkbox
+                                              checked={currentJustificatif}
+                                              onCheckedChange={(checked) =>
+                                                setParticipantsEdits((prev) => ({
+                                                  ...prev,
+                                                  [a.id]: {
+                                                    statut: prev[a.id]?.statut ?? currentStatut,
+                                                    justificatifFournit: checked === true,
+                                                  },
+                                                }))
+                                              }
+                                            />
+                                            Justificatif fourni
+                                          </label>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                          </tbody>
+                        </table>
+                      )}
+                    </div>
+                    <DialogFooter className="shrink-0 px-4 py-3 border-t border-slate-200 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/50">
+                      <Button
+                        type="button"
+                        onClick={handleSaveParticipants}
+                        disabled={
+                          loading ||
+                          participantsDialogLoading ||
+                          participantsRefreshing ||
+                          !participantsDialogReady
+                        }
+                      >
+                        Enregistrer
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={closeParticipantsDialog}
+                      >
+                        Fermer
+                      </Button>
+                    </DialogFooter>
+                  </>
+                );
+              })()}
             </DialogContent>
           </Dialog>
+
+          <AlertDialog
+            open={refreshConfirmScope !== null}
+            onOpenChange={(open) => {
+              if (!open) setRefreshConfirmScope(null);
+            }}
+          >
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>Abandonner les modifications ?</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {PARTICIPANTS_REFRESH_DISCARD_MESSAGE}
+                  {refreshConfirmScope === "list" &&
+                    (editingReunion || showForm) &&
+                    " Les formulaires d'édition ou de création ouverts seront également fermés."}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel>Annuler</AlertDialogCancel>
+                <AlertDialogAction onClick={confirmPendingRefresh}>
+                  Actualiser
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
 
           {/* Recherche d'adhérent (création) — panneau hors dialog création si besoin */}
           <InlineAdherentSearchPanel

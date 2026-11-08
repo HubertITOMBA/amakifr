@@ -13,6 +13,7 @@ import { useRouter } from "expo-router";
 import {
   getMyReunions,
   updateMyReunionParticipation,
+  clearMyReunionParticipation,
 } from "@/api/reunions";
 import { canOpenPublishedReport } from "@/api/rapports-reunion-state";
 import {
@@ -108,7 +109,10 @@ export default function ReunionsScreen() {
   }, [load]);
 
   const handleParticipationUpdate = useCallback(
-    (reunionId: string, statut: UpdateMyReunionParticipationInput["statut"]) => {
+    (
+      reunionId: string,
+      statut: UpdateMyReunionParticipationInput["statut"] | null
+    ) => {
       setReunions((prev) =>
         prev.map((r) =>
           r.id === reunionId ? { ...r, participationStatus: statut } : r
@@ -218,10 +222,14 @@ type ReunionCardProps = {
   onToggle: () => void;
   onParticipationSuccess: (
     reunionId: string,
-    statut: UpdateMyReunionParticipationInput["statut"]
+    statut: UpdateMyReunionParticipationInput["statut"] | null
   ) => void;
   onReload: () => void;
 };
+
+type ParticipationSubmitKind =
+  | UpdateMyReunionParticipationInput["statut"]
+  | "clear";
 
 function ReunionCard({
   reunion,
@@ -234,9 +242,13 @@ function ReunionCard({
   const statut = mapReunionStatut(reunion.statut);
   const participation = mapParticipationStatut(reunion.participationStatus);
   const showReport = canOpenPublishedReport(reunion);
-  const [submitting, setSubmitting] = useState<
-    UpdateMyReunionParticipationInput["statut"] | null
-  >(null);
+  const hasAnswer =
+    reunion.participationStatus === "Present" ||
+    reunion.participationStatus === "Absent" ||
+    reunion.participationStatus === "Excuse";
+  const [submitting, setSubmitting] = useState<ParticipationSubmitKind | null>(
+    null
+  );
   const [participationError, setParticipationError] = useState<string | null>(
     null
   );
@@ -249,6 +261,7 @@ function ReunionCard({
     setSubmitting(statutChoice);
     try {
       await updateMyReunionParticipation(reunion.id, { statut: statutChoice });
+      // Mise à jour locale uniquement après succès serveur (pas avant l'await)
       onParticipationSuccess(reunion.id, statutChoice);
       onReload();
     } catch (e) {
@@ -256,6 +269,25 @@ function ReunionCard({
         e instanceof ApiClientError
           ? participationErrorMessage(e)
           : "Impossible d'enregistrer votre participation";
+      setParticipationError(message);
+    } finally {
+      setSubmitting(null);
+    }
+  };
+
+  const handleClearParticipation = async () => {
+    if (!reunion.canUpdateParticipation || submitting || !hasAnswer) return;
+    setParticipationError(null);
+    setSubmitting("clear");
+    try {
+      await clearMyReunionParticipation(reunion.id);
+      onParticipationSuccess(reunion.id, null);
+      onReload();
+    } catch (e) {
+      const message =
+        e instanceof ApiClientError
+          ? participationErrorMessage(e)
+          : "Impossible de retirer votre réponse";
       setParticipationError(message);
     } finally {
       setSubmitting(null);
@@ -376,13 +408,27 @@ function ReunionCard({
                     );
                   })}
                 </View>
+                {hasAnswer ? (
+                  <SecondaryButton
+                    label="Retirer ma réponse"
+                    loading={submitting === "clear"}
+                    disabled={submitting !== null}
+                    style={styles.clearParticipationBtn}
+                    onPress={() => void handleClearParticipation()}
+                    accessibilityLabel="Retirer ma réponse"
+                  />
+                ) : null}
                 {submitting ? (
                   <View style={styles.submittingRow}>
                     <ActivityIndicator
                       size="small"
                       color={AmakiColors.primary}
                     />
-                    <Text style={styles.submittingText}>Enregistrement…</Text>
+                    <Text style={styles.submittingText}>
+                      {submitting === "clear"
+                        ? "Retrait en cours…"
+                        : "Enregistrement…"}
+                    </Text>
                   </View>
                 ) : null}
                 {participationError ? (
@@ -558,6 +604,10 @@ const styles = StyleSheet.create({
   participationBtnSelected: {
     backgroundColor: AmakiColors.primarySoft,
     borderColor: AmakiColors.primary,
+  },
+  clearParticipationBtn: {
+    alignSelf: "stretch",
+    marginTop: AmakiSpacing.xs,
   },
   submittingRow: {
     flexDirection: "row",

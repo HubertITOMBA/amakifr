@@ -42,6 +42,20 @@ export async function updateMyReunionParticipation(
 }
 
 /**
+ * DELETE /api/v1/me/reunions/[id]/participation — retirer sa réponse (Non répondu).
+ */
+export async function clearMyReunionParticipation(
+  reunionId: string
+): Promise<{ participationStatus: null; cleared: true; alreadyClear: boolean }> {
+  return authenticatedFetch(
+    `/api/v1/me/reunions/${encodeURIComponent(reunionId)}/participation`,
+    {
+      method: "DELETE",
+    }
+  );
+}
+
+/**
  * POST /api/v1/me/reunions/host-proposals — se proposer comme hôte.
  */
 export async function proposeMyselfAsReunionHost(

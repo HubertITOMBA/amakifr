@@ -1,7 +1,12 @@
+import { getParisYmd } from "@/lib/services/cotisations/rappel-dette/paris-calendar";
+
 /**
  * Helpers métier réunions mensuelles (lieu, dates, éligibilité participation).
  * Alignés sur le Web `/reunions-mensuelles` et `confirmerParticipationReunion`.
  */
+
+/** Fuseau calendaire pour la clôture « journée » des RSVP. */
+export const REUNION_CIVIL_TIMEZONE = "Europe/Paris" as const;
 
 export type HostTelephoneDto = {
   numero: string;
@@ -18,33 +23,49 @@ export type AdresseLike = {
   country?: string | null;
 };
 
+function compareParisYmd(
+  a: { year: number; month: number; day: number },
+  b: { year: number; month: number; day: number }
+): number {
+  if (a.year !== b.year) return a.year - b.year;
+  if (a.month !== b.month) return a.month - b.month;
+  return a.day - b.day;
+}
+
 /**
- * Indique si la date de réunion est passée (comparaison au début de journée locale).
+ * Indique si la date de réunion est passée au sens **journée civile Europe/Paris**.
+ *
+ * Règle conservée : on compare les jours civils Paris, **pas** l'heure exacte
+ * de début. Une réunion « aujourd'hui » (Paris) reste modifiable toute la journée,
+ * même après l'heure de début éventuelle.
+ *
+ * @param dateReunion - Instant / date de la réunion
+ * @param now - Horloge injectable (défaut : maintenant)
  */
 export function isReunionPast(
   dateReunion: Date | null | undefined,
   now: Date = new Date()
 ): boolean {
   if (!dateReunion) return false;
-  const startOfToday = new Date(now);
-  startOfToday.setHours(0, 0, 0, 0);
   const d = new Date(dateReunion);
   if (Number.isNaN(d.getTime())) return false;
-  d.setHours(0, 0, 0, 0);
-  return d.getTime() < startOfToday.getTime();
+  return compareParisYmd(getParisYmd(d), getParisYmd(now)) < 0;
 }
 
 /**
  * Participation modifiable uniquement si date confirmée et réunion non passée
  * (aligné Web : dialog participation ouvert seulement pour DateConfirmee future).
+ *
+ * @param input.now - Horloge injectable partagée avec `isReunionPast`
  */
 export function canUpdateParticipation(input: {
   statut: string;
   dateReunion: Date | null;
+  now?: Date;
 }): boolean {
   if (input.statut !== "DateConfirmee") return false;
   if (!input.dateReunion) return false;
-  return !isReunionPast(input.dateReunion);
+  return !isReunionPast(input.dateReunion, input.now);
 }
 
 /**

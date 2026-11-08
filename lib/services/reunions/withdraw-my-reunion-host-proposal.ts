@@ -3,18 +3,17 @@ import type { AuthContext } from "@/lib/auth-context";
 import { ServiceError } from "@/lib/service-error";
 import { canWithdrawAsReunionHost } from "@/lib/services/reunions/year-calendar-helpers";
 import { hostWithdrawalLocationPatch } from "@/lib/services/reunions/reunion-helpers";
+import {
+  withReunionRowLock,
+  type ReunionLockTx,
+} from "@/lib/services/reunions/reunion-row-lock";
 import type { WithdrawMyReunionHostProposalResult } from "@/lib/services/reunions/types";
 
 /**
  * Désistement self-service de l'hôte authentifié.
  *
- * Reproduit `desisterReunionMensuelle` (Web) :
- * - seul l'hôte courant (actor.userId → Adherent) peut se désister ;
- * - pas de date, ou date ≥ aujourd'hui + 28 jours ;
- * - aucun filtre de statut métier explicite (comme le Web) ;
- * - libère adherentHoteId, remet EnAttente, efface dateReunion ;
- * - Domicile : nullifie `adresse` (PII hôte) ; Restaurant/Autre : lieu conservé ;
- * - pas de notification email (log Web uniquement côté Server Action).
+ * Protocole writers : TX → verrou réunion → relecture → update via `tx`
+ * (EnAttente, date null). Aligné `desisterReunionMensuelle`.
  *
  * @throws {ServiceError} UNAUTHENTICATED | NOT_FOUND | FORBIDDEN | INTERNAL_ERROR
  */
@@ -41,64 +40,72 @@ export async function withdrawMyReunionHostProposal(
       throw new ServiceError("NOT_FOUND", "Adhérent non trouvé");
     }
 
-    const reunion = await db.reunionMensuelle.findUnique({
-      where: { id },
-      select: {
-        id: true,
-        annee: true,
-        mois: true,
-        statut: true,
-        dateReunion: true,
-        adherentHoteId: true,
-        typeLieu: true,
-      },
-    });
+    const updated = await db.$transaction(async (tx) => {
+      return withReunionRowLock(
+        tx as unknown as ReunionLockTx,
+        id,
+        async () => {
+          const reunion = await tx.reunionMensuelle.findUnique({
+            where: { id },
+            select: {
+              id: true,
+              annee: true,
+              mois: true,
+              statut: true,
+              dateReunion: true,
+              adherentHoteId: true,
+              typeLieu: true,
+            },
+          });
 
-    if (!reunion) {
-      throw new ServiceError("NOT_FOUND", "Réunion non trouvée");
-    }
+          if (!reunion) {
+            throw new ServiceError("NOT_FOUND", "Réunion non trouvée");
+          }
 
-    if (!reunion.adherentHoteId) {
-      throw new ServiceError(
-        "FORBIDDEN",
-        "Cette réunion n'a pas d'hôte assigné."
+          if (!reunion.adherentHoteId) {
+            throw new ServiceError(
+              "FORBIDDEN",
+              "Cette réunion n'a pas d'hôte assigné."
+            );
+          }
+
+          if (reunion.adherentHoteId !== adherent.id) {
+            throw new ServiceError(
+              "FORBIDDEN",
+              "Seul l'hôte de la réunion peut se désister."
+            );
+          }
+
+          if (
+            !canWithdrawAsReunionHost({
+              isCurrentUserHost: true,
+              dateReunion: reunion.dateReunion,
+            })
+          ) {
+            throw new ServiceError(
+              "FORBIDDEN",
+              "Vous ne pouvez vous désister que si la réunion a lieu dans 28 jours ou plus. La date actuelle est à moins de 28 jours."
+            );
+          }
+
+          return tx.reunionMensuelle.update({
+            where: { id: reunion.id },
+            data: {
+              adherentHoteId: null,
+              statut: "EnAttente",
+              dateReunion: null,
+              updatedBy: actor.userId,
+              ...hostWithdrawalLocationPatch(reunion.typeLieu),
+            },
+            select: {
+              id: true,
+              annee: true,
+              mois: true,
+              statut: true,
+            },
+          });
+        }
       );
-    }
-
-    if (reunion.adherentHoteId !== adherent.id) {
-      throw new ServiceError(
-        "FORBIDDEN",
-        "Seul l'hôte de la réunion peut se désister."
-      );
-    }
-
-    if (
-      !canWithdrawAsReunionHost({
-        isCurrentUserHost: true,
-        dateReunion: reunion.dateReunion,
-      })
-    ) {
-      throw new ServiceError(
-        "FORBIDDEN",
-        "Vous ne pouvez vous désister que si la réunion a lieu dans 28 jours ou plus. La date actuelle est à moins de 28 jours."
-      );
-    }
-
-    const updated = await db.reunionMensuelle.update({
-      where: { id: reunion.id },
-      data: {
-        adherentHoteId: null,
-        statut: "EnAttente",
-        dateReunion: null,
-        updatedBy: actor.userId,
-        ...hostWithdrawalLocationPatch(reunion.typeLieu),
-      },
-      select: {
-        id: true,
-        annee: true,
-        mois: true,
-        statut: true,
-      },
     });
 
     return {
@@ -109,6 +116,9 @@ export async function withdrawMyReunionHostProposal(
     };
   } catch (error) {
     if (error instanceof ServiceError) throw error;
+    if (error instanceof Error && error.name === "ReunionNotFoundError") {
+      throw new ServiceError("NOT_FOUND", "Réunion non trouvée");
+    }
     console.error("[withdrawMyReunionHostProposal] Erreur:", error);
     throw new ServiceError(
       "INTERNAL_ERROR",

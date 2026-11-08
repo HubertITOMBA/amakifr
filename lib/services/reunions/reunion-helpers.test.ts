@@ -254,23 +254,65 @@ describe("selectHostTelephones", () => {
   });
 });
 
-describe("isReunionPast / canUpdateParticipation", () => {
-  const now = new Date("2026-06-15T12:00:00.000Z");
+describe("isReunionPast / canUpdateParticipation — Europe/Paris journée civile", () => {
+  const now = new Date("2026-06-15T12:00:00.000Z"); // 14:00 Paris (CEST)
 
-  it("réunion passée", () => {
-    expect(isReunionPast(new Date("2026-01-01"), now)).toBe(true);
+  it("réunion passée (jour civil Paris antérieur)", () => {
+    expect(isReunionPast(new Date("2026-01-01T12:00:00.000Z"), now)).toBe(true);
   });
 
-  it("réunion future ou aujourd'hui", () => {
-    expect(isReunionPast(new Date("2026-06-15"), now)).toBe(false);
-    expect(isReunionPast(new Date("2026-07-01"), now)).toBe(false);
+  it("réunion future ou aujourd'hui (même jour civil Paris)", () => {
+    expect(isReunionPast(new Date("2026-06-15T08:00:00.000Z"), now)).toBe(false);
+    expect(isReunionPast(new Date("2026-07-01T12:00:00.000Z"), now)).toBe(false);
+  });
+
+  it("ne clôture pas à l'heure exacte de début : soirée du jour J encore ouverte", () => {
+    // 23:30 Europe/Paris le 15 juin 2026 = 21:30 UTC
+    const lateEvening = new Date("2026-06-15T21:30:00.000Z");
+    expect(isReunionPast(new Date("2026-06-15T10:00:00.000Z"), lateEvening)).toBe(
+      false
+    );
+  });
+
+  it("minuit Paris : jour J+1 clôture le jour J", () => {
+    // 00:15 Europe/Paris le 16 juin 2026 = 22:15 UTC le 15
+    const afterMidnightParis = new Date("2026-06-15T22:15:00.000Z");
+    expect(
+      isReunionPast(new Date("2026-06-15T10:00:00.000Z"), afterMidnightParis)
+    ).toBe(true);
+    expect(
+      isReunionPast(new Date("2026-06-16T10:00:00.000Z"), afterMidnightParis)
+    ).toBe(false);
+  });
+
+  it("changement heure été (mars 2026) : jour civil Paris stable", () => {
+    // 29 mars 2026 00:30 CET = 28 mars 23:30 UTC
+    const justAfterMidnightCestEve = new Date("2026-03-28T23:30:00.000Z");
+    expect(
+      isReunionPast(new Date("2026-03-28T12:00:00.000Z"), justAfterMidnightCestEve)
+    ).toBe(true);
+    expect(
+      isReunionPast(new Date("2026-03-29T12:00:00.000Z"), justAfterMidnightCestEve)
+    ).toBe(false);
+  });
+
+  it("changement heure hiver (octobre 2026) : jour civil Paris stable", () => {
+    // 25 oct 2026 00:30 CEST = 24 oct 22:30 UTC
+    const justAfterMidnightCetEve = new Date("2026-10-24T22:30:00.000Z");
+    expect(
+      isReunionPast(new Date("2026-10-24T12:00:00.000Z"), justAfterMidnightCetEve)
+    ).toBe(true);
+    expect(
+      isReunionPast(new Date("2026-10-25T12:00:00.000Z"), justAfterMidnightCetEve)
+    ).toBe(false);
   });
 
   it("participation modifiable si DateConfirmee future", () => {
     expect(
       canUpdateParticipation({
         statut: "DateConfirmee",
-        dateReunion: new Date("2027-07-01"),
+        dateReunion: new Date("2027-07-01T12:00:00.000Z"),
+        now,
       })
     ).toBe(true);
   });
@@ -279,7 +321,8 @@ describe("isReunionPast / canUpdateParticipation", () => {
     expect(
       canUpdateParticipation({
         statut: "EnAttente",
-        dateReunion: new Date("2026-07-01"),
+        dateReunion: new Date("2026-07-01T12:00:00.000Z"),
+        now,
       })
     ).toBe(false);
   });
@@ -288,7 +331,8 @@ describe("isReunionPast / canUpdateParticipation", () => {
     expect(
       canUpdateParticipation({
         statut: "DateConfirmee",
-        dateReunion: new Date("2026-01-01"),
+        dateReunion: new Date("2026-01-01T12:00:00.000Z"),
+        now,
       })
     ).toBe(false);
   });

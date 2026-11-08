@@ -3,9 +3,10 @@ import { z } from "zod";
 import type { AuthContext } from "@/lib/auth-context";
 import { ServiceError } from "@/lib/service-error";
 import {
-  canUpdateParticipation,
-  isReunionPast,
-} from "@/lib/services/reunions/reunion-helpers";
+  ReunionParticipationNotWritableError,
+  withReunionParticipationLocks,
+  type ReunionLockTx,
+} from "@/lib/services/reunions/reunion-row-lock";
 import type {
   UpdateMyReunionParticipationInput,
   UpdateMyReunionParticipationResult,
@@ -20,12 +21,9 @@ const ParticipationSchema = z.object({
 /**
  * Met à jour la participation de l'adhérent authentifié à une réunion.
  *
- * Aligné sur `confirmerParticipationReunion` (Web) :
- * - statut réunion DateConfirmee uniquement ;
- * - valeurs Present | Absent | Excuse ;
- * - identité via actor.userId → Adherent (anti-IDOR).
- *
- * Refus supplémentaire côté API mobile : réunion passée (contrôle serveur).
+ * Protocole : TX → verrou réunion → relecture statut/date → assert →
+ * verrou participation (adherentId) → upsert via `tx`.
+ * Aucun appel externe sous verrou.
  *
  * @throws {ServiceError} UNAUTHENTICATED | NOT_FOUND | FORBIDDEN | VALIDATION_ERROR | INTERNAL_ERROR
  */
@@ -60,66 +58,43 @@ export async function updateMyReunionParticipation(
       throw new ServiceError("NOT_FOUND", "Adhérent non trouvé");
     }
 
-    const reunion = await db.reunionMensuelle.findUnique({
-      where: { id: reunionId },
-      select: {
-        id: true,
-        statut: true,
-        dateReunion: true,
-      },
-    });
-
-    if (!reunion) {
-      throw new ServiceError("NOT_FOUND", "Réunion non trouvée");
-    }
-
-    if (reunion.statut !== "DateConfirmee") {
-      throw new ServiceError(
-        "FORBIDDEN",
-        "La date de la réunion n'est pas encore confirmée. Vous pourrez confirmer votre présence une fois la date validée."
-      );
-    }
-
-    if (!reunion.dateReunion || isReunionPast(reunion.dateReunion)) {
-      throw new ServiceError(
-        "FORBIDDEN",
-        "Cette réunion est passée. Vous ne pouvez plus modifier votre participation."
-      );
-    }
-
-    if (
-      !canUpdateParticipation({
-        statut: reunion.statut,
-        dateReunion: reunion.dateReunion,
-      })
-    ) {
-      throw new ServiceError(
-        "FORBIDDEN",
-        "Modification de participation non autorisée pour cette réunion."
-      );
-    }
-
-    const participation = await db.participationReunion.upsert({
-      where: {
-        reunionId_adherentId: {
-          reunionId,
-          adherentId: adherent.id,
-        },
-      },
-      create: {
+    const participation = await db.$transaction(async (tx) => {
+      return withReunionParticipationLocks(
+        tx as unknown as ReunionLockTx,
         reunionId,
-        adherentId: adherent.id,
-        statut: parsed.data.statut,
-      },
-      update: {
-        statut: parsed.data.statut,
-      },
-      select: { statut: true },
+        [adherent.id],
+        async () => {
+          const row = await tx.participationReunion.upsert({
+            where: {
+              reunionId_adherentId: {
+                reunionId,
+                adherentId: adherent.id,
+              },
+            },
+            create: {
+              reunionId,
+              adherentId: adherent.id,
+              statut: parsed.data.statut,
+            },
+            update: {
+              statut: parsed.data.statut,
+            },
+            select: { statut: true },
+          });
+          return row;
+        }
+      );
     });
 
     return { statut: participation.statut };
   } catch (error) {
     if (error instanceof ServiceError) throw error;
+    if (error instanceof ReunionParticipationNotWritableError) {
+      if (error.message === "Réunion non trouvée") {
+        throw new ServiceError("NOT_FOUND", "Réunion non trouvée");
+      }
+      throw new ServiceError("FORBIDDEN", error.message);
+    }
     console.error("[updateMyReunionParticipation] Erreur:", error);
     throw new ServiceError(
       "INTERNAL_ERROR",

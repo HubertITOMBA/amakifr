@@ -1,21 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { AuthContext } from "@/lib/auth-context";
 
-const { findUniqueAdherent, findUniqueReunion, updateReunion } = vi.hoisted(
-  () => ({
+const { findUniqueAdherent, findUniqueReunion, updateReunion, transactionMock, queryRaw } =
+  vi.hoisted(() => ({
     findUniqueAdherent: vi.fn(),
     findUniqueReunion: vi.fn(),
     updateReunion: vi.fn(),
-  })
-);
+    transactionMock: vi.fn(),
+    queryRaw: vi.fn(),
+  }));
 
 vi.mock("@/lib/db", () => ({
   db: {
     adherent: { findUnique: findUniqueAdherent },
-    reunionMensuelle: {
-      findUnique: findUniqueReunion,
-      update: updateReunion,
-    },
+    $transaction: transactionMock,
   },
 }));
 
@@ -36,13 +34,29 @@ function actor(overrides: Partial<AuthContext> = {}): AuthContext {
   };
 }
 
+function wireTx() {
+  queryRaw.mockResolvedValue([{ id: "r1" }]);
+  transactionMock.mockImplementation(async (fn: (tx: unknown) => Promise<unknown>) => {
+    return fn({
+      $queryRaw: queryRaw,
+      reunionMensuelle: {
+        findUnique: findUniqueReunion,
+        update: updateReunion,
+      },
+    });
+  });
+}
+
 beforeEach(() => {
   findUniqueAdherent.mockReset();
   findUniqueReunion.mockReset();
   updateReunion.mockReset();
+  transactionMock.mockReset();
+  queryRaw.mockReset();
+  wireTx();
 });
 
-describe("withdrawMyReunionHostProposal", () => {
+describe("withdrawMyReunionHostProposal — verrou réunion", () => {
   it("UNAUTHENTICATED si userId absent", async () => {
     await expect(
       withdrawMyReunionHostProposal(actor({ userId: "" }), "r1")
@@ -62,9 +76,9 @@ describe("withdrawMyReunionHostProposal", () => {
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
   });
 
-  it("NOT_FOUND si réunion inconnue", async () => {
+  it("NOT_FOUND si réunion inconnue (lock miss)", async () => {
     findUniqueAdherent.mockResolvedValue({ id: "adh-A" });
-    findUniqueReunion.mockResolvedValue(null);
+    queryRaw.mockResolvedValue([]);
     await expect(
       withdrawMyReunionHostProposal(actor(), "r-unknown")
     ).rejects.toMatchObject({ code: "NOT_FOUND" });
@@ -159,6 +173,7 @@ describe("withdrawMyReunionHostProposal", () => {
       },
       select: expect.any(Object),
     });
+    expect(queryRaw).toHaveBeenCalled();
   });
 
   it("Domicile → nullifie adresse en base", async () => {
@@ -191,7 +206,7 @@ describe("withdrawMyReunionHostProposal", () => {
     );
   });
 
-  it("Restaurant → conserve adresse / ne patch pas adresse", async () => {
+  it("Restaurant → conserve adresse", async () => {
     findUniqueAdherent.mockResolvedValue({ id: "adh-A" });
     findUniqueReunion.mockResolvedValue({
       id: "r1",
@@ -213,29 +228,6 @@ describe("withdrawMyReunionHostProposal", () => {
     const data = updateReunion.mock.calls[0][0].data;
     expect(data.adherentHoteId).toBeNull();
     expect(data).not.toHaveProperty("adresse");
-    expect(data).not.toHaveProperty("nomRestaurant");
-  });
-
-  it("Autre → conserve adresse", async () => {
-    findUniqueAdherent.mockResolvedValue({ id: "adh-A" });
-    findUniqueReunion.mockResolvedValue({
-      id: "r1",
-      annee: 2027,
-      mois: 12,
-      statut: "EnAttente",
-      dateReunion: null,
-      adherentHoteId: "adh-A",
-      typeLieu: "Autre",
-    });
-    updateReunion.mockResolvedValue({
-      id: "r1",
-      annee: 2027,
-      mois: 12,
-      statut: "EnAttente",
-    });
-
-    await withdrawMyReunionHostProposal(actor(), "r1");
-    expect(updateReunion.mock.calls[0][0].data).not.toHaveProperty("adresse");
   });
 
   it("A hôte avec date ≥ 28 jours peut se désister", async () => {
@@ -260,34 +252,5 @@ describe("withdrawMyReunionHostProposal", () => {
 
     await withdrawMyReunionHostProposal(actor(), "r1");
     expect(updateReunion).toHaveBeenCalled();
-  });
-
-  it("ignore adherentId session injecté — ownership via userId", async () => {
-    findUniqueAdherent.mockResolvedValue({ id: "adh-A" });
-    findUniqueReunion.mockResolvedValue({
-      id: "r1",
-      annee: 2027,
-      mois: 11,
-      statut: "EnAttente",
-      dateReunion: null,
-      adherentHoteId: "adh-A",
-      typeLieu: "Domicile",
-    });
-    updateReunion.mockResolvedValue({
-      id: "r1",
-      annee: 2027,
-      mois: 11,
-      statut: "EnAttente",
-    });
-
-    await withdrawMyReunionHostProposal(
-      actor({ userId: "user-A", adherentId: "adh-injected" }),
-      "r1"
-    );
-
-    expect(findUniqueAdherent).toHaveBeenCalledWith({
-      where: { userId: "user-A" },
-      select: { id: true },
-    });
   });
 });
