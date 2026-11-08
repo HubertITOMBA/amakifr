@@ -33,6 +33,27 @@ export const RAPPEL_DETTE_OPERATIONS_REFRESH_TOAST =
   "Fonctions et historiques actualisés." as const;
 
 /**
+ * Libellé français d’un motif de gel (présentation UI uniquement).
+ * Ne modifie pas la valeur persistée (`motifCode`).
+ *
+ * @param motifCode - Code stocké (ex. VERIFICATION_ADMINISTRATIVE)
+ */
+export function formatRappelDetteGelMotifLabel(
+  motifCode: string | null | undefined
+): string {
+  switch (motifCode) {
+    case "CONTESTATION":
+      return "Contestation";
+    case "VERIFICATION_ADMINISTRATIVE":
+      return "Vérification administrative";
+    case "AUTRE":
+      return "Autre";
+    default:
+      return motifCode?.trim() ? motifCode : "—";
+  }
+}
+
+/**
  * Formate une date/heure ISO en fr-FR Europe/Paris (avec secondes).
  *
  * @param iso - Instant ISO ou null

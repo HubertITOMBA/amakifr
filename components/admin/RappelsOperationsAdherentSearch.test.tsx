@@ -62,6 +62,19 @@ describe("RappelsOperationsAdherentSearch", () => {
     vi.useRealTimers();
   });
 
+  it("input recherche : pl-10 sm:pl-10 réservé pour la loupe (contre sm:px-3 global)", () => {
+    render(
+      <RappelsOperationsAdherentSearch
+        open
+        onOpenChange={() => {}}
+        onSelect={() => {}}
+      />
+    );
+    const box = screen.getByRole("searchbox");
+    expect(box.className).toMatch(/\bpl-10\b/);
+    expect(box.className).toMatch(/\bsm:pl-10\b/);
+  });
+
   it("aucune requête sous le seuil (1 caractère)", async () => {
     const user = userEvent.setup({
       advanceTimers: vi.advanceTimersByTime,

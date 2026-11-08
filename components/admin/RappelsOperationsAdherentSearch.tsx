@@ -141,18 +141,31 @@ export function RappelsOperationsAdherentSearch({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
+      <DialogContent className="max-w-lg max-h-[80vh] flex flex-col font-sans">
         <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          <DialogTitle className="font-sans text-base sm:text-lg text-slate-900">
+            {title}
+          </DialogTitle>
+          <DialogDescription className="font-sans text-sm leading-relaxed text-slate-700">
+            {description}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 flex-1 min-h-0 flex flex-col">
           <div className="space-y-1.5">
-            <Label htmlFor={inputId}>Recherche</Label>
+            <Label
+              htmlFor={inputId}
+              className="text-sm font-semibold text-slate-800"
+            >
+              Recherche
+            </Label>
             <div className="relative">
+              {/*
+                Input global : px-4 sm:px-3 — sm:px-3 écraserait pl-10 sans sm:pl-10.
+                pl-10 (2.5rem) réserve la loupe ; icône non interactive.
+              */}
               <Search
-                className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400"
+                className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500"
                 aria-hidden
               />
               <Input
@@ -163,7 +176,7 @@ export function RappelsOperationsAdherentSearch({
                 placeholder="Nom ou prénom (min. 2 caractères)…"
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10 pr-10"
+                className="pl-10 sm:pl-10 pr-10 font-sans text-sm sm:text-base"
                 autoFocus
               />
               {searchTerm ? (
@@ -188,13 +201,16 @@ export function RappelsOperationsAdherentSearch({
             className="flex-1 overflow-y-auto rounded-md border border-slate-200 min-h-[12rem]"
           >
             {ui.kind === "idle" ? (
-              <p className="text-center py-8 text-sm text-slate-500">
+              <p className="text-center py-8 font-sans text-sm sm:text-base leading-relaxed text-slate-600">
                 Saisissez au moins {RAPPEL_DETTE_ADHERENT_SEARCH_MIN_CHARS}{" "}
                 caractères.
               </p>
             ) : null}
             {ui.kind === "below_threshold" ? (
-              <p role="status" className="text-center py-8 text-sm text-amber-800">
+              <p
+                role="status"
+                className="text-center py-8 font-sans text-sm sm:text-base leading-relaxed text-amber-900"
+              >
                 Saisissez au moins {RAPPEL_DETTE_ADHERENT_SEARCH_MIN_CHARS}{" "}
                 caractères pour lancer la recherche.
               </p>

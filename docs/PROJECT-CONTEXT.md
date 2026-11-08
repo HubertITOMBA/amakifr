@@ -1,6 +1,6 @@
 # AMAKI — Contexte permanent du projet
 
-Dernière mise à jour : 2026-11-01
+Dernière mise à jour : 2026-11-08
 
 ## Baselines (ne pas confondre)
 
@@ -10,13 +10,23 @@ Dernière mise à jour : 2026-11-01
 | Commit fonctionnel R1 Lot 2 (preview initial) | `773a5c4` | `feat(cotisations): add dry-run debt reminder preview for ADMIN and PRESID` — parent `f2dc638` |
 | Correction Actualiser / libellés (Lot 2) | `aa08df9` (`aa08df96d759a0ebc22548f2af7b91f165314d0c`) | `fix(cotisations): clarify debt reminder preview refresh feedback` |
 | Exclusion entité Assistance du rappel/preview | `b8c4edd` | `fix(cotisations): exclude received assistance from reminder debt` |
-| Production web / backend / `origin/main` **attendue** | `c95e611` | Lots 1+2 + exclusion Assistance rappel + totaux compte F1–F3 (vérifier VPS avant toute mutation) |
-| Branche Lot 3 — socles **déjà commités** | `889c849` (envoi) → gels `5c38bf9` → pose/levée `b68a9a3` → lectures admin `9ef7218` (base `c95e611`) | **Deux flags off** ; migrations Lot 3 **non** appliquées aux bases app ; **non** déployé |
-| Branche Lot 3 — UI opérations + recherche | Passe 2026-11-01 sur `fix/r1-lot3-realign-on-c95e611` (parent lectures `9ef7218`) | Route `/admin/finances/rappels-operations` **distincte** de la preview ; **flags off** ; **non** déployée |
+| Jalon antérieur prod (avant alignement Lot 3) | `c95e611` | Lots 1+2 + exclusion Assistance rappel + totaux compte F1–F3 — **historique** |
+| Production web / backend / `origin/main` **observée** (**avant** le commit de présentation dialogs/accessibilité) | `62e59a1` | Chaîne Lot 3 jusqu’au SHA applicatif ; **migrations Lot 3 appliquées** en prod ; **deux flags off** (envoi + gel mutation) — **revérifier VPS** avant toute mutation |
+| Branche Lot 3 — socles **déjà commités** | `889c849` → gels `5c38bf9` → pose/levée `b68a9a3` → lectures `9ef7218` → … → **`62e59a1`** | **Deux flags off** ; runtime Lot 3 présent en prod **mais inactif** (flags) |
+| Branche Lot 3 — UI opérations + recherche + présentation | Sur `fix/r1-lot3-realign-on-c95e611` : parent applicatif `62e59a1` ; **correctifs présentation** livrés **dans le même commit** que cette mise à jour documentaire | Route `/admin/finances/rappels-operations` ; **flags off** dans le livré ; **pas** d’activation prod |
 | Commit embarqué dans l’AAB store | `7e4e51e` | `chore(mobile): exclude local assets from EAS builds` |
 | Application Android Play Store **publiée** | `1.1.0` / `versionCode` `3` | Production 100 %, disponible sur Google Play depuis le 27 oct. 2026 01:05 |
 
-**Règle** : M1 et M2 restent **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`). Distinguer : `ed253fd` (Lot 1), `773a5c4` (Lot 2), `aa08df9` (Actualiser), `b8c4edd` (exclusion Assistance **rappel**), `c95e611` (prod / `origin/main`), `889c849` (socle envoi Lot 3), `5c38bf9` (gels), `b68a9a3` (pose/levée), `9ef7218` (lectures admin) — **pas** en prod. Totaux compte prod : inclus dans `c95e611`.
+**Règle** : M1 et M2 restent **en production web/backend** et **publiés sur le Play Store** (`1.1.0` / code `3`). Distinguer : `ed253fd` (Lot 1), `773a5c4` (Lot 2), `aa08df9` (Actualiser), `b8c4edd` (exclusion Assistance **rappel**), jalon antérieur `c95e611`, production / `origin/main` applicatif **`62e59a1`** (**flags Lot 3 off**), WIP principal historique `1455af5`, copie SAS de recette (flags `true` temporaires — **hors** dépôt produit). Totaux compte : inclus dans la chaîne jusqu’à `c95e611` puis `62e59a1`.
+
+### Recette isolée Lot 3 (locale, 2026-11-02 → 2026-11-08)
+
+- Racine : `/soft/SAS_AMAKIFR/r1-lot3-recette-fonc-20261102T080147Z/` (baseline `62e59a1`, DB jetable / données fictives, Mailpit loopback, confinement LD_PRELOAD) — **sans** activation production.
+- **Observations navigateur** et **preuves DB/Mailpit/harness** tenues **séparées** (voir `BILAN-RECETTE-CONSOLIDE-20261108.md` dans la racine SAS).
+- Exercés (non exhaustif) : envoi+notif, gel adhérent pose/levée/envoi, cooldown, Assistance exclue, avoir 150−30=120, reprise notif sans renvoi, rejeu serveur même confirmation, double-clic (1 email), Unknown fournisseur, incertitude UI sticky (exception applicative post-orch ≠ Unknown DB ≠ rupture réseau réelle).
+- **Limites** : clavier/focus non vérifiés ; gel ligne **absent** de l’UI ; **pas** de rupture réseau réelle testée ; compteur d’appels action au double-clic non démontré ; TypeScript global **non validé** ; recette **non** exhaustive ; **pas** d’autorisation d’activation.
+- **Avant** ce commit (HEAD worktree = `62e59a1`) : six correctifs de présentation **uniquement** en worktree (empreintes : inventaire SAS `INVENTAIRE-FINAL-6-CORRECTIFS-AVANT-COMMIT.md`) — **hors** patches panne SAS / flags `true`.
+- **Après** push de ce commit sur `fix/r1-lot3-realign-on-c95e611` : les six correctifs + cette doc sont **sur la branche Lot 3** ; `origin/main` / prod applicative restent **`62e59a1`** avec **flags off** — aucun déploiement ni activation effectué par cette passe.
 
 > Ce document évite de répéter les audits déjà conclus. Il ne remplace pas les vérifications d’état courantes avant une mutation de production. En cas de contradiction entre ce document, le dépôt Git et l’état réel du VPS, arrêter l’opération, signaler l’écart et vérifier avant d’agir.
 
@@ -45,48 +55,44 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 
 ## Point de reprise — R1 rappels cotisations/dettes
 
-**ÉTAT AU 2026-11-01 — production / `origin/main` = `c95e611` ; branche Lot 3 `fix/r1-lot3-realign-on-c95e611` : socles commités jusqu’aux lectures @ `9ef7218` + **passe UI opérations / recherche** — **deux flags off**, **non déployées** ; migrations Lot 3 **non** appliquées aux bases app**
+**ÉTAT AU 2026-11-08 — production / `origin/main` = `62e59a1` (**avant** ce commit de présentation) ; migrations Lot 3 **appliquées** ; **deux flags off** ; branche Lot 3 `fix/r1-lot3-realign-on-c95e611` : socles → UI ops + **correctifs présentation** (ce commit) — **pas** d’activation**
 
 | Lot | État | SHA / remarque |
 |-----|------|----------------|
 | Lot 1 — calcul d’éligibilité | **Commité** + chaîne Lot 2 | `ed253fd` ; sources rappelables **corrigées** ensuite |
 | Lot 2 — prévisualisation admin dry-run | **Commité** + déployé | Preview `773a5c4` ; Actualiser `aa08df9` ; route `/admin/finances/rappels-preview` |
-| Exclusion Assistance (rappel) | **Production / `origin/main`** | Chaîne jusqu’à `b8c4edd` puis totaux `c95e611` |
-| Totaux dette compte (F1–F3 + ownership S1) | **Production / `origin/main`** | `c95e611` — Obligations legacy **conservées** dans ces totaux |
-| Lot 3 — envoi manuel (socle) | **Commité sur branche dédiée, non activé en prod** | Chaîne jusqu’à `889c849` puis gels `5c38bf9` ; flag `RAPPEL_DETTE_ENVOI_ENABLED=false` ; migrations **non** appliquées aux bases app |
-| Lot 3 — gels / contestation (persistance) | **Commité sur branche dédiée @ `5c38bf9`, non activé** | Schéma + `20261030150000_rappel_dette_gel` ; résolveur ; jeton prepare **v2** ; branchements preview/prepare/reserve/Calling — **absents de la production** |
-| Lot 3 — gels pose / levée (commandes) | **Commité sur branche dédiée @ `b68a9a3`, non activé** | Services + Server Actions ; flag `RAPPEL_DETTE_GEL_MUTATION_ENABLED=false` (**indépendant** de l’envoi) ; levée = audit acteur/date **sans** nouveau motif |
-| Lot 3 — lectures admin (capacités / historiques) | **Commité sur branche dédiée @ `9ef7218`, non activé** | Parent `b68a9a3` ; capacités + historiques paginés ; curseurs + ancre ; `notifResumeEligible` ≠ `canResumeNotif` ; lectures OK flags off |
-| Lot 3 — UI opérations + recherche adhérents | **Passe 2026-11-01 sur branche dédiée, non déployée** | Route `/admin/finances/rappels-operations` (**≠** preview) ; recherche bornée ADMIN\|PRESID (Zod ≥2, limit 20, « Fiche N », **sans passeport**) ; séparation client/serveur (constants purs) ; **deux flags false** ; **aucun** envoi |
+| Exclusion Assistance (rappel) | **Production / `origin/main`** | Chaîne jusqu’à `b8c4edd` puis totaux `c95e611` → `62e59a1` |
+| Totaux dette compte (F1–F3 + ownership S1) | **Production / `origin/main`** | Chaîne `c95e611` → `62e59a1` — Obligations legacy **conservées** dans ces totaux |
+| Lot 3 — envoi manuel (socle) | **Présent en prod @ `62e59a1`, non activé** | Flag `RAPPEL_DETTE_ENVOI_ENABLED=false` ; migration `…envoi` **appliquée** |
+| Lot 3 — gels / contestation (persistance) | **Présent en prod @ `62e59a1`, non activé** | Schéma + `20261030150000_rappel_dette_gel` ; migration **appliquée** ; runtime **inactif** (flags) |
+| Lot 3 — gels pose / levée (commandes) | **Présent en prod @ `62e59a1`, non activé** | Services + Server Actions ; flag `RAPPEL_DETTE_GEL_MUTATION_ENABLED=false` (**indépendant** de l’envoi) ; levée = audit acteur/date **sans** nouveau motif |
+| Lot 3 — lectures admin (capacités / historiques) | **Présent en prod @ `62e59a1`, non activé** | Capacités + historiques paginés ; curseurs + ancre ; `notifResumeEligible` ≠ `canResumeNotif` ; lectures OK flags off |
+| Lot 3 — UI opérations + recherche + présentation | **Branche Lot 3** : UI ops 2026-11-01 + correctifs présentation 2026-11-08 (ce commit) ; prod applicative **`62e59a1`** sans ces correctifs tant que non fusionnés/déployés | Route `/admin/finances/rappels-operations` (**≠** preview) ; **deux flags false** ; **aucun** envoi activé |
 
-### Distinction production vs branche Lot 3 (mise à jour 2026-11-01)
+### Distinction production vs branche Lot 3 (mise à jour 2026-11-08)
 
 | Surface | Contenu |
 |---------|---------|
-| **Production / `origin/main` @ `c95e611`** | Lots 1+2 ; rappel/preview **sans** Assistance comme dette ; totaux compte F1–F3 + ownership S1 ; **aucun** runtime Lot 3 / gels / UI ops |
-| **WIP local principal @ `1455af5` + fichiers non suivis** *(historique)* | Broader WIP Lot 3 — **ne pas** confondre avec la greffe réalignée |
-| **Branche Lot 3** (socles → lectures `9ef7218` + UI ops 2026-11-01) | Socle envoi + gels + pose·levée + lectures + **UI opérations / recherche** ; **deux flags off** ; migrations dans le dépôt **non** appliquées aux bases app ; harness PG / generate **exclus** des commits produit |
+| **Production / `origin/main` @ `62e59a1`** (**avant** ce commit) | Lots 1+2 + chaîne Lot 3 jusqu’à `62e59a1` ; **migrations Lot 3 appliquées** ; **deux flags off** — runtime Lot 3 **inactif** |
+| **WIP local principal @ `1455af5` + fichiers non suivis** *(historique)* | Broader WIP Lot 3 — **ne pas** confondre avec la greffe réalignée ni avec la recette SAS |
+| **Branche Lot 3** (`fix/r1-lot3-realign-on-c95e611`) | Socles → UI ops + **correctifs présentation** (ce commit, parent `62e59a1`) ; **deux flags off** ; harness PG / generate / patches panne SAS **exclus** des commits produit |
 
 #### Garde-fous Lot 3 (socle inactif en production)
 
 - **Flags off** : `RAPPEL_DETTE_ENVOI_ENABLED=false` ; `RAPPEL_DETTE_GEL_MUTATION_ENABLED=false` — pas d’activation runtime en dépôt ; **aucun** envoi / notif / push réel via cette surface tant que flags off.
 - **Pose / levée** : services + Server Actions @ `b68a9a3` — **non activés** / **non déployés** ; garde mutation **indépendante** de l’envoi ; levée = audit acteur/date **sans** nouveau motif.
 - **Lectures admin** : capacités + historiques paginés @ `9ef7218` ; curseurs liés + **ancre vérifiée** ; `notifResumeEligible` ≠ `canResumeNotif` ; `canProposeResend` toujours false.
-- **UI opérations + recherche** (2026-11-01) : **distincte** de la preview Lot 2 ; ADMIN\|PRESID ; recherche limitée (pas de chargement massif, **pas de passeport**) ; modules constants / display **purs** côté client ; Prisma / recherche métier via Server Actions uniquement ; layout admin global / sidebar **inchangés**.
-- **Recette navigateur locale (partielle)** : grand écran / recherche / sélection **observés** ; mobile, clavier et toast Actualiser **non confirmés**.
+- **UI opérations + recherche** (2026-11-01) + **correctifs présentation** (2026-11-08, ce commit) : **distincte** de la preview Lot 2 ; ADMIN\|PRESID ; recherche limitée (pas de chargement massif, **pas de passeport**) ; modules constants / display **purs** côté client ; dialogs/accessibilité (contraste, loupe, libellés motifs FR) ; Prisma / recherche métier via Server Actions uniquement ; layout admin global / sidebar **inchangés**.
+- **Recette isolée** (2026-11-02 → 2026-11-08) : observations navigateur **≠** preuves DB/Mailpit/harness ; limites : clavier/focus, gel ligne absent UI, pas de rupture réseau réelle, TypeScript global non validé — voir § Recette isolée ci-dessus.
 - **Validations pose/levée (séparées)** : **26** Vitest mockés (historique) ; **20** contrôles PG jetable — ne pas cumuler. Recovery **P2002** : **non exercée** en PG sous verrou normal.
 - **Validations lectures admin (séparées)** : **38** Vitest mockés ; **15** scénarios PG jetable — **ne pas** cumuler avec pose/levée.
-- **Validations UI ops / recherche (séparées)** : Vitest jsdom page + recherche + display — **≠** preuve navigateur complète.
-- **Services d’envoi** : présents sur la branche dédiée ; **non activés** en production.
-- **Preview / `computeDetteRappelable`** (socle Lot 3) : lit aussi `RappelDetteEnvoi` (cooldown Accepted). Le branchement gels lit en outre les tables gels / révision. **Déployer le binaire correspondant sans les migrations** → échec Prisma (fail-closed).
-- **Deux migrations Lot 3 requises** avant mise en service du code correspondant (y compris preview / lectures / UI qui lisent ces tables) :
-  1. `20261027190000_rappel_dette_envoi`
-  2. `20261030150000_rappel_dette_gel`
-  Appliquer **avant** ou **avec** le binaire — **jamais** le code seul sur une base sans tables.
+- **Validations UI ops / recherche / présentation (séparées)** : Vitest jsdom page + recherche + display — **≠** preuve navigateur complète.
+- **Services d’envoi** : présents en prod @ `62e59a1` ; **non activés** (flag envoi off).
+- **Preview / `computeDetteRappelable`** (socle Lot 3) : lit aussi `RappelDetteEnvoi` (cooldown Accepted). Le branchement gels lit en outre les tables gels / révision.
+- **Deux migrations Lot 3** (`20261027190000_rappel_dette_envoi`, `20261030150000_rappel_dette_gel`) : **appliquées** en production au 2026-11-08 ; runtime reste **inactif** tant que les **deux flags** restent off.
 - **Limite gels** : un gel posé **après** un Calling déjà **commité** n’est **pas rétroactif** — il n’annule pas l’autorisation Calling ; l’appel fournisseur peut encore avoir lieu une fois, puis preuve Accepted.
-- **Bases applicatives** : **aucune** migration Lot 3 (`…envoi` ni `…gel`) appliquée à `amakifr_db` / `amakifr` / `amakifr_vcl`.
 - **TypeScript global** : **non validé** (ne pas affirmer le contraire).
-- **Production courante** : `origin/main` / prod = **`c95e611`** (sans Lot 3 runtime, sans gels, sans UI ops).
+- **Production courante** : `origin/main` / prod = **`62e59a1`** (**avant** ce commit de présentation) — Lot 3 présent, migrations appliquées, **flags off** ; correctifs présentation **uniquement** sur la branche Lot 3 après ce push.
 - **Après clôture du Lot 3** : harmoniser progressivement les **autres** pages admin (largeur utile, marges, cartes, headers, typographie, responsive) — **hors** bande Lot 3 courante.
 
 ### Lot 1 (commité — `ed253fd`)
@@ -127,7 +133,7 @@ La pause et le plan « piste interne → promo prod » sont **terminés**.
 - Historique d’envoi / preuve Accepted Lot 3 (`RappelDetteEnvoi`) : socle **commité** sur branche dédiée (chaîne → `5c38bf9`) — **non activé / non déployé** en production.
 - Persistance gels / révision / jeton prepare v2 / résolveur : **commités** sur branche dédiée @ `5c38bf9` — **non activés / absents de la production**.
 - Pose / levée gels (commandes) : **commitées** sur branche dédiée — flag mutation off ; levée auditée sans nouveau motif ; **non activées** en production.
-- UI opérations Lot 3 : surface **distincte** de la preview — voir garde-fous 2026-11-01 ; **flags off** / **non déployée**.
+- UI opérations Lot 3 : surface **distincte** de la preview — voir garde-fous 2026-11-08 ; **flags off** ; correctifs présentation sur branche Lot 3 (ce commit).
 
 ### Lot 2 (preview dry-run — déployé)
 
@@ -168,11 +174,11 @@ Prévisualisation administrateur dry-run : route `/admin/finances/rappels-previe
 
 ### Prochaine étape
 
-- **Lot 3 socles** déjà **commités** sur `fix/r1-lot3-realign-on-c95e611` (envoi → gels `5c38bf9` → pose/levée `b68a9a3` → lectures `9ef7218`) — **pas** d’activation app/cron en prod ; **pas** d’application des migrations aux bases app sans autorisation explicite.
-- **UI opérations + recherche** : présente sur la branche (passe 2026-11-01) — **flags off** ; **non déployée** ; recette navigateur **partielle**.
-- Avant mise en service du binaire gels/envoi/UI correspondant : appliquer **les deux** migrations Lot 3 (`…envoi` + `…gel`) **avec** le code — y compris si la preview / UI lit ces tables.
+- **Lot 3** présent en prod @ **`62e59a1`** avec **migrations appliquées** et **deux flags off** — **pas** d’activation app/cron sans autorisation explicite.
+- **UI opérations + recherche + présentation** : sur `fix/r1-lot3-realign-on-c95e611` (ce commit, parent `62e59a1`) — **flags off** ; **pas** d’activation ; `origin/main` reste **`62e59a1`** tant que non fusionné.
+- Recette isolée SAS (données fictives + Mailpit) **terminée** pour la fenêtre 2026-11-02 → 2026-11-08 — **sans** activation prod ; limites documentées (§ Recette isolée).
 - Ne pas lancer d’anciens producteurs de relances comme substitut du Lot 3.
-- Validation PG isolée : bases jetables préfixées uniquement (`amakifr_r1_lot3_*`) — jamais `amakifr_db` / `amakifr` / `amakifr_vcl`.
+- Validation PG isolée : bases jetables préfixées uniquement (`amakifr_r1_lot3_*`) — jamais confondre avec la copie SAS ni avec une activation prod.
 - **Après clôture Lot 3** : harmoniser progressivement les autres pages admin (largeur, marges, cartes, headers, typographie, responsive).
 
 ### Validations locales passe gels (2026-10-30) — **séparées**, pas de total cumulé
@@ -425,25 +431,25 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ## 11. Travaux prioritaires
 
-**ÉTAT AU 2026-11-01 (Android clôturée ; `origin/main` / prod = `c95e611` ; Lot 3 socles jusqu’à lectures `9ef7218` + UI ops/recherche — flags off ; non déployé)**
+**ÉTAT AU 2026-11-08 (Android clôturée ; `origin/main` / prod = `62e59a1` avant ce commit ; migrations Lot 3 appliquées ; flags off ; correctifs présentation sur branche Lot 3)**
 
 | Priorité | Sujet | État |
 |----------|-------|------|
 | P0 | Inscription web | Livré en production |
 | P1 | Mot de passe oublié (M1) | **Production web + Play Store `1.1.0` OK** |
 | P1 | Lecture CR mobile (M2) | **Production web + Play Store `1.1.0` OK** |
-| P1 | Rappels cotisations / dettes (R1) Lots 1+2 + exclusion Assistance rappel | **Production `c95e611`** ; dry-run uniquement |
-| P1 | Totaux dette compte (Assistance hors dette) | **Production `c95e611`** |
-| **Suivant** | R1 Lot 3 — envoi manuel (socle) | **Commité** (chaîne → `5c38bf9`) — **flag envoi off** / non déployé ; migrations non appliquées aux bases app |
-| **Suivant** | R1 Lot 3 — gels / contestation (persistance) | **Commité** @ `5c38bf9` — absents de la prod |
-| **Suivant** | R1 Lot 3 — gels pose / levée | **Commité** @ `b68a9a3` — flag mutation off (indépendant) ; levée auditée sans nouveau motif ; non activé |
-| **Suivant** | R1 Lot 3 — lectures admin (capacités / historiques) | **Commité** @ `9ef7218` — curseurs + ancre ; `notifResumeEligible` ≠ `canResumeNotif` ; **38** Vitest / **15** PG **séparés** ; flags off |
-| **Suivant** | R1 Lot 3 — UI opérations + recherche | Passe 2026-11-01 — route ops **≠** preview ; recherche ADMIN\|PRESID bornée ; sans passeport ; recette navigateur **partielle** ; flags off ; non déployée |
+| P1 | Rappels cotisations / dettes (R1) Lots 1+2 + exclusion Assistance rappel | **Production `62e59a1`** ; dry-run / flags off |
+| P1 | Totaux dette compte (Assistance hors dette) | **Production `62e59a1`** |
+| **Suivant** | R1 Lot 3 — envoi manuel (socle) | **Présent @ `62e59a1`** — **flag envoi off** ; migration appliquée |
+| **Suivant** | R1 Lot 3 — gels / contestation (persistance) | **Présent @ `62e59a1`** — migration appliquée ; inactif (flags) |
+| **Suivant** | R1 Lot 3 — gels pose / levée | **Présent @ `62e59a1`** — flag mutation off (indépendant) ; levée auditée sans nouveau motif ; non activé |
+| **Suivant** | R1 Lot 3 — lectures admin (capacités / historiques) | **Présent @ `62e59a1`** — curseurs + ancre ; `notifResumeEligible` ≠ `canResumeNotif` ; flags off |
+| **Suivant** | R1 Lot 3 — UI opérations + recherche + présentation | UI ops 2026-11-01 + correctifs présentation 2026-11-08 (ce commit, parent `62e59a1`) ; flags off ; pas d’activation |
 | Après Lot 3 | Harmonisation pages admin | Largeur, marges, cartes, headers, typographie, responsive — **progressif** ; **pas maintenant** |
 
 ### Dettes ouvertes
 
-1. **Rappels cotisations / dettes (R1) Lot 3 — mise en service** — uniquement avec **les deux** migrations Lot 3 + activations serveur explicites (envoi / mutation gels) ; UI ops présente sur branche mais **flags off** / non déployée ; auto hors v1 ; ne pas utiliser d’anciens producteurs de relances.
+1. **Rappels cotisations / dettes (R1) Lot 3 — activation** — migrations déjà **appliquées** ; reste l’activation serveur **explicite** (envoi / mutation gels) ; UI ops + présentation sur branche Lot 3 mais **flags off** ; auto hors v1 ; ne pas utiliser d’anciens producteurs de relances.
 1b. Totaux admin synthèse / prestations (`getFinancialStats`, créances avec Assistance) — **non corrigés**.
 2. Identification de l’origine des connexions.
 3. Copilote IA comptes rendus — **seulement après** stabilisation store M1/M2 ; **non commencé**.
@@ -512,18 +518,19 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - **2026-10-30** : **Passe gels persistés** — schéma + migration `20261030150000_rappel_dette_gel` + résolveur + jeton prepare v2 + branchements ; validations **séparées** (SQL 30 ; Vitest 93 ; PG 14 ; complément G6) ; **commité** @ `5c38bf9` ; tables gels / révision **absentes de la production** ; gel après Calling **non rétroactif** ; **TypeScript global non validé**.
 - **2026-10-30** : **Pose / levée gels** — commit `b68a9a3` ; services + Server Actions + tests ; garde mutation indépendante (défaut off) ; levée auditée acteur/date sans nouveau motif ; **aucune UI** *(à cette date)* ; validations **séparées** (**26** Vitest historiques ; **20** contrôles PG) ; recovery P2002 **non exercée** en PG sous verrou normal ; **deux** migrations Lot 3 toujours requises avant mise en service ; migrations **non** appliquées aux bases app.
 - **2026-10-30** : **Lectures admin Lot 3** (capacités + historiques envois/gels paginés) — commit `9ef7218` sur `fix/r1-lot3-realign-on-c95e611` (parent `b68a9a3`) ; curseurs liés + ancre vérifiée ; `notifResumeEligible` distinct de `canResumeNotif` ; validations **séparées** (**38** Vitest ; **15** scénarios PG jetable) ; base jetable **supprimée** ; **aucune** base app migrée ; **deux flags false** ; TypeScript global **non validé** ; `origin/main` / prod restent **`c95e611`**.
-- **2026-11-01** : **UI opérations + recherche adhérents** sur branche Lot 3 (parent lectures `9ef7218`) — route `/admin/finances/rappels-operations` **distincte** de la preview ; recherche limitée ADMIN\|PRESID ; **sans passeport** ; « Fiche N » ; séparation client/serveur (constants purs) ; **deux flags false** ; migrations **non** appliquées ; **aucun** envoi ; TypeScript global **non validé** ; recette navigateur **partielle** (grand écran / recherche / sélection observés ; mobile, clavier, toast Actualiser non confirmés) ; harmonisation des autres pages admin **reportée après** clôture Lot 3 ; `origin/main` / prod restent **`c95e611`**.
+- **2026-11-01** : **UI opérations + recherche adhérents** sur branche Lot 3 (parent lectures `9ef7218`) — route `/admin/finances/rappels-operations` **distincte** de la preview ; recherche limitée ADMIN\|PRESID ; **sans passeport** ; « Fiche N » ; séparation client/serveur (constants purs) ; **deux flags false** ; *(à cette date)* migrations **non** encore appliquées aux bases app ; **aucun** envoi ; TypeScript global **non validé** ; recette navigateur **partielle** ; `origin/main` / prod étaient alors **`c95e611`**.
+- **2026-11-08** : Alignement observé — production / `origin/main` = **`62e59a1`** (**avant** ce commit) ; **deux** migrations Lot 3 **appliquées** ; **deux flags off** ; recette isolée SAS (données fictives + Mailpit, 2026-11-02 → 2026-11-08) sans activation prod ; observations navigateur **distinctes** des preuves DB/harness ; limites (clavier/focus, gel ligne absent UI, pas de rupture réseau réelle, TypeScript global non validé) ; **correctifs présentation** dialogs/accessibilité livrés **dans ce commit** sur `fix/r1-lot3-realign-on-c95e611` (parent `62e59a1`) — **sans** push `main`, **sans** déploiement, **sans** activation ; WIP principal **`1455af5`** préservé.
 
 ---
 
 ## Faits temporaires à revérifier
 
-- SHA `origin/main` vs checkout VPS `/sites/amakifr` (rappel+totaux attendus sur **`c95e611`** — **revérifier** avant mutation).
-- Lot 3 : branche `fix/r1-lot3-realign-on-c95e611` (socles → lectures `9ef7218` + UI ops 2026-11-01) — **ne pas** confondre avec le WIP principal historique `1455af5`.
+- SHA `origin/main` vs checkout VPS `/sites/amakifr` (attendu **`62e59a1`** — **revérifier** avant mutation).
+- Lot 3 : migrations `…envoi` / `…gel` **présentes** en prod ; **deux flags off** — **revérifier** avant toute activation.
+- Branche `fix/r1-lot3-realign-on-c95e611` (parent `62e59a1` + commit présentation) — **ne pas** confondre avec le WIP principal historique `1455af5` ni avec la copie SAS.
 - Présence/absence de `maintenance.flag` ; HTTP public/interne.
 - PM2 `amakifr` online ; écoute `127.0.0.1:9060` uniquement.
 - Flags Notes de frais + stockage privé (sans afficher d’autres secrets).
-- Prisma prod : migrations M1/M2 `finished` ; **aucune** migration Lot 3 (`…envoi` / `…gel`) sur bases app.
 - Play Store public : `1.1.0` / code `3` (inchangé par R1 / totaux / Lot 3).
 - `mobile/.env` local = LAN DEV.
-- R1 prod : dry-run uniquement ; Lot 3 **flags off / non déployé** ; ne pas lancer d’anciens producteurs de relances.
+- R1 prod : Lot 3 **flags off** (runtime inactif malgré migrations) ; ne pas lancer d’anciens producteurs de relances.

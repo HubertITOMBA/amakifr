@@ -60,6 +60,7 @@ import {
 import { formatPreviewEuroAmount } from "@/lib/services/cotisations/rappel-dette/preview-display";
 import {
   formatOperationsDateTime,
+  formatRappelDetteGelMotifLabel,
   isPrepareExpired,
   RAPPEL_DETTE_CONFIRM_UNCERTAIN_MESSAGE,
   RAPPEL_DETTE_CONFIRM_UNCERTAIN_OPS_HINT,
@@ -70,6 +71,31 @@ import {
   RAPPEL_DETTE_OPERATIONS_REFRESH_TOAST,
   RAPPEL_DETTE_SOURCE_UNAVAILABLE_UI,
 } from "@/lib/services/cotisations/rappel-dette/rappels-operations-display";
+
+/** Case confirmation ops — taille ~24px, contraste, focus (présentation locale page). */
+const OPS_CONFIRM_CHECKBOX_CLASS =
+  "mt-0.5 size-6 shrink-0 rounded-[4px] border-2 border-slate-700 " +
+  "bg-white text-white shadow-sm " +
+  "data-[state=checked]:bg-blue-600 data-[state=checked]:border-blue-700 " +
+  "data-[state=checked]:text-white " +
+  "focus-visible:border-blue-600 focus-visible:ring-2 " +
+  "focus-visible:ring-blue-500 focus-visible:ring-offset-2";
+
+const OPS_CONFIRM_ZONE_CLASS =
+  "flex items-start gap-3 rounded-md border-2 border-slate-400 " +
+  "bg-white p-3 shadow-sm hover:bg-slate-50 " +
+  "focus-within:outline-none focus-within:ring-2 " +
+  "focus-within:ring-blue-500 focus-within:ring-offset-2 " +
+  "has-[:disabled]:opacity-60";
+
+const OPS_CONFIRM_LABEL_CLASS =
+  "flex-1 min-h-6 font-sans text-sm sm:text-base " +
+  "leading-relaxed text-slate-900 cursor-pointer " +
+  "peer-disabled:cursor-not-allowed";
+
+const OPS_DIALOG_BODY_CLASS = "space-y-3 py-2 font-sans text-sm sm:text-base leading-relaxed text-slate-900";
+const OPS_DIALOG_LABEL_CLASS =
+  "text-sm font-semibold text-slate-800";
 import { RAPPEL_DETTE_ADMIN_READ_SOURCE_UNAVAILABLE } from "@/lib/services/cotisations/rappel-dette/rappel-dette-admin-read-constants";
 import type {
   RappelDetteAdminCapabilities,
@@ -1168,20 +1194,25 @@ export default function AdminRappelsOperationsPage() {
                       </div>
                     </div>
 
-                    <div className="flex items-start gap-2">
+                    {/*
+                      Zone entière cliquable via Label htmlFor (frère du Checkbox Radix) —
+                      évite le double basculement d’un Checkbox imbriqué dans <label>.
+                    */}
+                    <div className={OPS_CONFIRM_ZONE_CLASS}>
                       <Checkbox
                         id="confirm-send-check"
                         checked={confirmChecked}
                         onCheckedChange={(v) => setConfirmChecked(v === true)}
                         disabled={confirmBusy || prepareExpired}
+                        className={OPS_CONFIRM_CHECKBOX_CLASS}
                       />
                       <Label
                         htmlFor="confirm-send-check"
-                        className="text-xs leading-snug cursor-pointer"
+                        className={OPS_CONFIRM_LABEL_CLASS}
                       >
-                        Je confirme explicitement l’envoi de ce rappel pour
-                        l’adhérent sélectionné, avec le montant et le destinataire
-                        masqué ci-dessus.
+                        Je confirme l’envoi de ce rappel à l’adhérent
+                        sélectionné, pour le montant et le destinataire
+                        indiqués.
                       </Label>
                     </div>
 
@@ -1449,8 +1480,10 @@ export default function AdminRappelsOperationsPage() {
                             ) : null}
                           </td>
                           <td className="px-2 py-2">
-                            <span className="font-medium">{row.motifCode}</span>
-                            <span className="block text-[10px] text-slate-600 line-clamp-2">
+                            <span className="font-medium font-sans text-sm text-slate-900">
+                              {formatRappelDetteGelMotifLabel(row.motifCode)}
+                            </span>
+                            <span className="block text-xs text-slate-600 line-clamp-2 leading-relaxed">
                               {row.motifTexte}
                             </span>
                           </td>
@@ -1511,21 +1544,28 @@ export default function AdminRappelsOperationsPage() {
         </Card>
 
         <Dialog open={poseOpen} onOpenChange={setPoseOpen}>
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md font-sans">
             <DialogHeader>
-              <DialogTitle>Poser un gel adhérent</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="font-sans text-base sm:text-lg text-slate-900">
+                Poser un gel adhérent
+              </DialogTitle>
+              <DialogDescription className="font-sans text-sm leading-relaxed text-slate-700">
                 Motif obligatoire. {RAPPEL_DETTE_GEL_NON_RETROACTIF_MESSAGE}
               </DialogDescription>
             </DialogHeader>
-            <div className="space-y-3 py-2">
+            <div className={OPS_DIALOG_BODY_CLASS}>
               <div className="space-y-1.5">
-                <Label htmlFor="pose-motif-code">Motif</Label>
+                <Label htmlFor="pose-motif-code" className={OPS_DIALOG_LABEL_CLASS}>
+                  Motif
+                </Label>
                 <Select
                   value={poseMotifCode}
                   onValueChange={(v) => setPoseMotifCode(v as MotifCode)}
                 >
-                  <SelectTrigger id="pose-motif-code" className="w-full">
+                  <SelectTrigger
+                    id="pose-motif-code"
+                    className="w-full font-sans text-sm sm:text-base"
+                  >
                     <SelectValue placeholder="Choisir un motif" />
                   </SelectTrigger>
                   <SelectContent>
@@ -1538,7 +1578,10 @@ export default function AdminRappelsOperationsPage() {
                 </Select>
               </div>
               <div className="space-y-1.5">
-                <Label htmlFor="pose-motif-texte">
+                <Label
+                  htmlFor="pose-motif-texte"
+                  className={OPS_DIALOG_LABEL_CLASS}
+                >
                   Commentaire (obligatoire)
                 </Label>
                 <Input
@@ -1547,20 +1590,23 @@ export default function AdminRappelsOperationsPage() {
                   onChange={(e) => setPoseMotifTexte(e.target.value)}
                   maxLength={500}
                   aria-required
+                  className="font-sans text-sm sm:text-base"
                 />
               </div>
-              <div className="flex items-start gap-2">
+              <div className={OPS_CONFIRM_ZONE_CLASS}>
                 <Checkbox
                   id="pose-confirm"
                   checked={poseConfirmChecked}
                   onCheckedChange={(v) => setPoseConfirmChecked(v === true)}
+                  disabled={poseBusy}
+                  className={OPS_CONFIRM_CHECKBOX_CLASS}
                 />
-                <Label htmlFor="pose-confirm" className="text-xs cursor-pointer">
+                <Label htmlFor="pose-confirm" className={OPS_CONFIRM_LABEL_CLASS}>
                   Je confirme la pose de ce gel pour l’adhérent sélectionné.
                 </Label>
               </div>
               {poseError ? (
-                <p role="alert" className="text-xs text-red-700">
+                <p role="alert" className="text-sm text-red-700 leading-relaxed">
                   {poseError}
                 </p>
               ) : null}
@@ -1577,7 +1623,13 @@ export default function AdminRappelsOperationsPage() {
               <Button
                 type="button"
                 onClick={() => void handlePose()}
-                disabled={poseBusy || !gelMutationsAllowed}
+                disabled={
+                  poseBusy ||
+                  !gelMutationsAllowed ||
+                  !poseConfirmChecked ||
+                  !poseMotifCode ||
+                  !poseMotifTexte.trim()
+                }
               >
                 {poseBusy ? (
                   <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -1596,17 +1648,20 @@ export default function AdminRappelsOperationsPage() {
             if (!open) setLeveTarget(null);
           }}
         >
-          <DialogContent className="sm:max-w-md">
+          <DialogContent className="sm:max-w-md font-sans">
             <DialogHeader>
-              <DialogTitle>Lever le gel</DialogTitle>
-              <DialogDescription>
+              <DialogTitle className="font-sans text-base sm:text-lg text-slate-900">
+                Lever le gel
+              </DialogTitle>
+              <DialogDescription className="font-sans text-sm leading-relaxed text-slate-700">
                 La levée enregistre l’acteur et la date. Aucun nouveau motif
                 n’est demandé ni stocké.
               </DialogDescription>
             </DialogHeader>
             {leveTarget ? (
-              <p className="text-xs text-slate-600">
-                Gel {leveTarget.id} — {leveTarget.motifCode} (posé le{" "}
+              <p className="font-sans text-sm sm:text-base leading-relaxed text-slate-800">
+                Gel {leveTarget.id} —{" "}
+                {formatRappelDetteGelMotifLabel(leveTarget.motifCode)} (posé le{" "}
                 {formatOperationsDateTime(leveTarget.posedAt)})
               </p>
             ) : null}

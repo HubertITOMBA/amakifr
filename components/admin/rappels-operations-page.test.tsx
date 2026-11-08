@@ -407,7 +407,7 @@ describe("AdminRappelsOperationsPage", () => {
     await user.click(screen.getByRole("button", { name: /Préparer l’envoi/i }));
     await waitFor(() => expect(prepareAction).toHaveBeenCalledTimes(1));
     await user.click(
-      screen.getByLabelText(/Je confirme explicitement l’envoi/i)
+      screen.getByLabelText(/Je confirme l’envoi de ce rappel/i)
     );
     const btn = screen.getByRole("button", { name: /Confirmer l’envoi/i });
     // Double invocation synchrone (avant re-render)
@@ -416,6 +416,48 @@ describe("AdminRappelsOperationsPage", () => {
     expect(confirmAction).toHaveBeenCalledTimes(1);
     d.resolve({ success: true, data: { ok: true, envoiId: "e1" } });
     await waitFor(() => expect(confirmAction).toHaveBeenCalledTimes(1));
+  });
+
+  it("présentation confirm : case décochée, bouton disabled, label associé (mock Checkbox)", async () => {
+    /**
+     * Limite : Checkbox Radix est mocké en <input type="checkbox"> —
+     * ne prouve ni size 20–24px, ni ring focus-visible réel, ni contraste CSS.
+     * Prouve uniquement association label/htmlFor, défaut décoché, disabled bouton.
+     */
+    const user = userEvent.setup();
+    render(<AdminRappelsOperationsPage />);
+    await waitFor(() => expect(getCapabilities).toHaveBeenCalled());
+    await selectAdherent(user);
+    await user.click(screen.getByRole("button", { name: /Préparer l’envoi/i }));
+    await waitFor(() => expect(prepareAction).toHaveBeenCalledTimes(1));
+
+    const checkbox = screen.getByLabelText(
+      /Je confirme l’envoi de ce rappel à l’adhérent sélectionné, pour le montant et le destinataire indiqués/i
+    ) as HTMLInputElement;
+    expect(checkbox).toBeTruthy();
+    expect(checkbox.checked).toBe(false);
+    expect(
+      (screen.getByRole("button", { name: /Confirmer l’envoi/i }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+
+    await user.click(checkbox);
+    expect(checkbox.checked).toBe(true);
+    expect(
+      (screen.getByRole("button", { name: /Confirmer l’envoi/i }) as HTMLButtonElement)
+        .disabled
+    ).toBe(false);
+
+    // Clavier : Space sur la case mockée après focus explicite —
+    // ≠ anneau focus-visible / taille Radix réelle (Checkbox mocké).
+    checkbox.focus();
+    await user.keyboard(" ");
+    expect(checkbox.checked).toBe(false);
+    expect(
+      (screen.getByRole("button", { name: /Confirmer l’envoi/i }) as HTMLButtonElement)
+        .disabled
+    ).toBe(true);
+    expect(confirmAction).not.toHaveBeenCalled();
   });
 
   it("A→B réponses historiques en ordre inverse : état B uniquement", async () => {
@@ -557,7 +599,7 @@ describe("AdminRappelsOperationsPage", () => {
       expect(screen.getByRole("button", { name: /Confirmer l’envoi/i })).toBeTruthy()
     );
     await user.click(
-      screen.getByLabelText(/Je confirme explicitement l’envoi/i)
+      screen.getByLabelText(/Je confirme l’envoi de ce rappel/i)
     );
     await user.click(
       screen.getByRole("button", { name: /Confirmer l’envoi/i })
