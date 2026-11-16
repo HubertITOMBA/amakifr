@@ -483,11 +483,18 @@ export type MyActiveSurveyDto = {
   requiredAnswered: number;
   estComplet: boolean;
   modifiable: boolean;
+  /** Présent sur clients ≥ quiz v1 ; absent = traiter comme Sondage (compat 1.1.1). */
+  kind?: string;
+  kindLabel?: string;
+  /** Quiz piloté question par question. */
+  modeEnDirect?: boolean;
 };
 
 export type MySurveysListDto = {
   items: MyActiveSurveyDto[];
   total: number;
+  /** Présent si demandé via ?scope=open|closed (clients ≥ rubrique permanente). */
+  scope?: "open" | "closed";
 };
 
 export type MySurveyAnswerItem = {
@@ -516,6 +523,59 @@ export type MySurveyQuestionDto = {
   lignesMatrice: Array<{ id: string; ordre: number; libelle: string }>;
 };
 
+export type MySurveyVue =
+  | "formulaire"
+  | "en_direct"
+  | "synthese"
+  | "non_repondu";
+
+export type MySurveyLivePhase =
+  | "attente"
+  | "question_ouverte"
+  | "question_fermee"
+  | "corrige_question";
+
+export type MySurveyLiveQuestionDto = {
+  id: string;
+  ordre: number;
+  libelle: string;
+  liveEtat: string;
+  liveEtatLabel: string;
+  options: Array<{ id: string; ordre: number; libelle: string }>;
+  monOptionId: string | null;
+  estCorrecte?: boolean | null;
+  bonneReponse?: string | null;
+  explication?: string | null;
+};
+
+export type MySurveyLiveDto = {
+  phase: MySurveyLivePhase;
+  message: string;
+  question: MySurveyLiveQuestionDto | null;
+};
+
+export type MySurveyPersonalSyntheseQuestion = {
+  questionId: string;
+  libelle: string;
+  type: string;
+  reponses: string[];
+  estCorrecte?: boolean | null;
+  bonneReponse?: string | null;
+  explication?: string | null;
+};
+
+export type MySurveyPersonalSyntheseDto = {
+  sondageId: string;
+  sujet: string;
+  aRepondu: boolean;
+  message: string | null;
+  questions: MySurveyPersonalSyntheseQuestion[];
+  soumiseLe: string | null;
+  modifieLe: string | null;
+  corrigePublie?: boolean;
+  score?: { correct: number; total: number } | null;
+};
+
 export type MySurveyDetailDto = {
   id: string;
   sujet: string;
@@ -527,6 +587,18 @@ export type MySurveyDetailDto = {
   estComplet: boolean;
   requiredTotal: number;
   requiredAnswered: number;
+  kind?: string;
+  kindLabel?: string;
+  modeEnDirect?: boolean;
+  vue: MySurveyVue;
+  /** Toujours null tant que le sondage est ouvert. */
+  synthesePersonnelle: MySurveyPersonalSyntheseDto | null;
+  /** Agrégats collectifs autorisés par ADMIN (indépendant de la synthèse perso). */
+  resultatsCollectifsPublies: boolean;
+  /** Corrigé quiz publié par ADMIN après clôture. */
+  corrigePublie?: boolean;
+  /** État live — clients ≥ En direct uniquement. */
+  live?: MySurveyLiveDto | null;
   questions: MySurveyQuestionDto[];
   maReponse: {
     id: string;
@@ -534,6 +606,40 @@ export type MySurveyDetailDto = {
     modifieLe: string;
     items: MySurveyAnswerItem[];
   } | null;
+};
+
+export type MySurveyCollectiveResultsDto = {
+  sondageId: string;
+  sujet: string;
+  totalReponses: number;
+  totalAdherentsActifs: number;
+  tauxParticipation: number;
+  generatedAt: string;
+  questions: Array<{
+    id: string;
+    ordre: number;
+    section: string | null;
+    libelle: string;
+    type: string;
+    participations: number;
+    choix?: Array<{
+      optionId: string;
+      libelle: string;
+      count: number;
+      percent: number;
+    }>;
+    textesCount?: number;
+    matrice?: Array<{
+      ligneId: string;
+      libelle: string;
+      colonnes: Array<{
+        optionId: string;
+        libelle: string;
+        count: number;
+        percent: number;
+      }>;
+    }>;
+  }>;
 };
 
 /* ── Événements (≠ réunions mensuelles) ─────────────────── */

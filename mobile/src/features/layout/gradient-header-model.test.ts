@@ -12,6 +12,7 @@ import {
   resolveHeaderStatusInset,
   shouldShowHeaderBack,
 } from "@/features/layout/gradient-header-model";
+// patch Quiz: compact + padding sondages
 
 describe("gradient-header-model", () => {
   it("tokens inset / corps / hit", () => {
@@ -47,5 +48,14 @@ describe("gradient-header-model", () => {
     expect(shouldShowHeaderBack("index", false, true)).toBe(true);
     expect(shouldShowHeaderBack("documents", true)).toBe(true);
     expect(shouldShowHeaderBack("documents", false)).toBe(false);
+  });
+});
+
+describe("tokens Sondages (patch Quiz)", () => {
+  it("conserve le rayon app à 28 et expose le compact 12 + padding sondages", async () => {
+    const mod = await import("@/features/layout/gradient-header-model");
+    expect(mod.HEADER_BOTTOM_RADIUS).toBe(28);
+    expect(mod.HEADER_BOTTOM_RADIUS_COMPACT).toBe(12);
+    expect(mod.HEADER_SHELL_PADDING_BOTTOM_SONDAGES).toBe(24);
   });
 });

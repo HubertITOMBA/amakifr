@@ -1,8 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { UserRole } from "@prisma/client";
 
-const { findUnique, update } = vi.hoisted(() => ({
+const { findUnique, update, auth } = vi.hoisted(() => ({
   findUnique: vi.fn(),
   update: vi.fn(),
+  auth: vi.fn(),
 }));
 
 vi.mock("@/lib/db", () => ({
@@ -12,28 +14,31 @@ vi.mock("@/lib/db", () => ({
 }));
 
 vi.mock("@/auth", () => ({
-  auth: vi.fn(),
+  auth,
 }));
 
 vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
-import { auth } from "@/auth";
-import { UserRole } from "@prisma/client";
 import { updateSondageDates } from "@/actions/sondages";
+
+/**
+ * Session minimale pour assertAdmin (id + role).
+ */
+function sessionWithRole(id: string, role: UserRole) {
+  return { user: { id, role } };
+}
 
 describe("updateSondageDates", () => {
   beforeEach(() => {
     findUnique.mockReset();
     update.mockReset();
-    vi.mocked(auth).mockReset();
+    auth.mockReset();
   });
 
   it("refuse non admin", async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: "u1", role: UserRole.MEMBRE },
-    } as any);
+    auth.mockResolvedValue(sessionWithRole("u1", UserRole.MEMBRE));
     const res = await updateSondageDates({
       id: "s1",
       dateDebut: new Date("2026-01-01"),
@@ -44,9 +49,7 @@ describe("updateSondageDates", () => {
   });
 
   it("refuse dates invalides", async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: "admin", role: UserRole.ADMIN },
-    } as any);
+    auth.mockResolvedValue(sessionWithRole("admin", UserRole.ADMIN));
     const res = await updateSondageDates({
       id: "s1",
       dateDebut: new Date("2026-02-01"),
@@ -57,9 +60,7 @@ describe("updateSondageDates", () => {
   });
 
   it("refuse sondage inexistant", async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: "admin", role: UserRole.ADMIN },
-    } as any);
+    auth.mockResolvedValue(sessionWithRole("admin", UserRole.ADMIN));
     findUnique.mockResolvedValue(null);
     const res = await updateSondageDates({
       id: "missing",
@@ -70,12 +71,12 @@ describe("updateSondageDates", () => {
   });
 
   it("met à jour dates d'un Ouvert et conserve reponseCount", async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: "admin", role: UserRole.ADMIN },
-    } as any);
+    auth.mockResolvedValue(sessionWithRole("admin", UserRole.ADMIN));
     findUnique.mockResolvedValue({
       id: "s1",
       status: "Ouvert",
+      dateDebut: new Date("2026-03-01"),
+      dateFin: new Date("2026-12-01"),
       _count: { reponses: 5 },
     });
     update.mockResolvedValue({
@@ -107,12 +108,12 @@ describe("updateSondageDates", () => {
   });
 
   it("met à jour un brouillon", async () => {
-    vi.mocked(auth).mockResolvedValue({
-      user: { id: "admin", role: UserRole.ADMIN },
-    } as any);
+    auth.mockResolvedValue(sessionWithRole("admin", UserRole.ADMIN));
     findUnique.mockResolvedValue({
       id: "s1",
       status: "Brouillon",
+      dateDebut: new Date("2026-03-01"),
+      dateFin: new Date("2026-04-01"),
       _count: { reponses: 0 },
     });
     update.mockResolvedValue({
@@ -128,5 +129,24 @@ describe("updateSondageDates", () => {
       dateFin: new Date("2026-04-01"),
     });
     expect(res.success).toBe(true);
+  });
+
+  it("refuse Ouvert avec échéance passée (clôture effective)", async () => {
+    auth.mockResolvedValue(sessionWithRole("admin", UserRole.ADMIN));
+    findUnique.mockResolvedValue({
+      id: "s1",
+      status: "Ouvert",
+      dateDebut: new Date("2025-01-01"),
+      dateFin: new Date("2025-02-01"),
+      _count: { reponses: 3 },
+    });
+    const res = await updateSondageDates({
+      id: "s1",
+      dateDebut: new Date("2026-03-01"),
+      dateFin: new Date("2026-04-01"),
+    });
+    expect(res.success).toBe(false);
+    expect(res.error).toMatch(/terminé/i);
+    expect(update).not.toHaveBeenCalled();
   });
 });

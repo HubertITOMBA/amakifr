@@ -473,9 +473,44 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ---
 
-## 11. Travaux prioritaires
+## 11. Quiz v1 — validation A54 (DEV)
 
-**ÉTAT AU 2026-11-08 (Android clôturée ; `origin/main` / prod = `62e59a1` avant ce commit ; migrations Lot 3 appliquées ; flags off ; correctifs présentation sur branche Lot 3)**
+**VALIDÉ SUR A54 LE 2026-11-16 — DEV habituel (9052 / `amakifr_db`) — NON DÉPLOYÉ EN PRODUCTION**
+
+Recette mobile A54 (comptes DEV) :
+
+- badges **Quiz** / **Sondage** visibles en liste et détail ;
+- après clôture : refus d’une modification avec **conservation** des réponses déjà enregistrées ;
+- synthèse personnelle **sans** score ni corrigé tant que le corrigé n’est pas publié ;
+- après publication ADMIN du corrigé : corrigé (bonne réponse + explication) et score visibles ;
+- publication des **résultats collectifs** indépendante de la publication du corrigé ;
+- migration Quiz v1 `20261115233000_sondage_kind_quiz_corrige` **appliquée en DEV** (additive : `SondageKind`, `corrigeVisiblesAdherents`, `explication`, `estCorrecte`).
+
+Suite DEV (2026-11-16) : mode **En direct** (pilote question par question) ajouté en local — migration `20261116093000_sondage_quiz_en_direct` appliquée en DEV ; chronomètre / classement hors périmètre ; **pas en production**.
+
+**Création = brouillon uniquement** (DEV, 2026-11-16) :
+- `createSondage` crée toujours un `Brouillon` ; **aucun** email / in-app / push à la création.
+- Relecture et correction sur le détail (onglet Édition) ; publication explicite via `publishSondage` avec confirmation d’audience.
+
+**Notification à la première publication** (DEV, 2026-11-16) :
+- Action : `publishSondage` uniquement → email (`sendSondageInvitationsToActiveAdherents`) **et** in-app + push (`notifySondagePublishedInApp` → `pushAfterInternalNotifications`).
+- Public : adhérents actifs (`MEMBRE`|`ADMIN` avec fiche adhérent) ; dédup par lien `/sondages/:id` (republication / ouverture des questions suivantes = pas de doublon).
+- Mobile : `notificationLinkToMobileRoute` mappe `/sondages/:id` vers l’écran questionnaire.
+- Preuves : destinataires fictifs + **transport push simulé** (pas d’envoi Expo réel) ; création testée en brouillon sans notification.
+
+**Contrôle visuel clavier / contraste formulaire** (DEV, 2026-11-16) :
+- Formulaire admin création/modification Sondages et Quiz (questions et choix) : contraste, astérisques obligatoires, erreurs sous champ, boutons contrastés.
+- **Validé le 16 novembre 2026** sur 9052 en fenêtre large et à 390 px, y compris la **visibilité du focus au clavier**.
+
+Migration complémentaire DEV : `20261115221500_sondage_resultats_visibles_adherents` (`resultatsVisiblesAdherents`).
+
+**Lot 3 rappels cotisations** : **non démarré** / inchangé par ce chantier.
+
+---
+
+## 12. Travaux prioritaires
+
+**ÉTAT AU 2026-11-16 (Android clôturée ; R1 Lots 1+2 en prod ; Quiz v1 validé A54 en DEV ; Lot 3 non commencé)**
 
 | Priorité | Sujet | État |
 |----------|-------|------|
@@ -510,7 +545,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ---
 
-## 12. Méthode de travail ChatGPT/Cursor
+## 13. Méthode de travail ChatGPT/Cursor
 
 - Lire ce fichier avant toute opération sur AMAKI.
 - Ne pas réauditer ce qui est marqué livré/validé sauf :
@@ -535,7 +570,7 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 
 ---
 
-## 13. Journal synthétique des décisions permanentes
+## 14. Journal synthétique des décisions permanentes
 
 - **2026-09** : durcissement du déploiement, backup atomique, maintenance Nginx, smoke interne avec retry.
 - **2026-09** : migrations Notes de frais 4.x, stockage privé et activation production.
@@ -565,6 +600,12 @@ Ne jamais afficher ni versionner les secrets de `.env`.
 - **2026-11-01** : **UI opérations + recherche adhérents** sur branche Lot 3 (parent lectures `9ef7218`) — route `/admin/finances/rappels-operations` **distincte** de la preview ; recherche limitée ADMIN\|PRESID ; **sans passeport** ; « Fiche N » ; séparation client/serveur (constants purs) ; **deux flags false** ; *(à cette date)* migrations **non** encore appliquées aux bases app ; **aucun** envoi ; TypeScript global **non validé** ; recette navigateur **partielle** ; `origin/main` / prod étaient alors **`c95e611`**.
 - **2026-11-08** : Alignement observé — production / `origin/main` = **`62e59a1`** (**avant** ce commit) ; **deux** migrations Lot 3 **appliquées** ; **deux flags off** ; recette isolée SAS (données fictives + Mailpit, 2026-11-02 → 2026-11-08) sans activation prod ; observations navigateur **distinctes** des preuves DB/harness ; limites (clavier/focus, gel ligne absent UI, pas de rupture réseau réelle, TypeScript global non validé) ; **correctifs présentation** dialogs/accessibilité livrés **dans ce commit** sur `fix/r1-lot3-realign-on-c95e611` (parent `62e59a1`) — **sans** push `main`, **sans** déploiement, **sans** activation ; WIP principal **`1455af5`** préservé.
 - **2026-11-09** : RSVP réunions (retrait + conflit admin) — **état local non commité** sur `feat/reunions-rsvp-withdraw` @ base `a7762c7` ; DELETE participation + delta admin + CONFLICT structurel ; mobile retrait en dev-client seulement ; preuves 91 Vitest ≠ 17 PG ≠ 431 mobile ≠ 162 Vitest post-nettoyage ≠ test manuel CONFLICT ; tsc ciblé 0 sur candidats / 38 transitifs (**pas** une validation tsc web globale) ; limites A→B→A / build-id séparé / lenteur non expliquée ; **aucun** déploiement web ni AAB annoncé.
+
+- **2026-11-16** : **Quiz v1** validé sur A54 en DEV (9052 / `amakifr_db`) — badges Quiz/Sondage ; refus post-clôture avec conservation des réponses ; synthèse sans score/corrigé avant publication ADMIN ; corrigé après publication ; résultats collectifs indépendants ; migration `20261115233000_sondage_kind_quiz_corrige` appliquée en DEV. **Pas de déploiement production.** Chronomètre / classement / Lot 3 hors périmètre.
+- **2026-11-16** : **Quiz En direct** (DEV local) — `modeEnDirect` + `liveEtat` ; pilote ADMIN ouvrir/fermer/révéler/suivante ; mobile question active + attente + polling ; submit avec garde concurrente ; API adhérent n’expose jamais le formulaire multi-questions (compat 1.1.1) ; migration `20261116093000_sondage_quiz_en_direct` appliquée en DEV. Hors chrono/classement/prod/Lot 3.
+- **2026-11-16** : **1ʳᵉ publication questionnaire** — in-app + push branchés avec l’email ; dédup `/sondages/:id` ; lien mobile mappé ; push prouvé avec transport simulé ; hors prod.
+- **2026-11-16** : **Création questionnaire = brouillon seul** — plus de « Publier immédiatement » ; notifications uniquement via `publishSondage` après confirmation d’audience ; hors prod.
+- **2026-11-16** : **Contrôle visuel clavier** du formulaire admin Sondages et Quiz (création/modification, questions, choix) **validé** sur DEV 9052 (fenêtre large + 390 px) ; hors prod.
 
 ---
 

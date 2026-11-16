@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Alert,
+  AppState,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -8,8 +9,12 @@ import {
   TextInput,
   View,
 } from "react-native";
-import { useLocalSearchParams, router } from "expo-router";
-import { getMySurvey, submitMySurveyAnswers } from "@/api/sondages";
+import { useFocusEffect, useLocalSearchParams, router } from "expo-router";
+import {
+  getMySurvey,
+  getMySurveyCollectiveResults,
+  submitMySurveyAnswers,
+} from "@/api/sondages";
 import {
   formatSurveyPeriod,
   formatSurveyProgress,
@@ -18,7 +23,9 @@ import {
 import {
   ApiClientError,
   type MySurveyAnswerItem,
+  type MySurveyCollectiveResultsDto,
   type MySurveyDetailDto,
+  type MySurveyQuestionDto,
 } from "@/api/types";
 import { Card } from "@/components/ui/card";
 import { ErrorBanner } from "@/components/ui/error-banner";
@@ -81,15 +88,197 @@ function ChoiceRow({
 }
 
 /**
+ * Questions + choix en lecture seule (consultation après clôture sans réponse).
+ */
+function ReadOnlyQuestions({ questions }: { questions: MySurveyQuestionDto[] }) {
+  return (
+    <>
+      {questions.map((q) => (
+        <Card key={q.id} style={styles.qCard}>
+          <Text style={styles.qTitle}>
+            {q.libelle}
+            {q.obligatoire ? " *" : ""}
+          </Text>
+          {q.type === "TexteLibre" ? (
+            <Text style={styles.metaMuted}>Champ texte libre</Text>
+          ) : null}
+          {q.type === "ChoixUnique" || q.type === "ChoixMultiple"
+            ? q.options.map((o) => (
+                <ChoiceRow
+                  key={o.id}
+                  kind={q.type === "ChoixUnique" ? "radio" : "checkbox"}
+                  label={o.libelle}
+                  selected={false}
+                  disabled
+                  onPress={() => {}}
+                />
+              ))
+            : null}
+          {q.type === "Matrice"
+            ? q.lignesMatrice.map((line) => (
+                <View key={line.id} style={styles.matrixRow}>
+                  <Text style={styles.matrixLabel}>{line.libelle}</Text>
+                  {q.options.map((o) => (
+                    <ChoiceRow
+                      key={o.id}
+                      kind="radio"
+                      label={o.libelle}
+                      selected={false}
+                      disabled
+                      onPress={() => {}}
+                    />
+                  ))}
+                </View>
+              ))
+            : null}
+        </Card>
+      ))}
+    </>
+  );
+}
+
+/** Accents bleu / turquoise pour les barres (alignés synthèse admin Web). */
+const BAR_BLUE = AmakiColors.primary;
+const BAR_TEAL = "#14b8a6";
+
+/**
+ * Ligne de résultat collectif : libellé, effectif, %, barre proportionnelle.
+ * 0 % → piste vide (pas de remplissage).
+ */
+function CollectiveChoiceBar({
+  libelle,
+  count,
+  percent,
+  toneIndex,
+}: {
+  libelle: string;
+  count: number;
+  percent: number;
+  toneIndex: number;
+}) {
+  const safePercent = Number.isFinite(percent)
+    ? Math.max(0, Math.min(100, percent))
+    : 0;
+  const fillColor = toneIndex % 2 === 0 ? BAR_BLUE : BAR_TEAL;
+
+  return (
+    <View
+      style={styles.resultRow}
+      accessibilityLabel={`${libelle}, ${count}, ${safePercent} pour cent`}
+    >
+      <View style={styles.resultRowHeader}>
+        <Text style={styles.resultLabel}>{libelle}</Text>
+        <Text style={styles.resultMeta}>
+          {count} — {safePercent} %
+        </Text>
+      </View>
+      <View style={styles.resultTrack}>
+        {safePercent > 0 ? (
+          <View
+            style={[
+              styles.resultFill,
+              {
+                width: `${safePercent}%`,
+                backgroundColor: fillColor,
+              },
+            ]}
+          />
+        ) : null}
+      </View>
+    </View>
+  );
+}
+
+/**
+ * Bloc résultats collectifs (uniquement si ADMIN a autorisé).
+ * Présentation distincte de « Ma synthèse » (accent turquoise).
+ */
+function CollectiveResultsBlock({
+  data,
+}: {
+  data: MySurveyCollectiveResultsDto;
+}) {
+  return (
+    <View style={styles.collectiveBlock}>
+      <View style={styles.collectiveHeader}>
+        <Text style={styles.collectiveTitle}>Résultats collectifs</Text>
+        <Text style={styles.collectiveSubtitle}>
+          Agrégats publiés pour les adhérents
+        </Text>
+      </View>
+      <View style={styles.participationSummary}>
+        <Text style={styles.participationLabel}>Participation</Text>
+        <Text style={styles.participationValue}>
+          {data.totalReponses} réponse(s) / {data.totalAdherentsActifs}{" "}
+          adhérent(s) actifs
+        </Text>
+        <Text style={styles.participationRate}>
+          {data.tauxParticipation} %
+        </Text>
+      </View>
+      {data.questions.map((q) => (
+        <Card key={q.id} style={styles.collectiveCard}>
+          <Text style={styles.qTitle}>{q.libelle}</Text>
+          {q.choix?.map((c, idx) => (
+            <CollectiveChoiceBar
+              key={c.optionId}
+              libelle={c.libelle}
+              count={c.count}
+              percent={c.percent}
+              toneIndex={idx}
+            />
+          ))}
+          {q.matrice?.map((line) => (
+            <View key={line.ligneId} style={styles.matrixRow}>
+              <Text style={styles.matrixLabel}>{line.libelle}</Text>
+              {line.colonnes.map((c, idx) => (
+                <CollectiveChoiceBar
+                  key={c.optionId}
+                  libelle={c.libelle}
+                  count={c.count}
+                  percent={c.percent}
+                  toneIndex={idx}
+                />
+              ))}
+            </View>
+          ))}
+          {typeof q.textesCount === "number" ? (
+            <Text style={styles.metaMuted}>
+              {q.textesCount} réponse(s) texte
+            </Text>
+          ) : null}
+        </Card>
+      ))}
+    </View>
+  );
+}
+
+/**
+ * En-tête de section « Ma synthèse » (réponses personnelles).
+ */
+function PersonalSyntheseHeader() {
+  return (
+    <View style={styles.personalHeader}>
+      <Text style={styles.personalTitle}>Ma synthèse</Text>
+      <Text style={styles.personalSubtitle}>Vos réponses — lecture seule</Text>
+    </View>
+  );
+}
+
+/**
  * Questionnaire mobile — types Web (choix, texte, matrice).
  */
 export default function SondageDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const [detail, setDetail] = useState<MySurveyDetailDto | null>(null);
+  const [collective, setCollective] =
+    useState<MySurveyCollectiveResultsDto | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [items, setItems] = useState<MySurveyAnswerItem[]>([]);
+  const liveSelectedRef = useRef<Record<string, string>>({});
+  const [, setLiveTick] = useState(0);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -99,6 +288,15 @@ export default function SondageDetailScreen() {
       const data = await getMySurvey(id);
       setDetail(data);
       setItems(data.maReponse?.items ?? []);
+      if (data.resultatsCollectifsPublies) {
+        try {
+          setCollective(await getMySurveyCollectiveResults(id));
+        } catch {
+          setCollective(null);
+        }
+      } else {
+        setCollective(null);
+      }
     } catch (e) {
       setError(
         e instanceof ApiClientError
@@ -113,6 +311,46 @@ export default function SondageDetailScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  const livePollRef = useRef({ modeEnDirect: false, modifiable: false });
+  useEffect(() => {
+    livePollRef.current = {
+      modeEnDirect: Boolean(detail?.modeEnDirect),
+      modifiable: Boolean(detail?.modifiable),
+    };
+  }, [detail?.modeEnDirect, detail?.modifiable]);
+
+  // Actualisation auto du quiz En direct tant que l'écran est au premier plan.
+  useFocusEffect(
+    useCallback(() => {
+      if (!id) return undefined;
+      let alive = true;
+      const tick = () => {
+        if (!alive) return;
+        if (AppState.currentState !== "active") return;
+        if (!livePollRef.current.modeEnDirect || !livePollRef.current.modifiable) {
+          return;
+        }
+        void getMySurvey(id)
+          .then((data) => {
+            if (!alive) return;
+            setDetail(data);
+          })
+          .catch(() => {
+            /* garde l'état courant */
+          });
+      };
+      const interval = setInterval(tick, 2500);
+      const sub = AppState.addEventListener("change", (state) => {
+        if (state === "active") tick();
+      });
+      return () => {
+        alive = false;
+        clearInterval(interval);
+        sub.remove();
+      };
+    }, [id])
+  );
 
   const byQuestion = useMemo(() => {
     const map = new Map<string, MySurveyAnswerItem[]>();
@@ -206,6 +444,241 @@ export default function SondageDetailScreen() {
     );
   }
 
+  const vue = detail.vue ?? (detail.modifiable ? "formulaire" : "synthese");
+  const synthese = detail.synthesePersonnelle;
+  const live = detail.live;
+
+  // Quiz En direct : une question à la fois (jamais le formulaire multi-questions).
+  if (vue === "en_direct" || (detail.modeEnDirect && detail.modifiable)) {
+    const q = live?.question ?? null;
+    const ouverte = live?.phase === "question_ouverte";
+    const selectedId = liveSelectedRef.current[q?.id ?? ""] ?? q?.monOptionId ?? null;
+
+    return (
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.content}
+      >
+        {error ? <ErrorBanner message={error} /> : null}
+        <Text style={styles.title}>{detail.sujet}</Text>
+        <View style={styles.liveBadgeRow}>
+          <Text style={styles.kindBadge}>
+            {detail.kindLabel ?? detail.kind ?? "Quiz"}
+          </Text>
+          <Text style={styles.liveBadge}>En direct</Text>
+        </View>
+        <Text style={styles.period}>
+          {formatSurveyPeriod(detail.dateDebut, detail.dateFin)}
+        </Text>
+        <Text style={styles.liveMessage}>
+          {live?.message ?? "En attente de la prochaine question"}
+        </Text>
+
+        {!q ? (
+          <Card style={styles.qCard}>
+            <Text style={styles.waitingTitle}>En attente de la prochaine question</Text>
+            <Text style={styles.metaMuted}>
+              L&apos;écran se met à jour automatiquement.
+            </Text>
+          </Card>
+        ) : (
+          <Card style={styles.qCard}>
+            <Text style={styles.qMeta}>Question {q.ordre + 1}</Text>
+            <Text style={styles.qTitle}>{q.libelle}</Text>
+            {q.options.map((o) => (
+              <ChoiceRow
+                key={o.id}
+                kind="radio"
+                label={o.libelle}
+                selected={selectedId === o.id}
+                disabled={!ouverte || saving}
+                onPress={() => {
+                  liveSelectedRef.current[q.id] = o.id;
+                  setLiveTick((n) => n + 1);
+                }}
+              />
+            ))}
+            {ouverte ? (
+              <PrimaryButton
+                label={
+                  saving
+                    ? "Enregistrement…"
+                    : q.monOptionId
+                      ? "Modifier ma réponse"
+                      : "Enregistrer"
+                }
+                disabled={saving || !selectedId}
+                onPress={async () => {
+                  if (!selectedId) return;
+                  setSaving(true);
+                  setError(null);
+                  try {
+                    await submitMySurveyAnswers(id, {
+                      items: [{ questionId: q.id, optionId: selectedId }],
+                      mode: "partial",
+                    });
+                    Alert.alert(
+                      "Réponse enregistrée",
+                      "Vous pouvez encore modifier tant que la question est ouverte."
+                    );
+                    await load();
+                  } catch (e) {
+                    setError(
+                      e instanceof ApiClientError
+                        ? sondageErrorMessage(e)
+                        : "Enregistrement impossible"
+                    );
+                  } finally {
+                    setSaving(false);
+                  }
+                }}
+              />
+            ) : null}
+            {live?.phase === "corrige_question" ? (
+              <View style={styles.corrigeBox}>
+                {typeof q.estCorrecte === "boolean" ? (
+                  <Text
+                    style={q.estCorrecte ? styles.corrigeOk : styles.corrigeKo}
+                  >
+                    {q.estCorrecte ? "Bonne réponse" : "Réponse incorrecte"}
+                  </Text>
+                ) : null}
+                {q.bonneReponse ? (
+                  <Text style={styles.corrigeBonne}>
+                    Corrigé : {q.bonneReponse}
+                  </Text>
+                ) : null}
+                {q.explication ? (
+                  <Text style={styles.corrigeExpl}>{q.explication}</Text>
+                ) : null}
+              </View>
+            ) : null}
+            {live?.phase === "question_fermee" ? (
+              <Text style={styles.metaMuted}>
+                Réponses fermées — en attente de la suite
+              </Text>
+            ) : null}
+          </Card>
+        )}
+        {detail.conclusion ? (
+          <Text style={styles.intro}>{detail.conclusion}</Text>
+        ) : null}
+      </ScrollView>
+    );
+  }
+
+  // Après clôture sans réponse : consultation questions/choix + message
+  if (vue === "non_repondu") {
+    return (
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.content}
+      >
+        {error ? <ErrorBanner message={error} /> : null}
+        <Text style={styles.title}>{detail.sujet}</Text>
+        <Text style={styles.kindBadge}>
+          {detail.kindLabel ?? detail.kind ?? "Sondage"}
+        </Text>
+        <Text style={styles.period}>
+          {formatSurveyPeriod(detail.dateDebut, detail.dateFin)}
+        </Text>
+        <Text style={styles.closed}>Ce sondage est maintenant clôturé.</Text>
+        <Card style={styles.qCard}>
+          <Text style={styles.nonRepondu}>
+            {synthese?.message ?? "Vous n’avez pas répondu"}
+          </Text>
+        </Card>
+        {detail.introduction ? (
+          <Text style={styles.intro}>{detail.introduction}</Text>
+        ) : null}
+        <ReadOnlyQuestions questions={detail.questions} />
+        {detail.conclusion ? (
+          <Text style={styles.intro}>{detail.conclusion}</Text>
+        ) : null}
+        {collective ? <CollectiveResultsBlock data={collective} /> : null}
+      </ScrollView>
+    );
+  }
+
+  // Après clôture avec réponses → synthèse personnelle lecture seule
+  if (vue === "synthese" && synthese) {
+    return (
+      <ScrollView
+        style={styles.root}
+        contentContainerStyle={styles.content}
+      >
+        {error ? <ErrorBanner message={error} /> : null}
+        <Text style={styles.title}>{detail.sujet}</Text>
+        <Text style={styles.kindBadge}>
+          {detail.kindLabel ?? detail.kind ?? "Sondage"}
+        </Text>
+        <Text style={styles.period}>
+          {formatSurveyPeriod(detail.dateDebut, detail.dateFin)}
+        </Text>
+        <Text style={styles.closed}>Ce sondage est maintenant clôturé.</Text>
+        {detail.introduction ? (
+          <Text style={styles.intro}>{detail.introduction}</Text>
+        ) : null}
+        {detail.conclusion ? (
+          <Text style={styles.intro}>{detail.conclusion}</Text>
+        ) : null}
+        <View style={styles.personalBlock}>
+          <PersonalSyntheseHeader />
+          {synthese.corrigePublie && synthese.score ? (
+            <View style={styles.scoreBox}>
+              <Text style={styles.scoreLabel}>Score</Text>
+              <Text style={styles.scoreValue}>
+                {synthese.score.correct} / {synthese.score.total}
+              </Text>
+            </View>
+          ) : null}
+          {synthese.questions.map((q) => (
+            <Card key={q.questionId} style={styles.personalCard}>
+              <Text style={styles.qTitle}>{q.libelle}</Text>
+              {q.reponses.length === 0 ? (
+                <Text style={styles.metaMuted}>Sans réponse</Text>
+              ) : (
+                q.reponses.map((r, idx) => (
+                  <Text
+                    key={`${q.questionId}-${idx}`}
+                    style={styles.syntheseAnswer}
+                  >
+                    {r}
+                  </Text>
+                ))
+              )}
+              {synthese.corrigePublie ? (
+                <View style={styles.corrigeBox}>
+                  {typeof q.estCorrecte === "boolean" ? (
+                    <Text
+                      style={
+                        q.estCorrecte
+                          ? styles.corrigeOk
+                          : styles.corrigeKo
+                      }
+                    >
+                      {q.estCorrecte ? "Bonne réponse" : "Réponse incorrecte"}
+                    </Text>
+                  ) : null}
+                  {q.bonneReponse ? (
+                    <Text style={styles.corrigeBonne}>
+                      Corrigé : {q.bonneReponse}
+                    </Text>
+                  ) : null}
+                  {q.explication ? (
+                    <Text style={styles.corrigeExpl}>{q.explication}</Text>
+                  ) : null}
+                </View>
+              ) : null}
+            </Card>
+          ))}
+        </View>
+        {collective ? <CollectiveResultsBlock data={collective} /> : null}
+      </ScrollView>
+    );
+  }
+
+  // Ouvert : formulaire (réponses préchargées pour modification)
   return (
     <ScrollView
       style={styles.root}
@@ -214,6 +687,9 @@ export default function SondageDetailScreen() {
     >
       {error ? <ErrorBanner message={error} /> : null}
       <Text style={styles.title}>{detail.sujet}</Text>
+      <Text style={styles.kindBadge}>
+        {detail.kindLabel ?? detail.kind ?? "Sondage"}
+      </Text>
       <Text style={styles.period}>
         {formatSurveyPeriod(detail.dateDebut, detail.dateFin)}
       </Text>
@@ -222,9 +698,6 @@ export default function SondageDetailScreen() {
       </Text>
       {detail.introduction ? (
         <Text style={styles.intro}>{detail.introduction}</Text>
-      ) : null}
-      {!detail.modifiable ? (
-        <Text style={styles.closed}>Ce sondage est maintenant clôturé.</Text>
       ) : null}
 
       {detail.questions.map((q) => {
@@ -316,15 +789,110 @@ export default function SondageDetailScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: AmakiColors.background },
-  content: { padding: AmakiSpacing.lg, paddingBottom: AmakiSpacing["2xl"] },
+  content: {
+    paddingHorizontal: AmakiSpacing.lg,
+    paddingTop: AmakiSpacing.lg,
+    paddingBottom: AmakiSpacing["2xl"],
+  },
   title: {
     ...AmakiTypography.title,
     color: AmakiColors.text,
     marginBottom: AmakiSpacing.xs,
   },
+  kindBadge: {
+    ...AmakiTypography.caption,
+    fontWeight: "700",
+    color: AmakiColors.primaryStrong,
+    marginBottom: AmakiSpacing.xs,
+  },
+  liveBadgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: AmakiSpacing.xs,
+    marginBottom: AmakiSpacing.xs,
+  },
+  liveBadge: {
+    ...AmakiTypography.caption,
+    fontWeight: "700",
+    color: "#0f766e",
+  },
+  liveMessage: {
+    ...AmakiTypography.body,
+    color: AmakiColors.textSecondary,
+    marginBottom: AmakiSpacing.md,
+  },
+  waitingTitle: {
+    ...AmakiTypography.heading,
+    color: AmakiColors.text,
+    marginBottom: AmakiSpacing.xs,
+  },
+  qMeta: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+    marginBottom: AmakiSpacing.xs,
+  },
   period: {
     ...AmakiTypography.caption,
     color: AmakiColors.textMuted,
+  },
+  scoreBox: {
+    backgroundColor: "#f0fdfa",
+    borderWidth: 1,
+    borderColor: "#99f6e4",
+    borderRadius: AmakiRadius.md,
+    padding: AmakiSpacing.md,
+    marginBottom: AmakiSpacing.md,
+    alignItems: "center",
+  },
+  scoreLabel: {
+    ...AmakiTypography.caption,
+    color: "#0f766e",
+    fontWeight: "700",
+  },
+  scoreValue: {
+    ...AmakiTypography.title,
+    color: "#0f766e",
+  },
+  corrigeBox: {
+    marginTop: AmakiSpacing.sm,
+    paddingTop: AmakiSpacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: AmakiColors.border,
+    gap: AmakiSpacing.xs,
+  },
+  corrigeOk: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.success,
+    fontWeight: "700",
+  },
+  corrigeKo: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.danger,
+    fontWeight: "700",
+  },
+  corrigeBonne: {
+    ...AmakiTypography.body,
+    color: AmakiColors.text,
+  },
+  corrigeExpl: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textSecondary,
+  },
+  nonRepondu: {
+    ...AmakiTypography.body,
+    color: AmakiColors.textSecondary,
+    textAlign: "center",
+    paddingVertical: AmakiSpacing.md,
+  },
+  syntheseAnswer: {
+    ...AmakiTypography.body,
+    color: AmakiColors.text,
+    marginTop: AmakiSpacing.xs,
+  },
+  metaMuted: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+    marginTop: AmakiSpacing.xs,
   },
   progress: {
     ...AmakiTypography.caption,
@@ -424,4 +992,113 @@ const styles = StyleSheet.create({
   },
   actions: { gap: AmakiSpacing.sm, marginTop: AmakiSpacing.md },
   btn: { alignSelf: "stretch" },
+  personalBlock: {
+    marginTop: AmakiSpacing.sm,
+    marginBottom: AmakiSpacing.md,
+  },
+  personalHeader: {
+    backgroundColor: AmakiColors.primarySoft,
+    borderWidth: 1,
+    borderColor: AmakiColors.primaryBorder,
+    borderRadius: AmakiRadius.md,
+    padding: AmakiSpacing.md,
+    marginBottom: AmakiSpacing.md,
+  },
+  personalTitle: {
+    ...AmakiTypography.heading,
+    color: AmakiColors.primaryStrong,
+    marginBottom: AmakiSpacing.xs,
+  },
+  personalSubtitle: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textSecondary,
+  },
+  personalCard: {
+    marginBottom: AmakiSpacing.md,
+    borderColor: AmakiColors.primaryBorder,
+  },
+  collectiveBlock: {
+    marginTop: AmakiSpacing.lg,
+    paddingTop: AmakiSpacing.md,
+    borderTopWidth: 1,
+    borderTopColor: AmakiColors.border,
+  },
+  collectiveHeader: {
+    backgroundColor: "#f0fdfa",
+    borderWidth: 1,
+    borderColor: "#99f6e4",
+    borderRadius: AmakiRadius.md,
+    padding: AmakiSpacing.md,
+    marginBottom: AmakiSpacing.md,
+  },
+  collectiveTitle: {
+    ...AmakiTypography.heading,
+    color: "#0f766e",
+    marginBottom: AmakiSpacing.xs,
+  },
+  collectiveSubtitle: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textSecondary,
+  },
+  participationSummary: {
+    backgroundColor: "#ecfeff",
+    borderWidth: 1,
+    borderColor: "#a5f3fc",
+    borderRadius: AmakiRadius.md,
+    padding: AmakiSpacing.md,
+    marginBottom: AmakiSpacing.md,
+  },
+  participationLabel: {
+    ...AmakiTypography.caption,
+    fontWeight: "700",
+    color: "#0e7490",
+    textTransform: "uppercase",
+    letterSpacing: 0.4,
+    marginBottom: AmakiSpacing.xs,
+  },
+  participationValue: {
+    ...AmakiTypography.body,
+    color: AmakiColors.text,
+  },
+  participationRate: {
+    ...AmakiTypography.title,
+    color: "#0f766e",
+    marginTop: AmakiSpacing.xs,
+  },
+  collectiveCard: {
+    marginBottom: AmakiSpacing.md,
+    borderColor: "#99f6e4",
+  },
+  resultRow: {
+    marginBottom: AmakiSpacing.sm,
+  },
+  resultRowHeader: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    gap: AmakiSpacing.sm,
+    marginBottom: AmakiSpacing.xs,
+  },
+  resultLabel: {
+    ...AmakiTypography.body,
+    color: AmakiColors.text,
+    flex: 1,
+    flexShrink: 1,
+  },
+  resultMeta: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textSecondary,
+    fontVariant: ["tabular-nums"],
+    flexShrink: 0,
+  },
+  resultTrack: {
+    height: 10,
+    borderRadius: 5,
+    backgroundColor: AmakiColors.surfaceMuted,
+    overflow: "hidden",
+  },
+  resultFill: {
+    height: "100%",
+    borderRadius: 5,
+  },
 });

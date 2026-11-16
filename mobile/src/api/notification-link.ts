@@ -46,6 +46,13 @@ export function notificationLinkToMobileRoute(
     return "/cotisations";
   }
 
+  const sondage = path.match(/^\/sondages\/([^/]+)\/?$/);
+  if (sondage?.[1]) return `/sondages/${sondage[1]}`;
+
+  if (path === "/sondages" || path === "/sondages/") {
+    return "/sondages";
+  }
+
   // Fallback sûr : centre notifications
   return "/notifications";
 }

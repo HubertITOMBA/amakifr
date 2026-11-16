@@ -2,19 +2,32 @@
 
 import { auth } from "@/auth";
 import { db } from "@/lib/db";
+import { ServiceError } from "@/lib/service-error";
 import {
+  getSondageStatusPresentation,
+  getSondageStatutEffectif,
+  isSondageCorrigeVisiblesPourAdherent,
   isSondageModifiable,
+  isSondageResultatsCollectifsVisiblesPourAdherent,
   isSondageVisiblePourAdherent,
+  sondageKindLabel,
+  validateQuizReadyForOpen,
   validateSondageDates,
   type SondageQuestionInput,
   type SondageReponseItemInput,
 } from "@/lib/sondages";
-import { sendSondageInvitationsToActiveAdherents } from "@/lib/sondages-notifications";
+import { listSondageNotifyEligibleUserIds } from "@/lib/sondages-notifications";
 import { buildSondageSynthese, type SondageSynthese } from "@/lib/sondages-synthese";
 import { buildSondageSynthesePDF } from "@/lib/sondages-synthese-pdf";
+import { buildPersonalSyntheseQuestions } from "@/lib/services/sondages/get-my-surveys";
+import {
+  closeSondageService,
+  publishSondageService,
+} from "@/lib/services/sondages/publish-and-close-sondage";
 import jsPDF from "jspdf";
 import {
   Prisma,
+  SondageKind,
   SondageQuestionType,
   SondageStatus,
   UserRole,
@@ -29,6 +42,8 @@ const SondageQuestionTypeSchema = z.enum([
   "Matrice",
 ]);
 
+const SondageKindSchema = z.enum(["Sondage", "Quiz"]);
+
 const QuestionInputSchema = z.object({
   ordre: z.number().int().min(0),
   section: z.string().max(255).optional().nullable(),
@@ -38,12 +53,14 @@ const QuestionInputSchema = z.object({
   maxSelections: z.number().int().positive().optional().nullable(),
   minCaracteres: z.number().int().min(0).optional().nullable(),
   maxCaracteres: z.number().int().positive().optional().nullable(),
+  explication: z.string().max(20000).optional().nullable(),
   options: z
     .array(
       z.object({
         ordre: z.number().int().min(0),
         libelle: z.string().min(1).max(500),
         permetTexteLibre: z.boolean().optional().default(false),
+        estCorrecte: z.boolean().optional().default(false),
       })
     )
     .optional()
@@ -65,9 +82,16 @@ const CreateSondageSchema = z.object({
   conclusion: z.string().max(20000).optional().nullable(),
   dateDebut: z.coerce.date(),
   dateFin: z.coerce.date(),
+  /** Défaut Sondage — créations sans type restent sondages. */
+  kind: SondageKindSchema.optional().default("Sondage"),
+  /** Quiz uniquement — diffusion question par question. Ignoré pour Sondage. */
+  modeEnDirect: z.boolean().optional().default(false),
   questions: z.array(QuestionInputSchema).min(1, "Ajoutez au moins une question"),
-  /** Si true (défaut), le sondage est publié et les adhérents actifs sont notifiés par email */
-  publier: z.boolean().optional().default(true),
+});
+
+const SetCorrigeVisiblesSchema = z.object({
+  id: z.string().min(1),
+  visibles: z.boolean(),
 });
 
 const UpdateSondageSchema = CreateSondageSchema.extend({
@@ -82,6 +106,11 @@ const AddQuestionsToSondageSchema = z.object({
 
 const SondageIdSchema = z.object({
   id: z.string().min(1),
+});
+
+const SetResultatsVisiblesSchema = z.object({
+  id: z.string().min(1),
+  visibles: z.boolean(),
 });
 
 const DuplicateSondageSchema = z.object({
@@ -185,6 +214,7 @@ function validateQuestionsStructure(questions: SondageQuestionInput[]): string |
 function mapSondageListItem(
   sondage: Prisma.SondageGetPayload<{ include: typeof sondageInclude }>
 ) {
+  const presentation = getSondageStatusPresentation(sondage);
   return {
     id: sondage.id,
     sujet: sondage.sujet,
@@ -192,7 +222,21 @@ function mapSondageListItem(
     conclusion: sondage.conclusion,
     dateDebut: sondage.dateDebut.toISOString(),
     dateFin: sondage.dateFin.toISOString(),
+    kind: sondage.kind,
+    kindLabel: sondageKindLabel(sondage.kind),
+    modeEnDirect: Boolean(sondage.modeEnDirect),
+    /** Statut stocké en base (peut rester Ouvert si échéance passée). */
     status: sondage.status,
+    /** Statut effectif = règle mobile (sans écriture DB). */
+    statusEffectif: presentation.effectif,
+    statusLabel: presentation.label,
+    statusBadgeKey: presentation.badgeKey,
+    echeancePassee: presentation.echeancePassee,
+    resultatsVisiblesAdherents: sondage.resultatsVisiblesAdherents,
+    resultatsCollectifsPublies:
+      isSondageResultatsCollectifsVisiblesPourAdherent(sondage),
+    corrigeVisiblesAdherents: sondage.corrigeVisiblesAdherents,
+    corrigePublie: isSondageCorrigeVisiblesPourAdherent(sondage),
     sourceId: sondage.sourceId,
     createdAt: sondage.createdAt.toISOString(),
     updatedAt: sondage.updatedAt.toISOString(),
@@ -205,8 +249,10 @@ function mapSondageListItem(
 }
 
 function mapSondageDetail(
-  sondage: Prisma.SondageGetPayload<{ include: typeof sondageInclude }>
+  sondage: Prisma.SondageGetPayload<{ include: typeof sondageInclude }>,
+  options?: { includeCorrigeFields?: boolean }
 ) {
+  const includeCorrigeFields = options?.includeCorrigeFields ?? true;
   return {
     ...mapSondageListItem(sondage),
     questions: sondage.questions.map((q) => ({
@@ -219,11 +265,16 @@ function mapSondageDetail(
       maxSelections: q.maxSelections,
       minCaracteres: q.minCaracteres,
       maxCaracteres: q.maxCaracteres,
+      liveEtat: q.liveEtat,
+      ...(includeCorrigeFields
+        ? { explication: q.explication }
+        : {}),
       options: q.options.map((o) => ({
         id: o.id,
         ordre: o.ordre,
         libelle: o.libelle,
         permetTexteLibre: o.permetTexteLibre,
+        ...(includeCorrigeFields ? { estCorrecte: o.estCorrecte } : {}),
       })),
       lignesMatrice: q.lignesMatrice.map((l) => ({
         id: l.id,
@@ -246,11 +297,13 @@ async function createQuestionsNested(
     maxSelections: question.maxSelections ?? null,
     minCaracteres: question.minCaracteres ?? null,
     maxCaracteres: question.maxCaracteres ?? null,
+    explication: question.explication?.trim() || null,
     options: {
       create: (question.options || []).map((option) => ({
         ordre: option.ordre,
         libelle: option.libelle,
         permetTexteLibre: option.permetTexteLibre ?? false,
+        estCorrecte: option.estCorrecte ?? false,
       })),
     },
     lignesMatrice: {
@@ -314,7 +367,8 @@ export async function getSondageByIdAdmin(sondageId: string) {
 }
 
 /**
- * Crée un sondage avec ses questions et notifie les adhérents actifs si publié.
+ * Crée un sondage ou un quiz **toujours en brouillon**.
+ * Aucun email / notification in-app / push à la création — publication via `publishSondage`.
  */
 export async function createSondage(input: z.infer<typeof CreateSondageSchema>) {
   try {
@@ -328,6 +382,16 @@ export async function createSondage(input: z.infer<typeof CreateSondageSchema>) 
     const structureError = validateQuestionsStructure(parsed.questions);
     if (structureError) return { success: false, error: structureError };
 
+    const quizError = validateQuizReadyForOpen(parsed.kind, parsed.questions);
+    if (quizError) return { success: false, error: quizError };
+
+    if (parsed.modeEnDirect && parsed.kind !== "Quiz") {
+      return {
+        success: false,
+        error: "Le mode En direct est réservé aux quiz",
+      };
+    }
+
     const existing = await db.sondage.findUnique({
       where: { sujet: parsed.sujet },
       select: { id: true },
@@ -336,6 +400,7 @@ export async function createSondage(input: z.infer<typeof CreateSondageSchema>) 
       return { success: false, error: "Un sondage avec ce sujet existe déjà" };
     }
 
+    const kindLabel = sondageKindLabel(parsed.kind);
     const sondage = await db.sondage.create({
       data: {
         sujet: parsed.sujet,
@@ -343,7 +408,9 @@ export async function createSondage(input: z.infer<typeof CreateSondageSchema>) 
         conclusion: parsed.conclusion || null,
         dateDebut: parsed.dateDebut,
         dateFin: parsed.dateFin,
-        status: parsed.publier ? SondageStatus.Ouvert : SondageStatus.Brouillon,
+        kind: parsed.kind as SondageKind,
+        modeEnDirect: parsed.kind === "Quiz" ? Boolean(parsed.modeEnDirect) : false,
+        status: SondageStatus.Brouillon,
         createdBy: guard.userId,
         questions: {
           create: await createQuestionsNested(parsed.questions),
@@ -352,27 +419,11 @@ export async function createSondage(input: z.infer<typeof CreateSondageSchema>) 
       include: sondageInclude,
     });
 
-    let emailStats = { sentCount: 0, failedCount: 0 };
-    if (parsed.publier) {
-      const notify = await sendSondageInvitationsToActiveAdherents(sondage);
-      emailStats = { sentCount: notify.sentCount, failedCount: notify.failedCount };
-    }
-
-    const emailPart =
-      parsed.publier && emailStats.sentCount > 0
-        ? ` (${emailStats.sentCount} email(s) envoyé(s))`
-        : parsed.publier && emailStats.failedCount > 0
-          ? " (échec partiel de l'envoi des emails)"
-          : "";
-
     return {
       success: true,
-      message: parsed.publier
-        ? `Sondage créé et publié${emailPart}`
-        : "Sondage créé en brouillon",
+      message: `${kindLabel} créé en brouillon`,
       id: sondage.id,
       data: mapSondageDetail(sondage),
-      emailStats: parsed.publier ? emailStats : undefined,
     };
   } catch (error) {
     if (error instanceof z.ZodError) {
@@ -409,6 +460,8 @@ export async function updateSondageDates(
       select: {
         id: true,
         status: true,
+        dateDebut: true,
+        dateFin: true,
         _count: { select: { reponses: true } },
       },
     });
@@ -417,10 +470,11 @@ export async function updateSondageDates(
       return { success: false, error: "Sondage introuvable" };
     }
 
-    if (existing.status === SondageStatus.Cloture) {
+    // Même règle que le mobile : échéance passée = clôturé effectif (sans écrire le statut).
+    if (getSondageStatutEffectif(existing) === SondageStatus.Cloture) {
       return {
         success: false,
-        error: "Impossible de modifier les dates d'un sondage clôturé",
+        error: "Impossible de modifier les dates d'un sondage terminé",
       };
     }
 
@@ -479,6 +533,16 @@ export async function updateSondage(input: z.infer<typeof UpdateSondageSchema>) 
     const structureError = validateQuestionsStructure(parsed.questions);
     if (structureError) return { success: false, error: structureError };
 
+    const quizError = validateQuizReadyForOpen(parsed.kind, parsed.questions);
+    if (quizError) return { success: false, error: quizError };
+
+    if (parsed.modeEnDirect && parsed.kind !== "Quiz") {
+      return {
+        success: false,
+        error: "Le mode En direct est réservé aux quiz",
+      };
+    }
+
     const existing = await db.sondage.findUnique({
       where: { id: parsed.id },
       select: { id: true, status: true, sujet: true },
@@ -516,6 +580,9 @@ export async function updateSondage(input: z.infer<typeof UpdateSondageSchema>) 
           conclusion: parsed.conclusion || null,
           dateDebut: parsed.dateDebut,
           dateFin: parsed.dateFin,
+          kind: parsed.kind as SondageKind,
+          modeEnDirect:
+            parsed.kind === "Quiz" ? Boolean(parsed.modeEnDirect) : false,
           questions: {
             create: await createQuestionsNested(parsed.questions),
           },
@@ -526,7 +593,7 @@ export async function updateSondage(input: z.infer<typeof UpdateSondageSchema>) 
 
     return {
       success: true,
-      message: "Sondage mis à jour",
+      message: `${sondageKindLabel(parsed.kind)} mis à jour`,
       data: mapSondageDetail(sondage),
     };
   } catch (error) {
@@ -564,6 +631,7 @@ export async function addQuestionsToSondage(
       select: {
         id: true,
         status: true,
+        kind: true,
         questions: { select: { ordre: true }, orderBy: { ordre: "desc" }, take: 1 },
       },
     });
@@ -578,6 +646,12 @@ export async function addQuestionsToSondage(
         error: "Des questions ne peuvent être ajoutées qu'à un sondage ouvert",
       };
     }
+
+    const quizAddError = validateQuizReadyForOpen(
+      existing.kind,
+      parsed.questions
+    );
+    if (quizAddError) return { success: false, error: quizAddError };
 
     const maxOrdre = existing.questions[0]?.ordre ?? -1;
     const questionsWithOrdre = parsed.questions.map((q, i) => ({
@@ -619,55 +693,46 @@ export async function addQuestionsToSondage(
 }
 
 /**
+ * Audience de notification pour la confirmation de publication (adhérents actifs éligibles).
+ *
+ * @returns count d’utilisateurs qui recevront in-app / push (email si adresse présente)
+ */
+export async function getSondagePublishAudiencePreview() {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false as const, error: guard.error };
+
+    const userIds = await listSondageNotifyEligibleUserIds();
+    return {
+      success: true as const,
+      count: userIds.length,
+      message:
+        userIds.length === 0
+          ? "Aucun adhérent actif éligible ne sera averti."
+          : `${userIds.length} adhérent(s) actif(s) (membres et administrateurs avec fiche adhérent) seront avertis par notification dans l’application et push ; un e-mail sera envoyé à ceux qui ont une adresse.`,
+    };
+  } catch (error) {
+    console.error("Erreur getSondagePublishAudiencePreview:", error);
+    return {
+      success: false as const,
+      error: "Impossible de préparer la confirmation de publication",
+    };
+  }
+}
+
+/**
  * Publie un sondage (passe en statut Ouvert).
+ * Délègue au service ; aucune injection de deps / canaux (non exposée au client).
+ *
+ * @param sondageId - Identifiant du brouillon
  */
 export async function publishSondage(sondageId: string) {
   try {
     const guard = await assertAdmin();
     if (!guard.ok) return { success: false, error: guard.error };
 
-    const parsed = SondageIdSchema.parse({ id: sondageId });
-    const sondage = await db.sondage.findUnique({
-      where: { id: parsed.id },
-      include: { questions: true },
-    });
-
-    if (!sondage) {
-      return { success: false, error: "Sondage introuvable" };
-    }
-
-    if (sondage.status !== SondageStatus.Brouillon) {
-      return { success: false, error: "Seul un brouillon peut être publié" };
-    }
-
-    if (!sondage.questions.length) {
-      return { success: false, error: "Ajoutez au moins une question avant publication" };
-    }
-
-    const dateError = validateSondageDates(sondage.dateDebut, sondage.dateFin);
-    if (dateError) return { success: false, error: dateError };
-
-    await db.sondage.update({
-      where: { id: parsed.id },
-      data: { status: SondageStatus.Ouvert },
-    });
-
-    const notify = await sendSondageInvitationsToActiveAdherents(sondage);
-    const emailPart =
-      notify.sentCount > 0
-        ? ` — ${notify.sentCount} email(s) envoyé(s) aux adhérents actifs`
-        : notify.failedCount > 0
-          ? " — échec de l'envoi des emails"
-          : "";
-
-    return {
-      success: true,
-      message: `Sondage publié${emailPart}`,
-      emailStats: {
-        sentCount: notify.sentCount,
-        failedCount: notify.failedCount,
-      },
-    };
+    SondageIdSchema.parse({ id: sondageId });
+    return await publishSondageService(sondageId);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { success: false, error: error.errors[0].message };
@@ -682,32 +747,17 @@ export async function publishSondage(sondageId: string) {
 
 /**
  * Clôture un sondage (plus de modification possible pour les adhérents).
+ * Délègue au service ; aucune barrière de test exposée au client.
+ *
+ * @param sondageId - Identifiant du sondage
  */
 export async function closeSondage(sondageId: string) {
   try {
     const guard = await assertAdmin();
     if (!guard.ok) return { success: false, error: guard.error };
 
-    const parsed = SondageIdSchema.parse({ id: sondageId });
-    const sondage = await db.sondage.findUnique({
-      where: { id: parsed.id },
-      select: { id: true, status: true },
-    });
-
-    if (!sondage) {
-      return { success: false, error: "Sondage introuvable" };
-    }
-
-    if (sondage.status === SondageStatus.Cloture) {
-      return { success: false, error: "Ce sondage est déjà clôturé" };
-    }
-
-    await db.sondage.update({
-      where: { id: parsed.id },
-      data: { status: SondageStatus.Cloture },
-    });
-
-    return { success: true, message: "Sondage clôturé" };
+    SondageIdSchema.parse({ id: sondageId });
+    return await closeSondageService(sondageId);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { success: false, error: error.errors[0].message };
@@ -716,6 +766,165 @@ export async function closeSondage(sondageId: string) {
     return { success: false, error: "Erreur lors de la clôture" };
   } finally {
     revalidatePath("/admin/sondages");
+    revalidatePath("/user/profile");
+  }
+}
+
+/**
+ * Autorise ou retire la consultation des résultats collectifs par les adhérents.
+ * Indépendant de la clôture ; réservé ADMIN.
+ *
+ * @param input - Identifiant sondage + flag visibles
+ */
+export async function setSondageResultatsVisiblesAdherents(
+  input: z.infer<typeof SetResultatsVisiblesSchema>
+) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+
+    const parsed = SetResultatsVisiblesSchema.parse(input);
+    const sondage = await db.sondage.findUnique({
+      where: { id: parsed.id },
+      select: {
+        id: true,
+        status: true,
+        dateDebut: true,
+        dateFin: true,
+        resultatsVisiblesAdherents: true,
+      },
+    });
+
+    if (!sondage) {
+      return { success: false, error: "Sondage introuvable" };
+    }
+
+    // Autorisation possible dès que le sondage est effectivement terminé
+    // (statut Cloture OU échéance passée) — même règle que l’API mobile.
+    const effectif = getSondageStatutEffectif(sondage);
+    if (parsed.visibles && effectif !== SondageStatus.Cloture) {
+      return {
+        success: false,
+        error:
+          "Les résultats collectifs ne peuvent être autorisés qu’après la fin du sondage.",
+      };
+    }
+
+    // Uniquement le flag de publication — jamais les dates ni les réponses.
+    await db.sondage.update({
+      where: { id: parsed.id },
+      data: { resultatsVisiblesAdherents: parsed.visibles },
+    });
+
+    const effectifPublie = isSondageResultatsCollectifsVisiblesPourAdherent({
+      ...sondage,
+      resultatsVisiblesAdherents: parsed.visibles,
+    });
+
+    return {
+      success: true,
+      message: parsed.visibles
+        ? "Résultats collectifs autorisés à la consultation"
+        : "Résultats collectifs retirés de la consultation",
+      data: {
+        resultatsVisiblesAdherents: parsed.visibles,
+        resultatsCollectifsPublies: effectifPublie,
+      },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Erreur setSondageResultatsVisiblesAdherents:", error);
+    return {
+      success: false,
+      error:
+        "Impossible d’enregistrer l’autorisation des résultats collectifs",
+    };
+  } finally {
+    revalidatePath("/admin/sondages");
+    revalidatePath(`/admin/sondages/${input.id}`);
+    revalidatePath("/user/profile");
+  }
+}
+
+/**
+ * Publie ou retire le corrigé d'un quiz pour les adhérents.
+ * Réservé ADMIN, après clôture effective. Indépendant des résultats collectifs.
+ *
+ * @param input - Identifiant + flag visibles
+ */
+export async function setSondageCorrigeVisiblesAdherents(
+  input: z.infer<typeof SetCorrigeVisiblesSchema>
+) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+
+    const parsed = SetCorrigeVisiblesSchema.parse(input);
+    const sondage = await db.sondage.findUnique({
+      where: { id: parsed.id },
+      select: {
+        id: true,
+        kind: true,
+        status: true,
+        dateDebut: true,
+        dateFin: true,
+        corrigeVisiblesAdherents: true,
+      },
+    });
+
+    if (!sondage) {
+      return { success: false, error: "Sondage introuvable" };
+    }
+
+    if (sondage.kind !== SondageKind.Quiz) {
+      return {
+        success: false,
+        error: "Le corrigé ne s’applique qu’aux quiz",
+      };
+    }
+
+    const effectif = getSondageStatutEffectif(sondage);
+    if (parsed.visibles && effectif !== SondageStatus.Cloture) {
+      return {
+        success: false,
+        error: "Le corrigé ne peut être publié qu’après la fin du quiz.",
+      };
+    }
+
+    await db.sondage.update({
+      where: { id: parsed.id },
+      data: { corrigeVisiblesAdherents: parsed.visibles },
+    });
+
+    const corrigePublie = isSondageCorrigeVisiblesPourAdherent({
+      ...sondage,
+      corrigeVisiblesAdherents: parsed.visibles,
+    });
+
+    return {
+      success: true,
+      message: parsed.visibles
+        ? "Corrigé publié pour les adhérents"
+        : "Corrigé retiré de la consultation",
+      data: {
+        corrigeVisiblesAdherents: parsed.visibles,
+        corrigePublie,
+      },
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    console.error("Erreur setSondageCorrigeVisiblesAdherents:", error);
+    return {
+      success: false,
+      error: "Impossible d’enregistrer la publication du corrigé",
+    };
+  } finally {
+    revalidatePath("/admin/sondages");
+    revalidatePath(`/admin/sondages/${input.id}`);
     revalidatePath("/user/profile");
   }
 }
@@ -766,10 +975,12 @@ export async function duplicateSondage(input: z.infer<typeof DuplicateSondageSch
       maxSelections: q.maxSelections,
       minCaracteres: q.minCaracteres,
       maxCaracteres: q.maxCaracteres,
+      explication: q.explication,
       options: q.options.map((o) => ({
         ordre: o.ordre,
         libelle: o.libelle,
         permetTexteLibre: o.permetTexteLibre,
+        estCorrecte: o.estCorrecte,
       })),
       lignesMatrice: q.lignesMatrice.map((l) => ({
         ordre: l.ordre,
@@ -784,6 +995,7 @@ export async function duplicateSondage(input: z.infer<typeof DuplicateSondageSch
         conclusion: source.conclusion,
         dateDebut: parsed.dateDebut,
         dateFin: parsed.dateFin,
+        kind: source.kind,
         status: SondageStatus.Brouillon,
         sourceId: source.id,
         createdBy: guard.userId,
@@ -796,7 +1008,7 @@ export async function duplicateSondage(input: z.infer<typeof DuplicateSondageSch
 
     return {
       success: true,
-      message: "Sondage dupliqué en brouillon",
+      message: `${sondageKindLabel(source.kind)} dupliqué en brouillon`,
       id: sondage.id,
       data: mapSondageDetail(sondage),
     };
@@ -958,6 +1170,8 @@ export async function getActiveSondagesForAdherent() {
       data: sondages.map((s) => ({
         id: s.id,
         sujet: s.sujet,
+        kind: s.kind,
+        kindLabel: sondageKindLabel(s.kind),
         dateDebut: s.dateDebut.toISOString(),
         dateFin: s.dateFin.toISOString(),
         aRepondu: s.reponses.length > 0,
@@ -1004,22 +1218,81 @@ export async function getSondageForAdherent(sondageId: string) {
       },
     });
 
+    const modifiable = isSondageModifiable(sondage);
+    const corrigePublie = isSondageCorrigeVisiblesPourAdherent(sondage);
+    const items = (maReponse?.items ?? []).map((item) => ({
+      questionId: item.questionId,
+      optionId: item.optionId,
+      ligneMatriceId: item.ligneMatriceId,
+      texteLibre: item.texteLibre,
+    }));
+
+    // Jamais estCorrecte / explication sur les questions du formulaire adhérent.
+    const detail = mapSondageDetail(sondage, { includeCorrigeFields: false });
+
+    let synthesePersonnelle: {
+      aRepondu: boolean;
+      message: string | null;
+      questions: ReturnType<typeof buildPersonalSyntheseQuestions>;
+      soumiseLe: string | null;
+      modifieLe: string | null;
+      corrigePublie: boolean;
+      score: { correct: number; total: number } | null;
+    } | null = null;
+
+    if (!modifiable) {
+      if (maReponse) {
+        const questionsSynthese = buildPersonalSyntheseQuestions(
+          sondage.questions,
+          items,
+          corrigePublie
+        );
+        const scored = corrigePublie
+          ? questionsSynthese.filter((q) => typeof q.estCorrecte === "boolean")
+          : [];
+        synthesePersonnelle = {
+          aRepondu: true,
+          message: null,
+          questions: questionsSynthese,
+          soumiseLe: maReponse.soumiseLe.toISOString(),
+          modifieLe: maReponse.modifieLe.toISOString(),
+          corrigePublie,
+          score:
+            corrigePublie && scored.length > 0
+              ? {
+                  correct: scored.filter((q) => q.estCorrecte).length,
+                  total: scored.length,
+                }
+              : null,
+        };
+      } else {
+        synthesePersonnelle = {
+          aRepondu: false,
+          message: "Vous n’avez pas répondu",
+          questions: [],
+          soumiseLe: null,
+          modifieLe: null,
+          corrigePublie,
+          score: null,
+        };
+      }
+    }
+
     return {
       success: true,
       data: {
-        ...mapSondageDetail(sondage),
-        modifiable: isSondageModifiable(sondage),
+        ...detail,
+        // Ne pas exposer le flag admin brut côté adhérent (seul corrigePublie compte).
+        corrigeVisiblesAdherents: undefined,
+        corrigePublie,
+        modifiable,
+        synthesePersonnelle,
         maReponse: maReponse
           ? {
               id: maReponse.id,
               soumiseLe: maReponse.soumiseLe.toISOString(),
               modifieLe: maReponse.modifieLe.toISOString(),
-              items: maReponse.items.map((item) => ({
-                questionId: item.questionId,
-                optionId: item.optionId,
-                ligneMatriceId: item.ligneMatriceId,
-                texteLibre: item.texteLibre,
-              })),
+              items,
             }
           : null,
       },
@@ -1384,5 +1657,175 @@ export async function generateSondageSynthesePdf(sondageId: string) {
     }
     console.error("Erreur generateSondageSynthesePdf:", error);
     return { success: false, error: "Erreur lors de la génération du PDF" };
+  }
+}
+
+const LiveQuestionSchema = z.object({
+  sondageId: z.string().min(1),
+  questionId: z.string().min(1),
+});
+
+const LiveSondageSchema = z.object({
+  sondageId: z.string().min(1),
+});
+
+const SetModeEnDirectSchema = z.object({
+  id: z.string().min(1),
+  enabled: z.boolean(),
+});
+
+/**
+ * Active / désactive le mode En direct (quiz uniquement, ADMIN).
+ */
+export async function setSondageModeEnDirect(
+  input: z.infer<typeof SetModeEnDirectSchema>
+) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+    const parsed = SetModeEnDirectSchema.parse(input);
+    const { setQuizModeEnDirect } = await import(
+      "@/lib/services/sondages/live-pilot"
+    );
+    const data = await setQuizModeEnDirect(parsed.id, parsed.enabled);
+    return {
+      success: true,
+      message: parsed.enabled
+        ? "Mode En direct activé"
+        : "Mode En direct désactivé",
+      data,
+    };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    if (error instanceof ServiceError) {
+      return { success: false, error: error.message };
+    }
+    console.error("Erreur setSondageModeEnDirect:", error);
+    return { success: false, error: "Impossible de modifier le mode En direct" };
+  } finally {
+    revalidatePath("/admin/sondages");
+    revalidatePath(`/admin/sondages/${input.id}`);
+  }
+}
+
+/**
+ * Ouvre une question aux réponses (pilote En direct).
+ */
+export async function openSondageLiveQuestion(
+  input: z.infer<typeof LiveQuestionSchema>
+) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+    const parsed = LiveQuestionSchema.parse(input);
+    const { openLiveQuestion } = await import(
+      "@/lib/services/sondages/live-pilot"
+    );
+    const data = await openLiveQuestion(null, parsed.sondageId, parsed.questionId);
+    return { success: true, message: "Question ouverte aux réponses", data };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    if (error instanceof ServiceError) {
+      return { success: false, error: error.message };
+    }
+    console.error("Erreur openSondageLiveQuestion:", error);
+    return { success: false, error: "Impossible d’ouvrir la question" };
+  } finally {
+    revalidatePath(`/admin/sondages/${input.sondageId}`);
+  }
+}
+
+/**
+ * Ferme les réponses d'une question live.
+ */
+export async function closeSondageLiveQuestion(
+  input: z.infer<typeof LiveQuestionSchema>
+) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+    const parsed = LiveQuestionSchema.parse(input);
+    const { closeLiveQuestion } = await import(
+      "@/lib/services/sondages/live-pilot"
+    );
+    const data = await closeLiveQuestion(null, parsed.sondageId, parsed.questionId);
+    return { success: true, message: "Réponses fermées", data };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    if (error instanceof ServiceError) {
+      return { success: false, error: error.message };
+    }
+    console.error("Erreur closeSondageLiveQuestion:", error);
+    return { success: false, error: "Impossible de fermer la question" };
+  } finally {
+    revalidatePath(`/admin/sondages/${input.sondageId}`);
+  }
+}
+
+/**
+ * Révèle le corrigé d'une question live (après fermeture).
+ */
+export async function revealSondageLiveQuestionCorrige(
+  input: z.infer<typeof LiveQuestionSchema>
+) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+    const parsed = LiveQuestionSchema.parse(input);
+    const { revealLiveQuestionCorrige } = await import(
+      "@/lib/services/sondages/live-pilot"
+    );
+    const data = await revealLiveQuestionCorrige(
+      null,
+      parsed.sondageId,
+      parsed.questionId
+    );
+    return { success: true, message: "Corrigé révélé", data };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    if (error instanceof ServiceError) {
+      return { success: false, error: error.message };
+    }
+    console.error("Erreur revealSondageLiveQuestionCorrige:", error);
+    return { success: false, error: "Impossible de révéler le corrigé" };
+  } finally {
+    revalidatePath(`/admin/sondages/${input.sondageId}`);
+  }
+}
+
+/**
+ * Ouvre la prochaine question en attente (sans exiger la révélation du corrigé).
+ */
+export async function openNextSondageLiveQuestion(
+  input: z.infer<typeof LiveSondageSchema>
+) {
+  try {
+    const guard = await assertAdmin();
+    if (!guard.ok) return { success: false, error: guard.error };
+    const parsed = LiveSondageSchema.parse(input);
+    const { openNextLiveQuestion } = await import(
+      "@/lib/services/sondages/live-pilot"
+    );
+    const data = await openNextLiveQuestion(null, parsed.sondageId);
+    return { success: true, message: "Question suivante ouverte", data };
+  } catch (error) {
+    if (error instanceof z.ZodError) {
+      return { success: false, error: error.errors[0].message };
+    }
+    if (error instanceof ServiceError) {
+      return { success: false, error: error.message };
+    }
+    console.error("Erreur openNextSondageLiveQuestion:", error);
+    return { success: false, error: "Impossible d’ouvrir la question suivante" };
+  } finally {
+    revalidatePath(`/admin/sondages/${input.sondageId}`);
   }
 }

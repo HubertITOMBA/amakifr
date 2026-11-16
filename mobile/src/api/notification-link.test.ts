@@ -32,4 +32,15 @@ describe("notificationLinkToMobileRoute", () => {
       notificationLinkToMobileRoute("https://amaki.fr/chat/xyz")
     ).toBe("/messages/xyz");
   });
+
+  it("sondage / quiz → /sondages/:id", () => {
+    expect(notificationLinkToMobileRoute("/sondages/s1")).toBe("/sondages/s1");
+    expect(
+      notificationLinkToMobileRoute("https://amaki.fr/sondages/quiz-live-1")
+    ).toBe("/sondages/quiz-live-1");
+  });
+
+  it("liste sondages", () => {
+    expect(notificationLinkToMobileRoute("/sondages")).toBe("/sondages");
+  });
 });

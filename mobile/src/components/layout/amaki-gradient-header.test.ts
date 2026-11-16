@@ -4,6 +4,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import {
   HEADER_BOTTOM_RADIUS,
+  HEADER_BOTTOM_RADIUS_COMPACT,
   HEADER_ICON_HIT_SIZE,
   headerContentPaddingTop,
   headerMinHeight,
@@ -26,8 +27,10 @@ describe("AmakiGradientHeader — source", () => {
     expect(source).toMatch(/home-header-gradient\.png/);
     expect(source).toMatch(/HEADER_BOTTOM_RADIUS/);
     expect(HEADER_BOTTOM_RADIUS).toBe(28);
+    expect(HEADER_BOTTOM_RADIUS_COMPACT).toBe(12);
     expect(source).toMatch(/borderBottomLeftRadius/);
     expect(source).toMatch(/borderBottomRightRadius/);
+    expect(source).toMatch(/bottomRadius/);
     expect(source).not.toMatch(/borderTopLeftRadius/);
   });
 
@@ -67,13 +70,12 @@ describe("AmakiGradientHeader — source", () => {
 describe("layouts migrés — header partagé", () => {
   const appDir = join(srcDir, "../../app");
 
-  it("tabs et stacks utilisent AmakiStackHeader", () => {
+  it("tabs et stacks utilisent AmakiStackHeader ou AmakiGradientHeader", () => {
     const layouts = [
       "(app)/_layout.tsx",
       "(app)/messages/_layout.tsx",
       "(app)/elections/_layout.tsx",
       "(app)/evenements/_layout.tsx",
-      "(app)/sondages/_layout.tsx",
       "(app)/profil/_layout.tsx",
     ];
     for (const rel of layouts) {
@@ -83,6 +85,13 @@ describe("layouts migrés — header partagé", () => {
         /headerStyle:\s*\{\s*backgroundColor:\s*AmakiColors\.primary/
       );
     }
+    const sondages = readFileSync(join(appDir, "(app)/sondages/_layout.tsx"), "utf8");
+    expect(sondages).toMatch(/AmakiGradientHeader/);
+    expect(sondages).toMatch(/HEADER_SHELL_PADDING_BOTTOM_SONDAGES/);
+    expect(sondages).toMatch(/Sondages et Quiz/);
+    expect(sondages).not.toMatch(
+      /headerStyle:\s*\{\s*backgroundColor:\s*AmakiColors\.primary/
+    );
   });
 
   it("accueil et login gardent headerShown false / coque partagée", () => {
