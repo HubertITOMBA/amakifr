@@ -1,10 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
   countSurveysToComplete,
+  getSondageStatusPresentation,
   getSurveyRequiredProgress,
   isRequiredQuestionAnswered,
+  isSondageCorrigeVisiblesPourAdherent,
+  isSondageResultatsCollectifsVisiblesPourAdherent,
   isSurveyCompleteForMember,
   isSurveyToComplete,
+  validateQuizReadyForOpen,
   validateSondageDates,
 } from "@/lib/sondages";
 
@@ -130,5 +134,186 @@ describe("countSurveysToComplete / summary rule", () => {
     expect(isSurveyToComplete({ estComplet: true, modifiable: true })).toBe(
       false
     );
+  });
+});
+
+describe("getSondageStatusPresentation", () => {
+  it("Ouvert + échéance passée → Terminé — échéance passée (sans écrire DB)", () => {
+    const p = getSondageStatusPresentation(
+      {
+        status: "Ouvert",
+        dateDebut: new Date("2026-01-01T00:00:00.000Z"),
+        dateFin: new Date("2026-01-31T00:00:00.000Z"),
+      },
+      new Date("2026-02-15T00:00:00.000Z")
+    );
+    expect(p.effectif).toBe("Cloture");
+    expect(p.badgeKey).toBe("Cloture");
+    expect(p.label).toBe("Terminé — échéance passée");
+    expect(p.echeancePassee).toBe(true);
+  });
+
+  it("Cloture stockée → Terminé", () => {
+    const p = getSondageStatusPresentation({
+      status: "Cloture",
+      dateDebut: new Date("2026-01-01T00:00:00.000Z"),
+      dateFin: new Date("2026-01-31T00:00:00.000Z"),
+    });
+    expect(p.label).toBe("Terminé");
+    expect(p.echeancePassee).toBe(false);
+  });
+});
+
+describe("isSondageResultatsCollectifsVisiblesPourAdherent", () => {
+  const past = {
+    status: "Cloture" as const,
+    dateDebut: new Date("2026-01-01T00:00:00.000Z"),
+    dateFin: new Date("2026-01-31T00:00:00.000Z"),
+  };
+
+  it("clôture seule → masqués", () => {
+    expect(
+      isSondageResultatsCollectifsVisiblesPourAdherent({
+        ...past,
+        resultatsVisiblesAdherents: false,
+      })
+    ).toBe(false);
+  });
+
+  it("autorisés après clôture + flag ADMIN", () => {
+    expect(
+      isSondageResultatsCollectifsVisiblesPourAdherent({
+        ...past,
+        resultatsVisiblesAdherents: true,
+      })
+    ).toBe(true);
+  });
+
+  it("flag true mais encore ouvert → masqués", () => {
+    const now = new Date("2026-01-15T12:00:00.000Z");
+    expect(
+      isSondageResultatsCollectifsVisiblesPourAdherent(
+        {
+          status: "Ouvert",
+          dateDebut: new Date("2026-01-01T00:00:00.000Z"),
+          dateFin: new Date("2026-01-31T00:00:00.000Z"),
+          resultatsVisiblesAdherents: true,
+        },
+        now
+      )
+    ).toBe(false);
+  });
+});
+
+describe("validateQuizReadyForOpen", () => {
+  const baseOpt = (id: string, estCorrecte = false) => ({
+    id,
+    ordre: 0,
+    libelle: id,
+    permetTexteLibre: false,
+    estCorrecte,
+  });
+
+  it("ignore les sondages classiques", () => {
+    expect(
+      validateQuizReadyForOpen("Sondage", [
+        {
+          ordre: 0,
+          libelle: "Q",
+          type: "TexteLibre",
+          obligatoire: true,
+          options: [],
+          lignesMatrice: [],
+        },
+      ])
+    ).toBeNull();
+  });
+
+  it("exige ChoixUnique + une bonne réponse", () => {
+    expect(
+      validateQuizReadyForOpen("Quiz", [
+        {
+          ordre: 0,
+          libelle: "Capitale",
+          type: "ChoixMultiple",
+          obligatoire: true,
+          options: [baseOpt("a", true), baseOpt("b")],
+          lignesMatrice: [],
+        },
+      ])
+    ).toMatch(/choix unique/i);
+
+    expect(
+      validateQuizReadyForOpen("Quiz", [
+        {
+          ordre: 0,
+          libelle: "Capitale",
+          type: "ChoixUnique",
+          obligatoire: true,
+          options: [baseOpt("a"), baseOpt("b")],
+          lignesMatrice: [],
+        },
+      ])
+    ).toMatch(/bonne réponse/i);
+
+    expect(
+      validateQuizReadyForOpen("Quiz", [
+        {
+          ordre: 0,
+          libelle: "Capitale",
+          type: "ChoixUnique",
+          obligatoire: true,
+          options: [baseOpt("a", true), baseOpt("b")],
+          lignesMatrice: [],
+        },
+      ])
+    ).toBeNull();
+  });
+});
+
+describe("isSondageCorrigeVisiblesPourAdherent", () => {
+  const closed = {
+    status: "Cloture" as const,
+    dateDebut: new Date("2026-01-01T00:00:00.000Z"),
+    dateFin: new Date("2026-01-31T00:00:00.000Z"),
+  };
+
+  it("masqué si pas Quiz / pas flag / encore ouvert", () => {
+    expect(
+      isSondageCorrigeVisiblesPourAdherent({
+        ...closed,
+        kind: "Sondage",
+        corrigeVisiblesAdherents: true,
+      })
+    ).toBe(false);
+    expect(
+      isSondageCorrigeVisiblesPourAdherent({
+        ...closed,
+        kind: "Quiz",
+        corrigeVisiblesAdherents: false,
+      })
+    ).toBe(false);
+    expect(
+      isSondageCorrigeVisiblesPourAdherent(
+        {
+          status: "Ouvert",
+          dateDebut: new Date("2026-01-01T00:00:00.000Z"),
+          dateFin: new Date("2026-12-31T00:00:00.000Z"),
+          kind: "Quiz",
+          corrigeVisiblesAdherents: true,
+        },
+        new Date("2026-06-01T00:00:00.000Z")
+      )
+    ).toBe(false);
+  });
+
+  it("visible après clôture Quiz + flag ADMIN", () => {
+    expect(
+      isSondageCorrigeVisiblesPourAdherent({
+        ...closed,
+        kind: "Quiz",
+        corrigeVisiblesAdherents: true,
+      })
+    ).toBe(true);
   });
 });

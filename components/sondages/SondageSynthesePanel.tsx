@@ -103,10 +103,26 @@ export function SondageSynthesePanel({ sondageId }: SondageSynthesePanelProps) {
     <div className="space-y-4">
       <div className="flex flex-wrap gap-2 justify-between items-start">
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 flex-1">
-          <MiniStat label="Réponses" value={synthese.totalReponses} />
-          <MiniStat label="Adhérents actifs" value={synthese.totalAdherentsActifs} />
-          <MiniStat label="Taux" value={`${synthese.tauxParticipation} %`} />
-          <MiniStat label="Questions" value={synthese.questions.length} />
+          <MiniStat
+            label="Réponses"
+            value={synthese.totalReponses}
+            tone="blue"
+          />
+          <MiniStat
+            label="Adhérents actifs"
+            value={synthese.totalAdherentsActifs}
+            tone="sky"
+          />
+          <MiniStat
+            label="Taux"
+            value={`${synthese.tauxParticipation} %`}
+            tone="teal"
+          />
+          <MiniStat
+            label="Questions"
+            value={synthese.questions.length}
+            tone="indigo"
+          />
         </div>
         <div className="flex gap-2 shrink-0">
           <Button
@@ -165,17 +181,21 @@ export function SondageSynthesePanel({ sondageId }: SondageSynthesePanelProps) {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-3 pb-4">
-                {question.choix?.map((opt) => (
+                {question.choix?.map((opt, optIdx) => (
                   <div key={opt.optionId} className="space-y-1">
-                    <div className="flex justify-between text-sm gap-2">
-                      <span>{opt.libelle}</span>
-                      <span className="font-mono text-muted-foreground shrink-0">
+                    <div className="flex justify-between text-sm gap-2 text-slate-800 dark:text-slate-100">
+                      <span className="min-w-0 break-words">{opt.libelle}</span>
+                      <span className="font-mono text-slate-600 dark:text-slate-300 shrink-0 tabular-nums">
                         {opt.count} — {opt.percent} %
                       </span>
                     </div>
-                    <div className="h-2 rounded-full bg-slate-200 overflow-hidden">
+                    <div className="h-2.5 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden print:bg-slate-200">
                       <div
-                        className="h-full bg-blue-600 rounded-full transition-all"
+                        className={`h-full rounded-full transition-all print:bg-slate-600 ${
+                          optIdx % 2 === 0
+                            ? "bg-gradient-to-r from-blue-500 to-blue-600"
+                            : "bg-gradient-to-r from-teal-400 to-teal-500"
+                        }`}
                         style={{ width: `${Math.min(100, opt.percent)}%` }}
                       />
                     </div>
@@ -184,19 +204,25 @@ export function SondageSynthesePanel({ sondageId }: SondageSynthesePanelProps) {
 
                 {question.matrice?.map((ligne) => (
                   <div key={ligne.ligneId} className="border-t pt-2 first:border-0 first:pt-0">
-                    <p className="text-sm font-medium mb-2">{ligne.libelle}</p>
+                    <p className="text-sm font-medium mb-2 text-slate-800 dark:text-slate-100">
+                      {ligne.libelle}
+                    </p>
                     <div className="space-y-2 pl-2">
-                      {ligne.colonnes.map((col) => (
+                      {ligne.colonnes.map((col, colIdx) => (
                         <div key={col.optionId} className="space-y-1">
-                          <div className="flex justify-between text-xs gap-2">
-                            <span>{col.libelle}</span>
-                            <span className="font-mono text-muted-foreground">
+                          <div className="flex justify-between text-xs gap-2 text-slate-800 dark:text-slate-100">
+                            <span className="min-w-0 break-words">{col.libelle}</span>
+                            <span className="font-mono text-slate-600 dark:text-slate-300 tabular-nums">
                               {col.count} — {col.percent} %
                             </span>
                           </div>
-                          <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden">
+                          <div className="h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden print:bg-slate-200">
                             <div
-                              className="h-full bg-indigo-600 rounded-full"
+                              className={`h-full rounded-full print:bg-slate-600 ${
+                                colIdx % 2 === 0
+                                  ? "bg-gradient-to-r from-blue-500 to-blue-600"
+                                  : "bg-gradient-to-r from-teal-400 to-teal-500"
+                              }`}
                               style={{ width: `${Math.min(100, col.percent)}%` }}
                             />
                           </div>
@@ -228,11 +254,46 @@ export function SondageSynthesePanel({ sondageId }: SondageSynthesePanelProps) {
   );
 }
 
-function MiniStat({ label, value }: { label: string; value: string | number }) {
+const MINI_STAT_TONES = {
+  blue: {
+    box: "border-blue-200 bg-blue-50/80 dark:border-blue-800 dark:bg-blue-950/40 print:border-slate-400 print:bg-blue-50",
+    value: "text-blue-800 dark:text-blue-200 print:text-slate-900",
+  },
+  sky: {
+    box: "border-sky-200 bg-sky-50/80 dark:border-sky-800 dark:bg-sky-950/40 print:border-slate-400 print:bg-sky-50",
+    value: "text-sky-800 dark:text-sky-200 print:text-slate-900",
+  },
+  teal: {
+    box: "border-teal-200 bg-teal-50/80 dark:border-teal-800 dark:bg-teal-950/40 print:border-slate-400 print:bg-teal-50",
+    value: "text-teal-800 dark:text-teal-200 print:text-slate-900",
+  },
+  indigo: {
+    box: "border-indigo-200 bg-indigo-50/80 dark:border-indigo-800 dark:bg-indigo-950/40 print:border-slate-400 print:bg-indigo-50",
+    value: "text-indigo-800 dark:text-indigo-200 print:text-slate-900",
+  },
+} as const;
+
+type MiniStatTone = keyof typeof MINI_STAT_TONES;
+
+/**
+ * Indicateur compact de la synthèse — teintes légères, contraste conservé à l’écran.
+ */
+function MiniStat({
+  label,
+  value,
+  tone = "blue",
+}: {
+  label: string;
+  value: string | number;
+  tone?: MiniStatTone;
+}) {
+  const t = MINI_STAT_TONES[tone];
   return (
-    <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3 text-center">
-      <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</p>
-      <p className="text-lg font-bold text-blue-800">{value}</p>
+    <div className={`rounded-lg border p-3 text-center ${t.box}`}>
+      <p className="text-[10px] uppercase tracking-wide text-slate-600 dark:text-slate-300 print:text-slate-700">
+        {label}
+      </p>
+      <p className={`text-lg font-bold tabular-nums ${t.value}`}>{value}</p>
     </div>
   );
 }

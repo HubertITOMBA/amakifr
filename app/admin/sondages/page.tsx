@@ -56,19 +56,18 @@ type SondageRow = {
   dateDebut: string;
   dateFin: string;
   status: string;
+  statusEffectif?: string;
+  statusLabel?: string;
+  statusBadgeKey?: string;
+  echeancePassee?: boolean;
   questionCount: number;
   reponseCount: number;
   createdByName: string;
   createdAt: string;
+  modifiable?: boolean;
 };
 
 const columnHelper = createColumnHelper<SondageRow>();
-
-const STATUS_LABELS: Record<string, string> = {
-  Brouillon: "Brouillon",
-  Ouvert: "Ouvert",
-  Cloture: "Clôturé",
-};
 
 const STATUS_COLORS: Record<string, string> = {
   Brouillon: "bg-slate-100 text-slate-800",
@@ -137,10 +136,18 @@ export default function AdminSondagesPage() {
 
   const filteredData = useMemo(() => {
     return data.filter((row) => {
-      if (statusFilter !== "all" && row.status !== statusFilter) return false;
+      const effectif = row.statusEffectif ?? row.status;
+      if (statusFilter !== "all" && effectif !== statusFilter) return false;
       if (globalFilter.trim()) {
         const q = globalFilter.toLowerCase();
-        const text = [row.sujet, row.createdByName, row.status].join(" ").toLowerCase();
+        const text = [
+          row.sujet,
+          row.createdByName,
+          row.statusLabel ?? row.status,
+          effectif,
+        ]
+          .join(" ")
+          .toLowerCase();
         if (!text.includes(q)) return false;
       }
       return true;
@@ -192,24 +199,52 @@ export default function AdminSondagesPage() {
       columnHelper.accessor("sujet", {
         header: "Sujet",
         cell: ({ row }) => (
-          <span className="font-medium text-sm text-slate-900 dark:text-slate-100">
+          <span className="font-medium text-sm text-slate-900 dark:text-slate-100 break-words">
             {row.getValue("sujet")}
           </span>
         ),
-        size: 220,
-        minSize: 150,
+        size: 280,
+        minSize: 160,
         enableResizing: true,
       }),
-      columnHelper.accessor("status", {
-        header: "Statut",
+      columnHelper.accessor((row) => row.kindLabel ?? row.kind ?? "Sondage", {
+        id: "kind",
+        header: "Type",
         cell: ({ row }) => {
-          const s = row.getValue("status") as string;
+          const kind = row.original.kind ?? "Sondage";
+          const label = row.original.kindLabel ?? kind;
           return (
-            <Badge className={STATUS_COLORS[s] || ""}>{STATUS_LABELS[s] || s}</Badge>
+            <Badge
+              className={
+                kind === "Quiz"
+                  ? "bg-teal-100 text-teal-800"
+                  : "bg-slate-100 text-slate-700"
+              }
+            >
+              {label}
+            </Badge>
           );
         },
         size: 100,
-        minSize: 90,
+        minSize: 80,
+        enableResizing: true,
+      }),
+      columnHelper.accessor((row) => row.statusEffectif ?? row.status, {
+        id: "statusEffectif",
+        header: "Statut",
+        cell: ({ row }) => {
+          const badgeKey =
+            row.original.statusBadgeKey ??
+            row.original.statusEffectif ??
+            row.original.status;
+          const label =
+            row.original.statusLabel ?? row.original.status;
+          return (
+            <Badge className={STATUS_COLORS[badgeKey] || ""}>{label}</Badge>
+          );
+        },
+        size: 180,
+        minSize: 120,
         enableResizing: true,
       }),
       columnHelper.accessor("reponseCount", {
@@ -269,8 +304,9 @@ export default function AdminSondagesPage() {
                   <Eye className="h-3.5 w-3.5" />
                 </Button>
               </Link>
-              {item.status === "Brouillon" && (
+              {(item.statusEffectif ?? item.status) === "Brouillon" && (
                 <Button
+                  type="button"
                   variant="outline"
                   size="sm"
                   className="h-7 w-7 p-0 border-green-300 hover:bg-green-50"
@@ -280,8 +316,9 @@ export default function AdminSondagesPage() {
                   <Send className="h-3.5 w-3.5" />
                 </Button>
               )}
-              {item.status === "Ouvert" && (
+              {(item.statusEffectif ?? item.status) === "Ouvert" && (
                 <Button
+                  type="button"
                   variant="outline"
                   size="sm"
                   className="h-7 w-7 p-0 border-red-300 hover:bg-red-50"
@@ -337,8 +374,8 @@ export default function AdminSondagesPage() {
   });
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 p-4 sm:p-6">
-      <Card className="mx-auto max-w-7xl shadow-lg border-blue-200 dark:border-slate-700">
+    <div className="w-full min-w-0 bg-gradient-to-br from-blue-50 via-white to-blue-50 dark:from-slate-900 dark:via-slate-900 dark:to-slate-800 rounded-lg">
+      <Card className="w-full shadow-lg border-blue-200 dark:border-slate-700">
         <CardHeader className="bg-gradient-to-r from-blue-500/90 to-blue-600/90 dark:from-blue-600/90 dark:to-blue-700/90 text-white rounded-t-lg pb-3 sm:pb-4 pt-3 sm:pt-4 px-4 sm:px-6">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 sm:gap-0">
             <div>
@@ -347,15 +384,15 @@ export default function AdminSondagesPage() {
                 Sondages ({filteredData.length})
               </CardTitle>
               <CardDescription className="text-blue-100 dark:text-blue-200 mt-1 sm:mt-2 text-sm sm:text-base">
-                Créer, publier et suivre les sondages destinés aux adhérents
+                Créer, publier et suivre les sondages et quiz destinés aux adhérents
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2 w-full sm:w-auto">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 w-full sm:w-auto">
               <ColumnVisibilityToggle table={table} storageKey="admin-sondages-column-visibility" />
               <Link href="/admin/sondages/nouveau" className="w-full sm:w-auto">
-                <Button className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg">
+                <Button type="button" className="w-full sm:w-auto bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white shadow-lg">
                   <Plus className="h-4 w-4 mr-2" />
-                  Nouveau sondage
+                  Nouveau sondage ou quiz
                 </Button>
               </Link>
             </div>
@@ -363,24 +400,24 @@ export default function AdminSondagesPage() {
         </CardHeader>
         <CardContent className="pt-6">
           <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" />
+            <div className="relative flex-1 min-w-0">
+              <Search className="pointer-events-none absolute left-3 top-1/2 z-10 h-4 w-4 -translate-y-1/2 text-gray-400" />
               <Input
                 placeholder="Rechercher..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="pl-10"
+                className="pl-10 sm:pl-10"
               />
             </div>
             <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-full sm:w-48">
+              <SelectTrigger className="w-full sm:w-56">
                 <SelectValue placeholder="Statut" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Tous les statuts</SelectItem>
                 <SelectItem value="Brouillon">Brouillon</SelectItem>
                 <SelectItem value="Ouvert">Ouvert</SelectItem>
-                <SelectItem value="Cloture">Clôturé</SelectItem>
+                <SelectItem value="Cloture">Terminé</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -394,7 +431,15 @@ export default function AdminSondagesPage() {
               <div className="mb-4 text-sm text-muted-foreground">
                 {filteredData.length} sondage(s)
               </div>
-              <DataTable table={table} emptyMessage="Aucun sondage" compact headerBold headerUppercase={false} />
+              <div className="overflow-x-auto min-w-0">
+                <DataTable
+                  table={table}
+                  emptyMessage="Aucun sondage"
+                  compact
+                  headerBold
+                  headerUppercase={false}
+                />
+              </div>
 
               <div className="bg-white dark:bg-gray-800 mt-5 flex flex-col sm:flex-row items-center justify-between py-5 px-4 font-semibold rounded-xl shadow-xl border border-gray-200 dark:border-gray-700 gap-4">
                 <div className="text-sm text-muted-foreground">

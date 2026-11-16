@@ -1,14 +1,14 @@
 import { useCallback, useRef, useState } from "react";
 import {
-  FlatList,
   Pressable,
   RefreshControl,
+  SectionList,
   StyleSheet,
   Text,
   View,
 } from "react-native";
 import { router, useFocusEffect } from "expo-router";
-import { getMyActiveSurveys } from "@/api/sondages";
+import { getMyClosedSurveys, getMyOpenSurveys } from "@/api/sondages";
 import {
   formatSurveyPeriod,
   formatSurveyProgress,
@@ -33,11 +33,19 @@ import {
   AmakiTypography,
 } from "@/constants/theme";
 
+type SurveySection = {
+  key: "open" | "closed";
+  title: string;
+  data: MyActiveSurveyDto[];
+};
+
 /**
- * Liste des sondages à compléter.
+ * Rubrique permanente « Sondages et Quiz » — En cours + Terminés.
+ * Réutilise le parcours `/sondages/[id]` existant.
  */
 export default function SondagesScreen() {
-  const [items, setItems] = useState<MyActiveSurveyDto[]>([]);
+  const [openItems, setOpenItems] = useState<MyActiveSurveyDto[]>([]);
+  const [closedItems, setClosedItems] = useState<MyActiveSurveyDto[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -52,9 +60,13 @@ export default function SondagesScreen() {
     else if (!hasLoadedRef.current) setLoading(true);
     setError(null);
     try {
-      const page = await getMyActiveSurveys();
+      const [openPage, closedPage] = await Promise.all([
+        getMyOpenSurveys(),
+        getMyClosedSurveys(),
+      ]);
       if (!shouldApplyLoadResult(gen, guardRef.current.dataGen)) return;
-      setItems(page.items);
+      setOpenItems(openPage.items);
+      setClosedItems(closedPage.items);
       hasLoadedRef.current = true;
     } catch (e) {
       if (!shouldApplyLoadResult(gen, guardRef.current.dataGen)) return;
@@ -79,16 +91,24 @@ export default function SondagesScreen() {
     }, [load])
   );
 
-  if (loading && items.length === 0) return <LoadingState />;
+  const sections: SurveySection[] = [
+    { key: "open", title: "En cours", data: openItems },
+    { key: "closed", title: "Terminés", data: closedItems },
+  ];
+
+  const totalCount = openItems.length + closedItems.length;
+
+  if (loading && !hasLoadedRef.current) return <LoadingState />;
 
   return (
     <View style={styles.root}>
       {error ? <ErrorBanner message={error} /> : null}
-      <FlatList
-        data={items}
+      <SectionList
+        sections={sections}
         keyExtractor={(item) => item.id}
+        stickySectionHeadersEnabled={false}
         contentContainerStyle={
-          items.length === 0 ? styles.emptyContainer : styles.list
+          totalCount === 0 ? styles.emptyContainer : styles.list
         }
         refreshControl={
           <RefreshControl
@@ -99,8 +119,25 @@ export default function SondagesScreen() {
         }
         ListEmptyComponent={
           error ? null : (
-            <EmptyState title="Aucun sondage à compléter" />
+            <EmptyState title="Aucun sondage pour le moment" />
           )
+        }
+        renderSectionHeader={({ section }) => (
+          <View style={styles.sectionHeader}>
+            <Text style={styles.sectionTitle}>{section.title}</Text>
+            <Text style={styles.sectionCount}>
+              {section.data.length}
+            </Text>
+          </View>
+        )}
+        renderSectionFooter={({ section }) =>
+          section.data.length === 0 && totalCount > 0 ? (
+            <Text style={styles.sectionEmpty}>
+              {section.key === "open"
+                ? "Aucun sondage en cours"
+                : "Aucun sondage terminé"}
+            </Text>
+          ) : null
         }
         renderItem={({ item }) => (
           <Pressable
@@ -117,16 +154,32 @@ export default function SondagesScreen() {
                   {item.introduction}
                 </Text>
               ) : null}
-              <StatusBadge label={item.statusLabel} tone="warning" />
+              <View style={styles.badgeRow}>
+                <StatusBadge
+                  label={item.kindLabel ?? item.kind ?? "Sondage"}
+                  tone={item.kind === "Quiz" ? "success" : "neutral"}
+                />
+                {item.modeEnDirect ? (
+                  <StatusBadge label="En direct" tone="success" />
+                ) : null}
+                <StatusBadge
+                  label={item.statusLabel}
+                  tone={item.modifiable ? "warning" : "neutral"}
+                />
+              </View>
               <Text style={styles.meta}>
                 {formatSurveyPeriod(item.dateDebut, item.dateFin)}
               </Text>
-              <Text style={styles.progress}>
-                {formatSurveyProgress(
-                  item.requiredAnswered,
-                  item.requiredTotal
-                )}
-              </Text>
+              {item.modifiable ? (
+                <Text style={styles.progress}>
+                  {formatSurveyProgress(
+                    item.requiredAnswered,
+                    item.requiredTotal
+                  )}
+                </Text>
+              ) : (
+                <Text style={styles.readonlyHint}>Lecture seule</Text>
+              )}
             </Card>
           </Pressable>
         )}
@@ -137,13 +190,49 @@ export default function SondagesScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: AmakiColors.background },
-  list: { padding: AmakiSpacing.lg },
+  list: {
+    paddingHorizontal: AmakiSpacing.lg,
+    paddingTop: AmakiSpacing.lg,
+    paddingBottom: AmakiSpacing.xl,
+  },
   emptyContainer: {
     flexGrow: 1,
     padding: AmakiSpacing.lg,
     justifyContent: "center",
   },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: AmakiSpacing.sm,
+    marginTop: AmakiSpacing.md,
+    paddingTop: AmakiSpacing.sm,
+    paddingBottom: AmakiSpacing.xs,
+  },
+  sectionTitle: {
+    ...AmakiTypography.heading,
+    fontSize: 18,
+    lineHeight: 28,
+    color: AmakiColors.text,
+    flexShrink: 1,
+  },
+  sectionCount: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+    fontWeight: "600",
+  },
+  sectionEmpty: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
+    marginBottom: AmakiSpacing.md,
+  },
   card: { marginBottom: AmakiSpacing.md },
+  badgeRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: AmakiSpacing.xs,
+    marginBottom: AmakiSpacing.xs,
+  },
   title: {
     ...AmakiTypography.heading,
     color: AmakiColors.text,
@@ -163,6 +252,11 @@ const styles = StyleSheet.create({
     ...AmakiTypography.caption,
     color: AmakiColors.primaryStrong,
     fontWeight: "600",
+    marginTop: AmakiSpacing.xs,
+  },
+  readonlyHint: {
+    ...AmakiTypography.caption,
+    color: AmakiColors.textMuted,
     marginTop: AmakiSpacing.xs,
   },
 });

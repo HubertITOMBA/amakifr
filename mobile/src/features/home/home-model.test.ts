@@ -94,7 +94,7 @@ describe("badges cartes contenu", () => {
 });
 
 describe("menu hamburger", () => {
-  it("ordre complet avec Cotisations et Notifications", () => {
+  it("ordre complet avec Cotisations, Notifications et Sondages et Quiz", () => {
     const items = buildHomeMenuItems(0);
     expect(items.map((s) => s.id)).toEqual([
       "documents",
@@ -106,6 +106,7 @@ describe("menu hamburger", () => {
       "passeport",
       "taches",
       "elections",
+      "sondages",
       "profil",
     ]);
     expect(
@@ -115,7 +116,11 @@ describe("menu hamburger", () => {
       notifications: "/notifications",
       documents: "/documents",
       reunions: "/reunions",
+      sondages: "/sondages",
     });
+    expect(items.find((i) => i.id === "sondages")?.label).toBe(
+      "Sondages et Quiz"
+    );
   });
 
   it("badges réels Notifications / Messages uniquement", () => {
@@ -127,11 +132,13 @@ describe("menu hamburger", () => {
     expect(resolveHomeMenuBadge("documents", 9, 9)).toBeUndefined();
   });
 
-  it("ajoute sondages si summary > 0 (avant Profil)", () => {
-    const ids = buildHomeMenuItems(2).map((s) => s.id);
-    expect(ids).toContain("sondages");
-    expect(ids.indexOf("sondages")).toBeLessThan(ids.indexOf("profil"));
-    expect(buildHomeMenuItems(0).map((s) => s.id)).not.toContain("sondages");
+  it("Sondages et Quiz toujours présent avant Profil (même si summary = 0)", () => {
+    const idsZero = buildHomeMenuItems(0).map((s) => s.id);
+    const idsSome = buildHomeMenuItems(2).map((s) => s.id);
+    expect(idsZero).toContain("sondages");
+    expect(idsSome).toContain("sondages");
+    expect(idsZero.indexOf("sondages")).toBeLessThan(idsZero.indexOf("profil"));
+    expect(idsSome.indexOf("sondages")).toBeLessThan(idsSome.indexOf("profil"));
   });
 
   it("aucune route frais-avances", () => {

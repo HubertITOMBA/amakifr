@@ -1,6 +1,8 @@
 import { db } from "@/lib/db";
 import { sendSondageInvitationEmail } from "@/lib/mail";
-import { UserRole, UserStatus } from "@prisma/client";
+import { pushAfterInternalNotifications } from "@/lib/services/notifications/push-after-internal-notification";
+import { UserRole, UserStatus, TypeNotification } from "@prisma/client";
+import { sondageKindLabel } from "@/lib/sondages";
 
 const EMAIL_DELAY_MS = 2000;
 
@@ -11,16 +13,47 @@ export type SondageNotificationResult = {
   errors: string[];
 };
 
+export type SondageInAppNotifyResult = {
+  createdCount: number;
+  skippedDuplicateCount: number;
+  skippedIneligibleCount: number;
+  recipientUserIds: string[];
+};
+
 type SondageForNotification = {
   id: string;
   sujet: string;
   introduction: string | null;
   dateDebut: Date;
   dateFin: Date;
+  kind?: string;
+};
+
+export type SondageNotifyDeps = {
+  listEligibleUserIds?: () => Promise<string[]>;
+  findExistingLiens?: (
+    userIds: string[],
+    lien: string
+  ) => Promise<Set<string>>;
+  createNotifications?: (args: {
+    userIds: string[];
+    titre: string;
+    message: string;
+    lien: string;
+    type: TypeNotification;
+  }) => Promise<number>;
+  pushAfter?: typeof pushAfterInternalNotifications;
 };
 
 /**
- * Récupère les utilisateurs adhérents actifs avec une adresse email valide.
+ * Lien canonique notification → questionnaire (Web / mobile).
+ */
+export function sondageNotificationLien(sondageId: string): string {
+  return `/sondages/${sondageId}`;
+}
+
+/**
+ * Adhérents actifs (MEMBRE|ADMIN avec fiche adhérent) — public des questionnaires.
  */
 export async function getActiveAdherentsWithEmail() {
   const users = await db.user.findMany({
@@ -46,6 +79,21 @@ export async function getActiveAdherentsWithEmail() {
   return users.filter((user) => user.email && user.email.trim().length > 0);
 }
 
+/**
+ * Identifiants utilisateurs éligibles à la notif in-app / push (actifs + adhérent).
+ */
+export async function listSondageNotifyEligibleUserIds(): Promise<string[]> {
+  const users = await db.user.findMany({
+    where: {
+      role: { in: [UserRole.MEMBRE, UserRole.ADMIN] },
+      status: UserStatus.Actif,
+      adherent: { isNot: null },
+    },
+    select: { id: true },
+  });
+  return users.map((u) => u.id);
+}
+
 function formatUserName(user: {
   name: string | null;
   adherent: {
@@ -55,14 +103,16 @@ function formatUserName(user: {
   } | null;
 }): string {
   if (user.adherent) {
-    const full = `${user.adherent.civility || ""} ${user.adherent.firstname} ${user.adherent.lastname}`.trim();
+    const full =
+      `${user.adherent.civility || ""} ${user.adherent.firstname} ${user.adherent.lastname}`.trim();
     if (full) return full;
   }
   return user.name?.trim() || "Adhérent";
 }
 
 /**
- * Envoie l'invitation au sondage à tous les adhérents actifs.
+ * Envoie l'invitation email au sondage/quiz à tous les adhérents actifs.
+ * (Canal email distinct de la notification in-app / push.)
  */
 export async function sendSondageInvitationsToActiveAdherents(
   sondage: SondageForNotification
@@ -76,7 +126,6 @@ export async function sendSondageInvitationsToActiveAdherents(
   };
 
   if (users.length === 0) {
-    result.skippedCount = 0;
     return result;
   }
 
@@ -117,4 +166,96 @@ export async function sendSondageInvitationsToActiveAdherents(
   }
 
   return result;
+}
+
+/**
+ * Notification in-app + push à la première publication.
+ * Déduplique par lien `/sondages/:id` (republication / questions suivantes = 0 doublon).
+ *
+ * @param sondage - Campagne publiée (kind optionnel pour libellé)
+ * @param deps - Injectables pour tests (destinataires fictifs, push simulé)
+ */
+export async function notifySondagePublishedInApp(
+  sondage: SondageForNotification,
+  deps: SondageNotifyDeps = {}
+): Promise<SondageInAppNotifyResult> {
+  const lien = sondageNotificationLien(sondage.id);
+  const kindLabel = sondageKindLabel(sondage.kind);
+  const titre = `${kindLabel} publié`;
+  const message = `${kindLabel} : « ${sondage.sujet} ». Ouvrez pour participer.`;
+
+  const listEligible =
+    deps.listEligibleUserIds ?? listSondageNotifyEligibleUserIds;
+  const eligibleIds = await listEligible();
+
+  if (eligibleIds.length === 0) {
+    return {
+      createdCount: 0,
+      skippedDuplicateCount: 0,
+      skippedIneligibleCount: 0,
+      recipientUserIds: [],
+    };
+  }
+
+  const findExisting =
+    deps.findExistingLiens ??
+    (async (userIds: string[], link: string) => {
+      const existing = await db.notification.findMany({
+        where: {
+          userId: { in: userIds },
+          lien: link,
+        },
+        select: { userId: true },
+      });
+      return new Set(existing.map((n) => n.userId));
+    });
+
+  const already = await findExisting(eligibleIds, lien);
+  const toCreate = eligibleIds.filter((id) => !already.has(id));
+
+  if (toCreate.length === 0) {
+    return {
+      createdCount: 0,
+      skippedDuplicateCount: already.size,
+      skippedIneligibleCount: 0,
+      recipientUserIds: [],
+    };
+  }
+
+  const createMany =
+    deps.createNotifications ??
+    (async (args) => {
+      const res = await db.notification.createMany({
+        data: args.userIds.map((userId) => ({
+          userId,
+          type: args.type,
+          titre: args.titre,
+          message: args.message,
+          lien: args.lien,
+          lue: false,
+        })),
+      });
+      return res.count;
+    });
+
+  const createdCount = await createMany({
+    userIds: toCreate,
+    titre,
+    message,
+    lien,
+    type: TypeNotification.Systeme,
+  });
+
+  const push =
+    deps.pushAfter ?? pushAfterInternalNotifications;
+  void push(toCreate, { titre, message, lien }).catch(() => {
+    /* best-effort */
+  });
+
+  return {
+    createdCount,
+    skippedDuplicateCount: already.size,
+    skippedIneligibleCount: 0,
+    recipientUserIds: toCreate,
+  };
 }

@@ -10,6 +10,8 @@ import { getActiveSondagesForAdherent } from "@/actions/sondages";
 type ActiveSondage = {
   id: string;
   sujet: string;
+  kind?: string;
+  kindLabel?: string;
   dateDebut: string;
   dateFin: string;
   aRepondu: boolean;
@@ -61,7 +63,7 @@ export function SondageProfileBanner() {
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-semibold uppercase tracking-wide text-blue-700 dark:text-blue-300">
-                    Sondage en cours
+                    {s.kindLabel ?? s.kind ?? "Sondage"} en cours
                   </p>
                   <p className="font-semibold text-slate-900 dark:text-white truncate">{s.sujet}</p>
                   <p className="text-xs text-muted-foreground mt-0.5">
@@ -77,7 +79,11 @@ export function SondageProfileBanner() {
               </div>
               <Link href={`/sondages/${s.id}`} className="shrink-0">
                 <Button className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700">
-                  {s.aRepondu ? "Modifier ma réponse" : "Répondre au sondage"}
+                  {s.aRepondu
+                    ? "Modifier ma réponse"
+                    : s.kind === "Quiz"
+                      ? "Répondre au quiz"
+                      : "Répondre au sondage"}
                 </Button>
               </Link>
             </CardContent>

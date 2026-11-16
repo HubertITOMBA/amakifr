@@ -6,6 +6,7 @@ import { ServiceError } from "@/lib/service-error";
 import { isSurveyToComplete } from "@/lib/sondages";
 import {
   getMyActiveSurveys,
+  getMyClosedSurveys,
   getMySurveysSummary,
 } from "@/lib/services/sondages/get-my-surveys";
 
@@ -15,7 +16,10 @@ const FORBIDDEN = ["userId", "adherentId", "respondentId", "authorId", "force", 
 
 /**
  * GET /api/v1/me/sondages
- * ?summary=1 → compteur léger accueil
+ * - ?summary=1 → compteur léger accueil (inchangé)
+ * - (défaut) → uniquement « à compléter » (compat AMAKI 1.1.1 / bandeau)
+ * - ?scope=open → tous les sondages ouverts (y compris complétés modifiables)
+ * - ?scope=closed → archives clôturées / période écoulée (lecture seule)
  */
 export async function GET(request: NextRequest) {
   try {
@@ -34,7 +38,25 @@ export async function GET(request: NextRequest) {
       return apiSuccess(summary);
     }
 
+    const scopeRaw = params.get("scope");
+    if (scopeRaw != null && scopeRaw !== "open" && scopeRaw !== "closed") {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        "scope invalide (open|closed)"
+      );
+    }
+
+    if (scopeRaw === "closed") {
+      const items = await getMyClosedSurveys(actor);
+      return apiSuccess({ items, total: items.length, scope: "closed" });
+    }
+
     const items = await getMyActiveSurveys(actor);
+    if (scopeRaw === "open") {
+      return apiSuccess({ items, total: items.length, scope: "open" });
+    }
+
+    // Défaut : filtre « à compléter » — comportement historique clients 1.1.1
     const aCompleter = items.filter(isSurveyToComplete);
     return apiSuccess({ items: aCompleter, total: aCompleter.length });
   } catch (error) {

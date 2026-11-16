@@ -2,7 +2,9 @@ import { authenticatedFetch } from "@/auth/session";
 import type {
   MyActiveSurveyDto,
   MySurveyAnswerItem,
+  MySurveyCollectiveResultsDto,
   MySurveyDetailDto,
+  MySurveyPersonalSyntheseDto,
   MySurveysListDto,
   MySurveysSummaryDto,
 } from "@/api/types";
@@ -17,10 +19,29 @@ export async function getMySurveysSummary(): Promise<MySurveysSummaryDto> {
 }
 
 /**
- * GET /api/v1/me/sondages — sondages à compléter.
+ * GET /api/v1/me/sondages — défaut historique : uniquement « à compléter »
+ * (compat AMAKI 1.1.1 / bandeau).
  */
 export async function getMyActiveSurveys(): Promise<MySurveysListDto> {
   return authenticatedFetch<MySurveysListDto>("/api/v1/me/sondages");
+}
+
+/**
+ * GET /api/v1/me/sondages?scope=open — tous les ouverts (y compris complétés).
+ */
+export async function getMyOpenSurveys(): Promise<MySurveysListDto> {
+  return authenticatedFetch<MySurveysListDto>(
+    "/api/v1/me/sondages?scope=open"
+  );
+}
+
+/**
+ * GET /api/v1/me/sondages?scope=closed — archives lecture seule.
+ */
+export async function getMyClosedSurveys(): Promise<MySurveysListDto> {
+  return authenticatedFetch<MySurveysListDto>(
+    "/api/v1/me/sondages?scope=closed"
+  );
 }
 
 /**
@@ -29,6 +50,28 @@ export async function getMyActiveSurveys(): Promise<MySurveysListDto> {
 export async function getMySurvey(id: string): Promise<MySurveyDetailDto> {
   return authenticatedFetch<MySurveyDetailDto>(
     `/api/v1/me/sondages/${encodeURIComponent(id)}`
+  );
+}
+
+/**
+ * GET /api/v1/me/sondages/[id]/synthese — après clôture uniquement.
+ */
+export async function getMySurveyPersonalSynthese(
+  id: string
+): Promise<MySurveyPersonalSyntheseDto> {
+  return authenticatedFetch<MySurveyPersonalSyntheseDto>(
+    `/api/v1/me/sondages/${encodeURIComponent(id)}/synthese`
+  );
+}
+
+/**
+ * GET /api/v1/me/sondages/[id]/resultats — après autorisation ADMIN.
+ */
+export async function getMySurveyCollectiveResults(
+  id: string
+): Promise<MySurveyCollectiveResultsDto> {
+  return authenticatedFetch<MySurveyCollectiveResultsDto>(
+    `/api/v1/me/sondages/${encodeURIComponent(id)}/resultats`
   );
 }
 

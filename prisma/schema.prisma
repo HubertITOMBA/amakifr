@@ -2824,6 +2824,21 @@ enum SondageStatus {
   Cloture
 }
 
+
+/// Nature de campagne : sondage d'opinion ou quiz (corrigé).
+enum SondageKind {
+  Sondage
+  Quiz
+}
+
+/// Pilotage question par question (quiz « En direct » uniquement).
+enum SondageQuestionLiveEtat {
+  EnAttente
+  Ouverte
+  Fermee
+  CorrigeRevele
+}
+
 /// Type de question de sondage
 enum SondageQuestionType {
   ChoixUnique
@@ -2841,6 +2856,17 @@ model Sondage {
   dateDebut    DateTime
   dateFin      DateTime
   status       SondageStatus @default(Brouillon)
+  /// Sondage (défaut) ou Quiz — les lignes existantes restent Sondage.
+  kind         SondageKind   @default(Sondage)
+  /// Quiz uniquement : diffusion pilotée question par question (ADMIN).
+  /// false = formulaire classique. Défaut false (sondages / quiz classiques inchangés).
+  modeEnDirect Boolean       @default(false)
+  /// Autorisation ADMIN explicite : consultation des résultats collectifs par les adhérents.
+  /// La clôture seule ne publie pas (défaut false).
+  resultatsVisiblesAdherents Boolean @default(false)
+  /// Autorisation ADMIN explicite : publication du corrigé (quiz) après clôture.
+  /// Indépendant de resultatsVisiblesAdherents (défaut false).
+  corrigeVisiblesAdherents Boolean @default(false)
   sourceId     String?
   createdBy    String
   createdAt    DateTime      @default(now())
@@ -2854,6 +2880,8 @@ model Sondage {
 
   @@index([createdBy])
   @@index([status])
+  @@index([kind])
+  @@index([modeEnDirect])
   @@index([dateDebut])
   @@index([dateFin])
   @@index([sourceId])
@@ -2872,6 +2900,10 @@ model SondageQuestion {
   maxSelections Int?
   minCaracteres Int?
   maxCaracteres Int?
+  /// Explication du corrigé (quiz) — jamais exposée aux adhérents avant publication ADMIN.
+  explication   String?             @db.Text
+  /// État de diffusion en mode En direct (ignoré si modeEnDirect=false).
+  liveEtat      SondageQuestionLiveEtat @default(EnAttente)
   createdAt     DateTime            @default(now())
   updatedAt     DateTime            @updatedAt
 
@@ -2882,6 +2914,7 @@ model SondageQuestion {
 
   @@index([sondageId])
   @@index([ordre])
+  @@index([liveEtat])
   @@map("sondage_questions")
 }
 
@@ -2892,6 +2925,8 @@ model SondageOption {
   ordre           Int
   libelle         String   @db.VarChar(500)
   permetTexteLibre Boolean @default(false)
+  /// Bonne réponse (quiz / ChoixUnique) — une seule par question ; masquée côté adhérent avant publication.
+  estCorrecte     Boolean  @default(false)
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 

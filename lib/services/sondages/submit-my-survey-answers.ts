@@ -8,6 +8,7 @@ import {
   type SondageReponseItemInput,
 } from "@/lib/sondages";
 import { resolveSelfAdherentId } from "@/lib/services/sondages/get-my-surveys";
+import { SondageQuestionLiveEtat } from "@prisma/client";
 
 const ItemSchema = z.object({
   questionId: z.string().min(1),
@@ -88,8 +89,23 @@ function validateItemsStructure(
 }
 
 /**
+ * Fusionne les items existants hors questions touchées + nouveaux items.
+ * Conserve les réponses déjà enregistrées aux autres questions (En direct).
+ */
+export function mergeSurveyAnswerItems(
+  existing: SondageReponseItemInput[],
+  incoming: SondageReponseItemInput[],
+  touchedQuestionIds: Set<string>
+): SondageReponseItemInput[] {
+  const kept = existing.filter((i) => !touchedQuestionIds.has(i.questionId));
+  return [...kept, ...incoming];
+}
+
+/**
  * Enregistre les réponses de l'adhérent (partielles ou complètes).
  * Ownership via actor.userId → Adherent.
+ * Mode En direct : n’accepte que les questions encore `Ouverte`,
+ * avec re-vérification transactionnelle (course clôture / soumission).
  */
 export async function submitMySurveyAnswers(
   actor: AuthContext,
@@ -134,32 +150,115 @@ export async function submitMySurveyAnswers(
     );
   }
 
+  const modeEnDirect = Boolean(sondage.modeEnDirect);
+  const incoming = parsed.data.items;
+  const touchedQuestionIds = new Set(incoming.map((i) => i.questionId));
+
+  if (modeEnDirect) {
+    if (incoming.length === 0) {
+      throw new ServiceError("VALIDATION_ERROR", "Aucune réponse à enregistrer");
+    }
+    for (const qid of touchedQuestionIds) {
+      const q = sondage.questions.find((x) => x.id === qid);
+      if (!q || q.liveEtat !== SondageQuestionLiveEtat.Ouverte) {
+        throw new ServiceError(
+          "FORBIDDEN",
+          "Cette question n’accepte plus de réponses."
+        );
+      }
+    }
+    // En direct : pas d’exigence « complete » sur tout le quiz.
+  }
+
+  const questionsForValidation = modeEnDirect
+    ? sondage.questions.filter((q) => touchedQuestionIds.has(q.id))
+    : sondage.questions;
+
   const structureError = validateItemsStructure(
-    sondage.questions,
-    parsed.data.items,
-    parsed.data.mode === "complete"
+    questionsForValidation,
+    incoming,
+    !modeEnDirect && parsed.data.mode === "complete"
   );
   if (structureError) {
     throw new ServiceError("VALIDATION_ERROR", structureError);
   }
 
   const reponse = await db.$transaction(async (tx) => {
+    // Course clôture globale / fermeture question : relecture dans la transaction.
+    const fresh = await tx.sondage.findUnique({
+      where: { id },
+      select: {
+        status: true,
+        dateDebut: true,
+        dateFin: true,
+        modeEnDirect: true,
+        questions: {
+          where: modeEnDirect
+            ? { id: { in: [...touchedQuestionIds] } }
+            : undefined,
+          select: { id: true, liveEtat: true },
+        },
+      },
+    });
+    if (!fresh || !isSondageModifiable(fresh)) {
+      throw new ServiceError(
+        "FORBIDDEN",
+        "Ce sondage est maintenant clôturé."
+      );
+    }
+    if (fresh.modeEnDirect) {
+      for (const q of fresh.questions) {
+        if (q.liveEtat !== SondageQuestionLiveEtat.Ouverte) {
+          throw new ServiceError(
+            "FORBIDDEN",
+            "Cette question n’accepte plus de réponses."
+          );
+        }
+      }
+      if (fresh.questions.length !== touchedQuestionIds.size) {
+        throw new ServiceError(
+          "FORBIDDEN",
+          "Cette question n’accepte plus de réponses."
+        );
+      }
+    }
+
     const existing = await tx.sondageReponse.findUnique({
       where: {
         sondageId_adherentId: { sondageId: id, adherentId },
       },
+      include: { items: true },
     });
+
+    let finalItems = incoming;
+    if (modeEnDirect && existing) {
+      finalItems = mergeSurveyAnswerItems(
+        existing.items.map((i) => ({
+          questionId: i.questionId,
+          optionId: i.optionId,
+          ligneMatriceId: i.ligneMatriceId,
+          texteLibre: i.texteLibre,
+        })),
+        incoming,
+        touchedQuestionIds
+      );
+    }
 
     if (existing) {
       await tx.sondageReponseItem.deleteMany({
-        where: { reponseId: existing.id },
+        where: modeEnDirect
+          ? {
+              reponseId: existing.id,
+              questionId: { in: [...touchedQuestionIds] },
+            }
+          : { reponseId: existing.id },
       });
       return tx.sondageReponse.update({
         where: { id: existing.id },
         data: {
           modifieLe: new Date(),
           items: {
-            create: parsed.data.items.map((item) => ({
+            create: (modeEnDirect ? incoming : finalItems).map((item) => ({
               questionId: item.questionId,
               optionId: item.optionId || null,
               ligneMatriceId: item.ligneMatriceId || null,
@@ -176,7 +275,7 @@ export async function submitMySurveyAnswers(
         sondageId: id,
         adherentId,
         items: {
-          create: parsed.data.items.map((item) => ({
+          create: incoming.map((item) => ({
             questionId: item.questionId,
             optionId: item.optionId || null,
             ligneMatriceId: item.ligneMatriceId || null,

@@ -26,8 +26,17 @@ export const HEADER_VISUAL_BODY_LOGIN = 96;
  */
 export const HEADER_STATUS_INSET_FLOOR = 28;
 
-/** Rayon coins bas uniquement. */
+/** Rayon coins bas uniquement (défaut app). */
 export const HEADER_BOTTOM_RADIUS = 28;
+
+/**
+ * Rayon compact validé sur Sondages / Questionnaire — usage local stack Sondages.
+ * N’altère pas le défaut des autres pages.
+ */
+export const HEADER_BOTTOM_RADIUS_COMPACT = 12;
+
+/** Padding bas de coque pour les écrans Sondages (espace sous le bandeau). */
+export const HEADER_SHELL_PADDING_BOTTOM_SONDAGES = 24;
 
 /** Zone tactile minimale (accessibilité). */
 export const HEADER_ICON_HIT_SIZE = 44;

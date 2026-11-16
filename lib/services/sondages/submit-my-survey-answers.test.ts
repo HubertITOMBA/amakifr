@@ -74,6 +74,28 @@ describe("submitMySurveyAnswers", () => {
     });
   });
 
+  it("clôture → aucune transaction (réponse précédente inchangée)", async () => {
+    findUniqueSondage.mockResolvedValue({
+      id: "s1",
+      status: "Cloture",
+      dateDebut: nowOpen.dateDebut,
+      dateFin: nowOpen.dateFin,
+      questions: [],
+    });
+    findUniqueReponse.mockResolvedValue({
+      id: "r-exist",
+      items: [{ questionId: "q1", optionId: "o1" }],
+    });
+    await expect(
+      submitMySurveyAnswers(actor(), "s1", {
+        items: [{ questionId: "q1", optionId: "o-hack" }],
+        mode: "complete",
+      })
+    ).rejects.toMatchObject({ code: "FORBIDDEN" });
+    expect(transaction).not.toHaveBeenCalled();
+    expect(findUniqueReponse).not.toHaveBeenCalled();
+  });
+
   it("refuse choix d'une autre question", async () => {
     findUniqueSondage.mockResolvedValue({
       id: "s1",
@@ -126,13 +148,29 @@ describe("submitMySurveyAnswers", () => {
         },
       ],
     });
-    transaction.mockImplementation(async (fn: any) =>
+    transaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
       fn({
+        sondage: {
+          findUnique: vi.fn().mockResolvedValue({
+            status: "Ouvert",
+            dateDebut: nowOpen.dateDebut,
+            dateFin: nowOpen.dateFin,
+            modeEnDirect: false,
+            questions: [],
+          }),
+        },
         sondageReponse: {
           findUnique: vi.fn().mockResolvedValue(null),
           create: vi.fn().mockResolvedValue({
             id: "r1",
-            items: [{ questionId: "q1", optionId: "o1", ligneMatriceId: null, texteLibre: null }],
+            items: [
+              {
+                questionId: "q1",
+                optionId: "o1",
+                ligneMatriceId: null,
+                texteLibre: null,
+              },
+            ],
           }),
           update: vi.fn(),
         },

@@ -13,7 +13,7 @@ import { SondageReponseForm } from "@/components/sondages/SondageReponseForm";
 import { getSondageForAdherent } from "@/actions/sondages";
 
 /**
- * Page adhérent : répondre à un sondage
+ * Page adhérent : répondre à un sondage / quiz, ou consulter la synthèse après clôture.
  */
 export default function SondageReponsePage() {
   const params = useParams();
@@ -39,6 +39,9 @@ export default function SondageReponsePage() {
   useEffect(() => {
     load();
   }, [load]);
+
+  const kindLabel = data?.kindLabel ?? data?.kind ?? "Sondage";
+  const synthese = data?.synthesePersonnelle;
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 dark:from-slate-900 dark:to-slate-800">
@@ -71,15 +74,20 @@ export default function SondageReponsePage() {
                     <ClipboardList className="h-5 w-5" />
                     {data.sujet}
                   </CardTitle>
-                  <Badge
-                    className={
-                      data.modifiable
-                        ? "mt-1 bg-white text-green-700 border border-green-200 shadow-sm font-semibold"
-                        : "mt-1 bg-white text-red-700 border border-red-200 shadow-sm font-semibold"
-                    }
-                  >
-                    {data.modifiable ? "Ouvert" : "Clôturé"}
-                  </Badge>
+                  <div className="flex flex-col items-end gap-1">
+                    <Badge className="mt-1 bg-white text-blue-800 border border-blue-200 shadow-sm font-semibold">
+                      {kindLabel}
+                    </Badge>
+                    <Badge
+                      className={
+                        data.modifiable
+                          ? "bg-white text-green-700 border border-green-200 shadow-sm font-semibold"
+                          : "bg-white text-red-700 border border-red-200 shadow-sm font-semibold"
+                      }
+                    >
+                      {data.modifiable ? "Ouvert" : "Clôturé"}
+                    </Badge>
+                  </div>
                 </div>
                 <p className="text-blue-100 text-sm mt-2">
                   Jusqu&apos;au{" "}
@@ -99,13 +107,80 @@ export default function SondageReponsePage() {
               )}
             </Card>
 
-            <SondageReponseForm
-              sondageId={id}
-              questions={data.questions}
-              modifiable={data.modifiable}
-              initialItems={data.maReponse?.items}
-              onSuccess={load}
-            />
+            {data.modifiable ? (
+              <SondageReponseForm
+                sondageId={id}
+                questions={data.questions}
+                modifiable={data.modifiable}
+                initialItems={data.maReponse?.items}
+                onSuccess={load}
+              />
+            ) : synthese ? (
+              <Card className="border-slate-200 shadow-sm">
+                <CardHeader className="pb-2">
+                  <CardTitle className="text-base">Votre synthèse personnelle</CardTitle>
+                  {synthese.corrigePublie && synthese.score ? (
+                    <p className="text-sm font-semibold text-teal-700">
+                      Score : {synthese.score.correct} / {synthese.score.total}
+                    </p>
+                  ) : null}
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {!synthese.aRepondu ? (
+                    <p className="text-sm text-muted-foreground">
+                      {synthese.message ?? "Vous n’avez pas répondu"}
+                    </p>
+                  ) : (
+                    synthese.questions.map((q) => (
+                      <div
+                        key={q.questionId}
+                        className="rounded-md border border-slate-200 bg-slate-50 p-3 space-y-1"
+                      >
+                        <p className="text-sm font-medium text-slate-900">{q.libelle}</p>
+                        {q.reponses.length === 0 ? (
+                          <p className="text-xs text-muted-foreground">Sans réponse</p>
+                        ) : (
+                          q.reponses.map((r, idx) => (
+                            <p key={`${q.questionId}-${idx}`} className="text-sm text-slate-800">
+                              {r}
+                            </p>
+                          ))
+                        )}
+                        {synthese.corrigePublie ? (
+                          <div className="pt-2 mt-1 border-t border-slate-200 space-y-0.5">
+                            {typeof q.estCorrecte === "boolean" ? (
+                              <p
+                                className={
+                                  q.estCorrecte
+                                    ? "text-xs font-semibold text-green-700"
+                                    : "text-xs font-semibold text-red-700"
+                                }
+                              >
+                                {q.estCorrecte ? "Bonne réponse" : "Réponse incorrecte"}
+                              </p>
+                            ) : null}
+                            {q.bonneReponse ? (
+                              <p className="text-xs text-slate-800">
+                                Corrigé : {q.bonneReponse}
+                              </p>
+                            ) : null}
+                            {q.explication ? (
+                              <p className="text-xs text-muted-foreground">{q.explication}</p>
+                            ) : null}
+                          </div>
+                        ) : null}
+                      </div>
+                    ))
+                  )}
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-8 text-center text-muted-foreground text-sm">
+                  Ce questionnaire est clôturé.
+                </CardContent>
+              </Card>
+            )}
 
             {data.conclusion && (
               <p className="text-sm text-muted-foreground text-center whitespace-pre-wrap px-2">

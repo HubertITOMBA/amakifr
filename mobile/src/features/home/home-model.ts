@@ -128,7 +128,7 @@ const MENU_ALWAYS: readonly HomeMenuItemDef[] = [
 
 const MENU_SONDAGES: HomeMenuItemDef = {
   id: "sondages",
-  label: "Sondages",
+  label: "Sondages et Quiz",
   href: "/sondages" as Href,
   icon: "sondages",
 };
@@ -169,15 +169,18 @@ export function buildHomeQuickActions(
 }
 
 /**
- * Entrées du menu hamburger ; sondages si summary > 0.
+ * Entrées du menu hamburger.
+ * « Sondages et Quiz » est toujours présent (accès permanent) ;
+ * le bandeau « À la une » reste conditionné par `surveyCount` ailleurs.
  * Badges Notifications / Messages exposés côté UI (compteurs réels).
+ *
+ * @param surveyCount - Compteur « à compléter » (réservé / non utilisé pour le bandeau)
  */
 export function buildHomeMenuItems(surveyCount: number): HomeMenuItemDef[] {
+  void surveyCount;
   const list: HomeMenuItemDef[] = [...MENU_ALWAYS];
-  if (shouldShowHomeSurveyCta(surveyCount)) {
-    const profilIdx = list.findIndex((i) => i.id === "profil");
-    list.splice(profilIdx >= 0 ? profilIdx : list.length, 0, MENU_SONDAGES);
-  }
+  const profilIdx = list.findIndex((i) => i.id === "profil");
+  list.splice(profilIdx >= 0 ? profilIdx : list.length, 0, MENU_SONDAGES);
   return list;
 }
 

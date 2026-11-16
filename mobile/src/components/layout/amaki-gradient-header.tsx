@@ -51,6 +51,15 @@ export type AmakiGradientHeaderProps = {
   variant?: Variant;
   /** Remplace la zone titre (ex. marque + icônes accueil). */
   centerSlot?: ReactNode;
+  /**
+   * Rayon des coins bas (défaut : HEADER_BOTTOM_RADIUS).
+   */
+  bottomRadius?: number;
+  /**
+   * Padding bas de la coque dégradé (défaut : AmakiSpacing.md).
+   * Les écrans Sondages passent une valeur plus haute si besoin.
+   */
+  shellPaddingBottom?: number;
 };
 
 /**
@@ -80,6 +89,8 @@ type ShellProps = {
   statusInset: number;
   visualBody: number;
   children: ReactNode;
+  bottomRadius?: number;
+  shellPaddingBottom?: number;
 };
 
 /**
@@ -89,10 +100,22 @@ export function AmakiGradientShell({
   statusInset,
   visualBody,
   children,
+  bottomRadius = HEADER_BOTTOM_RADIUS,
+  shellPaddingBottom = AmakiSpacing.md,
 }: ShellProps) {
   const minH = headerMinHeight(statusInset, visualBody);
   return (
-    <View style={[styles.gradientClip, { minHeight: minH }]}>
+    <View
+      style={[
+        styles.gradientClip,
+        {
+          minHeight: minH,
+          borderBottomLeftRadius: bottomRadius,
+          borderBottomRightRadius: bottomRadius,
+          paddingBottom: shellPaddingBottom,
+        },
+      ]}
+    >
       <Image
         source={headerGradient}
         style={StyleSheet.absoluteFill}
@@ -121,6 +144,8 @@ export function AmakiGradientHeader({
   rightSlot,
   variant = "default",
   centerSlot,
+  bottomRadius = HEADER_BOTTOM_RADIUS,
+  shellPaddingBottom = AmakiSpacing.md,
 }: AmakiGradientHeaderProps) {
   const insets = useSafeAreaInsets();
   useLightTranslucentStatusBar();
@@ -136,7 +161,12 @@ export function AmakiGradientHeader({
   return (
     <View style={styles.root}>
       <StatusBar style="light" />
-      <AmakiGradientShell statusInset={statusInset} visualBody={visualBody}>
+      <AmakiGradientShell
+        statusInset={statusInset}
+        visualBody={visualBody}
+        bottomRadius={bottomRadius}
+        shellPaddingBottom={shellPaddingBottom}
+      >
         <View style={[styles.inner, { paddingTop: padTop }]}>
           <View style={styles.row}>
             <View style={styles.sideLeft}>
@@ -249,11 +279,8 @@ const styles = StyleSheet.create({
   },
   gradientClip: {
     overflow: "hidden",
-    borderBottomLeftRadius: HEADER_BOTTOM_RADIUS,
-    borderBottomRightRadius: HEADER_BOTTOM_RADIUS,
     marginTop: 0,
     paddingTop: 0,
-    paddingBottom: AmakiSpacing.md,
   },
   contrastVeil: {
     ...StyleSheet.absoluteFill,
