@@ -377,7 +377,15 @@ export function SondageForm({
           return;
         }
         toast.success(result.message || "Questions ajoutées");
-        setValues(buildDefaultValues({ questions: [defaultQuestion(0)] }));
+        // Conserver le kind (Quiz/Sondage) pour ne pas basculer le formulaire
+        // vers un type incorrect après un ajout réussi.
+        setValues(
+          buildDefaultValues({
+            kind: values.kind,
+            modeEnDirect: values.modeEnDirect,
+            questions: [defaultQuestion(0, values.kind === "Quiz")],
+          })
+        );
         onSuccess?.(sondageId);
         return;
       }

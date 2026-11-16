@@ -13,6 +13,8 @@ import {
   Eye,
   BarChart3,
   Plus,
+  RefreshCw,
+  Lock,
 } from "lucide-react";
 import { toast } from "react-toastify";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -87,32 +89,61 @@ export default function AdminSondageDetailPage() {
   const [publishAudience, setPublishAudience] = useState<string | null>(null);
   const [publishAudienceLoading, setPublishAudienceLoading] = useState(false);
   const [publishing, setPublishing] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    try {
-      const [detailRes, partRes] = await Promise.all([
-        getSondageByIdAdmin(id),
-        getSondageParticipationAdmin(id),
-      ]);
-
-      if (!detailRes.success || !detailRes.data) {
-        toast.error(detailRes.error || "Sondage introuvable");
-        router.push("/admin/sondages");
-        return;
+  /**
+   * Charge le détail et la participation.
+   * En mode `quiet`, ne remonte pas le spinner plein page afin de
+   * conserver la saisie en cours dans le formulaire d’ajout.
+   */
+  const loadAll = useCallback(
+    async (opts?: { quiet?: boolean }) => {
+      const quiet = Boolean(opts?.quiet);
+      if (quiet) {
+        setRefreshing(true);
+      } else {
+        setLoading(true);
       }
+      try {
+        const [detailRes, partRes] = await Promise.all([
+          getSondageByIdAdmin(id),
+          getSondageParticipationAdmin(id),
+        ]);
 
-      setSondage(detailRes.data);
-      if (partRes.success && partRes.data) {
-        setParticipation(partRes.data);
+        if (!detailRes.success || !detailRes.data) {
+          toast.error(detailRes.error || "Sondage introuvable");
+          if (!quiet) {
+            router.push("/admin/sondages");
+          }
+          return;
+        }
+
+        setSondage(detailRes.data);
+        if (partRes.success && partRes.data) {
+          setParticipation(partRes.data);
+        }
+      } finally {
+        if (quiet) {
+          setRefreshing(false);
+        } else {
+          setLoading(false);
+        }
       }
-    } finally {
-      setLoading(false);
-    }
-  }, [id, router]);
+    },
+    [id, router]
+  );
 
   useEffect(() => {
-    loadAll();
+    void loadAll();
+  }, [loadAll]);
+
+  /**
+   * Actualise la liste des questions depuis le serveur sans perdre
+   * le brouillon de saisie du formulaire « Ajouter des questions ».
+   */
+  const handleRefreshQuestions = useCallback(async () => {
+    await loadAll({ quiet: true });
+    toast.info("Liste des questions actualisée");
   }, [loadAll]);
 
   /**
@@ -272,8 +303,12 @@ export default function AdminSondageDetailPage() {
     : "participation";
 
   return (
-    <div className="w-full min-w-0 bg-gradient-to-br from-blue-50 via-white to-blue-50 rounded-lg">
-      <div className="w-full space-y-4">
+    <div className="w-full min-w-0 overflow-x-hidden bg-gradient-to-br from-blue-50 via-white to-blue-50 rounded-lg">
+      {/*
+        Conteneur commun centré dans l’espace à droite de la sidebar :
+        bandeau, pilote, dates, questions et onglets partagent les mêmes bords.
+      */}
+      <div className="mx-auto w-full max-w-7xl space-y-4">
         <div className="flex flex-wrap items-center gap-2 justify-between">
           <Link href="/admin/sondages">
             <Button type="button" variant="outline" size="sm">
@@ -309,7 +344,7 @@ export default function AdminSondageDetailPage() {
           </div>
         </div>
 
-        <Card className="w-full shadow-lg border-blue-200">
+        <Card className="w-full min-w-0 shadow-lg border-blue-200 overflow-hidden">
           <CardHeader className="bg-gradient-to-r from-blue-500 to-blue-600 text-white px-4 sm:px-6 py-4">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="flex items-start gap-2 text-lg min-w-0 flex-1 pr-0 sm:pr-4">
@@ -343,10 +378,9 @@ export default function AdminSondageDetailPage() {
               {new Date(sondage.dateFin).toLocaleString("fr-FR")}
             </p>
           </CardHeader>
-          <CardContent className="pt-4 space-y-5">
-            {/* Pilote / résumé : largeur de lecture ; bandeau et tableaux full-width */}
+          <CardContent className="pt-4 pb-4 space-y-5 min-w-0 px-0">
             {sondage.kind === "Quiz" ? (
-              <div className="mx-auto w-full max-w-3xl">
+              <div className="w-full min-w-0 px-4 sm:px-6">
                 <SondageLivePilotPanel
                   sondageId={sondage.id}
                   modeEnDirect={Boolean(sondage.modeEnDirect)}
@@ -357,51 +391,128 @@ export default function AdminSondageDetailPage() {
                     libelle: q.libelle,
                     liveEtat: q.liveEtat,
                   }))}
-                  onChanged={() => loadAll()}
+                  onChanged={() => void loadAll({ quiet: true })}
                   onCloturerQuiz={
-                    isOuvertEffectif && isQuizEnDirect ? handleClose : undefined
+                    isOuvertEffectif && isQuizEnDirect
+                      ? handleClose
+                      : undefined
                   }
                 />
               </div>
             ) : null}
 
-            <SondageCollapsibleSection
-              className="mx-auto max-w-3xl"
-              title={
-                isTermineEffectif && sondage.kind === "Quiz"
-                  ? "Dates du quiz"
-                  : "Modifier les dates"
-              }
-            >
-              <SondageDatesEditor
-                sondageId={sondage.id}
-                dateDebut={sondage.dateDebut}
-                dateFin={sondage.dateFin}
-                statusEffectif={statusEffectif}
-                onSuccess={() => loadAll()}
-              />
-            </SondageCollapsibleSection>
+            <div className="w-full min-w-0 px-4 sm:px-6">
+              <SondageCollapsibleSection
+                className="w-full min-w-0"
+                title={
+                  isTermineEffectif && sondage.kind === "Quiz"
+                    ? "Dates du quiz"
+                    : "Modifier les dates"
+                }
+              >
+                {/* Champs courts : largeur limitée à l’intérieur de la section pleine largeur */}
+                <div className="w-full max-w-md sm:max-w-lg">
+                  <SondageDatesEditor
+                    sondageId={sondage.id}
+                    dateDebut={sondage.dateDebut}
+                    dateFin={sondage.dateFin}
+                    statusEffectif={statusEffectif}
+                    onSuccess={() => void loadAll({ quiet: true })}
+                  />
+                </div>
+              </SondageCollapsibleSection>
+            </div>
 
             {isOuvertEffectif ? (
-              <SondageCollapsibleSection
-                className="mx-auto max-w-3xl"
-                title="Ajouter des questions"
-                icon={<Plus className="h-4 w-4 shrink-0" aria-hidden />}
-              >
-                <SondageForm
-                  sondageId={id}
-                  addQuestionsOnly
-                  initialData={{
-                    kind: sondage.kind ?? "Sondage",
-                    questions: undefined,
-                  }}
-                  onSuccess={() => loadAll()}
-                />
-              </SondageCollapsibleSection>
+              <div className="w-full min-w-0 space-y-4 px-4 sm:px-6">
+                <section
+                  className="w-full rounded-lg border border-slate-200 bg-white shadow-sm"
+                  aria-labelledby="questions-enregistrees-heading"
+                >
+                  <div className="flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3">
+                    <h2
+                      id="questions-enregistrees-heading"
+                      className="text-sm font-semibold text-slate-800 flex items-center gap-2"
+                    >
+                      <Lock
+                        className="h-3.5 w-3.5 text-slate-500 shrink-0"
+                        aria-hidden
+                      />
+                      Questions enregistrées ({sondage.questions.length})
+                    </h2>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      className="h-8 border-slate-300 text-slate-700 hover:bg-slate-50"
+                      onClick={() => void handleRefreshQuestions()}
+                      disabled={refreshing}
+                    >
+                      {refreshing ? (
+                        <Loader2 className="h-3.5 w-3.5 mr-1.5 animate-spin" />
+                      ) : (
+                        <RefreshCw className="h-3.5 w-3.5 mr-1.5" />
+                      )}
+                      Actualiser
+                    </Button>
+                  </div>
+                  {sondage.questions.length === 0 ? (
+                    <p className="px-4 py-3 text-sm text-slate-500">
+                      Aucune question enregistrée pour le moment.
+                    </p>
+                  ) : (
+                    <ol className="divide-y divide-slate-100">
+                      {sondage.questions.map((q, i) => (
+                        <li
+                          key={q.id}
+                          className="flex items-start gap-3 px-4 py-2.5 text-sm"
+                        >
+                          <span className="shrink-0 font-mono text-xs font-semibold text-slate-500 w-6 pt-0.5">
+                            {i + 1}.
+                          </span>
+                          <div className="min-w-0 flex-1">
+                            <p className="font-medium text-slate-900 break-words">
+                              {q.libelle}
+                            </p>
+                            <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                              <Badge
+                                variant="outline"
+                                className="text-[10px] px-1.5 py-0"
+                              >
+                                {q.type}
+                              </Badge>
+                              <span className="text-[10px] uppercase tracking-wide text-slate-400">
+                                Lecture seule
+                              </span>
+                            </div>
+                          </div>
+                        </li>
+                      ))}
+                    </ol>
+                  )}
+                </section>
+
+                <SondageCollapsibleSection
+                  className="w-full min-w-0"
+                  title="Ajouter des questions"
+                  icon={<Plus className="h-4 w-4 shrink-0" aria-hidden />}
+                  defaultOpen
+                >
+                  <SondageForm
+                    sondageId={id}
+                    addQuestionsOnly
+                    initialData={{
+                      kind: sondage.kind ?? "Sondage",
+                      questions: undefined,
+                    }}
+                    onSuccess={() => void loadAll({ quiet: true })}
+                  />
+                </SondageCollapsibleSection>
+              </div>
             ) : null}
 
-            <Tabs defaultValue={defaultTab}>
-              <TabsList className="mb-4 flex flex-wrap h-auto gap-1">
+            <Tabs defaultValue={defaultTab} className="w-full min-w-0 px-4 sm:px-6">
+              <TabsList className="mb-4 flex flex-wrap h-auto gap-1 w-full justify-start">
                 {isBrouillon && (
                   <TabsTrigger value="edition">Édition</TabsTrigger>
                 )}
@@ -418,7 +529,7 @@ export default function AdminSondageDetailPage() {
 
               {isBrouillon && (
                 <TabsContent value="edition" className="min-w-0">
-                  <div className="w-full min-w-0 max-w-full">
+                  <div className="w-full min-w-0">
                     <p className="text-sm text-slate-600 mb-4">
                       Corrigez le contenu (questions, choix
                       {sondage.kind === "Quiz" ? ", bonne réponse" : ""}) puis
@@ -434,7 +545,7 @@ export default function AdminSondageDetailPage() {
                 </TabsContent>
               )}
 
-              <TabsContent value="participation" className="space-y-4">
+              <TabsContent value="participation" className="space-y-4 min-w-0">
                 {participation && (
                   <>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -452,7 +563,7 @@ export default function AdminSondageDetailPage() {
                         value={sondage.questionCount}
                       />
                     </div>
-                    <div className="rounded-md border overflow-x-auto">
+                    <div className="rounded-md border overflow-x-auto max-w-full">
                       <table className="w-full text-sm min-w-[640px]">
                         <thead className="bg-slate-100 dark:bg-slate-800">
                           <tr>
@@ -511,7 +622,7 @@ export default function AdminSondageDetailPage() {
                 )}
               </TabsContent>
 
-              <TabsContent value="synthese" className="space-y-4">
+              <TabsContent value="synthese" className="space-y-4 min-w-0">
                 {isTermineEffectif ? (
                   <>
                     <div className="rounded-md border border-slate-200 bg-slate-50 p-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
@@ -605,7 +716,7 @@ export default function AdminSondageDetailPage() {
                 <SondageSynthesePanel sondageId={id} />
               </TabsContent>
 
-              <TabsContent value="apercu" className="space-y-4">
+              <TabsContent value="apercu" className="space-y-4 min-w-0">
                 {sondage.introduction && (
                   <p className="text-sm text-muted-foreground whitespace-pre-wrap">
                     {sondage.introduction}
