@@ -9,6 +9,18 @@ import {
 } from "@/lib/sondages";
 import { SondageKind, SondageQuestionLiveEtat, SondageStatus } from "@prisma/client";
 
+export type LivePilotOpts = {
+  /**
+   * Barrière de test après `FOR UPDATE` sur la question, avant mutation liveEtat.
+   */
+  afterQuestionLocked?: () => Promise<void>;
+  /**
+   * Barrière de test après verrouillage de toutes les questions du quiz
+   * (ouverture concurrente), avant mutation liveEtat.
+   */
+  afterQuestionsLocked?: () => Promise<void>;
+};
+
 const IdSchema = z.object({
   sondageId: z.string().min(1),
   questionId: z.string().min(1).optional(),
@@ -88,11 +100,19 @@ export function buildLivePilotSnapshot(questions: LiveQuestionRow[]) {
 
 /**
  * Ouvre une question aux réponses (une seule à la fois).
+ * Verrouille toutes les questions du quiz (`FOR UPDATE` ordonné) pour
+ * empêcher deux admins d’ouvrir deux questions distinctes en parallèle.
+ *
+ * @param _actor - Réservé (ADMIN via actions)
+ * @param sondageId - Quiz en direct
+ * @param questionId - Question à ouvrir
+ * @param opts - Hooks de test (barrières)
  */
 export async function openLiveQuestion(
   _actor: AuthContext | null,
   sondageId: string,
-  questionId: string
+  questionId: string,
+  opts: LivePilotOpts = {}
 ) {
   const sondage = await loadLiveQuizOrThrow(sondageId);
   if (sondage.status !== SondageStatus.Ouvert) {
@@ -119,19 +139,53 @@ export async function openLiveQuestion(
     );
   }
 
-  const autreOuverte = sondage.questions.find(
-    (q) => q.liveEtat === "Ouverte" && q.id !== questionId
-  );
-  if (autreOuverte) {
-    throw new ServiceError(
-      "VALIDATION_ERROR",
-      "Fermez d’abord la question actuellement ouverte"
-    );
-  }
+  await db.$transaction(async (tx) => {
+    // Ordre stable (ordre ASC) : évite les deadlocks entre ouvertures concurrentes.
+    await tx.$queryRaw`
+      SELECT id FROM sondage_questions
+      WHERE "sondageId" = ${sondageId}
+      ORDER BY ordre ASC
+      FOR UPDATE
+    `;
+    if (opts.afterQuestionsLocked) {
+      await opts.afterQuestionsLocked();
+    }
 
-  await db.sondageQuestion.update({
-    where: { id: questionId },
-    data: { liveEtat: SondageQuestionLiveEtat.Ouverte },
+    const autreOuverte = await tx.sondageQuestion.findFirst({
+      where: {
+        sondageId,
+        liveEtat: SondageQuestionLiveEtat.Ouverte,
+        NOT: { id: questionId },
+      },
+      select: { id: true },
+    });
+    if (autreOuverte) {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        "Fermez d’abord la question actuellement ouverte"
+      );
+    }
+
+    const opened = await tx.sondageQuestion.updateMany({
+      where: {
+        id: questionId,
+        liveEtat: SondageQuestionLiveEtat.EnAttente,
+      },
+      data: { liveEtat: SondageQuestionLiveEtat.Ouverte },
+    });
+    if (opened.count !== 1) {
+      // Déjà ouverte par un concurrent, ou état inattendu.
+      const current = await tx.sondageQuestion.findUnique({
+        where: { id: questionId },
+        select: { liveEtat: true },
+      });
+      if (current?.liveEtat !== SondageQuestionLiveEtat.Ouverte) {
+        throw new ServiceError(
+          "VALIDATION_ERROR",
+          "Impossible d’ouvrir cette question"
+        );
+      }
+    }
   });
 
   const refreshed = await loadLiveQuizOrThrow(sondageId);
@@ -140,11 +194,18 @@ export async function openLiveQuestion(
 
 /**
  * Ferme les réponses de la question ouverte (sans révéler le corrigé).
+ * Verrouille la ligne question (`FOR UPDATE`) pour sérialiser avec la soumission.
+ *
+ * @param _actor - Réservé (ADMIN via actions)
+ * @param sondageId - Quiz en direct
+ * @param questionId - Question à fermer
+ * @param opts - Hooks de test (barrières)
  */
 export async function closeLiveQuestion(
   _actor: AuthContext | null,
   sondageId: string,
-  questionId: string
+  questionId: string,
+  opts: LivePilotOpts = {}
 ) {
   const sondage = await loadLiveQuizOrThrow(sondageId);
   const target = sondage.questions.find((q) => q.id === questionId);
@@ -156,9 +217,26 @@ export async function closeLiveQuestion(
     );
   }
 
-  await db.sondageQuestion.update({
-    where: { id: questionId },
-    data: { liveEtat: SondageQuestionLiveEtat.Fermee },
+  await db.$transaction(async (tx) => {
+    await tx.$queryRaw`
+      SELECT id FROM sondage_questions WHERE id = ${questionId} FOR UPDATE
+    `;
+    if (opts.afterQuestionLocked) {
+      await opts.afterQuestionLocked();
+    }
+    const closed = await tx.sondageQuestion.updateMany({
+      where: {
+        id: questionId,
+        liveEtat: SondageQuestionLiveEtat.Ouverte,
+      },
+      data: { liveEtat: SondageQuestionLiveEtat.Fermee },
+    });
+    if (closed.count !== 1) {
+      throw new ServiceError(
+        "VALIDATION_ERROR",
+        "Seule une question ouverte peut être fermée"
+      );
+    }
   });
 
   const refreshed = await loadLiveQuizOrThrow(sondageId);

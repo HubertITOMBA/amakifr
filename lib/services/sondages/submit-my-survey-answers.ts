@@ -8,7 +8,16 @@ import {
   type SondageReponseItemInput,
 } from "@/lib/sondages";
 import { resolveSelfAdherentId } from "@/lib/services/sondages/get-my-surveys";
-import { SondageQuestionLiveEtat } from "@prisma/client";
+import { Prisma, SondageQuestionLiveEtat } from "@prisma/client";
+
+export type SubmitMySurveyAnswersOpts = {
+  /**
+   * Barrière de test après verrouillage FOR UPDATE (sondage + questions live)
+   * et contrôles d’état, avant l’écriture de la réponse
+   * (course avec closeLiveQuestion / closeSondage).
+   */
+  afterLiveEtatLocked?: () => Promise<void>;
+};
 
 const ItemSchema = z.object({
   questionId: z.string().min(1),
@@ -105,12 +114,18 @@ export function mergeSurveyAnswerItems(
  * Enregistre les réponses de l'adhérent (partielles ou complètes).
  * Ownership via actor.userId → Adherent.
  * Mode En direct : n’accepte que les questions encore `Ouverte`,
- * avec re-vérification transactionnelle (course clôture / soumission).
+ * avec verrouillage ligne (`FOR UPDATE`) partagé avec le pilote live.
+ *
+ * @param actor - Contexte auth self-service
+ * @param surveyId - Identifiant sondage
+ * @param input - Items + mode partial|complete
+ * @param opts - Hooks de test (barrières de concurrence)
  */
 export async function submitMySurveyAnswers(
   actor: AuthContext,
   surveyId: string,
-  input: { items: SondageReponseItemInput[]; mode?: "partial" | "complete" }
+  input: { items: SondageReponseItemInput[]; mode?: "partial" | "complete" },
+  opts: SubmitMySurveyAnswersOpts = {}
 ): Promise<{
   id: string;
   estComplet: boolean;
@@ -184,7 +199,10 @@ export async function submitMySurveyAnswers(
   }
 
   const reponse = await db.$transaction(async (tx) => {
-    // Course clôture globale / fermeture question : relecture dans la transaction.
+    // 1) Verrouille le sondage : sérialise avec closeSondage (clôture quiz).
+    await tx.$queryRaw`
+      SELECT id FROM sondages WHERE id = ${id} FOR UPDATE
+    `;
     const fresh = await tx.sondage.findUnique({
       where: { id },
       select: {
@@ -192,12 +210,6 @@ export async function submitMySurveyAnswers(
         dateDebut: true,
         dateFin: true,
         modeEnDirect: true,
-        questions: {
-          where: modeEnDirect
-            ? { id: { in: [...touchedQuestionIds] } }
-            : undefined,
-          select: { id: true, liveEtat: true },
-        },
       },
     });
     if (!fresh || !isSondageModifiable(fresh)) {
@@ -207,7 +219,24 @@ export async function submitMySurveyAnswers(
       );
     }
     if (fresh.modeEnDirect) {
-      for (const q of fresh.questions) {
+      const touchedIds = [...touchedQuestionIds];
+      // 2) Verrouille les questions touchées : sérialise avec closeLiveQuestion.
+      const locked = await tx.$queryRaw<
+        Array<{ id: string; liveEtat: SondageQuestionLiveEtat }>
+      >`
+        SELECT id, "liveEtat"
+        FROM sondage_questions
+        WHERE id IN (${Prisma.join(touchedIds)})
+        ORDER BY ordre ASC
+        FOR UPDATE
+      `;
+      if (locked.length !== touchedIds.length) {
+        throw new ServiceError(
+          "FORBIDDEN",
+          "Cette question n’accepte plus de réponses."
+        );
+      }
+      for (const q of locked) {
         if (q.liveEtat !== SondageQuestionLiveEtat.Ouverte) {
           throw new ServiceError(
             "FORBIDDEN",
@@ -215,10 +244,18 @@ export async function submitMySurveyAnswers(
           );
         }
       }
-      if (fresh.questions.length !== touchedQuestionIds.size) {
+    }
+    if (opts.afterLiveEtatLocked) {
+      await opts.afterLiveEtatLocked();
+      // Recontrôle après barrière (clôture quiz concurrente).
+      const afterGate = await tx.sondage.findUnique({
+        where: { id },
+        select: { status: true, dateDebut: true, dateFin: true },
+      });
+      if (!afterGate || !isSondageModifiable(afterGate)) {
         throw new ServiceError(
           "FORBIDDEN",
-          "Cette question n’accepte plus de réponses."
+          "Ce sondage est maintenant clôturé."
         );
       }
     }

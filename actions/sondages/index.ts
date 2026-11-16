@@ -16,14 +16,14 @@ import {
   type SondageQuestionInput,
   type SondageReponseItemInput,
 } from "@/lib/sondages";
-import {
-  listSondageNotifyEligibleUserIds,
-  notifySondagePublishedInApp,
-  sendSondageInvitationsToActiveAdherents,
-} from "@/lib/sondages-notifications";
+import { listSondageNotifyEligibleUserIds } from "@/lib/sondages-notifications";
 import { buildSondageSynthese, type SondageSynthese } from "@/lib/sondages-synthese";
 import { buildSondageSynthesePDF } from "@/lib/sondages-synthese-pdf";
 import { buildPersonalSyntheseQuestions } from "@/lib/services/sondages/get-my-surveys";
+import {
+  closeSondageService,
+  publishSondageService,
+} from "@/lib/services/sondages/publish-and-close-sondage";
 import jsPDF from "jspdf";
 import {
   Prisma,
@@ -722,87 +722,17 @@ export async function getSondagePublishAudiencePreview() {
 
 /**
  * Publie un sondage (passe en statut Ouvert).
+ * Délègue au service ; aucune injection de deps / canaux (non exposée au client).
+ *
+ * @param sondageId - Identifiant du brouillon
  */
 export async function publishSondage(sondageId: string) {
   try {
     const guard = await assertAdmin();
     if (!guard.ok) return { success: false, error: guard.error };
 
-    const parsed = SondageIdSchema.parse({ id: sondageId });
-    const sondage = await db.sondage.findUnique({
-      where: { id: parsed.id },
-      include: {
-        questions: {
-          include: {
-            options: { orderBy: { ordre: "asc" } },
-            lignesMatrice: { orderBy: { ordre: "asc" } },
-          },
-        },
-      },
-    });
-
-    if (!sondage) {
-      return { success: false, error: "Sondage introuvable" };
-    }
-
-    if (sondage.status !== SondageStatus.Brouillon) {
-      return { success: false, error: "Seul un brouillon peut être publié" };
-    }
-
-    if (!sondage.questions.length) {
-      return { success: false, error: "Ajoutez au moins une question avant publication" };
-    }
-
-    const dateError = validateSondageDates(sondage.dateDebut, sondage.dateFin);
-    if (dateError) return { success: false, error: dateError };
-
-    const quizError = validateQuizReadyForOpen(
-      sondage.kind,
-      sondage.questions.map((q) => ({
-        ordre: q.ordre,
-        libelle: q.libelle,
-        type: q.type,
-        options: q.options.map((o) => ({
-          ordre: o.ordre,
-          libelle: o.libelle,
-          estCorrecte: o.estCorrecte,
-        })),
-      }))
-    );
-    if (quizError) return { success: false, error: quizError };
-
-    await db.sondage.update({
-      where: { id: parsed.id },
-      data: { status: SondageStatus.Ouvert },
-    });
-
-    const notify = await sendSondageInvitationsToActiveAdherents(sondage);
-    const inApp = await notifySondagePublishedInApp(sondage);
-    const emailPart =
-      notify.sentCount > 0
-        ? ` — ${notify.sentCount} email(s) envoyé(s) aux adhérents actifs`
-        : notify.failedCount > 0
-          ? " — échec de l'envoi des emails"
-          : "";
-    const notifPart =
-      inApp.createdCount > 0
-        ? ` — ${inApp.createdCount} notification(s) in-app`
-        : inApp.skippedDuplicateCount > 0
-          ? " — notifications déjà envoyées (pas de doublon)"
-          : "";
-
-    return {
-      success: true,
-      message: `${sondageKindLabel(sondage.kind)} publié${emailPart}${notifPart}`,
-      emailStats: {
-        sentCount: notify.sentCount,
-        failedCount: notify.failedCount,
-      },
-      inAppStats: {
-        createdCount: inApp.createdCount,
-        skippedDuplicateCount: inApp.skippedDuplicateCount,
-      },
-    };
+    SondageIdSchema.parse({ id: sondageId });
+    return await publishSondageService(sondageId);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { success: false, error: error.errors[0].message };
@@ -817,37 +747,17 @@ export async function publishSondage(sondageId: string) {
 
 /**
  * Clôture un sondage (plus de modification possible pour les adhérents).
+ * Délègue au service ; aucune barrière de test exposée au client.
+ *
+ * @param sondageId - Identifiant du sondage
  */
 export async function closeSondage(sondageId: string) {
   try {
     const guard = await assertAdmin();
     if (!guard.ok) return { success: false, error: guard.error };
 
-    const parsed = SondageIdSchema.parse({ id: sondageId });
-    const sondage = await db.sondage.findUnique({
-      where: { id: parsed.id },
-      select: { id: true, status: true },
-    });
-
-    if (!sondage) {
-      return { success: false, error: "Sondage introuvable" };
-    }
-
-    if (sondage.status === SondageStatus.Cloture) {
-      return { success: false, error: "Ce sondage est déjà clôturé" };
-    }
-
-    // Clôture seule : ne publie PAS les résultats collectifs ni le corrigé.
-    await db.sondage.update({
-      where: { id: parsed.id },
-      data: {
-        status: SondageStatus.Cloture,
-        resultatsVisiblesAdherents: false,
-        corrigeVisiblesAdherents: false,
-      },
-    });
-
-    return { success: true, message: "Sondage clôturé" };
+    SondageIdSchema.parse({ id: sondageId });
+    return await closeSondageService(sondageId);
   } catch (error) {
     if (error instanceof z.ZodError) {
       return { success: false, error: error.errors[0].message };

@@ -148,15 +148,16 @@ describe("submitMySurveyAnswers", () => {
         },
       ],
     });
-    transaction.mockImplementation(async (fn: (tx: unknown) => unknown) =>
-      fn({
+    const queryRaw = vi.fn(async () => [{ id: "s1" }]);
+    transaction.mockImplementation(async (fn: (tx: Record<string, unknown>) => unknown) => {
+      const tx = {
+        $queryRaw: queryRaw,
         sondage: {
           findUnique: vi.fn().mockResolvedValue({
             status: "Ouvert",
             dateDebut: nowOpen.dateDebut,
             dateFin: nowOpen.dateFin,
             modeEnDirect: false,
-            questions: [],
           }),
         },
         sondageReponse: {
@@ -175,8 +176,9 @@ describe("submitMySurveyAnswers", () => {
           update: vi.fn(),
         },
         sondageReponseItem: { deleteMany: vi.fn() },
-      })
-    );
+      };
+      return fn(tx);
+    });
 
     const res = await submitMySurveyAnswers(actor(), "s1", {
       items: [{ questionId: "q1", optionId: "o1" }],
