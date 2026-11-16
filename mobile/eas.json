@@ -15,6 +15,10 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "APP_ENV": "preview",
+        "EXPO_PUBLIC_API_URL": "https://amaki.fr"
       }
     },
     "production": {
